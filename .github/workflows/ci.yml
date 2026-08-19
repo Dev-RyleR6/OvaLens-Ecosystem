@@ -81,10 +81,15 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
+      - name: Install Linux System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0 python3-tk
+
       - name: Install Edge Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r edge/requirements.txt pytest numpy opencv-python-headless onnxruntime
+          pip install -r edge/requirements.txt pytest
 
       - name: Run Edge CV Pytest Suite
         run: |
@@ -99,10 +104,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: dashboard/package.json
 
