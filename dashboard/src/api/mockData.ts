@@ -1,0 +1,165 @@
+import { BatchSummary, EggScan, Device, AnalyticsOverview, EconomicYield } from '../types';
+
+export const mockOverview: AnalyticsOverview = {
+  total_eggs_scanned: 2050,
+  total_fertile: 1812,
+  total_infertile: 168,
+  total_abnormal: 70,
+  overall_fertility_rate: 88.39,
+  active_batches_count: 3,
+  avg_inference_ms: 27.4,
+};
+
+export const mockEconomicYield: EconomicYield = {
+  penoy_culled_day_10: 168,
+  penoy_unit_price_php: 14.00,
+  salvage_revenue_php: 2352.00,
+  incubator_energy_saved_kwh: 45.36,
+  energy_savings_php: 544.32,
+  total_economic_benefit_php: 2896.32,
+};
+
+export const mockBatches: BatchSummary[] = [
+  {
+    batch_id: "BATCH-2026-08-KAY-01",
+    batch_code: "BATCH-2026-08-KAY-01",
+    breed: "KAYUMANGGI",
+    incubator_id: "INCUBATOR-A1",
+    initial_egg_count: 500,
+    set_date: new Date(Date.now() - 10 * 86400000).toISOString(),
+    target_hatch_date: new Date(Date.now() + 18 * 86400000).toISOString(),
+    current_stage: "DAY_10",
+    status: "INCUBATING",
+    hatched_count: 0,
+    unhatched_count: 0,
+    total_scanned: 500,
+    fertile_count: 451,
+    infertile_count: 37,
+    abnormal_count: 12,
+    fertility_rate: 90.2,
+    hatchability_rate: 0,
+    notes: "Kayumanggi flock from Bayawan breeder farm.",
+    created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    batch_id: "BATCH-2026-08-ITM-01",
+    batch_code: "BATCH-2026-08-ITM-01",
+    breed: "ITIM",
+    incubator_id: "INCUBATOR-A2",
+    initial_egg_count: 450,
+    set_date: new Date(Date.now() - 18 * 86400000).toISOString(),
+    target_hatch_date: new Date(Date.now() + 10 * 86400000).toISOString(),
+    current_stage: "DAY_18",
+    status: "INCUBATING",
+    hatched_count: 0,
+    unhatched_count: 0,
+    total_scanned: 450,
+    fertile_count: 396,
+    infertile_count: 38,
+    abnormal_count: 16,
+    fertility_rate: 88.0,
+    hatchability_rate: 0,
+    notes: "Itim duck eggs, healthy batch.",
+    created_at: new Date(Date.now() - 18 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    batch_id: "BATCH-2026-07-KHK-01",
+    batch_code: "BATCH-2026-07-KHK-01",
+    breed: "KHAKI",
+    incubator_id: "INCUBATOR-B1",
+    initial_egg_count: 600,
+    set_date: new Date(Date.now() - 29 * 86400000).toISOString(),
+    target_hatch_date: new Date(Date.now() - 1 * 86400000).toISOString(),
+    current_stage: "COMPLETED",
+    status: "COMPLETED",
+    hatched_count: 532,
+    unhatched_count: 68,
+    total_scanned: 600,
+    fertile_count: 546,
+    infertile_count: 42,
+    abnormal_count: 12,
+    fertility_rate: 91.0,
+    hatchability_rate: 88.67,
+    notes: "Successful hatch trial, 88.7% hatchability achieved.",
+    created_at: new Date(Date.now() - 29 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    batch_id: "BATCH-2026-08-KAY-02",
+    batch_code: "BATCH-2026-08-KAY-02",
+    breed: "KAYUMANGGI",
+    incubator_id: "INCUBATOR-B2",
+    initial_egg_count: 500,
+    set_date: new Date(Date.now() - 2 * 86400000).toISOString(),
+    target_hatch_date: new Date(Date.now() + 26 * 86400000).toISOString(),
+    current_stage: "SETTING",
+    status: "INCUBATING",
+    hatched_count: 0,
+    unhatched_count: 0,
+    total_scanned: 0,
+    fertile_count: 0,
+    infertile_count: 0,
+    abnormal_count: 0,
+    fertility_rate: 0,
+    hatchability_rate: 0,
+    notes: "Newly set batch awaiting Day 10 candling.",
+    created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
+export const mockDevices: Device[] = [
+  {
+    device_id: "STATION-01-RP5",
+    device_name: "Primary Raspberry Pi 5 Sorting Station",
+    ip_address: "192.168.1.120",
+    hardware_platform: "Raspberry Pi 5 (8GB)",
+    model_version: "yolov8n-fp16-v1.0",
+    status: "ONLINE",
+    last_heartbeat: new Date().toISOString(),
+    conveyor_speed_cm_s: 12.50,
+    conveyor_dist_cm: 25.00,
+    servo_pulse_ms: 250,
+    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+  },
+  {
+    device_id: "STATION-02-PC",
+    device_name: "Secondary Workstation Station",
+    ip_address: "192.168.1.125",
+    hardware_platform: "Windows 11 x86_64",
+    model_version: "yolov8n-fp16-v1.0",
+    status: "OFFLINE",
+    last_heartbeat: new Date(Date.now() - 2 * 3600000).toISOString(),
+    conveyor_speed_cm_s: 10.00,
+    conveyor_dist_cm: 20.00,
+    servo_pulse_ms: 250,
+    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+  },
+];
+
+export const mockScans: EggScan[] = Array.from({ length: 40 }, (_, i) => {
+  const isFertile = i % 10 !== 2 && i % 10 !== 7;
+  const isInfertile = i % 10 === 2;
+  const cls = isFertile ? "FERTILE" : (isInfertile ? "INFERTILE" : "ABNORMAL");
+  const action = isFertile ? "ACCEPT" : "REJECT";
+  const conf = isFertile ? 0.90 + (i % 8) * 0.01 : 0.85 + (i % 7) * 0.015;
+
+  return {
+    scan_id: `scan-uuid-${1000 + i}`,
+    session_id: "session-uuid-kay-01",
+    batch_id: "BATCH-2026-08-KAY-01",
+    sequence_number: i + 1,
+    final_class: cls,
+    confidence: Number(conf.toFixed(4)),
+    inference_ms: 24 + (i % 12),
+    routing_action: action,
+    detections: [{
+      bbox: [0.5, 0.5, 0.42, 0.58],
+      confidence: Number(conf.toFixed(4)),
+      class: cls
+    }],
+    scanned_at: new Date(Date.now() - (40 - i) * 15000).toISOString(),
+  };
+});
