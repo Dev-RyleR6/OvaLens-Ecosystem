@@ -1,56 +1,79 @@
-# OvaLens Web API — Central Backend & Data Sync Engine
+# OvaLens Central Backend — FastAPI & PostgreSQL 16 Data Engine
 
-**OvaLens_web** is the central FastAPI backend server and database engine for the OvaLens Hatchery Ecosystem. It connects OvaLens Edge stations with the Hatchio Incubator Management System.
+> **Subsystem**: `backend/`  
+> **Platform**: Python 3.11+ / FastAPI / SQLAlchemy 2.0 / PostgreSQL 16  
+> **License**: Apache License 2.0  
+
+**OvaLens Backend** is the high-performance central REST API server, database engine, and analytics service for the entire duck hatchery ecosystem. It manages incubation batches, ingest candling scans idempotently from edge stations, computes hatchery economics, and generates official audit reports.
 
 ---
 
 ## 🌟 Key Features
 
-- **FastAPI REST API**: High-performance async API for ingestion, analytics, session tracking, and dashboard integration.
-- **PostgreSQL Database**: Relational database storage for incubation batches (`batches`), sessions (`sessions`), scan events (`scans`), and YOLO bounding box detections (`detections`).
-- **Hatchio Firebase Sync Service (`services/firebase_writer.py`)**:
-  - Automatically fetches active incubating batches from Hatchio's Firebase Realtime Database.
-  - Automatically pushes aggregated candling results, egg counts, and fertility percentages to Hatchio upon scan ingestion.
-- **Hatchio Dashboard Integration Endpoints**:
-  - `GET /api/v1/hatchio/batches/candling-summary`: Provides aggregated batch metrics (fertility rate %, egg counts, stage metrics).
-  - `GET /api/v1/hatchio/batches/{batch_id}/candling-details`: Serves per-egg tray and grid position classification breakdowns.
-- **CORS Support**: Configured for web dashboard consumers (React, Next.js, Vite).
+* **Modular FastAPI Architecture**: Clean layered structure (`core/`, `models/`, `schemas/`, `api/v1/`, `services/`).
+* **PostgreSQL 16 Relational Schema**: Declarative SQLAlchemy 2.0 models for `users`, `devices`, `batches`, `candling_sessions`, `egg_scans` (with JSONB bounding boxes), and `audit_logs`.
+* **Idempotent Ingestion**: `POST /api/v1/scans/sync` uses PostgreSQL `ON CONFLICT (scan_id) DO NOTHING` to prevent duplicate network sync records.
+* **Hatchery Economics**: Computes Day-10 Penoy salvage revenue, energy savings from freed incubator capacity, and mortality distributions.
+* **Automated Audit Exporters**: Direct streaming of dynamic CSV datasets and official ReportLab PDF candling inspection certificates.
+* **Role-Based Access Control (RBAC)**: JWT authentication with bcrypt password hashing and API Key authentication for machine stations.
 
 ---
 
-## 📁 Repository Structure
+## 📁 Subsystem Directory Structure
 
 ```
-OvaLens_web/
-├── server.py                   # FastAPI main application & SQLAlchemy models
-├── services/
-│   └── firebase_writer.py      # Hatchio Firebase RTDB reader & writer module
-├── seed/                       # Database seed scripts for testing
-├── scripts/                    # Maintenance & sync utility scripts
-├── requirements.txt            # Python dependencies
-└── .env                        # Database credentials, API keys, & Firebase host settings
+backend/
+├── app/
+│   ├── core/                     # Config (Settings), DB session, JWT security, exceptions
+│   ├── models/                   # SQLAlchemy 2.0 declarative models
+│   ├── schemas/                  # Pydantic v2 DTOs (Request / Response validation)
+│   ├── api/                      # Modular API routers & dependency injection
+│   │   ├── deps.py               # Security & DB dependencies
+│   │   └── v1/endpoints/         # auth, devices, batches, sessions, scans, analytics, reports
+│   ├── services/                 # Batch lifecycle, analytics math, PDF/CSV generation
+│   └── main.py                   # FastAPI application entry point, CORS, exception handlers
+├── seed/
+│   └── seed_db.py                # Rich database seeder CLI for testing & defense
+├── tests/
+│   └── test_api.py               # Automated pytest REST API test suite
+├── Dockerfile                    # Containerization specification
+└── requirements.txt              # Backend Python dependencies
 ```
 
 ---
 
 ## ⚙️ Setup & Execution
 
-### Environment Variables (`.env`)
-```env
+### 1. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Configure Environment (`backend/.env`)
+```ini
 DB_USER=postgres
 DB_PASS=your_password
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=hatchery_db
-API_KEY=your_secure_api_key
-FIREBASE_HOST=hatchio-default-rtdb.firebaseio.com
+API_KEY=dev-api-key-123
+JWT_SECRET=super-secret-jwt-key-ovalens-capstone-2026
+ENVIRONMENT=development
 ```
 
-### Running the Server
+### 3. Initialize & Seed Database
 ```bash
-python server.py
+python -m seed.seed_db --reset
 ```
-The API server will run on `http://localhost:8000`. Swagger documentation is available at `http://localhost:8000/docs`.
 
-### Web Dashboard
-Open `http://localhost:8000/dashboard` to view the new lightweight OvaLens dashboard UI.
+### 4. Start Development Server
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+* **Interactive OpenAPI (Swagger) Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+* **API Health Check**: [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health)
+
+### 5. Run Automated Tests
+```bash
+python -m pytest tests/test_api.py -v
+```

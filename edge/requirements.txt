@@ -1,6 +1,9 @@
-customtkinter
-opencv-python
-ultralytics
-pyserial
-pillow
-requests
+customtkinter>=5.2.0
+opencv-python>=4.8.0
+ultralytics>=8.1.0
+onnxruntime>=1.17.0
+numpy>=1.24.0
+pyserial>=3.5
+pillow>=10.0.0
+requests>=2.31.0
+pytest>=8.0.0
