@@ -25,133 +25,138 @@ The system automates the inspection of duck eggs on a motorized conveyor belt, u
  │   [Egg Infeed] ──► [Optical Sensor] ──► [Candling Tunnel (10W LED)] ──► [Diverter Gate (Servo)]     │
  │                           │                       │                              ▲                   │
  │                           │ Trigger               │ DirectShow / V4L2            │ Serial UART       │
- │                           ▼                       ▼ Frame Capture                │ Reject Command    │
- │                     ┌───────────────────────────────────┐                        │ (within Δt travel)│
- │                     │    ESP32 Hardware Controller      │────────────────────────┘                   │
- └─────────────────────┼───────────────────────────────────┼────────────────────────────────────────────┘
-                       │                                   │
-                       │ USB Serial UART (115200 Baud)     │
-                       ▼                                   ▼
- ┌──────────────────────────────────────────────────────────────────────────────────────────────────────┐
- │                                     2. OVALENS EDGE NODE                                              │
- │                              (PC Dev -> Raspberry Pi 4/5 Prod)                                        │
- │                                                                                                      │
- │  • Multithreaded Engine: Camera Grabber (Thread 1) | Inference Engine (Thread 2)                      │
- │                          Actuator Comms (Thread 3) | Local DB & Sync (Thread 4)                       │
- │  • YOLOv8 Optimization: PyTorch (Dev) -> ONNX Runtime FP16 / NCNN / ARM OpenVINO (RPi)                │
- │  • Heuristics: Geometric Aspect-Ratio Filter (0.65 - 1.45) + HSV Candling Luminance Check            │
- │  • Offline-First Cache: Local SQLite (WAL Mode) with auto-reconnect queue                            │
- │  • Operator GUI: CustomTkinter (Desktop) / Touchscreen with local live camera HUD                     │
- └───────────────────────────────────┬──────────────────────────────────────────────────────────────────┘
-                                     │
-                    HTTP REST Sync   │ Scan Records, Batch Summaries & Images
-                    (X-API-Key Auth) │
-                                     ▼
- ┌──────────────────────────────────────────────────────────────────────────────────────────────────────┐
- │                                    3. CENTRAL BACKEND API                                             │
- │                                   (FastAPI + Async Uvicorn)                                          │
- │                                                                                                      │
- │  • /api/v1/auth          — Operator & Admin Authentication (JWT)                                     │
- │  • /api/v1/batches       — Incubation Batches (Setting -> Day 10 -> Day 18 -> Day 25 -> Hatched)    │
- │  • /api/v1/sessions      — Candling Sessions & Milestone Tracking                                    │
- │  • /api/v1/scans         — High-Throughput Scan Ingestion, Image Storage & Sync                       │
- │  • /api/v1/analytics     — Fertility %, Mortality Curves, Breed Yield & Penoy Salvage Revenue Engine │
- │  • /api/v1/devices       — Edge Node Heartbeat & Telemetry                                           │
- │  • /api/v1/reports       — Academic Defense & Hatchery PDF / CSV Exporter Engine                     │
- └───────────────────────────────────┬──────────────────────────────────▲───────────────────────────────┘
-                                     │                                  │
-                   Async SQLAlchemy  │                                  │ HTTPS REST
-                   Connection Pool   ▼                                  │ (JWT Auth)
-                       ┌──────────────────────────┐                     │
-                       │   PostgreSQL 16 Engine   │                     │
-                       │ (Relational Data + JSONB)│                     │
-                       └──────────────────────────┘                     │
-                                                                        │
- ┌──────────────────────────────────────────────────────────────────────┴───────────────────────────────┐
- │                                   4. OVALENS ADMIN DASHBOARD                                          │
- │                              (React 18 + Vite + TypeScript + Tailwind)                               │
- │                                                                                                      │
- │  • Foundation University Theme: Maroon (#800000), Dark Maroon (#5C0000), Agri-Green (#357a38)        │
- │  • Executive Dashboard: Total eggs scanned, fertility rates, active batches, cull rates               │
- │  • Batch Lifecycle Manager: 28-day duck egg incubation calendar, milestone alerts, hatch logger      │
- │  • Scan History Explorer: Multi-filter data grid, high-res candling photo modal with YOLO overlays   │
- │  • Analytics & Economic Predictor: Breed comparison, mortality curves, Day-10 Penoy salvage revenue  │
- │  • Hardware Station Manager: Edge device status, conveyor speed & latency telemetry                  │
- │  • PDF / CSV Exporter: One-click generation of defense reports and data tables                       │
+ └───────────────────────────┼───────────────────────┼──────────────────────────────┼───────────────────┘
+                             │                       │                              │
+ ┌───────────────────────────┼───────────────────────┼──────────────────────────────┼───────────────────┐
+ │                           ▼                       ▼                              │                   │
+ │   2. EDGE CV STATION                  [Inference Engine (YOLOv8 ONNX FP16)] ─────┘                   │
+ │   (Raspberry Pi 5 / PC)                           │                                                  │
+ │                                                   ▼                                                  │
+ │                                       [Local SQLite Store (WAL)]                                     │
+ │                                                   │                                                  │
+ │                                                   ▼ (Async Sync Worker: POST /api/v1/scans/sync)     │
+ └───────────────────────────────────────────────────┼──────────────────────────────────────────────────┘
+                                                     │
+ ┌───────────────────────────────────────────────────┼──────────────────────────────────────────────────┐
+ │                                                   ▼                                                  │
+ │   3. CENTRAL HATCHERY BACKEND          [FastAPI REST API Server]                                     │
+ │   (Production Server / Cloud)                     │                                                  │
+ │                                                   ▼                                                  │
+ │                                       [PostgreSQL 16 Engine]                                         │
+ │                                                   ▲                                                  │
+ └───────────────────────────────────────────────────┼──────────────────────────────────────────────────┘
+                                                     │
+ ┌───────────────────────────────────────────────────┼──────────────────────────────────────────────────┐
+ │                                                   │ (JWT REST / SSE Analytics Stream)                │
+ │   4. ADMIN WEB DASHBOARD                          ▼                                                  │
+ │   (React 18 + Vite + TypeScript)      [Hatchery Manager & Audit Portal]                              │
  └──────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📦 Unified Monorepo Directory Structure
+## 📁 Monorepo Directory Structure
 
 ```
-Capstone/ (Root Monorepo)
-├── .github/                      # CI/CD workflows (backend-ci.yml, frontend-ci.yml)
-├── edge/                         # Subproject 1: Edge CV Application & Operator GUI
-│   ├── models/                   # YOLOv8 weights (ONNX FP16 / PyTorch)
-│   ├── core/                     # Decoupled Camera grabber & inference engine
-│   ├── iot/                      # PySerial ESP32 communication driver
-│   ├── db/                       # Local SQLite WAL database manager
-│   ├── ui/                       # CustomTkinter 60 FPS operator interface
+Capstone/
+├── backend/                      # Central FastAPI REST API & Database Engine
+│   ├── app/                      # Clean modular application
+│   │   ├── core/                 # Config, DB engine, JWT auth, exceptions
+│   │   ├── models/               # SQLAlchemy 2.0 models (User, Device, Batch, Session, Scan)
+│   │   ├── schemas/              # Pydantic v2 DTOs (Request / Response validation)
+│   │   ├── api/v1/endpoints/     # Modular routers (auth, devices, batches, sessions, scans, analytics, reports)
+│   │   ├── services/             # Business logic (Batch state machine, PDF/CSV export, Analytics)
+│   │   └── main.py               # FastAPI entry point, CORS, middlewares
+│   ├── seed/seed_db.py           # Rich demo database seeder CLI for defense
+│   ├── tests/test_api.py         # Automated pytest test suite
+│   ├── Dockerfile
+│   └── requirements.txt
+│
+├── edge/                         # Edge CV Application & Conveyor Controller
+│   ├── models/                   # YOLOv8 ONNX FP16 weights & export tools
+│   │   ├── export_onnx.py        # Automated PyTorch -> ONNX slim export script
+│   │   └── weights/              # Production ONNX weights (best.onnx)
+│   ├── src/
+│   │   ├── core/                 # Camera frame grabber, ONNX inference, heuristics
+│   │   ├── iot/                  # Non-blocking PySerial ESP32 driver
+│   │   ├── db/                   # Local SQLite WAL database manager
+│   │   ├── sync/                 # Background HTTP REST sync worker
+│   │   └── ui/                   # CustomTkinter 60 FPS operator desktop interface
+│   ├── tests/test_edge_pipeline.py # Automated edge unit & smoke tests
 │   ├── launcher.py               # Edge entry point
-│   ├── requirements.txt
-│   └── .env.example
+│   └── requirements.txt
 │
-├── backend/                      # Subproject 2: FastAPI Backend Engine
-│   ├── app/                      # Modular FastAPI core (core, models, api, services)
-│   ├── alembic/                  # Database schema migrations
-│   ├── seed/                     # CLI demo data generator (seed_db.py)
-│   ├── tests/                    # Pytest test suite
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   └── .env.example
-│
-├── dashboard/                    # Subproject 3: React 18 + Vite + TS Admin Dashboard
-│   ├── src/                      # Components, pages, hooks, api client, FU theme
+├── dashboard/                    # React 18 + Vite + TypeScript Admin Dashboard
+│   ├── src/
+│   │   ├── api/                  # Axios client & TanStack Query hooks
+│   │   ├── components/           # Reusable UI widgets (Navbar, Cards, Modals, Tables)
+│   │   ├── pages/                # Overview, Batches, ScanExplorer, Analytics, Devices
+│   │   ├── store/                # Zustand global state (Auth, Settings)
+│   │   ├── types/                # TypeScript interfaces matching backend schemas
+│   │   └── styles/               # TailwindCSS & Foundation University theme tokens
 │   ├── package.json
-│   ├── tailwind.config.js
-│   ├── Dockerfile
-│   └── .env.example
+│   ├── vite.config.ts
+│   └── tailwind.config.js
 │
-├── firmware/                     # Subproject 4: ESP32 IoT Microcontroller Source Code
+├── firmware/                     # ESP32 IoT Microcontroller Source Code
 │   └── esp32_actuator/
-│       ├── esp32_actuator.ino    # Hardware timer interrupt, optical debounce, servo PWM
+│       ├── esp32_actuator.ino    # Hardware interrupt, optical debounce, servo PWM timer
 │       └── README.md             # Pinout wiring diagram & serial command specs
 │
-├── docker-compose.yml            # 1-Click local/cloud deployment (Postgres + Backend + Web)
+├── docker-compose.yml            # 1-Click PostgreSQL + Backend + Dashboard deployment
+├── AGENTS.md                     # Master AI developer rulebook & architectural guide
 ├── .gitignore                    # Master root gitignore
-└── README.md                     # Master documentation & living changelog
+└── README.md                     # Master project documentation & living changelog
 ```
 
 ---
 
-## 🎯 Target Biological Classification
-
-OvaLens is calibrated specifically for Philippine duck egg breeds (**Kayumanggi**, **Itim**, **Khaki**) across the standard 28-day incubation cycle:
-
-| Class Label | Biological Definition | Actuator Action | Commercial Disposition |
-| :--- | :--- | :--- | :--- |
-| **`FERTILE`** | Active embryo with distinct spider-like blood vein vascularization | **ACCEPT** (Continues to setter tray) | Continues incubation to Day 28 |
-| **`INFERTILE`** | Clear, unfertilized yolk with no embryo development ("Bugok") | **REJECT** (Diverted to cull chute) | Salvaged on Day 10 as commercial Penoy / Salted Egg (₱12–₱15) |
-| **`ABNORMAL`** | Early dead embryo, blood ring, corrupted yolk, or ceased development | **REJECT** (Diverted to cull chute) | Discarded early to prevent bacterial explosion & contamination |
-
----
-
-## 🗄 Consolidated PostgreSQL Database Schema
+## 🗄️ Relational Database Schema (PostgreSQL 16)
 
 ```
-┌──────────┐ 1      * ┌──────────┐ 1      * ┌───────────────────┐ 1      * ┌───────────┐
-│  users   ├─────────►│ batches  ├─────────►│ candling_sessions ├─────────►│ egg_scans │
-└──────────┘          └──────────┘          └─────────▲─────────┘          └───────────┘
-                                                      │ *
-                                                      │ 1
-                                            ┌─────────┴─────────┐
-                                            │      devices      │
-                                            └───────────────────┘
+┌───────────────────┐       ┌─────────────────────────┐       ┌───────────────────────┐
+│       users       │       │         batches         │◄──────│   candling_sessions   │
+├───────────────────┤       ├─────────────────────────┤       ├───────────────────────┤
+│ PK  user_id       │       │ PK  batch_id            │       │ PK  session_id        │
+│     email         │       │     batch_code          │       │ FK  batch_id          │
+│     role          │       │     breed               │       │ FK  device_id         │
+│     hashed_pass   │       │     incubator_id        │       │     stage             │
+└───────────────────┘       │     initial_egg_count   │       │     operator_name     │
+                            │     current_stage       │       │     total_scanned     │
+                            │     set_date            │       │     fertile_count     │
+                            │     target_hatch_date   │       │     infertile_count   │
+                            │     status              │       │     abnormal_count    │
+                            └───────────┬─────────────┘       └───────────┬───────────┘
+                                        │                                 │
+                                        │     ┌─────────────────────┐     │
+                                        └────►│      egg_scans      │◄────┘
+                                              ├─────────────────────┤
+                                              │ PK  scan_id         │
+                                              │ FK  session_id      │
+                                              │ FK  batch_id        │
+                                              │     sequence_number │
+                                              │     final_class     │ (FERTILE/INFERTILE/ABNORMAL)
+                                              │     confidence      │
+                                              │     inference_ms    │
+                                              │     routing_action  │ (ACCEPT/REJECT)
+                                              │     detections      │ (JSONB)
+                                              │     image_url       │
+                                              │     scanned_at      │
+                                              └─────────────────────┘
+                                                         │
+                                              ┌──────────┴──────────┐
+                                              │       devices       │
+                                              ├─────────────────────┤
+                                              │ PK  device_id       │
+                                              │     device_name     │
+                                              │     status          │
+                                              │     conveyor_speed  │
+                                              │     conveyor_dist   │
+                                              │     servo_pulse_ms  │
+                                              └─────────────────────┘
 ```
 
-1. **`users`**: Authentication credentials, password hashes (`bcrypt`), and RBAC tiers (`ADMIN`, `MANAGER`, `OPERATOR`).
+1. **`users`**: Authentication credentials, password hashes, and RBAC tiers (`ADMIN`, `MANAGER`, `OPERATOR`).
 2. **`devices`**: Registered Edge sorting stations, telemetry heartbeats, and conveyor calibration ($D$, $v$, pulse duration).
 3. **`batches`**: 28-day incubation batch tracking (`SETTING` $\to$ `DAY_10` $\to$ `DAY_18` $\to$ `DAY_25` $\to$ `HATCHED` $\to$ `COMPLETED`).
 4. **`candling_sessions`**: Milestone candling runs (Day 10, Day 18, Day 25) with session aggregates and operator logs.
@@ -184,16 +189,27 @@ The Admin Web Dashboard and Edge GUI follow Foundation University's visual ident
 
 ## 📝 Living Changelog & Architecture Evolution
 
-### [2026-08-20] — Transition to Central Monorepo & Standalone Capstone Ecosystem
+### [2026-08-20] — Phase 2: Edge App CV Optimization & CustomTkinter Operator GUI
+- **ONNX Runtime FP16 Model Export**:
+  - Exported YOLOv8 weights (`best.pt`) to optimized ONNX Runtime model (`best.onnx` - 11.7 MB).
+  - Implemented 3-pass warmup on initialization to eliminate first-frame latency spikes.
+- **Decoupled Quad-Thread Edge Architecture**:
+  - `src/core/camera.py`: DirectShow / V4L2 background grabber with single-frame atomic slot (zero buffer lag).
+  - `src/core/inference.py`: Pluggable ONNX Runtime / PyTorch engine with candling heuristics and aspect ratio filtering ($0.65 \le \text{AR} \le 1.45$).
+  - `src/iot/serial_driver.py`: Non-blocking ESP32 serial driver implementing delayed ejection strokes ($\Delta t = D/v$).
+  - `src/db/local_db.py`: Embedded SQLite manager with WAL mode enabled.
+  - `src/sync/sync_worker.py`: Background HTTP sync worker with exponential backoff syncing to `POST /api/v1/scans/sync`.
+  - `src/ui/app.py`: High-performance CustomTkinter operator GUI with live HUD, real-time counters, audio chimes, and manual override keys (`[SPACEBAR]` / `[R]`).
+- **Automated Testing Suite**:
+  - Built `edge/tests/test_edge_pipeline.py` covering heuristics, camera mock generation, ONNX inference, SQLite WAL transactions, and serial mock (5/5 tests passed).
+
+### [2026-08-20] — Phase 1: Transition to Central Monorepo & Standalone Capstone Ecosystem
 - **Monorepo Structure Established**:
   - Unified root Git repository containing `edge/`, `backend/`, `dashboard/`, and `firmware/`.
-  - Configured 5-Pillar robust engineering pipeline (Model Export, CI Testing, 1-Click Docker, ESP32 Firmware, Idempotent Sync).
-- **Purged Legacy Code**:
-  - Removed external `hatchio` project and Firebase RTDB dependencies.
-- **Architected**:
-  - **Mechanical Rig**: Conveyor-belt continuous feed with optical trigger and downstream ESP32 servo kicker ($\Delta t = D/v$).
-  - **Vision Engine**: YOLOv8 exported to ONNX Runtime FP16 with quad-thread decoupled pipeline (30-40ms on Raspberry Pi 5).
-  - **Database Engine**: Consolidated PostgreSQL 16 schema with JSONB detection storage, Alembic migrations, and comprehensive seeders.
-  - **Backend API**: Modular FastAPI REST backend with JWT/API-Key auth, 28-day batch lifecycle state machine, and PDF/CSV reporting.
-  - **Admin Dashboard**: React 18 + Vite + TypeScript + TailwindCSS with Foundation University theme, batch tracking, scan explorer, and Penoy economic salvage calculator.
-- **Documented**: Master `README.md` and `implementation_plan.md` established as central sources of truth.
+  - Linked and pushed to GitHub remote `Dev-RyleR6/OvaLens-Ecosystem`.
+- **FastAPI Backend & Relational Schema**:
+  - Modularized `backend/app/` (`core`, `models`, `schemas`, `api/v1`, `services`).
+  - Implemented 28-day batch state machine, idempotent scan sync, and PDF/CSV reporting.
+  - Built rich database seeder (`seed/seed_db.py`) and automated backend pytest suite (6/6 tests passed).
+- **ESP32 Firmware**:
+  - Created `firmware/esp32_actuator/esp32_actuator.ino` with hardware interrupt, 600ms optical debounce, and serial command protocol.
