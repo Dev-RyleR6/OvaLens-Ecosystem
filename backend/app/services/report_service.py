@@ -9,6 +9,7 @@ from app.models.scan import EggScanModel
 from app.core.exceptions import EntityNotFoundException
 
 try:
+    # pyrefly: ignore [missing-import]
     from reportlab.lib.pagesizes import letter
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle

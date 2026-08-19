@@ -9,6 +9,7 @@ if os.path.exists(env_path):
     load_dotenv(dotenv_path=env_path)
 
 try:
+    # pyrefly: ignore [missing-import]
     from pydantic_settings import BaseSettings, SettingsConfigDict
     _HAVE_PYDANTIC_SETTINGS = True
 except ImportError:
