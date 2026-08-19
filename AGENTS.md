@@ -26,6 +26,8 @@ This document serves as the **Master Source of Truth & Architecture Guide** for 
    - **Agri-Green (Fertile/Success)**: `#357a38` | **Reject Red**: `#DC2626`
    - **Dark Theme Background**: `#0F172A` | **Card**: `#1E293B` | **Border**: `#334155`
    - **Light Theme Background**: `#F8FAFC` | **Card**: `#FFFFFF` | **Border**: `#E2E8F0`
+6. **Open Source Institutional License**:
+   - OvaLens is licensed under the **Apache License 2.0** (`LICENSE`).
 
 ---
 
@@ -33,6 +35,9 @@ This document serves as the **Master Source of Truth & Architecture Guide** for 
 
 ```
 Capstone/
+├── .agents/                      # AI Agent Customizations & Skills
+│   └── skills/                   # git-workflow, code-reviewer, performance-auditor
+│
 ├── backend/                      # Central FastAPI REST API & Database Engine
 │   ├── app/                      # Clean modular application
 │   │   ├── core/                 # Config (Pydantic Settings), DB engine, JWT auth, exceptions
@@ -47,13 +52,16 @@ Capstone/
 │   └── requirements.txt
 │
 ├── edge/                         # Edge CV Application & Conveyor Controller
-│   ├── models/weights/           # YOLOv8 ONNX FP16 weights (best.onnx)
+│   ├── models/                   # YOLOv8 ONNX FP16 weights & export tools
+│   │   ├── export_onnx.py        # Automated PyTorch -> ONNX slim export script
+│   │   └── weights/              # Production ONNX weights (best.onnx)
 │   ├── src/
 │   │   ├── core/                 # Camera frame grabber, ONNX inference, heuristics
 │   │   ├── iot/                  # Non-blocking PySerial ESP32 driver
 │   │   ├── db/                   # Local SQLite WAL database manager
 │   │   ├── sync/                 # Background HTTP REST sync worker
 │   │   └── ui/                   # CustomTkinter 60 FPS operator desktop interface
+│   ├── tests/test_edge_pipeline.py # Automated edge unit & smoke tests
 │   ├── launcher.py               # Edge entry point
 │   └── requirements.txt
 │
@@ -75,6 +83,8 @@ Capstone/
 │       └── README.md             # Pinout wiring diagram & serial command specs
 │
 ├── docker-compose.yml            # 1-Click PostgreSQL + Backend + Dashboard deployment
+├── AGENTS.md                     # Master AI developer rulebook & architectural guide
+├── LICENSE                       # Apache License 2.0
 ├── .gitignore                    # Master root gitignore
 └── README.md                     # Master project documentation & living changelog
 ```
@@ -114,7 +124,26 @@ Capstone/
 
 ---
 
-## 📝 4. Conventional Commits Standard
+## 🛠️ 4. AI Agent Skills & Tooling (`.agents/skills/`)
+
+The repository includes specialized agent skills to optimize developer and AI pair-programming workflows:
+
+1. **`git-workflow`** ([`.agents/skills/git-workflow/SKILL.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/.agents/skills/git-workflow/SKILL.md)):
+   - Feature branching rules (`feat/...`, `fix/...`, `refactor/...`).
+   - Conventional Commits message standards.
+   - Pull Request templates and quality checklists.
+2. **`code-reviewer`** ([`.agents/skills/code-reviewer/SKILL.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/.agents/skills/code-reviewer/SKILL.md)):
+   - Automated security audit (SQL injection defense, zero hardcoded secrets, RBAC).
+   - Edge non-blocking concurrency and SQLite WAL verification.
+   - Foundation University branding audits.
+3. **`performance-auditor`** ([`.agents/skills/performance-auditor/SKILL.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/.agents/skills/performance-auditor/SKILL.md)):
+   - ONNX Runtime vs PyTorch latency benchmarks ($\le 35$ms SLA).
+   - FastAPI database connection pool optimization.
+   - CustomTkinter 60 FPS and React render optimization.
+
+---
+
+## 📝 5. Conventional Commits Standard
 
 All Git commit messages in this repository MUST follow the **Conventional Commits** specification:
 
@@ -135,7 +164,7 @@ All Git commit messages in this repository MUST follow the **Conventional Commit
 
 ---
 
-## 🧪 5. Testing & Verification Runbook
+## 🧪 6. Testing & Verification Runbook
 
 Before submitting or committing changes, run the following verification commands:
 
@@ -145,29 +174,28 @@ cd backend
 python -m pytest tests/test_api.py -v
 ```
 
-### 2. Test Database Seeder
+### 2. Test Edge CV Suite
+```bash
+cd edge
+python -m pytest tests/test_edge_pipeline.py -v
+```
+
+### 3. Test Database Seeder
 ```bash
 cd backend
 python -m seed.seed_db --reset
 ```
 
-### 3. Run FastAPI Dev Server Locally
+### 4. Run FastAPI Dev Server Locally
 ```bash
 cd backend
 uvicorn app.main:app --reload --port 8000
 # OpenAPI Docs available at http://localhost:8000/docs
 ```
 
-### 4. Build React Dashboard (Once initialized)
-```bash
-cd dashboard
-npm install
-npm run build
-```
-
 ---
 
-## 🚫 6. Hard Don'ts (Negative Constraints)
+## 🚫 7. Hard Don'ts (Negative Constraints)
 
 1. ❌ **DO NOT** import or re-create `firebase_writer.py` or connect to Firebase RTDB.
 2. ❌ **DO NOT** make blocking network requests on the main GUI thread of the Edge App.
