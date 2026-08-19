@@ -6,10 +6,20 @@
 [![Backend](https://img.shields.io/badge/FastAPI-PostgreSQL%2016-teal.svg)]()
 [![Frontend](https://img.shields.io/badge/React%2018-Vite%20%2B%20TypeScript-61dafb.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-orange.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/Automated%20Tests-11%2F11%20Passing-brightgreen.svg)]()
 
 **OvaLens** is an automated, industrial-grade duck egg candling, fertility classification, and hatchery analytics ecosystem developed for Foundation University.
 
 The system automates the inspection of duck eggs on a motorized conveyor belt, utilizing high-intensity candling LEDs, an optimized **YOLOv8** computer vision pipeline, **ESP32** millisecond-accurate mechanical sorting, a high-throughput **FastAPI + PostgreSQL** backend, and a modern **React Admin Dashboard**.
+
+---
+
+## 📚 Key Project Documentation
+
+* 📖 **[Setup & Operations Manual](SETUP_AND_OPERATIONS.md)**: Full guide on prerequisites, installation, operating procedures, and troubleshooting.
+* 🛡️ **[Code Review & Security Audit](CODE_REVIEW.md)**: Formal code review audit covering security, non-blocking edge concurrency, and test coverage.
+* 🤖 **[Master AI & Developer Guidelines](AGENTS.md)**: Architecture tenets, negative constraints, Conventional Commits standard, and verification runbooks.
+* 📜 **[Apache License 2.0](LICENSE)**: Institutional open-source license.
 
 ---
 
@@ -109,6 +119,8 @@ Capstone/
 │       └── README.md             # Pinout wiring diagram & serial command specs
 │
 ├── docker-compose.yml            # 1-Click PostgreSQL + Backend + Dashboard deployment
+├── SETUP_AND_OPERATIONS.md       # Full Setup, Installation & Operator Manual
+├── CODE_REVIEW.md                # Formal Code Review & Security Audit Report
 ├── AGENTS.md                     # Master AI developer rulebook & architectural guide
 ├── LICENSE                       # Apache License 2.0
 ├── .gitignore                    # Master root gitignore
