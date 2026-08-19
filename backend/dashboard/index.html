@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OvaLens DB Dashboard</title>
+  <style>
+    body { margin: 0; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: #f4f7fb; color: #1e293b; }
+    .page { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+    h1 { font-size: 2rem; margin: 0; }
+    .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .card { background: white; border-radius: 18px; box-shadow: 0 16px 36px rgba(15,23,42,.08); padding: 22px; }
+    .card h2 { margin-top: 0; font-size: 1.1rem; color: #0f172a; }
+    .metric { display: grid; gap: 8px; margin: 12px 0; }
+    .metric strong { font-size: 1.8rem; display: block; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+    th { font-weight: 600; color: #334155; }
+    tr:hover { background: #f8fafc; }
+    .status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: .82rem; }
+    .status.fertile { background: #dcfce7; color: #166534; }
+    .status.infertile { background: #fee2e2; color: #991b1b; }
+    .status.abnormal { background: #fef3c7; color: #92400e; }
+    .section-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .badge { color: #475569; font-size: 0.9rem; }
+    .detail { margin-top: 14px; font-size: .95rem; }
+    .empty { color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <h1>OvaLens Dashboard</h1>
+        <p class="badge">View hatchery scan metrics, session summaries, and active batch status.</p>
+      </div>
+      <div id="refreshStatus">Loading data…</div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <div class="section-title"><h2>Overall Metrics</h2></div>
+        <div class="metric"><strong id="totalScans">—</strong><span>Total eggs scanned</span></div>
+        <div class="metric"><strong id="fertilityRate">—</strong><span>Overall fertility rate</span></div>
+        <div class="metric"><strong id="avgLatency">—</strong><span>Average inference latency (ms)</span></div>
+      </section>
+
+      <section class="card">
+        <div class="section-title"><h2>Classification Breakdown</h2></div>
+        <div class="metric"><strong id="fertileCount">—</strong><span>Fertile</span></div>
+        <div class="metric"><strong id="infertileCount">—</strong><span>Infertile</span></div>
+        <div class="metric"><strong id="abnormalCount">—</strong><span>Abnormal</span></div>
+      </section>
+
+      <section class="card">
+        <div class="section-title"><h2>Breed Distribution</h2></div>
+        <div class="metric"><strong id="kayumanggiCount">—</strong><span>Kayumanggi</span></div>
+        <div class="metric"><strong id="itimCount">—</strong><span>Itim</span></div>
+        <div class="metric"><strong id="khakiCount">—</strong><span>Khaki</span></div>
+      </section>
+    </div>
+
+    <div class="grid" style="margin-top: 18px;">
+      <section class="card" style="grid-column: span 2;">
+        <div class="section-title"><h2>Active Incubation Batches</h2></div>
+        <table>
+          <thead><tr><th>Batch</th><th>Breed</th><th>Day</th><th>Status</th><th>Set date</th></tr></thead>
+          <tbody id="batchTable"></tbody>
+        </table>
+      </section>
+
+      <section class="card" style="grid-column: span 2;">
+        <div class="section-title"><h2>Recent Sessions</h2></div>
+        <table>
+          <thead><tr><th>Batch</th><th>Breed</th><th>Stage</th><th>Scans</th><th>Fertility</th></tr></thead>
+          <tbody id="sessionTable"></tbody>
+        </table>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="section-title"><h2>Selected Batch Details</h2><span id="batchLabel" class="badge">Click a batch row</span></div>
+      <div id="batchDetails" class="detail empty">Choose an active batch to view details.</div>
+    </section>
+
+  <section class="card">
+    <div class="section-title"><h2>Selected Session Details</h2><span id="sessionLabel" class="badge">Click a session row</span></div>
+    <div id="sessionDetails" class="detail empty">Choose a session to view totals and recent scan logs.</div>
+  </section>
+
+  <section class="card">
+    <div class="section-title"><h2>Table Browser</h2><span class="badge">Select a table to inspect rows</span></div>
+    <div class="metric">
+      <label for="tableSelect">Table</label>
+      <select id="tableSelect" style="width:100%; padding:10px; border-radius:10px; border:1px solid #cbd5e1;"></select>
+    </div>
+    <div id="tableView" class="detail empty">Select a table to view up to 100 rows.</div>
+  </section>
+  <script>
+    const summaryUrl = '/dashboard/api/summary';
+    const sessionsUrl = '/dashboard/api/sessions';
+    const batchesUrl = '/dashboard/api/batches/active';
+    const batchDetailsUrl = id => `/dashboard/api/batches/${encodeURIComponent(id)}`;
+    const tableListUrl = '/dashboard/api/tables';
+    const tableRowsUrl = table => `/dashboard/api/tables/${encodeURIComponent(table)}?limit=100`;
+
+    const refreshStatus = document.getElementById('refreshStatus');
+    const batchLabel = document.getElementById('batchLabel');
+    const batchDetails = document.getElementById('batchDetails');
+    const tableSelect = document.getElementById('tableSelect');
+    const tableView = document.getElementById('tableView');
+
+    window.addEventListener('error', event => {
+      refreshStatus.innerText = `JS error: ${event.message}`;
+    });
+
+    window.addEventListener('unhandledrejection', event => {
+      refreshStatus.innerText = `Unhandled promise rejection: ${event.reason}`;
+    });
+
+    async function loadJson(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status}`);
+      return res.json();
+    }
+
+    function renderSummary(data) {
+      document.getElementById('totalScans').innerText = data.metrics.total_eggs_scanned;
+      document.getElementById('fertilityRate').innerText = `${data.metrics.overall_fertility_rate_pct}%`;
+      document.getElementById('avgLatency').innerText = `${data.metrics.avg_inference_speed_ms} ms`;
+      document.getElementById('fertileCount').innerText = data.classification_breakdown.fertile;
+      document.getElementById('infertileCount').innerText = data.classification_breakdown.infertile;
+      document.getElementById('abnormalCount').innerText = data.classification_breakdown.abnormal;
+      document.getElementById('kayumanggiCount').innerText = data.breed_breakdown.kayumanggi;
+      document.getElementById('itimCount').innerText = data.breed_breakdown.itim;
+      document.getElementById('khakiCount').innerText = data.breed_breakdown.khaki;
+    }
+
+    function renderBatches(items) {
+      const tbody = document.getElementById('batchTable');
+      tbody.innerHTML = '';
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">No active batches found.</td></tr>';
+        return;
+      }
+      items.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${item.batch_id}</td>
+          <td>${item.breed}</td>
+          <td>${item.incubation_day}</td>
+          <td>${item.status}</td>
+          <td>${new Date(item.set_date).toLocaleDateString()}</td>
+        `;
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', () => loadBatchDetails(item.batch_id));
+        tbody.appendChild(row);
+      });
+    }
+
+    function renderSessions(items) {
+      const tbody = document.getElementById('sessionTable');
+      tbody.innerHTML = '';
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">No session data available.</td></tr>';
+        return;
+      }
+      items.slice(0, 10).forEach(item => {
+        const row = document.createElement('tr');
+        const fertility = item.total_scans ? `${Math.round((item.fertile_count / item.total_scans) * 100)}%` : '0%';
+        row.innerHTML = `
+          <td>${item.batch_code}</td>
+          <td>${item.breed_code}</td>
+          <td>${item.stage}</td>
+          <td>${item.total_scans}</td>
+          <td>${fertility}</td>
+        `;
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', () => loadSessionDetails(item.session_id));
+        tbody.appendChild(row);
+      });
+    }
+
+    function renderBatchDetails(data) {
+      batchLabel.innerText = data.batch_id;
+      if (!data.scans.length) {
+        batchDetails.innerHTML = '<p class="empty">No candling scans recorded for this batch yet.</p>';
+        return;
+      }
+      const rows = data.scans.map(scan =>
+        `<tr><td>${scan.tray_id}</td><td>${scan.egg_position}</td><td>${scan.classification}</td><td>${scan.confidence.toFixed(2)}</td><td>${new Date(scan.scanned_at).toLocaleString()}</td></tr>`
+      ).join('');
+      batchDetails.innerHTML = `
+        <table style="width:100%; border-collapse: collapse;">
+          <thead><tr><th>Tray</th><th>Position</th><th>Class</th><th>Confidence</th><th>Scanned At</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    async function loadBatchDetails(batchId) {
+      batchDetails.innerHTML = 'Loading batch details…';
+      try {
+        const data = await loadJson(batchDetailsUrl(batchId));
+        renderBatchDetails(data);
+      } catch (error) {
+        batchDetails.innerHTML = `<p class="empty">Unable to load batch details: ${error.message}</p>`;
+      }
+    }
+
+    // --- Session details & logs -------------------------------------------------
+    const sessionLabel = document.getElementById('sessionLabel');
+    const sessionDetails = document.getElementById('sessionDetails');
+    const sessionStatsUrl = id => `/dashboard/api/sessions/${encodeURIComponent(id)}/stats`;
+    const sessionScansUrl = id => `/dashboard/api/sessions/${encodeURIComponent(id)}/scans?limit=50`;
+
+    function renderSessionDetails(stats, scans) {
+      sessionLabel.innerText = stats.session_id;
+      const fertility = stats.total_scans ? `${Math.round((stats.fertile_count / stats.total_scans) * 100)}%` : '0%';
+      const head = `
+        <div style="display:flex; gap:18px; align-items:center;">
+          <div><strong>Batch</strong><div>${stats.batch_code}</div></div>
+          <div><strong>Started</strong><div>${new Date(stats.started_at).toLocaleString()}</div></div>
+          <div><strong>Total</strong><div>${stats.total_scans}</div></div>
+          <div><strong>Fertile</strong><div>${stats.fertile_count}</div></div>
+          <div><strong>Infertile</strong><div>${stats.infertile_count}</div></div>
+          <div><strong>Abnormal</strong><div>${stats.abnormal_count}</div></div>
+          <div><strong>Fertility</strong><div>${fertility}</div></div>
+        </div>
+      `;
+
+      let scansHtml = '<p class="empty">No scans for this session.</p>';
+      if (scans && scans.length) {
+        const rows = scans.map(s => `<tr><td>${s.scan_id}</td><td>${s.final_class}</td><td>${(s.confidence*100).toFixed(1)}%</td><td>${new Date(s.scanned_at).toLocaleString()}</td></tr>`).join('');
+        scansHtml = `
+          <div style="margin-top:12px;">
+            <table>
+              <thead><tr><th>Scan ID</th><th>Class</th><th>Confidence</th><th>Scanned At</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      sessionDetails.innerHTML = head + scansHtml;
+    }
+
+    async function loadSessionDetails(sessionId) {
+      sessionDetails.innerHTML = 'Loading session details…';
+      try {
+        const [stats, scans] = await Promise.all([
+          loadJson(sessionStatsUrl(sessionId)),
+          loadJson(sessionScansUrl(sessionId)),
+        ]);
+        renderSessionDetails(stats, scans);
+      } catch (err) {
+        sessionDetails.innerHTML = `<p class="empty">Failed to load session: ${err.message}</p>`;
+      }
+    }
+
+    async function loadTableList() {
+      try {
+        const tables = await loadJson(tableListUrl);
+        tableSelect.innerHTML = '<option value="">Choose table</option>' + tables.map(name => `<option value="${name}">${name}</option>`).join('');
+        tableSelect.addEventListener('change', async () => {
+          const table = tableSelect.value;
+          if (!table) {
+            tableView.innerHTML = '<p class="empty">Select a table to view rows.</p>';
+            return;
+          }
+          tableView.innerHTML = '<p>Loading table rows…</p>';
+          try {
+            const data = await loadJson(tableRowsUrl(table));
+            renderTableRows(data);
+          } catch (error) {
+            tableView.innerHTML = `<p class="empty">Failed to load rows: ${error.message}</p>`;
+          }
+        });
+      } catch (error) {
+        tableView.innerHTML = `<p class="empty">Unable to load table list: ${error.message}</p>`;
+      }
+    }
+
+    function renderTableRows(data) {
+      if (!data.rows.length) {
+        tableView.innerHTML = '<p class="empty">No rows found for this table.</p>';
+        return;
+      }
+      const headerHtml = data.columns.map(col => `<th>${col}</th>`).join('');
+      const bodyHtml = data.rows.map(row => `<tr>${data.columns.map(col => `<td>${row[col] ?? ''}</td>`).join('')}</tr>`).join('');
+      tableView.innerHTML = `
+        <p><strong>${data.table}</strong> — ${data.row_count} row(s)</p>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr>${headerHtml}</tr></thead>
+            <tbody>${bodyHtml}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    async function refreshDashboard() {
+      refreshStatus.innerText = 'Refreshing data…';
+      try {
+        const [summary, sessions, batches] = await Promise.all([
+          loadJson(summaryUrl),
+          loadJson(sessionsUrl),
+          loadJson(batchesUrl)
+        ]);
+        renderSummary(summary);
+        renderSessions(sessions);
+        renderBatches(batches);
+        refreshStatus.innerText = `Updated ${new Date().toLocaleTimeString()}`;
+      } catch (error) {
+        refreshStatus.innerText = `Error loading dashboard: ${error.message}`;
+      }
+    }
+
+    refreshDashboard();
+    loadTableList();
+    setInterval(refreshDashboard, 30_000);
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,6 @@
+customtkinter
+opencv-python
+ultralytics
+pyserial
+pillow
+requests

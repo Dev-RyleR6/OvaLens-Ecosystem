@@ -1,0 +1,14 @@
+# Python virtual environment
+.venv/
+__pycache__/
+
+# Environment files
+.env
+.env.local
+
+# IDE/editor files
+.vscode/
+
+*test_db.py
+
+test_db.py
