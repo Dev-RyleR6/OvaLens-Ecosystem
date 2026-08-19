@@ -1,0 +1,117 @@
+name: OvaLens Continuous Integration (CI)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-tests:
+    name: Backend API & Database Test Suite
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: hatchery_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pytest
+
+      - name: Seed Test Database
+        env:
+          DB_USER: postgres
+          DB_PASS: postgrespassword
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: hatchery_db
+          API_KEY: dev-api-key-123
+          JWT_SECRET: test-secret-key-123
+        run: |
+          cd backend
+          python -m seed.seed_db --reset
+
+      - name: Run Backend Pytest Suite
+        env:
+          DB_USER: postgres
+          DB_PASS: postgrespassword
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: hatchery_db
+          API_KEY: dev-api-key-123
+          JWT_SECRET: test-secret-key-123
+        run: |
+          cd backend
+          python -m pytest tests/test_api.py -v
+
+  edge-tests:
+    name: Edge CV Pipeline Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Edge Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r edge/requirements.txt pytest numpy opencv-python-headless onnxruntime
+
+      - name: Run Edge CV Pytest Suite
+        run: |
+          cd edge
+          python -m pytest tests/test_edge_pipeline.py -v
+
+  dashboard-build:
+    name: React Dashboard Typecheck & Production Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: dashboard/package.json
+
+      - name: Install Dashboard Dependencies
+        run: |
+          cd dashboard
+          npm install
+
+      - name: Build Dashboard Bundle
+        run: |
+          cd dashboard
+          npm run build

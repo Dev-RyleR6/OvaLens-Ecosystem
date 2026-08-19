@@ -1,29 +1,29 @@
 ---
 name: git-workflow
-description: Enforces professional Git workflows including feature branching, Conventional Commits, code reviews, and pull requests for the OvaLens monorepo.
+description: Enforces professional Git workflows including feature branching, Conventional Commits, GitHub CLI (gh) PR automation, and CI/CD verification.
 ---
 
-# Git Workflow & Collaboration Standard
+# Git Workflow & GitHub CLI (`gh`) Automation Standard
 
-This skill defines the Git branching, commit messaging, and Pull Request (PR) protocol for the **OvaLens** monorepo.
+This skill provides step-by-step instructions for AI agents and engineers on branch creation, Conventional Commits, GitHub CLI PR automation, and CI/CD quality gates for the **OvaLens** monorepo.
 
 ---
 
-## 🌿 1. Branch Naming Conventions
+## 🌿 1. Branch Naming Protocol
 
-Always create a dedicated feature or bugfix branch before implementing changes:
+Before implementing any feature, bug fix, or refactor, always branch from `main`:
 
-| Branch Type | Prefix | Example | Description |
-| :--- | :--- | :--- | :--- |
-| **New Feature** | `feat/` | `feat/dashboard-analytics-view` | Adding a new page, endpoint, or CV module |
-| **Bug Fix** | `fix/` | `fix/opencv-buffer-lag` | Resolving an error or unexpected behavior |
-| **Refactoring** | `refactor/` | `refactor/modularize-edge-cv` | Code restructuring without feature changes |
-| **Performance** | `perf/` | `perf/onnx-fp16-warmup` | Latency, memory, or FPS improvements |
-| **Documentation** | `docs/` | `docs/update-esp32-pinout` | Updating README, guides, or docstrings |
-| **Testing** | `test/` | `test/add-batch-lifecycle-tests` | Adding pytest or Jest test cases |
-| **Chore** | `chore/` | `chore/update-docker-compose` | Dependency updates or build tooling |
+| Type | Branch Pattern | Example |
+| :--- | :--- | :--- |
+| **Feature** | `feat/<scope>-<description>` | `feat/dashboard-penoy-calc` |
+| **Bug Fix** | `fix/<scope>-<description>` | `fix/edge-opencv-lag` |
+| **Refactor** | `refactor/<scope>-<description>` | `refactor/backend-auth-routes` |
+| **Performance** | `perf/<scope>-<description>` | `perf/edge-onnx-fp16-export` |
+| **Documentation** | `docs/<description>` | `docs/update-operations-guide` |
+| **Testing** | `test/<scope>-<description>` | `test/add-batch-api-tests` |
+| **Chore** | `chore/<description>` | `chore/update-github-ci` |
 
-### Creating and Switching to a Feature Branch:
+### Step 1: Create & Switch to Branch:
 ```bash
 git checkout -b feat/your-feature-name
 ```
@@ -32,69 +32,77 @@ git checkout -b feat/your-feature-name
 
 ## 📝 2. Conventional Commits Standard
 
-Every commit message must follow this exact format:
+All commit messages MUST follow the Conventional Commits specification:
+
 ```
-<type>(<scope>): <short description in imperative mood>
+<type>(<scope>): <short imperative subject>
 
-[optional body explaining motivation and technical approach]
+[optional body explaining technical motivation and changes]
 ```
 
-### Commit Scopes:
-* `backend`: FastAPI API, services, models, schemas, or database migrations
-* `edge`: OpenCV grabber, ONNX model inference, CustomTkinter UI, or SQLite WAL
-* `dashboard`: React components, Zustand store, TanStack Query, or Tailwind styles
-* `firmware`: ESP32 Arduino C++, servo timer, or optical debounce
-* `agents`: AI assistant instructions, skills, or rulebooks
-* `docker`: Dockerfile or docker-compose configurations
+### Valid Scopes:
+* `backend` | `edge` | `dashboard` | `firmware` | `agents` | `docker` | `ci`
 
-### Example Commits:
+### Commit Execution:
 ```bash
-git commit -m "feat(dashboard): add Penoy economic salvage calculator card"
-git commit -m "fix(edge): resolve DirectShow camera frame buffer starvation"
-git commit -m "perf(backend): add index on egg_scans(batch_id, scanned_at)"
+git add .
+git commit -m "feat(dashboard): add interactive Penoy yield salvage estimator"
 ```
 
 ---
 
-## 🔍 3. Pre-Commit Quality Checklist
+## 🚀 3. Automated GitHub CLI (`gh`) Pull Request Workflow
 
-Before staging and committing changes, always execute the relevant verification commands:
+When the feature is complete and local test suites pass, use the **GitHub CLI (`gh`)** to automate the PR lifecycle:
 
+### Step 1: Push Branch to GitHub
 ```bash
-# 1. Backend Verification
-cd backend
-python -m pytest tests/test_api.py -v
+git push -u origin feat/your-feature-name
+```
 
-# 2. Edge CV Verification
-cd edge
-python -m pytest tests/test_edge_pipeline.py -v
+### Step 2: Open Pull Request via GitHub CLI
+```bash
+gh pr create \
+  --title "feat(dashboard): add interactive Penoy yield salvage estimator" \
+  --body "## 📌 Summary
+- Added dynamic Penoy economic salvage simulator to AnalyticsPage.tsx.
+- Integrated energy savings calculation (18 days incubation power cost avoided).
 
-# 3. Code Style & Hygiene
-git status
+## 🧪 Testing Verification
+- [x] Backend tests passed (6/6)
+- [x] Edge tests passed (5/5)
+- [x] React production build verified (\`npm run build\`)"
+```
+
+### Step 3: Check Automated CI Build Status
+```bash
+# View active CI test workflows triggered by GitHub Actions
+gh pr checks
+```
+
+### Step 4: View PR Diff in Terminal
+```bash
+gh pr diff
+```
+
+### Step 5: Merge Pull Request via CLI
+```bash
+# Squash and merge once CI checks pass
+gh pr merge --squash --delete-branch
+```
+
+### Step 6: Sync Local `main`
+```bash
+git checkout main
+git pull origin main
 ```
 
 ---
 
-## 🚀 4. Pull Request (PR) Workflow
+## 🧪 4. Mandatory Pre-PR Test Checklist
 
-1. **Push Branch to Remote**:
-   ```bash
-   git push -u origin feat/your-feature-name
-   ```
+Always execute these local verification commands before opening a PR:
 
-2. **Pull Request Template**:
-   ```markdown
-   ## 📌 Summary of Changes
-   - Clear bullet points summarizing what was built or fixed.
-
-   ## 🧪 Testing & Verification
-   - [x] Backend pytest suite passed (6/6 tests)
-   - [x] Edge CV pytest suite passed (5/5 tests)
-   - [x] No breaking database schema migrations
-
-   ## 📸 Screenshots / Demos (If Applicable)
-   - Attach UI screenshots or CLI output logs.
-   ```
-
-3. **Merging Strategy**:
-   - Always prefer **Squash and Merge** or **Rebase and Merge** to keep the `main` branch commit history clean and linear.
+1. **Backend Tests**: `cd backend && python -m pytest tests/test_api.py -v`
+2. **Edge CV Tests**: `cd edge && python -m pytest tests/test_edge_pipeline.py -v`
+3. **Dashboard Build**: `cd dashboard && npm run build`

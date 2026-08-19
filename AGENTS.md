@@ -38,6 +38,9 @@ Capstone/
 ├── .agents/                      # AI Agent Customizations & Skills
 │   └── skills/                   # git-workflow, code-reviewer, performance-auditor
 │
+├── .github/                      # CI/CD Workflows
+│   └── workflows/ci.yml          # Automated pytest & React build pipeline
+│
 ├── backend/                      # Central FastAPI REST API & Database Engine
 │   ├── app/                      # Clean modular application
 │   │   ├── core/                 # Config (Pydantic Settings), DB engine, JWT auth, exceptions
@@ -70,9 +73,10 @@ Capstone/
 │   │   ├── api/                  # Axios client & TanStack Query hooks
 │   │   ├── components/           # Reusable UI widgets (Navbar, Cards, Modals, Tables)
 │   │   ├── pages/                # Overview, Batches, ScanExplorer, Analytics, Devices
-│   │   ├── store/                # Zustand global state (Auth, Settings)
 │   │   ├── types/                # TypeScript interfaces matching backend schemas
-│   │   └── styles/               # TailwindCSS & Foundation University theme tokens
+│   │   └── index.css             # TailwindCSS & Foundation University theme tokens
+│   ├── Dockerfile
+│   ├── nginx.conf
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── tailwind.config.js
@@ -83,6 +87,8 @@ Capstone/
 │       └── README.md             # Pinout wiring diagram & serial command specs
 │
 ├── docker-compose.yml            # 1-Click PostgreSQL + Backend + Dashboard deployment
+├── SETUP_AND_OPERATIONS.md       # Complete installation & operator manual
+├── CODE_REVIEW.md                # Security & quality audit report
 ├── AGENTS.md                     # Master AI developer rulebook & architectural guide
 ├── LICENSE                       # Apache License 2.0
 ├── .gitignore                    # Master root gitignore
@@ -114,7 +120,6 @@ Capstone/
 ### C. Dashboard (`dashboard/`)
 - **Stack**: React 18 + Vite + TypeScript + TailwindCSS + Lucide Icons + Recharts.
 - **Type Safety**: Strictly define TypeScript interfaces in `src/types/` mirroring backend Pydantic schemas.
-- **State Management**: Use Zustand for auth & app settings; use TanStack Query for server state caching.
 - **UI Design**: Strictly adhere to the Foundation University theme tokens (Maroon `#800000`, Agri-Green `#357a38`, Slate backgrounds).
 
 ### D. Firmware (`firmware/`)
@@ -126,12 +131,12 @@ Capstone/
 
 ## 🛠️ 4. AI Agent Skills & Tooling (`.agents/skills/`)
 
-The repository includes specialized agent skills to optimize developer and AI pair-programming workflows:
+The repository includes specialized agent skills:
 
 1. **`git-workflow`** ([`.agents/skills/git-workflow/SKILL.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/.agents/skills/git-workflow/SKILL.md)):
    - Feature branching rules (`feat/...`, `fix/...`, `refactor/...`).
    - Conventional Commits message standards.
-   - Pull Request templates and quality checklists.
+   - GitHub CLI (`gh`) PR automation and merge protocol.
 2. **`code-reviewer`** ([`.agents/skills/code-reviewer/SKILL.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/.agents/skills/code-reviewer/SKILL.md)):
    - Automated security audit (SQL injection defense, zero hardcoded secrets, RBAC).
    - Edge non-blocking concurrency and SQLite WAL verification.
@@ -143,30 +148,44 @@ The repository includes specialized agent skills to optimize developer and AI pa
 
 ---
 
-## 📝 5. Conventional Commits Standard
+## 📝 5. Automated Git Workflow & GitHub CLI (`gh`) Standard
 
-All Git commit messages in this repository MUST follow the **Conventional Commits** specification:
+All developers and AI assistants working on OvaLens MUST follow the standardized Git and GitHub CLI lifecycle:
 
+### A. Feature Branching:
+```bash
+git checkout -b feat/<scope>-<description>
 ```
-<type>(<optional scope>): <subject>
+
+### B. Conventional Commits:
+```
+<type>(<scope>): <subject>
 
 [optional body]
 ```
+* **Types**: `feat` | `fix` | `refactor` | `perf` | `docs` | `test` | `chore`
+* **Scopes**: `backend` | `edge` | `dashboard` | `firmware` | `agents` | `ci`
 
-### Commit Types:
-- `feat`: A new user-facing feature (e.g. `feat(backend): add Day 10 Penoy salvage revenue calculation`).
-- `fix`: A bug fix (e.g. `fix(edge): resolve OpenCV frame queue buffer lag in DirectShow`).
-- `refactor`: Code change that neither fixes a bug nor adds a feature (e.g. `refactor(backend): modularize API endpoints into v1 router`).
-- `perf`: Performance improvements (e.g. `perf(edge): export YOLOv8 model to ONNX Runtime FP16`).
-- `docs`: Documentation updates (e.g. `docs: update root README architecture diagrams`).
-- `test`: Adding or modifying automated tests (e.g. `test(backend): add pytest cases for batch lifecycle`).
-- `chore`: Build scripts, dependencies, or tool configurations (e.g. `chore: update root docker-compose.yml`).
+### C. GitHub CLI (`gh`) PR Automation:
+```bash
+# Push branch to remote
+git push -u origin feat/<branch-name>
+
+# Create Pull Request
+gh pr create --title "feat(<scope>): <subject>" --body "<description>"
+
+# Check CI test status
+gh pr checks
+
+# Merge once verified
+gh pr merge --squash --delete-branch
+```
 
 ---
 
 ## 🧪 6. Testing & Verification Runbook
 
-Before submitting or committing changes, run the following verification commands:
+Before submitting or opening a PR, run the following verification commands:
 
 ### 1. Test Backend API Suite
 ```bash
@@ -186,11 +205,10 @@ cd backend
 python -m seed.seed_db --reset
 ```
 
-### 4. Run FastAPI Dev Server Locally
+### 4. Build React Dashboard
 ```bash
-cd backend
-uvicorn app.main:app --reload --port 8000
-# OpenAPI Docs available at http://localhost:8000/docs
+cd dashboard
+npm run build
 ```
 
 ---
