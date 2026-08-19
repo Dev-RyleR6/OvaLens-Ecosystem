@@ -5,6 +5,7 @@
 [![Model](https://img.shields.io/badge/YOLOv8-ONNX%20FP16-blue.svg)]()
 [![Backend](https://img.shields.io/badge/FastAPI-PostgreSQL%2016-teal.svg)]()
 [![Frontend](https://img.shields.io/badge/React%2018-Vite%20%2B%20TypeScript-61dafb.svg)]()
+[![License](https://img.shields.io/badge/License-Apache%202.0-orange.svg)](LICENSE)
 
 **OvaLens** is an automated, industrial-grade duck egg candling, fertility classification, and hatchery analytics ecosystem developed for Foundation University.
 
@@ -47,7 +48,7 @@ The system automates the inspection of duck eggs on a motorized conveyor belt, u
  └───────────────────────────────────────────────────┼──────────────────────────────────────────────────┘
                                                      │
  ┌───────────────────────────────────────────────────┼──────────────────────────────────────────────────┐
- │                                                   │ (JWT REST / SSE Analytics Stream)                │
+ │                                                   │ (JWT REST / HTTP API Proxy)                      │
  │   4. ADMIN WEB DASHBOARD                          ▼                                                  │
  │   (React 18 + Vite + TypeScript)      [Hatchery Manager & Audit Portal]                              │
  └──────────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -59,6 +60,9 @@ The system automates the inspection of duck eggs on a motorized conveyor belt, u
 
 ```
 Capstone/
+├── .agents/                      # AI Agent Customizations & Skills
+│   └── skills/                   # git-workflow, code-reviewer, performance-auditor
+│
 ├── backend/                      # Central FastAPI REST API & Database Engine
 │   ├── app/                      # Clean modular application
 │   │   ├── core/                 # Config, DB engine, JWT auth, exceptions
@@ -88,12 +92,13 @@ Capstone/
 │
 ├── dashboard/                    # React 18 + Vite + TypeScript Admin Dashboard
 │   ├── src/
-│   │   ├── api/                  # Axios client & TanStack Query hooks
-│   │   ├── components/           # Reusable UI widgets (Navbar, Cards, Modals, Tables)
+│   │   ├── api/                  # Axios client & Mock fallback engine
+│   │   ├── components/           # Navbar, Sidebar, StatCard, Badge, Modal, Timeline
 │   │   ├── pages/                # Overview, Batches, ScanExplorer, Analytics, Devices
-│   │   ├── store/                # Zustand global state (Auth, Settings)
 │   │   ├── types/                # TypeScript interfaces matching backend schemas
-│   │   └── styles/               # TailwindCSS & Foundation University theme tokens
+│   │   └── index.css             # TailwindCSS & Foundation University theme tokens
+│   ├── Dockerfile
+│   ├── nginx.conf
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── tailwind.config.js
@@ -105,6 +110,7 @@ Capstone/
 │
 ├── docker-compose.yml            # 1-Click PostgreSQL + Backend + Dashboard deployment
 ├── AGENTS.md                     # Master AI developer rulebook & architectural guide
+├── LICENSE                       # Apache License 2.0
 ├── .gitignore                    # Master root gitignore
 └── README.md                     # Master project documentation & living changelog
 ```
@@ -156,22 +162,6 @@ Capstone/
                                               └─────────────────────┘
 ```
 
-1. **`users`**: Authentication credentials, password hashes, and RBAC tiers (`ADMIN`, `MANAGER`, `OPERATOR`).
-2. **`devices`**: Registered Edge sorting stations, telemetry heartbeats, and conveyor calibration ($D$, $v$, pulse duration).
-3. **`batches`**: 28-day incubation batch tracking (`SETTING` $\to$ `DAY_10` $\to$ `DAY_18` $\to$ `DAY_25` $\to$ `HATCHED` $\to$ `COMPLETED`).
-4. **`candling_sessions`**: Milestone candling runs (Day 10, Day 18, Day 25) with session aggregates and operator logs.
-5. **`egg_scans`**: High-resolution scan records with monotonic sequence numbers, confidence scores, inference latency, JSONB YOLO bounding boxes, and image storage URLs.
-6. **`audit_logs`**: Immutable audit logs tracking administrative actions, batch completions, and configuration changes.
-
----
-
-## ⚙️ Anti-Duplication & Robustness Mechanisms
-
-1. **Hardware Debounce**: ESP32 enforces a 600ms optical trigger lockout window to eliminate sensor oscillation and egg jitter.
-2. **Client UUIDv4 & Monotonic Counters**: Edge mints a deterministic UUIDv4 (`scan_id`) and sequence number per scan.
-3. **Atomic UPSERT Ingestion**: Backend executes `ON CONFLICT (scan_id) DO NOTHING`, ensuring idempotent retries after network dropouts.
-4. **Power Loss Recovery**: Edge continuously records session state in SQLite WAL, allowing instant session resume upon reboot.
-
 ---
 
 ## 🎨 Foundation University Brand Design Tokens
@@ -182,34 +172,79 @@ The Admin Web Dashboard and Edge GUI follow Foundation University's visual ident
 * **Dark Maroon**: `#5C0000` (Hover states, sidebar accents)
 * **Agri-Green**: `#357a38` (Fertile indicator, positive yields, success badges)
 * **Reject Red**: `#DC2626` (Infertile / Dead embryo indicator, alerts)
+* **Infertile Amber**: `#D97706` (Penoy salvage badge)
 * **Dark Slate Background**: `#0F172A` / **Card**: `#1E293B` / **Border**: `#334155`
-* **Light Slate Background**: `#F8FAFC` / **Card**: `#FFFFFF` / **Border**: `#E2E8F0`
+
+---
+
+## 🚀 Quickstart & Development Guide
+
+### 1. Run the Complete Stack with Docker (1-Click)
+```bash
+docker compose up --build
+# Dashboard: http://localhost:3000
+# Backend API & Docs: http://localhost:8000/docs
+# PostgreSQL: localhost:5432
+```
+
+### 2. Run React Admin Dashboard Locally
+```bash
+cd dashboard
+npm install
+npm run dev
+# Dashboard running at http://localhost:5173
+```
+
+### 3. Run FastAPI Backend Locally
+```bash
+cd backend
+python -m seed.seed_db --reset
+uvicorn app.main:app --reload --port 8000
+```
+
+### 4. Run Edge Operator GUI Locally
+```bash
+cd edge
+python launcher.py
+```
 
 ---
 
 ## 📝 Living Changelog & Architecture Evolution
 
+### [2026-08-20] — Phase 3: React 18 + Vite + TypeScript Admin Web Dashboard
+- **Scaffolded Modern Web Dashboard**:
+  - React 18 + Vite + TypeScript + TailwindCSS + Recharts + Lucide Icons.
+  - Complete Foundation University dark-mode aesthetic (`#800000` Maroon, `#357a38` Agri-Green, `#0F172A` Slate).
+- **Core Management Views Built**:
+  - `OverviewPage.tsx`: Executive KPI cards, breed fertility distribution charts, active batch timelines, and live scan feed.
+  - `BatchesPage.tsx`: Full lifecycle management table, "Set New Batch" modal, and direct CSV/PDF report download links.
+  - `ScanExplorerPage.tsx`: Dual Grid/Table viewer with synthetic candling frames, bounding box HUD, and JSONB inspection drawer.
+  - `AnalyticsPage.tsx`: Interactive Day-10 Penoy Economic Salvage Yield Estimator (custom egg count $\times$ price simulator) and 28-day viability curves.
+  - `DevicesPage.tsx`: Edge station IoT telemetry cards, conveyor calibration specs ($\Delta t = D/v$), and remote station ping.
+- **Production Build & Containerization**:
+  - Created `dashboard/Dockerfile` and `dashboard/nginx.conf` for 1-click Docker Compose deployment.
+  - Verified bundle compilation (`tsc && vite build`) with zero errors.
+
 ### [2026-08-20] — Phase 2: Edge App CV Optimization & CustomTkinter Operator GUI
 - **ONNX Runtime FP16 Model Export**:
   - Exported YOLOv8 weights (`best.pt`) to optimized ONNX Runtime model (`best.onnx` - 11.7 MB).
-  - Implemented 3-pass warmup on initialization to eliminate first-frame latency spikes.
 - **Decoupled Quad-Thread Edge Architecture**:
   - `src/core/camera.py`: DirectShow / V4L2 background grabber with single-frame atomic slot (zero buffer lag).
-  - `src/core/inference.py`: Pluggable ONNX Runtime / PyTorch engine with candling heuristics and aspect ratio filtering ($0.65 \le \text{AR} \le 1.45$).
+  - `src/core/inference.py`: Pluggable ONNX Runtime / PyTorch engine with candling heuristics ($0.65 \le \text{AR} \le 1.45$).
   - `src/iot/serial_driver.py`: Non-blocking ESP32 serial driver implementing delayed ejection strokes ($\Delta t = D/v$).
   - `src/db/local_db.py`: Embedded SQLite manager with WAL mode enabled.
-  - `src/sync/sync_worker.py`: Background HTTP sync worker with exponential backoff syncing to `POST /api/v1/scans/sync`.
-  - `src/ui/app.py`: High-performance CustomTkinter operator GUI with live HUD, real-time counters, audio chimes, and manual override keys (`[SPACEBAR]` / `[R]`).
+  - `src/sync/sync_worker.py`: Background HTTP sync worker syncing to `POST /api/v1/scans/sync`.
+  - `src/ui/app.py`: CustomTkinter 60 FPS operator desktop application with live HUD and manual override controls (`[SPACEBAR]` / `[R]`).
 - **Automated Testing Suite**:
-  - Built `edge/tests/test_edge_pipeline.py` covering heuristics, camera mock generation, ONNX inference, SQLite WAL transactions, and serial mock (5/5 tests passed).
+  - Built `edge/tests/test_edge_pipeline.py` (5/5 tests passed).
 
 ### [2026-08-20] — Phase 1: Transition to Central Monorepo & Standalone Capstone Ecosystem
 - **Monorepo Structure Established**:
   - Unified root Git repository containing `edge/`, `backend/`, `dashboard/`, and `firmware/`.
-  - Linked and pushed to GitHub remote `Dev-RyleR6/OvaLens-Ecosystem`.
+  - Licensed under **Apache License 2.0**.
 - **FastAPI Backend & Relational Schema**:
   - Modularized `backend/app/` (`core`, `models`, `schemas`, `api/v1`, `services`).
-  - Implemented 28-day batch state machine, idempotent scan sync, and PDF/CSV reporting.
   - Built rich database seeder (`seed/seed_db.py`) and automated backend pytest suite (6/6 tests passed).
 - **ESP32 Firmware**:
   - Created `firmware/esp32_actuator/esp32_actuator.ino` with hardware interrupt, 600ms optical debounce, and serial command protocol.
