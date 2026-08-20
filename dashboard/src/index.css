@@ -4,76 +4,42 @@
 
 @layer base {
   :root {
-    --background: 224 30% 6%; /* #0B0D13 Deep Charcoal Canvas */
-    --foreground: 210 20% 98%;
-    --card: 222 28% 10%;      /* #121620 Bento Card */
-    --card-foreground: 210 20% 98%;
-    --popover: 222 28% 10%;
-    --popover-foreground: 210 20% 98%;
-    --primary: 0 100% 32%;    /* Foundation University Maroon */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 222 22% 16%;
-    --secondary-foreground: 210 20% 98%;
-    --muted: 222 22% 15%;
-    --muted-foreground: 215 16% 62%;
-    --accent: 222 22% 16%;
-    --accent-foreground: 210 20% 98%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 222 22% 18%;    /* #1F2636 */
-    --input: 222 22% 18%;
-    --ring: 0 100% 35%;
-    --radius: 0.75rem;
-  }
-
-  * {
-    @apply border-border;
+    --background: #F8FAFC;
+    --foreground: #0F172A;
+    --card: #FFFFFF;
+    --card-foreground: #0F172A;
+    --primary: #800000;
+    --primary-foreground: #FFFFFF;
+    --border: #E2E8F0;
+    --input: #E2E8F0;
   }
 
   body {
-    @apply bg-[#0B0D13] text-foreground font-sans antialiased selection:bg-[#800000] selection:text-white;
+    @apply bg-[#F8FAFC] text-[#0F172A] font-sans antialiased selection:bg-[#800000] selection:text-white;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
 
-/* Precision Subtle Scrollbars */
+/* Crisp Clean Scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0B0D13;
+  background: #F1F5F9;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1F2636;
+  background: #CBD5E1;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #323E56;
+  background: #94A3B8;
 }
 
-/* Glass & Bento Container Classes */
-.bento-card {
-  @apply bg-[#121620] border border-[#1F2636] rounded-2xl shadow-bento transition-all duration-200 hover:border-[#2A344A];
-}
-
-.bento-card-inner {
-  @apply bg-[#161B27] border border-[#222A3B] rounded-xl;
-}
-
-.pill-button {
-  @apply inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-[#161B27] hover:bg-[#1E2536] text-slate-200 border border-[#222A3B] transition-all cursor-pointer;
-}
-
-/* Keyframe for subtle ambient breathing glow */
-@keyframes ambientGlow {
-  0%, 100% { opacity: 0.8; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.96); }
-}
-
-.animate-ambient {
-  animation: ambientGlow 4s ease-in-out infinite;
+/* Clean Card Utility */
+.fu-card {
+  @apply bg-white border border-[#E2E8F0] rounded-xl shadow-xs transition-shadow duration-150 hover:shadow-sm;
 }
