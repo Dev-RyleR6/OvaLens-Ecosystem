@@ -6,26 +6,35 @@ import {
   ScanLine,
   TrendingUp,
   Cpu,
-  HelpCircle,
-  HardDrive
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from './ui/button';
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  isCollapsed: boolean;
+  setIsCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed }) => {
   const navItems = [
-    { to: '/', label: 'Overview', icon: LayoutDashboard, keyHint: '1' },
-    { to: '/batches', label: 'Batches', icon: Layers, keyHint: '2' },
-    { to: '/scans', label: 'Scan Explorer', icon: ScanLine, keyHint: '3' },
-    { to: '/analytics', label: 'Economics & ROI', icon: TrendingUp, keyHint: '4' },
-    { to: '/devices', label: 'IoT Stations', icon: Cpu, keyHint: '5' },
+    { to: '/', label: 'Overview', icon: LayoutDashboard },
+    { to: '/batches', label: 'Batches', icon: Layers },
+    { to: '/scans', label: 'Scan Explorer', icon: ScanLine },
+    { to: '/analytics', label: 'Economics & ROI', icon: TrendingUp },
+    { to: '/devices', label: 'Devices', icon: Cpu },
   ];
 
   return (
-    <aside className="w-16 md:w-56 bg-obsidian-900 border-r border-obsidian-700/80 flex flex-col justify-between flex-shrink-0">
-      <div className="p-3 space-y-1.5">
-        <div className="hidden md:block px-3 py-2 text-[10px] font-mono font-bold tracking-widest text-slate-500 uppercase">
-          NAVIGATION TERMINAL
-        </div>
-
+    <aside
+      className={cn(
+        "border-r bg-background flex flex-col justify-between transition-all duration-200 flex-shrink-0 z-30",
+        isCollapsed ? "w-14" : "w-56"
+      )}
+    >
+      {/* Navigation items */}
+      <div className="p-2 space-y-1">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
@@ -33,37 +42,42 @@ export const Sidebar: React.FC = () => {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex items-center justify-between px-3 py-2.5 rounded text-xs font-medium transition-all group ${
+                cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors group",
                   isActive
-                    ? 'bg-[#800000] text-white font-bold shadow-md border-l-4 border-amber-400'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-obsidian-800 border-l-4 border-transparent'
-                }`
+                    ? "bg-maroon-50 text-[#800000] dark:bg-maroon-950/40 dark:text-maroon-200 font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                )
               }
+              title={isCollapsed ? item.label : undefined}
             >
-              <div className="flex items-center gap-3">
-                <Icon className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden md:inline font-display">{item.label}</span>
-              </div>
-              <span className="hidden md:inline text-[9px] font-mono opacity-60 group-hover:opacity-100 bg-black/30 px-1.5 py-0.5 rounded">
-                [{item.keyHint}]
-              </span>
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              {!isCollapsed && <span className="truncate">{item.label}</span>}
             </NavLink>
           );
         })}
       </div>
 
-      {/* Footer System Status Badge */}
-      <div className="p-3 border-t border-obsidian-800">
-        <div className="hidden md:flex items-center justify-between p-2.5 bg-obsidian-950/80 rounded border border-obsidian-800 text-[10px] font-mono">
-          <div className="flex items-center gap-2">
-            <HardDrive className="w-3.5 h-3.5 text-amber-400" />
-            <div>
-              <span className="text-slate-300 font-bold block">SQLite WAL</span>
-              <span className="text-emerald-400">SYNC: 100% OK</span>
-            </div>
-          </div>
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-led-pulse" />
-        </div>
+      {/* Collapse Toggle Footer */}
+      <div className="p-2 border-t flex items-center justify-between">
+        {!isCollapsed && (
+          <span className="text-[11px] text-muted-foreground px-2">
+            OvaLens v2.0
+          </span>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsCollapsed((prev) => !prev)}
+          className="h-8 w-8 ml-auto text-muted-foreground hover:text-foreground"
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isCollapsed ? (
+            <ChevronRight className="w-4 h-4" />
+          ) : (
+            <ChevronLeft className="w-4 h-4" />
+          )}
+        </Button>
       </div>
     </aside>
   );

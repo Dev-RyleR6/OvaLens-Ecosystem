@@ -3,60 +3,76 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-obsidian-950 text-slate-100 antialiased font-sans;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 0 100% 25.1%; /* #800000 Foundation University Maroon */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 0 100% 25.1%;
+    --radius: 0.5rem;
   }
 
-  /* Force tabular numbers across all monospace data */
-  .tabular-nums,
-  .font-mono {
-    font-variant-numeric: tabular-nums;
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 5.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 5.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 100% 32%; /* slightly brighter maroon for dark mode */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 0 100% 32%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
 
-/* Precision Industrial Hairline Scrollbars */
+/* Subtle clean scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #070A11;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1A2234;
-  border-radius: 2px;
+  background: rgba(100, 116, 139, 0.2);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #800000;
-}
-
-/* Subtle Technical Grid Background */
-.bg-grid-pattern {
-  background-size: 24px 24px;
-  background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-}
-
-/* Tactical Pulse for Live Feeds */
-@keyframes pulseGlow {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.92); }
-}
-
-.animate-led-pulse {
-  animation: pulseGlow 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* High-Contrast Card Panel Utility */
-.panel-scada {
-  @apply bg-obsidian-900 border border-obsidian-700/70 rounded-lg shadow-xl;
-}
-
-.panel-scada-header {
-  @apply bg-obsidian-850 border-b border-obsidian-700/60 px-4 py-3 flex items-center justify-between text-xs font-display tracking-wider uppercase font-bold text-slate-300;
+  background: rgba(100, 116, 139, 0.35);
 }

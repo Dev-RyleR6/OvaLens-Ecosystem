@@ -1,28 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import {
   Cpu,
-  Wifi,
-  HardDrive,
-  Activity,
-  Gauge,
-  Sliders,
   RefreshCw,
-  CheckCircle,
-  Clock,
-  ShieldCheck,
-  Zap
+  Activity,
+  CheckCircle2,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { Device } from '../types';
 import { Badge } from '../components/Badge';
+import { Button } from '../components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
 
 export const DevicesPage: React.FC = () => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [pingStatus, setPingStatus] = useState<Record<string, string>>({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchDevices = async () => {
+    setIsRefreshing(true);
     const data = await apiClient.getDevices();
     setDevices(data);
+    setTimeout(() => setIsRefreshing(false), 300);
   };
 
   useEffect(() => {
@@ -30,119 +28,124 @@ export const DevicesPage: React.FC = () => {
   }, []);
 
   const handlePing = (deviceId: string) => {
-    setPingStatus(prev => ({ ...prev, [deviceId]: 'PINGING...' }));
+    setPingStatus(prev => ({ ...prev, [deviceId]: 'Pinging...' }));
     setTimeout(() => {
-      setPingStatus(prev => ({ ...prev, [deviceId]: 'PONG (12ms • UART OK)' }));
-    }, 350);
+      setPingStatus(prev => ({ ...prev, [deviceId]: 'Online (12ms • UART OK)' }));
+    }, 400);
   };
 
   return (
     <div className="space-y-6">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-obsidian-900 border border-obsidian-700/80 p-4 rounded-lg shadow-xl">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b">
         <div>
-          <h2 className="text-lg font-display font-black tracking-wide text-white uppercase flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-led-pulse" />
-            Edge Sorter Stations & Microcontroller Telemetry
-          </h2>
-          <p className="text-xs font-mono text-slate-400">
-            Raspberry Pi 5 / Industrial PC nodes • ESP32 UART actuators • Conveyor kinematics (Δt = D/v)
+          <h1 className="text-xl font-bold tracking-tight text-foreground">
+            Edge Sorter Devices
+          </h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Connected Raspberry Pi and PC candling stations, ESP32 UART actuators, and conveyor calibration.
           </p>
         </div>
 
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           onClick={fetchDevices}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-obsidian-950 hover:bg-obsidian-800 text-slate-300 rounded border border-obsidian-700 text-xs font-mono font-bold transition-colors shadow-sm"
+          disabled={isRefreshing}
+          className="gap-1.5 text-xs"
         >
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh Telemetry
-        </button>
+          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Refresh Status
+        </Button>
       </div>
 
       {/* Devices Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {devices.map((device) => (
-          <div
-            key={device.device_id}
-            className="panel-scada p-5 space-y-4"
-          >
-            {/* Top Node Header */}
-            <div className="flex items-start justify-between border-b border-obsidian-700/60 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-[#800000]/20 rounded border border-[#800000]/50 text-amber-400">
-                  <Cpu className="w-5 h-5" />
+          <Card key={device.device_id}>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-foreground">
+                    <Cpu className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold">{device.device_name}</CardTitle>
+                    <CardDescription className="text-xs font-mono">{device.device_id}</CardDescription>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-display font-bold uppercase tracking-wider text-slate-100">
-                    {device.device_name}
-                  </h3>
-                  <p className="text-xs text-amber-300 font-mono font-semibold">{device.device_id}</p>
-                </div>
+                <Badge type="device" value={device.status} />
               </div>
-              <Badge type="device" value={device.status} />
-            </div>
+            </CardHeader>
 
-            {/* Hardware Telemetry Grid */}
-            <div className="grid grid-cols-2 gap-2.5 text-xs font-mono">
-              <div className="p-2.5 bg-obsidian-950 rounded border border-obsidian-800">
-                <span className="text-[10px] text-slate-500 block">HARDWARE PLATFORM</span>
-                <span className="font-bold text-slate-200 mt-0.5 block">{device.hardware_platform}</span>
+            <CardContent className="space-y-4">
+              {/* Technical Properties Grid */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="p-3 bg-muted/40 rounded border">
+                  <span className="text-[11px] text-muted-foreground block">Hardware Platform</span>
+                  <span className="font-semibold text-foreground mt-0.5 block">{device.hardware_platform}</span>
+                </div>
+                <div className="p-3 bg-muted/40 rounded border">
+                  <span className="text-[11px] text-muted-foreground block">ONNX Model Runtime</span>
+                  <span className="font-semibold text-foreground mt-0.5 block">{device.model_version}</span>
+                </div>
+                <div className="p-3 bg-muted/40 rounded border">
+                  <span className="text-[11px] text-muted-foreground block">IP Address</span>
+                  <span className="font-semibold text-foreground mt-0.5 block">{device.ip_address || '127.0.0.1'}</span>
+                </div>
+                <div className="p-3 bg-muted/40 rounded border">
+                  <span className="text-[11px] text-muted-foreground block">Last Heartbeat</span>
+                  <span className="font-semibold text-foreground mt-0.5 block">
+                    {device.last_heartbeat ? new Date(device.last_heartbeat).toLocaleTimeString() : 'Online'}
+                  </span>
+                </div>
               </div>
-              <div className="p-2.5 bg-obsidian-950 rounded border border-obsidian-800">
-                <span className="text-[10px] text-slate-500 block">ONNX MODEL RUNTIME</span>
-                <span className="font-bold text-amber-300 mt-0.5 block">{device.model_version}</span>
+
+              {/* Conveyor Kinematics Parameters */}
+              <div className="p-3 bg-muted/30 rounded border space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-foreground">Conveyor Calibration Parameters</span>
+                  <span className="text-[11px] text-muted-foreground font-mono">Δt = D / v</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="p-2 bg-background rounded border">
+                    <span className="text-[10px] text-muted-foreground block">Speed (v)</span>
+                    <span className="font-semibold text-foreground">{device.conveyor_speed_cm_s} cm/s</span>
+                  </div>
+                  <div className="p-2 bg-background rounded border">
+                    <span className="text-[10px] text-muted-foreground block">Distance (D)</span>
+                    <span className="font-semibold text-foreground">{device.conveyor_dist_cm} cm</span>
+                  </div>
+                  <div className="p-2 bg-background rounded border">
+                    <span className="text-[10px] text-muted-foreground block">Servo Pulse</span>
+                    <span className="font-semibold text-foreground">{device.servo_pulse_ms} ms</span>
+                  </div>
+                </div>
               </div>
-              <div className="p-2.5 bg-obsidian-950 rounded border border-obsidian-800">
-                <span className="text-[10px] text-slate-500 block">LOCAL IP ADDRESS</span>
-                <span className="font-bold text-slate-200 mt-0.5 block">{device.ip_address || '127.0.0.1'}</span>
-              </div>
-              <div className="p-2.5 bg-obsidian-950 rounded border border-obsidian-800">
-                <span className="text-[10px] text-slate-500 block">LAST TELEMETRY HEARTBEAT</span>
-                <span className="font-bold text-emerald-400 mt-0.5 block">
-                  {device.last_heartbeat ? new Date(device.last_heartbeat).toLocaleTimeString() : 'Online (Active)'}
+
+              {/* Ping Actions */}
+              <div className="flex items-center justify-between pt-1 text-xs">
+                <span className="text-muted-foreground">
+                  {pingStatus[device.device_id] ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                      {pingStatus[device.device_id]}
+                    </span>
+                  ) : (
+                    'Ready for telemetry check'
+                  )}
                 </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePing(device.device_id)}
+                  className="gap-1.5 text-xs"
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  Test Connection
+                </Button>
               </div>
-            </div>
-
-            {/* Conveyor Kinematics Calibration Parameters */}
-            <div className="p-3 bg-obsidian-950 rounded border border-obsidian-800 space-y-2 text-xs font-mono">
-              <div className="flex items-center justify-between text-slate-300 font-bold border-b border-obsidian-850 pb-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Conveyor & ESP32 Ejection Kinematics</span>
-                </div>
-                <span className="text-[10px] text-amber-300 font-semibold">Δt = D / v</span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                <div className="p-2 bg-obsidian-900 rounded border border-obsidian-800">
-                  <span className="text-[9px] text-slate-500 block">VELOCITY (v)</span>
-                  <span className="font-bold text-slate-100 text-xs">{device.conveyor_speed_cm_s} cm/s</span>
-                </div>
-                <div className="p-2 bg-obsidian-900 rounded border border-obsidian-800">
-                  <span className="text-[9px] text-slate-500 block">DISTANCE (D)</span>
-                  <span className="font-bold text-slate-100 text-xs">{device.conveyor_dist_cm} cm</span>
-                </div>
-                <div className="p-2 bg-obsidian-900 rounded border border-obsidian-800">
-                  <span className="text-[9px] text-slate-500 block">SERVO PULSE</span>
-                  <span className="font-bold text-slate-100 text-xs">{device.servo_pulse_ms} ms</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Diagnostics & Remote Ping */}
-            <div className="flex items-center justify-between pt-1 font-mono text-xs">
-              <span className="text-emerald-400 font-bold">
-                {pingStatus[device.device_id] || 'NODE SYNCED (SQLite WAL: OK)'}
-              </span>
-              <button
-                onClick={() => handlePing(device.device_id)}
-                className="px-3 py-1.5 bg-obsidian-800 hover:bg-obsidian-700 text-slate-200 font-bold rounded border border-obsidian-700 transition-colors flex items-center gap-1.5 shadow-sm"
-              >
-                <Activity className="w-3.5 h-3.5 text-amber-400" />
-                Ping Station
-              </button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
     </div>

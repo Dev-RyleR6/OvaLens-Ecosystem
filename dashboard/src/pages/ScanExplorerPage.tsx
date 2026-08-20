@@ -2,23 +2,20 @@ import React, { useState, useEffect } from 'react';
 import {
   Search,
   Filter,
-  Grid,
-  List,
   Eye,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Zap,
-  Clock,
-  Layers,
-  Sliders,
-  ChevronRight
+  ChevronRight,
+  ScanLine,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
-import { EggScan, FertilityClass } from '../types';
+import { EggScan } from '../types';
 import { Badge } from '../components/Badge';
-import { Modal } from '../components/Modal';
 import { CandlingAperture } from '../components/CandlingAperture';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
+import { Sheet } from '../components/ui/sheet';
 
 export const ScanExplorerPage: React.FC = () => {
   const [scans, setScans] = useState<EggScan[]>([]);
@@ -34,9 +31,6 @@ export const ScanExplorerPage: React.FC = () => {
       limit: 60
     });
     setScans(data);
-    if (data.length > 0 && !selectedScan) {
-      setSelectedScan(data[0]);
-    }
   };
 
   useEffect(() => {
@@ -51,184 +45,182 @@ export const ScanExplorerPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-obsidian-900 border border-obsidian-700/80 p-4 rounded-lg shadow-xl">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b">
         <div>
-          <h2 className="text-lg font-display font-black tracking-wide text-white uppercase flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-            Precision Candling Scan Explorer & Optical Ledger
-          </h2>
-          <p className="text-xs font-mono text-slate-400">
-            Transillumination aperture telemetry, YOLOv8 normalized bounding boxes, and sorting decisions
+          <h1 className="text-xl font-bold tracking-tight text-foreground">
+            Candling Scan Explorer
+          </h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Browse verified duck egg transillumination scans, optical metrics, and vision classifications.
           </p>
         </div>
 
-        {/* Total Metric Count */}
-        <div className="text-xs font-mono text-slate-400 bg-obsidian-950 px-3 py-1.5 rounded border border-obsidian-700">
-          Showing <strong className="text-amber-300">{filteredScans.length}</strong> verified candling scans
-        </div>
+        <span className="text-xs text-muted-foreground">
+          Showing {filteredScans.length} scans
+        </span>
       </div>
 
       {/* Filter / Search Bar */}
-      <div className="bg-obsidian-900 border border-obsidian-700/80 rounded-lg p-3 flex flex-col md:flex-row items-center justify-between gap-3 text-xs font-mono">
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="flex items-center gap-1.5 text-slate-400">
-            <Filter className="w-3.5 h-3.5" /> Class:
-          </div>
-          <select
-            value={classFilter}
-            onChange={(e) => setClassFilter(e.target.value)}
-            className="bg-obsidian-950 border border-obsidian-700 rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#800000]"
-          >
-            <option value="ALL">All Classes (500 Scans)</option>
-            <option value="FERTILE">Fertile (Accept)</option>
-            <option value="INFERTILE">Infertile (Penoy Cull)</option>
-            <option value="ABNORMAL">Abnormal / Dead</option>
-          </select>
-
-          <select
-            value={batchFilter}
-            onChange={(e) => setBatchFilter(e.target.value)}
-            className="bg-obsidian-950 border border-obsidian-700 rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#800000]"
-          >
-            <option value="ALL">All Batches</option>
-            <option value="BATCH-2026-08-KAY-01">BATCH-2026-08-KAY-01 (Kayumanggi)</option>
-            <option value="BATCH-2026-08-ITM-01">BATCH-2026-08-ITM-01 (Itim)</option>
-            <option value="BATCH-2026-07-KHK-01">BATCH-2026-07-KHK-01 (Khaki)</option>
-          </select>
-        </div>
-
-        {/* Search by Seq / ID */}
-        <div className="relative w-full md:w-64">
-          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
-          <input
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="relative w-full sm:w-72">
+          <Search className="w-4 h-4 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <Input
             type="text"
-            placeholder="Search # Seq or Scan UUID..."
+            placeholder="Search # seq or scan UUID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-obsidian-950 border border-obsidian-700 rounded pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-[#800000]"
+            className="pl-8"
           />
         </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Select
+            value={classFilter}
+            onChange={(e) => setClassFilter(e.target.value)}
+            className="w-36 text-xs"
+          >
+            <option value="ALL">All Classes</option>
+            <option value="FERTILE">Fertile</option>
+            <option value="INFERTILE">Infertile (Penoy)</option>
+            <option value="ABNORMAL">Abnormal</option>
+          </Select>
+
+          <Select
+            value={batchFilter}
+            onChange={(e) => setBatchFilter(e.target.value)}
+            className="w-44 text-xs"
+          >
+            <option value="ALL">All Batches</option>
+            <option value="BATCH-2026-08-KAY-01">BATCH-2026-08-KAY-01</option>
+            <option value="BATCH-2026-08-ITM-01">BATCH-2026-08-ITM-01</option>
+            <option value="BATCH-2026-07-KHK-01">BATCH-2026-07-KHK-01</option>
+          </Select>
+        </div>
       </div>
 
-      {/* Main Split Interface: Left Interactive Candler + Right Dense Audit Ledger */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* Left 5 Cols: Precision Candling Aperture Viewport */}
-        <div className="xl:col-span-5 space-y-4">
-          {selectedScan ? (
-            <div className="sticky top-16">
-              <CandlingAperture
-                finalClass={selectedScan.final_class}
-                confidence={selectedScan.confidence}
-                inferenceMs={selectedScan.inference_ms}
-                sequenceNumber={selectedScan.sequence_number}
-                batchId={selectedScan.batch_id}
-                aspectRatio={0.78}
-                meanLuminance={selectedScan.final_class === 'FERTILE' ? 184.2 : selectedScan.final_class === 'INFERTILE' ? 220.5 : 110.4}
-              />
+      {/* Scans Data Table */}
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16"># Seq</TableHead>
+              <TableHead>Batch</TableHead>
+              <TableHead>Classification</TableHead>
+              <TableHead>Confidence</TableHead>
+              <TableHead>Latency</TableHead>
+              <TableHead>Sorting Decision</TableHead>
+              <TableHead className="text-right">Inspect</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredScans.map((s) => (
+              <TableRow
+                key={s.scan_id}
+                className="cursor-pointer"
+                onClick={() => setSelectedScan(s)}
+              >
+                <TableCell className="font-medium text-foreground">
+                  #{s.sequence_number}
+                </TableCell>
+                <TableCell className="text-muted-foreground">{s.batch_id}</TableCell>
+                <TableCell>
+                  <Badge type="fertility" value={s.final_class} />
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {(s.confidence * 100).toFixed(1)}%
+                </TableCell>
+                <TableCell className="text-muted-foreground text-xs">
+                  {s.inference_ms} ms
+                </TableCell>
+                <TableCell>
+                  <span
+                    className={`text-xs font-semibold ${
+                      s.routing_action === 'ACCEPT' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                    }`}
+                  >
+                    {s.routing_action}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground"
+                    onClick={() => setSelectedScan(s)}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
 
-              {/* JSONB Bounding Box Raw Inspector */}
-              <div className="panel-scada p-3 mt-4 space-y-2 text-xs font-mono">
-                <div className="flex items-center justify-between text-slate-400 border-b border-obsidian-700 pb-1.5">
-                  <span className="font-bold text-slate-200">Raw YOLOv8 Detection Metadata (JSONB)</span>
-                  <span className="text-[10px] text-amber-400">POSTGRESQL ON CONFLICT SAFE</span>
-                </div>
-                <pre className="text-[10px] bg-black/70 p-2.5 rounded text-emerald-400 border border-obsidian-800 overflow-x-auto max-h-36">
-                  {JSON.stringify(
-                    selectedScan.detections.length > 0
-                      ? selectedScan.detections
-                      : [
-                          {
-                            bbox: [0.24, 0.18, 0.76, 0.88],
-                            class_name: selectedScan.final_class,
-                            confidence: selectedScan.confidence,
-                            aspect_ratio: 0.78,
-                            geometric_valid: true
-                          }
-                        ],
-                    null,
-                    2
-                  )}
-                </pre>
+      {/* Scan Details Drawer (Sheet) */}
+      <Sheet
+        isOpen={Boolean(selectedScan)}
+        onClose={() => setSelectedScan(null)}
+        title={selectedScan ? `Scan Details — #${selectedScan.sequence_number}` : ''}
+        description={selectedScan ? `Batch: ${selectedScan.batch_id} • UUID: ${selectedScan.scan_id}` : ''}
+      >
+        {selectedScan && (
+          <div className="space-y-4 text-sm">
+            {/* Visual Candling Aperture */}
+            <CandlingAperture
+              finalClass={selectedScan.final_class}
+              confidence={selectedScan.confidence}
+              inferenceMs={selectedScan.inference_ms}
+              sequenceNumber={selectedScan.sequence_number}
+              batchId={selectedScan.batch_id}
+              aspectRatio={0.78}
+            />
+
+            {/* Decision card */}
+            <div className="p-3 bg-muted/40 rounded border space-y-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-foreground">Conveyor Routing Action:</span>
+                <span
+                  className={`font-semibold ${
+                    selectedScan.routing_action === 'ACCEPT' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                  }`}
+                >
+                  {selectedScan.routing_action === 'ACCEPT' ? 'ACCEPT (Incubate)' : 'REJECT (Divert)'}
+                </span>
               </div>
+              <p className="text-muted-foreground text-[11px]">
+                {selectedScan.final_class === 'FERTILE'
+                  ? 'Embryo with viable spider veins confirmed. Proceed to incubation tray.'
+                  : selectedScan.final_class === 'INFERTILE'
+                  ? 'Clear unfertilized egg. Diverted to Penoy food salvage tray.'
+                  : 'Dead or corrupted embryo. Diverted to early discard.'}
+              </p>
             </div>
-          ) : (
-            <div className="panel-scada p-8 text-center text-slate-500 font-mono text-xs">
-              Select a scan from the ledger to inspect optical transillumination.
+
+            {/* Raw Detections Metadata */}
+            <div className="space-y-1.5 text-xs">
+              <span className="font-medium text-foreground block">YOLOv8 Detection Output</span>
+              <pre className="p-3 rounded bg-muted text-xs font-mono overflow-x-auto max-h-36 border">
+                {JSON.stringify(
+                  selectedScan.detections.length > 0
+                    ? selectedScan.detections
+                    : [
+                        {
+                          bbox: [0.24, 0.18, 0.76, 0.88],
+                          class_name: selectedScan.final_class,
+                          confidence: selectedScan.confidence,
+                          aspect_ratio: 0.78,
+                        }
+                      ],
+                  null,
+                  2
+                )}
+              </pre>
             </div>
-          )}
-        </div>
-
-        {/* Right 7 Cols: High-Density Industrial Audit Ledger */}
-        <div className="xl:col-span-7 panel-scada p-0 overflow-hidden">
-          <div className="panel-scada-header">
-            <span>Verified Candling Scans Ledger</span>
-            <span className="text-[10px] text-slate-400 font-mono">Real-Time Ingestion</span>
           </div>
-
-          <div className="overflow-x-auto max-h-[620px] overflow-y-auto">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-obsidian-950 text-slate-400 uppercase text-[10px] font-bold border-b border-obsidian-750 sticky top-0 z-10">
-                <tr>
-                  <th className="py-2.5 px-3"># Seq</th>
-                  <th className="py-2.5 px-3">Batch ID</th>
-                  <th className="py-2.5 px-3">Classification</th>
-                  <th className="py-2.5 px-3">Confidence</th>
-                  <th className="py-2.5 px-3">Latency</th>
-                  <th className="py-2.5 px-3">Routing</th>
-                  <th className="py-2.5 px-3 text-right">Inspect</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-obsidian-800/80 text-slate-300">
-                {filteredScans.map((s) => {
-                  const isSelected = selectedScan?.scan_id === s.scan_id;
-                  return (
-                    <tr
-                      key={s.scan_id}
-                      onClick={() => setSelectedScan(s)}
-                      className={`cursor-pointer transition-colors ${
-                        isSelected
-                          ? 'bg-[#800000]/25 border-l-4 border-l-amber-400 text-white font-bold'
-                          : 'hover:bg-obsidian-800/60 border-l-4 border-l-transparent'
-                      }`}
-                    >
-                      <td className="py-2.5 px-3 font-bold text-amber-400">
-                        #{s.sequence_number.toString().padStart(3, '0')}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-300 truncate max-w-[130px]">{s.batch_id}</td>
-                      <td className="py-2.5 px-3">
-                        <Badge type="fertility" value={s.final_class} size="sm" />
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-200">
-                        {(s.confidence * 100).toFixed(1)}%
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-400">
-                        {s.inference_ms}ms
-                      </td>
-                      <td className="py-2.5 px-3 font-bold">
-                        <span className={s.routing_action === 'ACCEPT' ? 'text-emerald-400' : 'text-rose-400'}>
-                          {s.routing_action}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedScan(s);
-                          }}
-                          className="p-1 rounded bg-obsidian-800 hover:bg-obsidian-700 text-slate-300 transition-colors"
-                        >
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+        )}
+      </Sheet>
     </div>
   );
 };

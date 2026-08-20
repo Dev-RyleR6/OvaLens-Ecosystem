@@ -1,65 +1,69 @@
 import React from 'react';
 import { BatchStage } from '../types';
-import { CheckCircle2, Circle, AlertCircle } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 interface BatchProgressTimelineProps {
   currentStage: BatchStage;
   setDate: string;
 }
 
-export const BatchProgressTimeline: React.FC<BatchProgressTimelineProps> = ({ currentStage, setDate }) => {
+export const BatchProgressTimeline: React.FC<BatchProgressTimelineProps> = ({ currentStage }) => {
   const stages = [
-    { key: 'DAY_10', label: 'Day 10', title: '1st Candle (Penoy Cull)', dayOffset: 10, isCulled: true },
-    { key: 'DAY_18', label: 'Day 18', title: '2nd Candle & Hatcher Transfer', dayOffset: 18, isCulled: false },
-    { key: 'DAY_25', label: 'Day 25', title: 'Pipping Window', dayOffset: 25, isCulled: false },
-    { key: 'HATCHED', label: 'Day 28', title: 'Hatch & Harvest', dayOffset: 28, isCulled: false },
+    { key: 'SETTING', label: 'Day 0', title: 'Set' },
+    { key: 'DAY_10', label: 'Day 10', title: '1st Candle (Penoy)' },
+    { key: 'DAY_18', label: 'Day 18', title: 'Hatcher Transfer' },
+    { key: 'DAY_25', label: 'Day 25', title: 'Pipping' },
+    { key: 'HATCHED', label: 'Day 28', title: 'Hatch' },
   ];
 
   const getStageIndex = (stage: BatchStage) => {
     switch (stage) {
-      case 'SETTING': return -1;
-      case 'DAY_10': return 0;
-      case 'DAY_18': return 1;
-      case 'DAY_25': return 2;
-      case 'HATCHED': return 3;
-      case 'COMPLETED': return 3;
-      default: return -1;
+      case 'SETTING': return 0;
+      case 'DAY_10': return 1;
+      case 'DAY_18': return 2;
+      case 'DAY_25': return 3;
+      case 'HATCHED': return 4;
+      case 'COMPLETED': return 4;
+      default: return 0;
     }
   };
 
   const currentIndex = getStageIndex(currentStage);
 
   return (
-    <div className="w-full py-2">
+    <div className="w-full py-3">
       <div className="relative flex items-center justify-between">
-        {/* Connecting Track Line */}
-        <div className="absolute top-1/2 left-0 right-0 h-0.5 -translate-y-1/2 bg-obsidian-700 z-0" />
+        {/* Track Line */}
+        <div className="absolute top-3.5 left-3 right-3 h-0.5 -translate-y-1/2 bg-muted z-0" />
         
-        {/* Active Progress Bar */}
+        {/* Active Fill */}
         <div
-          className="absolute top-1/2 left-0 h-0.5 -translate-y-1/2 bg-amber-500 z-0 transition-all duration-500"
+          className="absolute top-3.5 left-3 h-0.5 -translate-y-1/2 bg-[#800000] z-0 transition-all duration-300"
           style={{ width: `${Math.max(0, (currentIndex / (stages.length - 1)) * 100)}%` }}
         />
 
         {stages.map((st, idx) => {
-          const isCompleted = idx < currentIndex || currentStage === 'HATCHED';
-          const isCurrent = idx === currentIndex && currentStage !== 'HATCHED';
+          const isCompleted = idx < currentIndex || currentStage === 'HATCHED' || currentStage === 'COMPLETED';
+          const isCurrent = idx === currentIndex && currentStage !== 'HATCHED' && currentStage !== 'COMPLETED';
 
-          let circleColor = "bg-obsidian-900 border-obsidian-700 text-slate-500";
-          if (isCompleted) circleColor = "bg-emerald-950 border-emerald-500 text-emerald-400";
-          if (isCurrent) circleColor = "bg-amber-950 border-amber-400 text-amber-300 ring-4 ring-amber-500/20";
+          let circleStyle = "bg-muted text-muted-foreground border-transparent";
+          if (isCompleted) {
+            circleStyle = "bg-[#800000] text-white border-[#800000]";
+          } else if (isCurrent) {
+            circleStyle = "bg-background text-[#800000] border-[#800000] ring-2 ring-[#800000]/20";
+          }
 
           return (
-            <div key={st.key} className="relative z-10 flex flex-col items-center group">
+            <div key={st.key} className="relative z-10 flex flex-col items-center">
               <div
-                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-[10px] font-mono font-bold transition-all ${circleColor}`}
+                className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-semibold transition-all ${circleStyle}`}
               >
-                {isCompleted ? '✓' : idx + 1}
+                {isCompleted ? <Check className="w-3.5 h-3.5" /> : idx + 1}
               </div>
-              <span className="mt-1.5 text-[10px] font-mono font-bold text-slate-200">
+              <span className="mt-1.5 text-xs font-medium text-foreground">
                 {st.label}
               </span>
-              <span className="text-[9px] font-mono text-slate-400 text-center max-w-[90px] hidden sm:block">
+              <span className="text-[10px] text-muted-foreground hidden sm:block">
                 {st.title}
               </span>
             </div>
