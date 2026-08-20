@@ -7,6 +7,9 @@ import {
   CandlingSession,
   MortalityTrends,
   BreedMetricItem,
+  User,
+  AuditLog,
+  HatcherySettings,
 } from '../types';
 
 export const mockOverview: AnalyticsOverview = {
@@ -68,6 +71,137 @@ export const mockBreedComparison: BreedMetricItem[] = [
     hatchability_rate: 88.67,
   },
 ];
+
+export const mockUsers: User[] = [
+  {
+    user_id: "usr-admin-01",
+    email: "lead.operator@foundationu.com",
+    full_name: "Ryle Gabotero",
+    role: "ADMIN",
+    is_active: true,
+    created_at: new Date(Date.now() - 60 * 86400000).toISOString(),
+  },
+  {
+    user_id: "usr-mgr-01",
+    email: "hatchery.mgr@foundationu.com",
+    full_name: "Dr. Alicia Santos",
+    role: "MANAGER",
+    is_active: true,
+    created_at: new Date(Date.now() - 45 * 86400000).toISOString(),
+  },
+  {
+    user_id: "usr-op-01",
+    email: "pedro.penduko@foundationu.com",
+    full_name: "Pedro Penduko",
+    role: "OPERATOR",
+    is_active: true,
+    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+  },
+  {
+    user_id: "usr-op-02",
+    email: "juan.delacruz@foundationu.com",
+    full_name: "Juan Dela Cruz",
+    role: "OPERATOR",
+    is_active: true,
+    created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
+  },
+  {
+    user_id: "usr-op-03",
+    email: "maria.clara@foundationu.com",
+    full_name: "Maria Clara",
+    role: "OPERATOR",
+    is_active: false,
+    created_at: new Date(Date.now() - 90 * 86400000).toISOString(),
+  },
+];
+
+export const mockAuditLogs: AuditLog[] = [
+  {
+    log_id: 1084,
+    user_id: "usr-admin-01",
+    operator_name: "Ryle Gabotero",
+    action: "BATCH_STAGE_ADVANCED",
+    entity_type: "BATCH",
+    entity_id: "BATCH-2026-08-KAY-01",
+    details: { from: "SETTING", to: "DAY_10", operator: "Ryle Gabotero", verified_eggs: 500 },
+    ip_address: "192.168.1.110",
+    severity: "INFO",
+    created_at: new Date(Date.now() - 12 * 60000).toISOString(),
+  },
+  {
+    log_id: 1083,
+    user_id: "usr-op-01",
+    operator_name: "Pedro Penduko",
+    action: "DEVICE_CALIBRATION_UPDATED",
+    entity_type: "DEVICE",
+    entity_id: "STATION-01-RP5",
+    details: { conveyor_speed: 12.5, conveyor_dist: 25.0, computed_delay_ms: 2000 },
+    ip_address: "192.168.1.120",
+    severity: "WARNING",
+    created_at: new Date(Date.now() - 45 * 60000).toISOString(),
+  },
+  {
+    log_id: 1082,
+    user_id: "usr-admin-01",
+    operator_name: "Ryle Gabotero",
+    action: "PDF_REPORT_GENERATED",
+    entity_type: "REPORT",
+    entity_id: "BATCH-2026-07-KHK-01",
+    details: { format: "PDF", recipient: "Dean of Agriculture" },
+    ip_address: "192.168.1.110",
+    severity: "INFO",
+    created_at: new Date(Date.now() - 3 * 3600000).toISOString(),
+  },
+  {
+    log_id: 1081,
+    user_id: "usr-op-02",
+    operator_name: "Juan Dela Cruz",
+    action: "USER_LOGIN_SUCCESS",
+    entity_type: "AUTH",
+    entity_id: "usr-op-02",
+    details: { method: "JWT", client: "CustomTkinter Operator Station" },
+    ip_address: "192.168.1.125",
+    severity: "INFO",
+    created_at: new Date(Date.now() - 5 * 3600000).toISOString(),
+  },
+  {
+    log_id: 1080,
+    user_id: "usr-admin-01",
+    operator_name: "Ryle Gabotero",
+    action: "BATCH_INITIALIZED",
+    entity_type: "BATCH",
+    entity_id: "BATCH-2026-08-KAY-02",
+    details: { breed: "KAYUMANGGI", egg_count: 500, incubator: "INCUBATOR-B2" },
+    ip_address: "192.168.1.110",
+    severity: "INFO",
+    created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
+  },
+  {
+    log_id: 1079,
+    action: "SYSTEM_SYNC_WAL",
+    entity_type: "SYSTEM",
+    entity_id: "STATION-01-RP5",
+    details: { records_synced: 500, sync_time_ms: 320, mode: "WAL" },
+    ip_address: "192.168.1.120",
+    severity: "INFO",
+    created_at: new Date(Date.now() - 30 * 3600000).toISOString(),
+  },
+];
+
+export const mockSettings: HatcherySettings = {
+  facility_name: "Foundation University Hatchery Research Center",
+  institution: "Foundation University (FU)",
+  location: "Dr. Miciano Rd, Dumaguete City, Negros Oriental",
+  min_confidence_threshold: 0.50,
+  aspect_ratio_min: 0.65,
+  aspect_ratio_max: 1.45,
+  hsv_luminance_min: 40,
+  penoy_unit_price: 14.00,
+  duckling_unit_price: 40.00,
+  kwh_rate_php: 12.50,
+  sqlite_retention_days: 7,
+  optical_debounce_ms: 600,
+};
 
 export const mockSessions: CandlingSession[] = [
   {

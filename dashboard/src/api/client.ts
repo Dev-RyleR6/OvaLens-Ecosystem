@@ -10,6 +10,9 @@ import {
   MortalityTrends,
   BreedMetricItem,
   BatchStage,
+  User,
+  AuditLog,
+  HatcherySettings,
 } from '../types';
 import {
   mockOverview,
@@ -20,6 +23,9 @@ import {
   mockSessions,
   mockMortalityTrends,
   mockBreedComparison,
+  mockUsers,
+  mockAuditLogs,
+  mockSettings,
 } from './mockData';
 
 const api = axios.create({
@@ -189,6 +195,71 @@ export const apiClient = {
       }
       throw new Error("Device not found");
     }
+  },
+
+  // User Management
+  getUsers: async (): Promise<User[]> => {
+    try {
+      const res = await api.get<User[]>('/users');
+      return res.data;
+    } catch {
+      return mockUsers;
+    }
+  },
+
+  createUser: async (user: Partial<User> & { password?: string }): Promise<User> => {
+    try {
+      const res = await api.post<User>('/users', user);
+      return res.data;
+    } catch {
+      const newUser: User = {
+        user_id: `usr-${Date.now()}`,
+        email: user.email || 'operator@foundationu.com',
+        full_name: user.full_name || 'New Operator',
+        role: user.role || 'OPERATOR',
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+      mockUsers.unshift(newUser);
+      return newUser;
+    }
+  },
+
+  toggleUserStatus: async (userId: string): Promise<User> => {
+    try {
+      const res = await api.patch<User>(`/users/${userId}/status`);
+      return res.data;
+    } catch {
+      const found = mockUsers.find(u => u.user_id === userId);
+      if (found) {
+        found.is_active = !found.is_active;
+        return found;
+      }
+      throw new Error("User not found");
+    }
+  },
+
+  // Audit Logs
+  getAuditLogs: async (params?: { action?: string; limit?: number }): Promise<AuditLog[]> => {
+    try {
+      const res = await api.get<AuditLog[]>('/audit-logs', { params });
+      return res.data;
+    } catch {
+      if (params?.action) {
+        return mockAuditLogs.filter(l => l.action === params.action);
+      }
+      return mockAuditLogs.slice(0, params?.limit || 50);
+    }
+  },
+
+  // Hatchery Settings
+  getSettings: async (): Promise<HatcherySettings> => {
+    return mockSettings;
+  },
+
+  updateSettings: async (settings: Partial<HatcherySettings>): Promise<HatcherySettings> => {
+    Object.assign(mockSettings, settings);
+    return mockSettings;
   },
 
   // Reports

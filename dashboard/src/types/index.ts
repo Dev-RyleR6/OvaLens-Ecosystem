@@ -4,12 +4,13 @@ export type BatchStatus = 'INCUBATING' | 'COMPLETED' | 'CANCELLED';
 export type FertilityClass = 'FERTILE' | 'INFERTILE' | 'ABNORMAL';
 export type RoutingAction = 'ACCEPT' | 'REJECT';
 export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
+export type UserRole = 'ADMIN' | 'MANAGER' | 'OPERATOR';
 
 export interface User {
   user_id: string;
   email: string;
   full_name: string;
-  role: 'ADMIN' | 'MANAGER' | 'OPERATOR';
+  role: UserRole;
   is_active: boolean;
   created_at: string;
 }
@@ -124,4 +125,32 @@ export interface BreedMetricItem {
   fertility_rate: number;
   hatched_count: number;
   hatchability_rate: number;
+}
+
+export interface AuditLog {
+  log_id: number;
+  user_id?: string;
+  operator_name?: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  details: Record<string, any>;
+  ip_address?: string;
+  severity: 'INFO' | 'WARNING' | 'SECURITY';
+  created_at: string;
+}
+
+export interface HatcherySettings {
+  facility_name: string;
+  institution: string;
+  location: string;
+  min_confidence_threshold: number;
+  aspect_ratio_min: number;
+  aspect_ratio_max: number;
+  hsv_luminance_min: number;
+  penoy_unit_price: number;
+  duckling_unit_price: number;
+  kwh_rate_php: number;
+  sqlite_retention_days: number;
+  optical_debounce_ms: number;
 }
