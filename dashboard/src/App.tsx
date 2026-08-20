@@ -7,6 +7,7 @@ import { BatchesPage } from './pages/BatchesPage';
 import { ScanExplorerPage } from './pages/ScanExplorerPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { DevicesPage } from './pages/DevicesPage';
+import { RecordsPage } from './pages/RecordsPage';
 import { ModelsPage } from './pages/ModelsPage';
 import { UsersPage } from './pages/UsersPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
@@ -25,6 +26,7 @@ export const App: React.FC = () => {
             <Route path="/scans" element={<ScanExplorerPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/devices" element={<DevicesPage />} />
+            <Route path="/records" element={<RecordsPage />} />
             <Route path="/models" element={<ModelsPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/logs" element={<AuditLogsPage />} />

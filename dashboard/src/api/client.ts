@@ -17,6 +17,8 @@ import {
   TrainingLossEpoch,
   ModelOpsSummary,
   FertilityClass,
+  PenoySalvageRecord,
+  HistoricalRecordSummary,
 } from '../types';
 import {
   mockOverview,
@@ -33,6 +35,8 @@ import {
   mockModelCheckpoints,
   mockTrainingLoss,
   mockModelOpsSummary,
+  mockHistoricalSummary,
+  mockSalvageRecords,
 } from './mockData';
 
 const api = axios.create({
@@ -229,6 +233,15 @@ export const apiClient = {
       }
       throw new Error("Device not found");
     }
+  },
+
+  // Records & Historical Ledger
+  getHistoricalSummary: async (): Promise<HistoricalRecordSummary> => {
+    return mockHistoricalSummary;
+  },
+
+  getPenoySalvageRecords: async (): Promise<PenoySalvageRecord[]> => {
+    return mockSalvageRecords;
   },
 
   // User Management

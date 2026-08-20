@@ -13,6 +13,8 @@ import {
   ModelCheckpoint,
   TrainingLossEpoch,
   ModelOpsSummary,
+  PenoySalvageRecord,
+  HistoricalRecordSummary,
 } from '../types';
 
 export const mockOverview: AnalyticsOverview = {
@@ -282,9 +284,9 @@ export const mockModelOpsSummary: ModelOpsSummary = {
   confusion_matrix: {
     classes: ["FERTILE", "INFERTILE (Penoy)", "ABNORMAL (Dead)"],
     matrix: [
-      [96.4, 2.1, 1.5],  // Actual Fertile -> Pred Fertile (96.4%), Penoy (2.1%), Dead (1.5%)
-      [3.2, 94.8, 2.0],  // Actual Penoy -> Pred Fertile (3.2%), Penoy (94.8%), Dead (2.0%)
-      [4.2, 3.7, 92.1],  // Actual Dead -> Pred Fertile (4.2%), Penoy (3.7%), Dead (92.1%)
+      [96.4, 2.1, 1.5],
+      [3.2, 94.8, 2.0],
+      [4.2, 3.7, 92.1],
     ],
     raw_counts: [
       [2700, 59, 41],
@@ -293,6 +295,61 @@ export const mockModelOpsSummary: ModelOpsSummary = {
     ],
   },
 };
+
+export const mockHistoricalSummary: HistoricalRecordSummary = {
+  total_lifetime_batches: 18,
+  total_lifetime_eggs_candled: 8950,
+  total_lifetime_penoy_salvaged_php: 14336.00,
+  avg_historical_fertility_rate: 89.4,
+  avg_historical_hatchability_rate: 88.1,
+};
+
+export const mockSalvageRecords: PenoySalvageRecord[] = [
+  {
+    record_id: "REC-PEN-2026-08-01",
+    batch_id: "BATCH-2026-08-KAY-01",
+    breed: "KAYUMANGGI",
+    culled_date: new Date(Date.now() - 4 * 3600000).toISOString(),
+    egg_count: 37,
+    unit_price: 14.00,
+    total_salvage_php: 518.00,
+    buyer_destination: "Dumaguete Public Market Vendor #4",
+    recorded_by: "Ryle Gabotero",
+  },
+  {
+    record_id: "REC-PEN-2026-08-02",
+    batch_id: "BATCH-2026-08-ITM-01",
+    breed: "ITIM",
+    culled_date: new Date(Date.now() - 24 * 3600000).toISOString(),
+    egg_count: 38,
+    unit_price: 14.00,
+    total_salvage_php: 532.00,
+    buyer_destination: "Valencia Streetfood Association",
+    recorded_by: "Pedro Penduko",
+  },
+  {
+    record_id: "REC-PEN-2026-07-01",
+    batch_id: "BATCH-2026-07-KHK-01",
+    breed: "KHAKI",
+    culled_date: new Date(Date.now() - 19 * 86400000).toISOString(),
+    egg_count: 42,
+    unit_price: 14.00,
+    total_salvage_php: 588.00,
+    buyer_destination: "Sibulan Balut & Penoy Dealer",
+    recorded_by: "Juan Dela Cruz",
+  },
+  {
+    record_id: "REC-PEN-2026-07-02",
+    batch_id: "BATCH-2026-07-KAY-01",
+    breed: "KAYUMANGGI",
+    culled_date: new Date(Date.now() - 35 * 86400000).toISOString(),
+    egg_count: 48,
+    unit_price: 14.00,
+    total_salvage_php: 672.00,
+    buyer_destination: "Dumaguete Public Market Vendor #4",
+    recorded_by: "Ryle Gabotero",
+  },
+];
 
 export const mockSessions: CandlingSession[] = [
   {

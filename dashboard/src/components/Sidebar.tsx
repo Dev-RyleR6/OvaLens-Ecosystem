@@ -10,6 +10,7 @@ import {
   Users,
   FileText,
   Settings,
+  Archive,
   HardDrive,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -24,6 +25,7 @@ export const Sidebar: React.FC = () => {
   ];
 
   const adminNav = [
+    { to: '/records', label: 'Historical Records', icon: Archive },
     { to: '/models', label: 'AI Models & MLOps', icon: Brain },
     { to: '/users', label: 'User & Access', icon: Users },
     { to: '/logs', label: 'Audit Trail Logs', icon: FileText },
@@ -65,7 +67,7 @@ export const Sidebar: React.FC = () => {
         {/* Administration Section */}
         <div className="space-y-1">
           <p className="px-3 pb-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            Administration & AI
+            Administration & Archives
           </p>
 
           {adminNav.map((item) => {

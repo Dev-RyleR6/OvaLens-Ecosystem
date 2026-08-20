@@ -198,3 +198,23 @@ export interface ModelOpsSummary {
     raw_counts: number[][];
   };
 }
+
+export interface PenoySalvageRecord {
+  record_id: string;
+  batch_id: string;
+  breed: DuckBreed;
+  culled_date: string;
+  egg_count: number;
+  unit_price: number;
+  total_salvage_php: number;
+  buyer_destination: string;
+  recorded_by: string;
+}
+
+export interface HistoricalRecordSummary {
+  total_lifetime_batches: number;
+  total_lifetime_eggs_candled: number;
+  total_lifetime_penoy_salvaged_php: number;
+  avg_historical_fertility_rate: number;
+  avg_historical_hatchability_rate: number;
+}
