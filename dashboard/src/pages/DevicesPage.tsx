@@ -9,7 +9,7 @@ import {
   Radio,
   Save,
   Camera,
-  Brain,
+  Microscope,
   Zap,
   Flame,
   ShieldCheck,
@@ -155,22 +155,22 @@ export const DevicesPage: React.FC = () => {
 
                   {/* 2. Model */}
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
-                    <div className="flex items-center gap-1.5 text-slate-700 font-bold">
-                      <Brain className="w-3.5 h-3.5 text-[#800000]" />
+                    <div className="flex items-center gap-1.5 text-slate-800 font-bold">
+                      <Microscope className="w-3.5 h-3.5 text-[#800000]" />
                       <span>ONNX Model</span>
                     </div>
                     <span className="text-[11px] text-slate-800 font-semibold block">{device.model_version}</span>
-                    <span className="text-[10px] text-emerald-700 font-bold block">24.6 ms FP16 Pass</span>
+                    <span className="text-[10px] text-emerald-800 font-bold block">24.6 ms FP16 Pass</span>
                   </div>
 
                   {/* 3. IoT ESP32 */}
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
-                    <div className="flex items-center gap-1.5 text-slate-700 font-bold">
+                    <div className="flex items-center gap-1.5 text-slate-800 font-bold">
                       <Zap className="w-3.5 h-3.5 text-[#800000]" />
                       <span>ESP32 IoT</span>
                     </div>
                     <span className="text-[11px] text-slate-800 font-semibold block">115200 Baud UART</span>
-                    <span className="text-[10px] text-emerald-700 font-bold block">600ms Optical Lock</span>
+                    <span className="text-[10px] text-emerald-800 font-bold block">600ms Optical Lock</span>
                   </div>
                 </div>
               </div>

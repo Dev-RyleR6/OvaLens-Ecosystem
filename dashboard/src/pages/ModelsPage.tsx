@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Cpu,
-  Brain,
+  Microscope,
   Zap,
   Activity,
   Layers,
@@ -102,7 +102,7 @@ export const ModelsPage: React.FC = () => {
           title="mAP@0.5 Score"
           value={`${(summary.overall_map50 * 100).toFixed(1)}%`}
           subtitle="Mean Average Precision @ IoU 0.50"
-          icon={Brain}
+          icon={Microscope}
           highlightColor="maroon"
         />
         <StatCard
