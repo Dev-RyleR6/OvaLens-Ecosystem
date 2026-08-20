@@ -57,8 +57,28 @@ export const apiClient = {
 
   getEconomicYield: async (): Promise<EconomicYield> => {
     try {
-      const res = await api.get<EconomicYield>('/analytics/economic-yield');
-      return res.data;
+      const res = await api.get<any>('/analytics/economic-yield');
+      const d = res.data;
+      if (!d) return mockEconomicYield;
+      const penoyCount = d.penoy_culled_day_10 ?? 168;
+      const penoyVal = d.salvage_revenue_php ?? d.estimated_penoy_salvage_value_php ?? (penoyCount * 14.00);
+      const kwhSaved = d.incubator_energy_saved_kwh ?? (penoyCount * 18 * 0.015);
+      const powerSaved = d.energy_savings_php ?? d.electricity_saved_estimated_php ?? (kwhSaved * 12.50);
+      const ducklingRev = d.duckling_sales_projected_php ?? d.projected_duckling_revenue_php ?? 21280.00;
+      const totalBenefit = d.total_economic_benefit_php ?? (penoyVal + powerSaved + ducklingRev);
+
+      return {
+        penoy_culled_day_10: penoyCount,
+        penoy_unit_price_php: d.penoy_unit_price_php ?? 14.00,
+        salvage_revenue_php: penoyVal,
+        estimated_penoy_salvage_value_php: penoyVal,
+        incubator_energy_saved_kwh: kwhSaved,
+        energy_savings_php: powerSaved,
+        electricity_saved_estimated_php: powerSaved,
+        total_economic_benefit_php: totalBenefit,
+        duckling_sales_projected_php: ducklingRev,
+        projected_duckling_revenue_php: ducklingRev,
+      };
     } catch {
       return mockEconomicYield;
     }
@@ -67,7 +87,7 @@ export const apiClient = {
   getMortalityTrends: async (): Promise<MortalityTrends> => {
     try {
       const res = await api.get<MortalityTrends>('/analytics/mortality-trends');
-      return res.data;
+      return res.data || mockMortalityTrends;
     } catch {
       return mockMortalityTrends;
     }
@@ -76,7 +96,7 @@ export const apiClient = {
   getBreedComparison: async (): Promise<BreedMetricItem[]> => {
     try {
       const res = await api.get<{ breeds: BreedMetricItem[] }>('/analytics/breed-comparison');
-      return res.data.breeds;
+      return res.data?.breeds || mockBreedComparison;
     } catch {
       return mockBreedComparison;
     }

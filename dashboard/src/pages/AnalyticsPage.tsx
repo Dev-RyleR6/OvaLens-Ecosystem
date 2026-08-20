@@ -16,9 +16,6 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell,
 } from 'recharts';
 
 import { StatCard } from '../components/StatCard';
@@ -33,21 +30,30 @@ export const AnalyticsPage: React.FC = () => {
   // Dynamic Financial Simulator sliders
   const [customEggs, setCustomEggs] = useState(168);
   const [customPrice, setCustomPrice] = useState(14.00);
-  const [ducklingPrice, setDucklingPrice] = useState(40.00);
   const [electricityRate, setElectricityRate] = useState(12.50); // PHP per kWh
 
   useEffect(() => {
+    let isMounted = true;
     const fetchData = async () => {
-      const [eData, mData, bData] = await Promise.all([
-        apiClient.getEconomicYield(),
-        apiClient.getMortalityTrends(),
-        apiClient.getBreedComparison(),
-      ]);
-      setEconomic(eData);
-      setMortality(mData);
-      setBreedMetrics(bData);
+      try {
+        const [eData, mData, bData] = await Promise.all([
+          apiClient.getEconomicYield(),
+          apiClient.getMortalityTrends(),
+          apiClient.getBreedComparison(),
+        ]);
+        if (isMounted) {
+          setEconomic(eData);
+          setMortality(mData);
+          setBreedMetrics(Array.isArray(bData) ? bData : []);
+        }
+      } catch (err) {
+        console.error("Error fetching analytics data:", err);
+      }
     };
     fetchData();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // 28-day duck egg developmental viability curve
@@ -63,31 +69,39 @@ export const AnalyticsPage: React.FC = () => {
   const mortalityBarData = [
     {
       stage: 'Day 10 (Early / Penoy)',
-      rate: mortality?.day_10_early_mortality_rate || 8.8,
+      rate: mortality?.day_10_early_mortality_rate ?? 8.8,
       desc: 'Unfertilized yolk / dead germinal disc (100% salvaged @ ₱14)',
       color: '#D97706',
     },
     {
       stage: 'Day 18 (Mid-Term)',
-      rate: mortality?.day_18_mid_mortality_rate || 3.2,
+      rate: mortality?.day_18_mid_mortality_rate ?? 3.2,
       desc: 'Mid embryonic arrest before hatcher transfer',
       color: '#DC2626',
     },
     {
       stage: 'Day 25 (Late / Pipping)',
-      rate: mortality?.day_25_late_mortality_rate || 1.4,
+      rate: mortality?.day_25_late_mortality_rate ?? 1.4,
       desc: 'Late dead-in-shell during shell pipping',
       color: '#991B1B',
     },
   ];
 
   // Dynamic calculations
-  const dynamicPenoySales = customEggs * customPrice;
-  const dynamicKwhSaved = customEggs * 18 * 0.015; // 0.015 kWh/egg/day across 18 days
-  const dynamicPowerSavings = dynamicKwhSaved * electricityRate;
-  const projectedDucklings = 450 * 0.88; // 88% hatchability
-  const dynamicDucklingRevenue = projectedDucklings * ducklingPrice;
+  const safeCustomEggs = Number(customEggs) || 0;
+  const safeCustomPrice = Number(customPrice) || 14.00;
+  const safeElectricityRate = Number(electricityRate) || 12.50;
+
+  const dynamicPenoySales = safeCustomEggs * safeCustomPrice;
+  const dynamicKwhSaved = safeCustomEggs * 18 * 0.015; // 0.015 kWh/egg/day across 18 days
+  const dynamicPowerSavings = dynamicKwhSaved * safeElectricityRate;
   const dynamicTotalBenefit = dynamicPenoySales + dynamicPowerSavings;
+
+  const penoyCount = economic?.penoy_culled_day_10 ?? 168;
+  const salvageRev = economic?.salvage_revenue_php ?? economic?.estimated_penoy_salvage_value_php ?? 2352.00;
+  const kwhSaved = economic?.incubator_energy_saved_kwh ?? 45.4;
+  const powerSaved = economic?.energy_savings_php ?? economic?.electricity_saved_estimated_php ?? 544.32;
+  const totalBenefit = economic?.total_economic_benefit_php ?? 24176.32;
 
   return (
     <div className="space-y-6 pb-8">
@@ -111,7 +125,7 @@ export const AnalyticsPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Penoy Eggs Salvaged"
-          value={economic ? `${economic.penoy_culled_day_10}` : '168'}
+          value={`${penoyCount}`}
           unit="eggs"
           subtitle="Culled on Day 10 candling"
           icon={Coins}
@@ -119,22 +133,22 @@ export const AnalyticsPage: React.FC = () => {
         />
         <StatCard
           title="Penoy Salvage Revenue"
-          value={economic ? `₱${economic.salvage_revenue_php.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '₱2,352.00'}
-          subtitle={`@ ₱${economic ? economic.penoy_unit_price_php : 14.0}/egg market rate`}
+          value={`₱${salvageRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle={`@ ₱${economic?.penoy_unit_price_php ?? 14.0}/egg market rate`}
           icon={TrendingUp}
           highlightColor="amber"
         />
         <StatCard
           title="Incubator Energy Saved"
-          value={economic ? `${economic.incubator_energy_saved_kwh.toFixed(1)}` : '45.4'}
+          value={`${kwhSaved.toFixed(1)}`}
           unit="kWh"
-          subtitle={`₱${economic ? economic.energy_savings_php.toFixed(2) : '544.32'} thermal power avoided`}
+          subtitle={`₱${powerSaved.toFixed(2)} thermal power avoided`}
           icon={Zap}
           highlightColor="blue"
         />
         <StatCard
           title="Total Economic Benefit"
-          value={economic ? `₱${economic.total_economic_benefit_php.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '₱24,176.32'}
+          value={`₱${totalBenefit.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
           subtitle="Direct sales + avoided power"
           icon={Award}
           highlightColor="green"
@@ -160,14 +174,14 @@ export const AnalyticsPage: React.FC = () => {
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
             <div className="flex justify-between text-xs">
               <label className="font-bold text-slate-700">Day 10 Infertile Eggs:</label>
-              <span className="font-extrabold text-[#800000]">{customEggs} eggs</span>
+              <span className="font-extrabold text-[#800000]">{safeCustomEggs} eggs</span>
             </div>
             <input
               type="range"
               min="0"
               max="500"
               step="5"
-              value={customEggs}
+              value={safeCustomEggs}
               onChange={(e) => setCustomEggs(Number(e.target.value))}
               className="w-full accent-[#800000] cursor-pointer"
             />
@@ -178,14 +192,14 @@ export const AnalyticsPage: React.FC = () => {
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
             <div className="flex justify-between text-xs">
               <label className="font-bold text-slate-700">Penoy Selling Price:</label>
-              <span className="font-extrabold text-amber-700">₱{customPrice.toFixed(2)} / egg</span>
+              <span className="font-extrabold text-amber-700">₱{safeCustomPrice.toFixed(2)} / egg</span>
             </div>
             <input
               type="range"
               min="10"
               max="22"
               step="0.5"
-              value={customPrice}
+              value={safeCustomPrice}
               onChange={(e) => setCustomPrice(Number(e.target.value))}
               className="w-full accent-[#800000] cursor-pointer"
             />
@@ -221,7 +235,7 @@ export const AnalyticsPage: React.FC = () => {
                   <p className="text-xs text-slate-500">Early arrest vs Mid-term vs Late pipping failure</p>
                 </div>
                 <span className="text-xs font-semibold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
-                  {mortality?.total_culled_eggs || 238} Culled Eggs Total
+                  {mortality?.total_culled_eggs ?? 238} Culled Eggs Total
                 </span>
               </div>
 
@@ -235,8 +249,8 @@ export const AnalyticsPage: React.FC = () => {
                     </div>
                     <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
                       <div
-                        className="h-full rounded-full"
-                        style={{ width: `${st.rate * 5}%`, backgroundColor: st.color }}
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, Math.max(0, st.rate * 5))}%`, backgroundColor: st.color }}
                       />
                     </div>
                     <p className="text-[11px] text-slate-500">{st.desc}</p>
@@ -263,8 +277,8 @@ export const AnalyticsPage: React.FC = () => {
                 <p className="text-xs text-slate-500">Live embryo retention curve across incubation milestones</p>
               </div>
 
-              <div className="h-60 mt-3">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-60 mt-3 w-full">
+                <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
                   <AreaChart data={cohortSurvivalData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="viabilityGradientFU" x1="0" y1="0" x2="0" y2="1">
@@ -325,12 +339,14 @@ export const AnalyticsPage: React.FC = () => {
               {breedMetrics.map((b) => (
                 <tr key={b.breed} className="hover:bg-slate-50 transition-colors">
                   <td className="py-3 px-4 font-bold text-[#0F172A]">{b.breed}</td>
-                  <td className="py-3 px-4 text-slate-700 font-medium">{b.total_eggs} eggs</td>
-                  <td className="py-3 px-4 text-emerald-700 font-bold">{b.fertile_count}</td>
-                  <td className="py-3 px-4 font-bold text-emerald-800">{b.fertility_rate}%</td>
-                  <td className="py-3 px-4 text-amber-800 font-semibold">{b.infertile_count} ({((b.infertile_count / b.total_eggs) * 100).toFixed(1)}%)</td>
-                  <td className="py-3 px-4 text-slate-800 font-bold">{b.hatched_count}</td>
-                  <td className="py-3 px-4 text-right font-extrabold text-slate-900">{b.hatchability_rate}%</td>
+                  <td className="py-3 px-4 text-slate-700 font-medium">{b.total_eggs ?? 0} eggs</td>
+                  <td className="py-3 px-4 text-emerald-700 font-bold">{b.fertile_count ?? 0}</td>
+                  <td className="py-3 px-4 font-bold text-emerald-800">{b.fertility_rate ?? 0}%</td>
+                  <td className="py-3 px-4 text-amber-800 font-semibold">
+                    {b.infertile_count ?? 0} ({b.total_eggs > 0 ? (((b.infertile_count ?? 0) / b.total_eggs) * 100).toFixed(1) : '0.0'}%)
+                  </td>
+                  <td className="py-3 px-4 text-slate-800 font-bold">{b.hatched_count ?? 0}</td>
+                  <td className="py-3 px-4 text-right font-extrabold text-slate-900">{b.hatchability_rate ?? 0}%</td>
                 </tr>
               ))}
             </tbody>

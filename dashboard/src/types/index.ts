@@ -101,12 +101,15 @@ export interface AnalyticsOverview {
 
 export interface EconomicYield {
   penoy_culled_day_10: number;
-  penoy_unit_price_php: number;
-  salvage_revenue_php: number;
-  incubator_energy_saved_kwh: number;
-  energy_savings_php: number;
-  total_economic_benefit_php: number;
+  penoy_unit_price_php?: number;
+  salvage_revenue_php?: number;
+  estimated_penoy_salvage_value_php?: number;
+  incubator_energy_saved_kwh?: number;
+  energy_savings_php?: number;
+  electricity_saved_estimated_php?: number;
+  total_economic_benefit_php?: number;
   duckling_sales_projected_php?: number;
+  projected_duckling_revenue_php?: number;
 }
 
 export interface MortalityTrends {
@@ -194,7 +197,7 @@ export interface ModelOpsSummary {
   avg_latency_ms: number;
   confusion_matrix: {
     classes: string[];
-    matrix: number[][]; // 3x3 normalized percentage [ [96.4, 2.1, 1.5], [3.2, 94.8, 2.0], [4.2, 3.7, 92.1] ]
+    matrix: number[][];
     raw_counts: number[][];
   };
 }
