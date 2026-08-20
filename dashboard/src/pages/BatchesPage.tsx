@@ -1,18 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus,
   Search,
   Download,
-  FileText,
   Layers,
   ChevronRight,
+  ChevronLeft,
   FastForward,
   Clock,
   User,
-  Activity,
-  CheckCircle2,
   Zap,
   Award,
+  List,
+  LayoutGrid,
+  ArrowUpDown,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { BatchSummary, DuckBreed, BatchStage, CandlingSession } from '../types';
@@ -22,11 +25,25 @@ import { Dialog } from '../components/ui/dialog';
 import { Sheet } from '../components/ui/sheet';
 import { CandlingCertificateModal } from '../components/CandlingCertificateModal';
 
+type ViewMode = 'TABLE' | 'GRID';
+type SortField = 'batch_code' | 'set_date' | 'initial_egg_count' | 'fertility_rate';
+type SortOrder = 'asc' | 'desc';
+
 export const BatchesPage: React.FC = () => {
   const [batches, setBatches] = useState<BatchSummary[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('TABLE');
   const [searchQuery, setSearchQuery] = useState('');
   const [breedFilter, setBreedFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [stageFilter, setStageFilter] = useState<string>('ALL');
+  
+  // Sorting & Pagination
+  const [sortField, setSortField] = useState<SortField>('set_date');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<BatchSummary | null>(null);
   const [batchSessions, setBatchSessions] = useState<CandlingSession[]>([]);
@@ -103,13 +120,81 @@ export const BatchesPage: React.FC = () => {
     }
   };
 
-  const filteredBatches = batches.filter((b) => {
-    const matchSearch = b.batch_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        b.incubator_id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchBreed = breedFilter === 'ALL' || b.breed === breedFilter;
-    const matchStatus = statusFilter === 'ALL' || b.status === statusFilter;
-    return matchSearch && matchBreed && matchStatus;
-  });
+  // Filtered & Sorted Batches
+  const processedBatches = useMemo(() => {
+    let result = [...batches];
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (b) =>
+          b.batch_code.toLowerCase().includes(q) ||
+          b.incubator_id.toLowerCase().includes(q) ||
+          b.breed.toLowerCase().includes(q)
+      );
+    }
+
+    if (breedFilter !== 'ALL') {
+      result = result.filter((b) => b.breed === breedFilter);
+    }
+
+    if (statusFilter !== 'ALL') {
+      result = result.filter((b) => b.status === statusFilter);
+    }
+
+    if (stageFilter !== 'ALL') {
+      result = result.filter((b) => b.current_stage === stageFilter);
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+
+      if (typeof aVal === 'string') {
+        return sortOrder === 'asc'
+          ? (aVal as string).localeCompare(bVal as string)
+          : (bVal as string).localeCompare(aVal as string);
+      }
+      return sortOrder === 'asc'
+        ? ((aVal as number) || 0) - ((bVal as number) || 0)
+        : ((bVal as number) || 0) - ((aVal as number) || 0);
+    });
+
+    return result;
+  }, [batches, searchQuery, breedFilter, statusFilter, stageFilter, sortField, sortOrder]);
+
+  // Paginated Batches
+  const paginatedBatches = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return processedBatches.slice(start, start + rowsPerPage);
+  }, [processedBatches, currentPage, rowsPerPage]);
+
+  const totalPages = Math.ceil(processedBatches.length / rowsPerPage) || 1;
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedBatchIds.length === paginatedBatches.length) {
+      setSelectedBatchIds([]);
+    } else {
+      setSelectedBatchIds(paginatedBatches.map((b) => b.batch_id));
+    }
+  };
+
+  const toggleSelectBatch = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedBatchIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
 
   return (
     <div className="space-y-6 pb-8">
@@ -133,24 +218,57 @@ export const BatchesPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Filter / Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search batch code or incubator unit..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#800000] shadow-xs"
-          />
+      {/* Enterprise Filter Toolbar */}
+      <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search batch code or incubator unit..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#800000] shadow-xs"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+              <button
+                onClick={() => setViewMode('TABLE')}
+                className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+                  viewMode === 'TABLE' ? 'bg-white text-[#800000] shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Table View"
+              >
+                <List className="w-3.5 h-3.5" />
+                <span>Table</span>
+              </button>
+              <button
+                onClick={() => setViewMode('GRID')}
+                className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+                  viewMode === 'GRID' ? 'bg-white text-[#800000] shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Grid Cards View"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Grid</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
           <select
             value={breedFilter}
-            onChange={(e) => setBreedFilter(e.target.value)}
-            className="h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
+            onChange={(e) => {
+              setBreedFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
           >
             <option value="ALL">All Duck Breeds</option>
             <option value="KAYUMANGGI">Kayumanggi</option>
@@ -159,9 +277,28 @@ export const BatchesPage: React.FC = () => {
           </select>
 
           <select
+            value={stageFilter}
+            onChange={(e) => {
+              setStageFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
+          >
+            <option value="ALL">All Incubation Stages</option>
+            <option value="SETTING">Setting (Day 0-9)</option>
+            <option value="DAY_10">Day 10 (1st Candling)</option>
+            <option value="DAY_18">Day 18 (2nd Candling)</option>
+            <option value="DAY_25">Day 25 (Pipping)</option>
+            <option value="COMPLETED">Completed</option>
+          </select>
+
+          <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
             <option value="INCUBATING">Incubating</option>
@@ -170,81 +307,228 @@ export const BatchesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Batches Table Card */}
-      <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="py-3 px-4">Batch Code</th>
-                <th className="py-3 px-4">Duck Breed</th>
-                <th className="py-3 px-4">Incubator</th>
-                <th className="py-3 px-4">Initial Set</th>
-                <th className="py-3 px-4">Current Stage</th>
-                <th className="py-3 px-4">Fertility Rate</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredBatches.map((b) => (
-                <tr
-                  key={b.batch_id}
-                  className="hover:bg-slate-50 transition-colors cursor-pointer"
-                  onClick={() => handleSelectBatch(b)}
-                >
-                  <td className="py-3 px-4 font-bold text-[#0F172A]">
-                    <div className="flex items-center gap-2">
-                      <Layers className="w-3.5 h-3.5 text-[#800000]" />
-                      <span>{b.batch_code}</span>
+      {/* View Mode: Table vs Grid */}
+      {viewMode === 'TABLE' ? (
+        <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th className="py-3 px-4 w-10 text-center">
+                    <button onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+                      {selectedBatchIds.length === paginatedBatches.length && paginatedBatches.length > 0 ? (
+                        <CheckSquare className="w-4 h-4 text-[#800000]" />
+                      ) : (
+                        <Square className="w-4 h-4" />
+                      )}
+                    </button>
+                  </th>
+                  <th
+                    className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                    onClick={() => toggleSort('batch_code')}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Batch Code</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
-                    <span className="text-[11px] text-slate-500 font-normal block mt-0.5">
-                      Set: {new Date(b.set_date).toLocaleDateString()}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 font-semibold text-slate-700">{b.breed}</td>
-                  <td className="py-3 px-4 text-slate-600 font-medium">{b.incubator_id}</td>
-                  <td className="py-3 px-4 text-slate-800 font-bold">{b.initial_egg_count} eggs</td>
-                  <td className="py-3 px-4">
-                    <Badge type="stage" value={b.current_stage} />
-                  </td>
-                  <td className="py-3 px-4 font-bold text-slate-900">
-                    {b.fertility_rate > 0 ? `${b.fertility_rate}%` : 'Pending Day 10'}
-                  </td>
-                  <td className="py-3 px-4">
-                    <Badge type="status" value={b.status} />
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={(e) => handleOpenCertificate(b, e)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded bg-maroon-50 hover:bg-maroon-100 text-[#800000] border border-maroon-200 transition-colors cursor-pointer"
-                        title="View Official Candling Certificate"
-                      >
-                        <Award className="w-3.5 h-3.5" />
-                        <span>Certificate</span>
-                      </button>
-
-                      <a
-                        href={apiClient.downloadCSVUrl(b.batch_id)}
-                        download
-                        className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors inline-block"
-                        title="Export CSV Data"
-                      >
-                        <Download className="w-4 h-4" />
-                      </a>
-                      <button
-                        className="p-1.5 text-slate-400 hover:text-slate-700 cursor-pointer"
-                        onClick={() => handleSelectBatch(b)}
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
+                  </th>
+                  <th className="py-3 px-4">Duck Breed</th>
+                  <th className="py-3 px-4">Incubator</th>
+                  <th
+                    className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                    onClick={() => toggleSort('initial_egg_count')}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Initial Set</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
-                  </td>
+                  </th>
+                  <th className="py-3 px-4">Current Stage</th>
+                  <th
+                    className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                    onClick={() => toggleSort('fertility_rate')}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Fertility Rate</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedBatches.map((b) => {
+                  const isSelected = selectedBatchIds.includes(b.batch_id);
+                  return (
+                    <tr
+                      key={b.batch_id}
+                      className={`hover:bg-slate-50 transition-colors cursor-pointer ${
+                        isSelected ? 'bg-maroon-50/30' : ''
+                      }`}
+                      onClick={() => handleSelectBatch(b)}
+                    >
+                      <td className="py-3 px-4 text-center" onClick={(e) => toggleSelectBatch(b.batch_id, e)}>
+                        {isSelected ? (
+                          <CheckSquare className="w-4 h-4 text-[#800000]" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-300 hover:text-slate-500" />
+                        )}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-[#0F172A]">
+                        <div className="flex items-center gap-2">
+                          <Layers className="w-3.5 h-3.5 text-[#800000]" />
+                          <span>{b.batch_code}</span>
+                        </div>
+                        <span className="text-[11px] text-slate-500 font-normal block mt-0.5">
+                          Set: {new Date(b.set_date).toLocaleDateString()}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-semibold text-slate-700">{b.breed}</td>
+                      <td className="py-3 px-4 text-slate-600 font-medium">{b.incubator_id}</td>
+                      <td className="py-3 px-4 text-slate-800 font-bold">{b.initial_egg_count} eggs</td>
+                      <td className="py-3 px-4">
+                        <Badge type="stage" value={b.current_stage} />
+                      </td>
+                      <td className="py-3 px-4 font-bold text-slate-900">
+                        {b.fertility_rate > 0 ? `${b.fertility_rate}%` : 'Pending Day 10'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge type="status" value={b.status} />
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={(e) => handleOpenCertificate(b, e)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded bg-maroon-50 hover:bg-maroon-100 text-[#800000] border border-maroon-200 transition-colors cursor-pointer"
+                            title="View Official Candling Certificate"
+                          >
+                            <Award className="w-3.5 h-3.5" />
+                            <span>Certificate</span>
+                          </button>
+
+                          <a
+                            href={apiClient.downloadCSVUrl(b.batch_id)}
+                            download
+                            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors inline-block"
+                            title="Export CSV Data"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+                          <button
+                            className="p-1.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+                            onClick={() => handleSelectBatch(b)}
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        /* Grid / Card View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {paginatedBatches.map((b) => (
+            <div
+              key={b.batch_id}
+              onClick={() => handleSelectBatch(b)}
+              className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs hover:border-[#800000] transition-colors cursor-pointer space-y-4 flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-[#800000]" />
+                      <h3 className="font-bold text-[#0F172A] text-sm">{b.batch_code}</h3>
+                    </div>
+                    <span className="text-[11px] text-slate-500 mt-0.5 block">
+                      Breed: <strong>{b.breed}</strong> • Incubator: <strong>{b.incubator_id}</strong>
+                    </span>
+                  </div>
+                  <Badge type="stage" value={b.current_stage} />
+                </div>
+
+                {/* Classification Breakdown */}
+                <div className="grid grid-cols-3 gap-2 text-center mt-3">
+                  <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-200">
+                    <span className="text-[10px] text-emerald-700 font-bold block">Fertile</span>
+                    <span className="text-base font-extrabold text-emerald-900">{b.fertile_count}</span>
+                  </div>
+                  <div className="p-2 bg-amber-50 rounded-lg border border-amber-200">
+                    <span className="text-[10px] text-amber-700 font-bold block">Penoy</span>
+                    <span className="text-base font-extrabold text-amber-900">{b.infertile_count}</span>
+                  </div>
+                  <div className="p-2 bg-red-50 rounded-lg border border-red-200">
+                    <span className="text-[10px] text-red-700 font-bold block">Dead</span>
+                    <span className="text-base font-extrabold text-red-900">{b.abnormal_count}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs pt-3 text-slate-600">
+                  <span>Initial Egg Set: <strong>{b.initial_egg_count}</strong></span>
+                  <span className="font-bold text-emerald-700">{b.fertility_rate > 0 ? `${b.fertility_rate}% Fertile` : 'Pending'}</span>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-slate-500">Day 10 Salvage: <strong>₱{(b.infertile_count * 14.0).toFixed(2)}</strong></span>
+                <button
+                  onClick={(e) => handleOpenCertificate(b, e)}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-[#800000] hover:underline"
+                >
+                  <Award className="w-3.5 h-3.5" />
+                  <span>Certificate</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 pt-2">
+        <div className="flex items-center gap-2">
+          <span>Showing {paginatedBatches.length} of {processedBatches.length} batches</span>
+          <span>•</span>
+          <span>Rows per page:</span>
+          <select
+            value={rowsPerPage}
+            onChange={(e) => {
+              setRowsPerPage(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+            className="h-7 px-2 bg-white border border-slate-200 rounded text-slate-700 font-medium focus:outline-none"
+          >
+            <option value={5}>5</option>
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="px-2 font-bold text-slate-800">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
