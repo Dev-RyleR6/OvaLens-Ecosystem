@@ -8,7 +8,7 @@ from typing import Optional, Union, Any
 from app.core.config import settings
 
 try:
-    # pyrefly: ignore [missing-import]
+        # pyrefly: ignore [missing-import]
     from passlib.context import CryptContext
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     _HAVE_PASSLIB = True
@@ -16,7 +16,6 @@ except ImportError:
     _HAVE_PASSLIB = False
 
 try:
-    # pyrefly: ignore [missing-import]
     from jose import jwt, JWTError
     _HAVE_JOSE = True
 except ImportError:

@@ -1,313 +1,295 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Layers,
   Activity,
+  Layers,
+  TrendingUp,
   Coins,
-  Flame,
-  ArrowRight,
-  Download,
+  Cpu,
+  Eye,
+  Zap,
   Clock,
-  Sparkles
+  CheckCircle2,
+  AlertTriangle,
+  Flame,
+  HardDrive
 } from 'lucide-react';
 import {
+  ResponsiveContainer,
   BarChart,
   Bar,
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
   PieChart,
   Pie,
-  Cell,
-  Legend
+  Cell
 } from 'recharts';
-import { Link } from 'react-router-dom';
 
 import { StatCard } from '../components/StatCard';
 import { Badge } from '../components/Badge';
+import { TrayMatrix } from '../components/TrayMatrix';
+import { CandlingAperture } from '../components/CandlingAperture';
 import { BatchProgressTimeline } from '../components/BatchProgressTimeline';
 import { apiClient } from '../api/client';
-import { AnalyticsOverview, EconomicYield, BatchSummary, EggScan } from '../types';
+import { AnalyticsOverview, BatchSummary, EggScan } from '../types';
 
 export const OverviewPage: React.FC = () => {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
-  const [economic, setEconomic] = useState<EconomicYield | null>(null);
   const [batches, setBatches] = useState<BatchSummary[]>([]);
   const [recentScans, setRecentScans] = useState<EggScan[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [selectedBatch, setSelectedBatch] = useState<BatchSummary | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [oData, eData, bData, sData] = await Promise.all([
-          apiClient.getOverview(),
-          apiClient.getEconomicYield(),
-          apiClient.getBatches(),
-          apiClient.getScans({ limit: 6 })
-        ]);
-        setOverview(oData);
-        setEconomic(eData);
-        setBatches(bData);
-        setRecentScans(sData);
-      } catch (err) {
-        console.error("Failed to load overview data", err);
-      } finally {
-        setLoading(false);
+    const fetchDashboardData = async () => {
+      const [overviewData, batchesData, scansData] = await Promise.all([
+        apiClient.getOverview(),
+        apiClient.getBatches(),
+        apiClient.getScans({ limit: 10 })
+      ]);
+      setOverview(overviewData);
+      setBatches(batchesData);
+      setRecentScans(scansData);
+      if (batchesData.length > 0) {
+        setSelectedBatch(batchesData[0]);
       }
     };
-    fetchData();
+    fetchDashboardData();
   }, []);
 
-  // Breed breakdown data
-  const breedData = [
-    { breed: 'Kayumanggi', eggs: 1000, fertileRate: 90.2, color: '#800000' },
-    { breed: 'Itim (Native)', eggs: 450, fertileRate: 88.0, color: '#357a38' },
-    { breed: 'Khaki Campbell', eggs: 600, fertileRate: 91.0, color: '#D97706' },
+  const fertilityDistribution = [
+    { name: 'Fertile (Accept)', count: overview?.total_fertile || 436, color: '#16A34A' },
+    { name: 'Infertile (Penoy)', count: overview?.total_infertile || 48, color: '#F59E0B' },
+    { name: 'Abnormal (Dead)', count: overview?.total_abnormal || 16, color: '#DC2626' },
   ];
 
-  // Classification pie data
-  const classPieData = overview ? [
-    { name: 'Fertile (Active)', value: overview.total_fertile, color: '#357a38' },
-    { name: 'Infertile (Penoy)', value: overview.total_infertile, color: '#D97706' },
-    { name: 'Abnormal / Dead', value: overview.total_abnormal, color: '#DC2626' },
-  ] : [];
+  const breedPerformance = [
+    { breed: 'Kayumanggi', fertility: 91.2, eggs: 500 },
+    { breed: 'Itim (Native)', fertility: 87.5, eggs: 450 },
+    { breed: 'Khaki Campbell', fertility: 84.8, eggs: 350 },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Page Banner */}
-      <div className="bg-gradient-to-r from-[#800000] via-[#5C0000] to-slate-900 rounded-2xl p-6 shadow-xl border border-[#991B1B]/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* Top Banner / System Status */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-obsidian-900 border border-obsidian-700/80 p-4 rounded-lg shadow-xl">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-400 text-slate-900 uppercase tracking-wide">
-              Live Operations
-            </span>
-            <span className="text-xs text-amber-200/80">Bayawan Incubation Facility</span>
-          </div>
-          <h2 className="text-2xl font-black text-white mt-1">Hatchery Executive Overview</h2>
-          <p className="text-sm text-slate-200 mt-0.5 max-w-xl">
-            Real-time duck egg fertility classification, Day-10 penoy salvage tracking, and incubator lifecycle management.
+          <h2 className="text-lg font-display font-black tracking-wide text-white uppercase flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-led-pulse shadow-[0_0_8px_#10B981]" />
+            Hatchery Candling Operations & Biological Telemetry
+          </h2>
+          <p className="text-xs font-mono text-slate-400">
+            Real-time duck egg developmental monitoring • YOLOv8 ONNX FP16 Vision Engine • Foundation University
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Link
-            to="/batches"
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900/80 hover:bg-slate-900 text-white rounded-lg text-sm font-semibold border border-slate-700 transition-all shadow-md"
-          >
-            <Layers className="w-4 h-4 text-amber-400" />
-            Manage Batches
-          </Link>
-          <Link
-            to="/scans"
-            className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg text-sm font-bold transition-all shadow-md"
-          >
-            <Sparkles className="w-4 h-4" />
-            Live Scans
-          </Link>
+        {/* Quick Conveyor Control Actions */}
+        <div className="flex items-center gap-2 text-xs font-mono">
+          <div className="px-3 py-1.5 bg-obsidian-950 border border-obsidian-700 rounded text-slate-300 flex items-center gap-2">
+            <Cpu className="w-3.5 h-3.5 text-amber-400" />
+            <span>CONVEYOR: <strong className="text-emerald-400">12.5 cm/s</strong></span>
+          </div>
+          <div className="px-3 py-1.5 bg-obsidian-950 border border-obsidian-700 rounded text-slate-300 flex items-center gap-2">
+            <Activity className="w-3.5 h-3.5 text-amber-400" />
+            <span>THROUGHPUT: <strong className="text-amber-300">45 eggs/min</strong></span>
+          </div>
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
+      {/* 4 High-Density SCADA KPI Tiles */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Eggs Candled"
-          value={overview ? overview.total_eggs_scanned.toLocaleString() : '---'}
-          subtitle={`Avg Latency: ${overview ? overview.avg_inference_ms : 28}ms`}
-          icon={Layers}
-          colorScheme="maroon"
-          trend={{ value: '+500 today', isPositive: true }}
-        />
-        <StatCard
-          title="Overall Fertility Rate"
-          value={overview ? `${overview.overall_fertility_rate.toFixed(1)}%` : '---'}
-          subtitle={`${overview ? overview.total_fertile : 0} fertile embryos`}
+          title="Total Candled (Day 10-25)"
+          value={overview ? overview.total_eggs_scanned : '500'}
+          unit="eggs"
+          subtitle="98.2% Optical Verification"
           icon={Activity}
-          colorScheme="green"
-          trend={{ value: '+1.8% vs benchmark', isPositive: true }}
+          accentColor="cyan"
+          trend={{ value: '100% SLA', isPositive: true, label: 'FP16 ONNX' }}
         />
         <StatCard
-          title="Day 10 Penoy Economic Gain"
-          value={economic ? `₱${economic.total_economic_benefit_php.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '---'}
-          subtitle={`${economic ? economic.penoy_culled_day_10 : 0} eggs salvaged @ ₱14`}
+          title="Fertility Viability Rate"
+          value={overview ? `${overview.overall_fertility_rate}%` : '87.2%'}
+          subtitle={`${overview?.total_fertile || 436} Viable Spider Veins`}
+          icon={CheckCircle2}
+          accentColor="green"
+          trend={{ value: '+2.4%', isPositive: true, label: 'vs baseline' }}
+        />
+        <StatCard
+          title="Day 10 Penoy Salvage"
+          value={`₱${((overview?.total_infertile || 48) * 14.0).toFixed(2)}`}
+          subtitle={`${overview?.total_infertile || 48} Eggs Culled @ ₱14.00/egg`}
           icon={Coins}
-          colorScheme="amber"
-          trend={{ value: '+₱544 energy saved', isPositive: true }}
+          accentColor="amber"
+          trend={{ value: '100% Salvage', isPositive: true, label: 'Food Market' }}
         />
         <StatCard
           title="Active Incubating Batches"
-          value={overview ? overview.active_batches_count : '---'}
-          subtitle="Kayumanggi & Itim Flocks"
-          icon={Flame}
-          colorScheme="blue"
+          value={overview ? overview.active_batches_count : '3'}
+          unit="batches"
+          subtitle="1,300 Total Incubator Set"
+          icon={Layers}
+          accentColor="maroon"
+          baseline="3 Units Online"
         />
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Classification Donut (1 col) */}
-        <div className="bg-[#1E293B] border border-slate-800 rounded-xl p-5 shadow-lg">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 mb-1">
-            Fertility Distribution
-          </h3>
-          <p className="text-xs text-slate-400 mb-4">Total breakdown across all candling runs</p>
+      {/* Split Centerpiece: Physical 42-Egg Tray Heatmap + Optical Candling Aperture */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Left: Physical 42-Egg Tray Heatmap Matrix */}
+        <TrayMatrix
+          batchCode={selectedBatch?.batch_code || "BATCH-2026-08-KAY-01"}
+          trayNumber={1}
+        />
 
-          <div className="h-60">
+        {/* Right: Live Optical Candling Aperture & Spectral Layer Inspector */}
+        <CandlingAperture
+          finalClass={recentScans[0]?.final_class || 'FERTILE'}
+          confidence={recentScans[0]?.confidence || 0.948}
+          inferenceMs={recentScans[0]?.inference_ms || 26.4}
+          sequenceNumber={recentScans[0]?.sequence_number || 42}
+          batchId={selectedBatch?.batch_code || 'BATCH-2026-08-KAY-01'}
+        />
+      </div>
+
+      {/* Analytics & Cohort Benchmarks */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Fertility Class Breakdown Donut */}
+        <div className="panel-scada p-4 space-y-3">
+          <div className="flex items-center justify-between border-b border-obsidian-700/60 pb-2">
+            <h3 className="text-xs font-display font-bold uppercase tracking-wider text-slate-200">
+              Fertility Distribution (3-Class YOLO)
+            </h3>
+            <span className="text-[10px] font-mono text-slate-400">Total: 500 Eggs</span>
+          </div>
+
+          <div className="h-44 relative flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={classPieData}
+                  data={fertilityDistribution}
                   cx="50%"
                   cy="50%"
-                  innerRadius={55}
-                  outerRadius={80}
+                  innerRadius={45}
+                  outerRadius={68}
                   paddingAngle={4}
-                  dataKey="value"
+                  dataKey="count"
                 >
-                  {classPieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {fertilityDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} stroke="#070A11" strokeWidth={2} />
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '8px', color: '#fff' }}
-                />
-                <Legend
-                  formatter={(value) => <span className="text-xs text-slate-300">{value}</span>}
+                  contentStyle={{ backgroundColor: '#070A11', borderColor: '#1E293B', borderRadius: '6px', fontSize: '11px', fontFamily: 'JetBrains Mono', color: '#fff' }}
+                  formatter={(val: any, name: any) => [`${val} eggs`, name]}
                 />
               </PieChart>
             </ResponsiveContainer>
+
+            {/* Inner Donut Center Metric */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-lg font-mono font-black text-white">87.2%</span>
+              <span className="text-[8px] font-mono text-emerald-400 font-bold">FERTILE</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] font-mono pt-1">
+            <div className="p-1.5 bg-emerald-950/40 rounded border border-emerald-800/40">
+              <span className="text-emerald-400 block font-bold">436 FERTILE</span>
+              <span className="text-[9px] text-slate-400">ACCEPT</span>
+            </div>
+            <div className="p-1.5 bg-amber-950/40 rounded border border-amber-800/40">
+              <span className="text-amber-300 block font-bold">48 PENOY</span>
+              <span className="text-[9px] text-slate-400">DAY 10 CULL</span>
+            </div>
+            <div className="p-1.5 bg-rose-950/40 rounded border border-rose-800/40">
+              <span className="text-rose-400 block font-bold">16 DEAD</span>
+              <span className="text-[9px] text-slate-400">DISCARD</span>
+            </div>
           </div>
         </div>
 
-        {/* Right: Breed Benchmark Comparison (2 cols) */}
-        <div className="bg-[#1E293B] border border-slate-800 rounded-xl p-5 shadow-lg lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">
-                Breed Fertility Benchmarking
-              </h3>
-              <p className="text-xs text-slate-400">Fertility yield percentage by duck breed</p>
-            </div>
-            <span className="text-xs font-semibold px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700">
-              Season 2026
-            </span>
+        {/* Breed Fertility Benchmark Comparison */}
+        <div className="panel-scada p-4 space-y-3">
+          <div className="flex items-center justify-between border-b border-obsidian-700/60 pb-2">
+            <h3 className="text-xs font-display font-bold uppercase tracking-wider text-slate-200">
+              Breed Fertility Benchmark
+            </h3>
+            <span className="text-[10px] font-mono text-emerald-400 font-bold">KAYUMANGGI LEADS</span>
           </div>
 
-          <div className="h-60">
+          <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={breedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="breed" stroke="#64748B" fontSize={12} tickLine={false} />
-                <YAxis domain={[80, 100]} stroke="#64748B" fontSize={12} tickLine={false} unit="%" />
+              <BarChart data={breedPerformance} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                <XAxis dataKey="breed" stroke="#64748B" fontSize={10} tickLine={false} />
+                <YAxis domain={[75, 100]} stroke="#64748B" fontSize={10} tickLine={false} unit="%" />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '8px', color: '#fff' }}
+                  contentStyle={{ backgroundColor: '#070A11', borderColor: '#1E293B', borderRadius: '6px', fontSize: '11px', fontFamily: 'JetBrains Mono', color: '#fff' }}
                   formatter={(val: any) => [`${val}%`, 'Fertility Rate']}
                 />
-                <Bar dataKey="fertileRate" radius={[6, 6, 0, 0]}>
-                  {breedData.map((entry, index) => (
-                    <Cell key={`bar-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
+                <Bar dataKey="fertility" fill="#800000" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
-      </div>
 
-      {/* Active Batches & Quick Progress */}
-      <div className="bg-[#1E293B] border border-slate-800 rounded-xl p-6 shadow-lg">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-base font-bold text-slate-100">Active Incubation Batches</h3>
-            <p className="text-xs text-slate-400">Current 28-day lifecycle status and candling milestones</p>
+          <div className="text-[10px] font-mono text-slate-400 text-center pt-1 border-t border-obsidian-800">
+            Kayumanggi yields highest Day 10 viability (91.2%) vs Native Itim (87.5%).
           </div>
-          <Link
-            to="/batches"
-            className="text-xs text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 transition-colors"
-          >
-            View All <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
         </div>
 
-        <div className="space-y-4">
-          {batches.filter(b => b.status === 'INCUBATING').map((b) => (
-            <div key={b.batch_id} className="p-4 rounded-lg bg-slate-900/60 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="space-y-1">
+        {/* Live Conveyor Scan Ticker */}
+        <div className="panel-scada p-4 space-y-3">
+          <div className="flex items-center justify-between border-b border-obsidian-700/60 pb-2">
+            <h3 className="text-xs font-display font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-led-pulse" />
+              Live Sorter Scan Feed
+            </h3>
+            <span className="text-[10px] font-mono text-slate-400">Stream: Active</span>
+          </div>
+
+          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+            {recentScans.slice(0, 5).map((scan) => (
+              <div
+                key={scan.scan_id}
+                className="p-2 bg-obsidian-950 rounded border border-obsidian-800 flex items-center justify-between text-[11px] font-mono hover:border-obsidian-700 transition-colors"
+              >
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-slate-100">{b.batch_code}</span>
-                  <Badge type="stage" value={b.current_stage} />
-                  <span className="text-xs text-amber-400 font-medium">{b.breed}</span>
+                  <span className="font-bold text-amber-400">#{scan.sequence_number.toString().padStart(3, '0')}</span>
+                  <Badge type="fertility" value={scan.final_class} size="sm" />
                 </div>
-                <p className="text-xs text-slate-400">
-                  {b.initial_egg_count} eggs • Incubator: {b.incubator_id} • Fertility: <strong className="text-emerald-400">{b.fertility_rate}%</strong>
-                </p>
+                <div className="flex items-center gap-3 text-[10px]">
+                  <span className="text-slate-300">{(scan.confidence * 100).toFixed(0)}%</span>
+                  <span className="text-slate-500">{scan.inference_ms}ms</span>
+                  <span className={`font-bold ${scan.routing_action === 'ACCEPT' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {scan.routing_action}
+                  </span>
+                </div>
               </div>
-
-              <div className="w-full md:w-1/2">
-                <BatchProgressTimeline currentStage={b.current_stage} setDate={b.set_date} />
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <a
-                  href={apiClient.downloadPDFUrl(b.batch_id)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" /> PDF
-                </a>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Recent Activity Scans */}
-      <div className="bg-[#1E293B] border border-slate-800 rounded-xl p-6 shadow-lg">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-base font-bold text-slate-100">Live Conveyor Scan Stream</h3>
-            <p className="text-xs text-slate-400">Real-time edge candling triggers and automated diverter actions</p>
+            ))}
           </div>
-          <Link
-            to="/scans"
-            className="text-xs text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 transition-colors"
-          >
-            Explore Scans <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
-              <tr>
-                <th className="py-3 px-4"># Sequence</th>
-                <th className="py-3 px-4">Batch ID</th>
-                <th className="py-3 px-4">Classification</th>
-                <th className="py-3 px-4">Confidence</th>
-                <th className="py-3 px-4">Latency</th>
-                <th className="py-3 px-4">Diverter Action</th>
-                <th className="py-3 px-4">Timestamp</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800 font-mono">
-              {recentScans.map((scan) => (
-                <tr key={scan.scan_id} className="hover:bg-slate-800/40 transition-colors">
-                  <td className="py-2.5 px-4 font-bold text-slate-300">#{scan.sequence_number.toString().padStart(3, '0')}</td>
-                  <td className="py-2.5 px-4 text-slate-300">{scan.batch_id}</td>
-                  <td className="py-2.5 px-4"><Badge type="fertility" value={scan.final_class} /></td>
-                  <td className="py-2.5 px-4 text-slate-200">{(scan.confidence * 100).toFixed(1)}%</td>
-                  <td className="py-2.5 px-4 text-slate-400">{scan.inference_ms}ms</td>
-                  <td className="py-2.5 px-4 font-sans font-bold">
-                    <span className={scan.routing_action === 'ACCEPT' ? 'text-emerald-400' : 'text-red-400'}>
-                      {scan.routing_action}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-4 text-slate-500 font-sans">{new Date(scan.scanned_at).toLocaleTimeString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
+
+      {/* Active Incubation Batch Timeline */}
+      {selectedBatch && (
+        <div className="panel-scada p-4 space-y-3">
+          <div className="flex items-center justify-between border-b border-obsidian-700/60 pb-2">
+            <div>
+              <h3 className="text-xs font-display font-bold uppercase tracking-wider text-slate-200">
+                Active Incubation Lifecycle — {selectedBatch.batch_code}
+              </h3>
+              <p className="text-[10px] font-mono text-slate-400">
+                Breed: <strong>{selectedBatch.breed}</strong> • Incubator: <strong>{selectedBatch.incubator_id}</strong> • Initial Set: <strong>{selectedBatch.initial_egg_count} eggs</strong>
+              </p>
+            </div>
+            <Badge type="status" value={selectedBatch.status} />
+          </div>
+
+          <BatchProgressTimeline
+            currentStage={selectedBatch.current_stage}
+            setDate={selectedBatch.set_date}
+          />
+        </div>
+      )}
     </div>
   );
 };

@@ -7,27 +7,36 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['"Space Grotesk"', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
+      },
       colors: {
-        fu: {
-          maroon: "#800000",
-          darkmaroon: "#5C0000",
-          lightmaroon: "#991B1B",
-          gold: "#EAB308",
-          green: "#357a38",
-          darkgreen: "#285e2b",
-          red: "#DC2626",
-          amber: "#D97706",
+        obsidian: {
+          950: '#070A11',
+          900: '#0C101B',
+          850: '#0F1523',
+          800: '#121826',
+          700: '#1A2234',
+          600: '#253147',
+          500: '#334155',
         },
-        dark: {
-          bg: "#0F172A",       // Main Slate 900
-          card: "#1E293B",     // Slate 800
-          cardalt: "#334155",  // Slate 700
-          border: "#334155",   // Slate 700
-          muted: "#94A3B8",    // Slate 400
+        brand: {
+          maroon: '#800000',
+          darkMaroon: '#5C0000',
+          lightMaroon: '#991B1B',
+          green: '#16A34A',
+          red: '#DC2626',
+          amber: '#D97706',
+          gold: '#EAB308',
         }
       },
-      fontFamily: {
-        sans: ['Inter', 'Segoe UI', 'sans-serif'],
+      backgroundImage: {
+        'tech-grid': 'radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px)',
+      },
+      backgroundSize: {
+        'tech-grid': '20px 20px',
       }
     },
   },
