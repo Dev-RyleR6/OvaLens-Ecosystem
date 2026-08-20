@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 
-from app.models.scan import EggScanModel, FertilityClass
+from app.models.scan import EggScanModel, FertilityClass, RoutingAction
 from app.models.session import CandlingSessionModel
 from app.schemas.scan import ScanSyncPayload, ScanSyncResponse
 from app.core.exceptions import EntityNotFoundException
@@ -73,3 +73,14 @@ class ScanService:
             duplicates_ignored=duplicates_ignored,
             session_id=session_id
         )
+
+    @staticmethod
+    def override_scan(db: Session, scan_id: UUID, final_class: FertilityClass) -> EggScanModel:
+        scan = db.query(EggScanModel).filter(EggScanModel.scan_id == scan_id).first()
+        if not scan:
+            raise EntityNotFoundException(f"Scan '{scan_id}' not found.")
+        scan.final_class = final_class
+        scan.routing_action = RoutingAction.ACCEPT if final_class == FertilityClass.FERTILE else RoutingAction.REJECT
+        db.commit()
+        db.refresh(scan)
+        return scan

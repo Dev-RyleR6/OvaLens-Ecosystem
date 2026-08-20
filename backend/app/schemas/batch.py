@@ -22,6 +22,10 @@ class BatchUpdate(BaseModel):
     unhatched_count: Optional[int] = None
 
 
+class AdvanceStagePayload(BaseModel):
+    stage: BatchStage
+
+
 class BatchResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

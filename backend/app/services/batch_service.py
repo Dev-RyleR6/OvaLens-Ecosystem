@@ -83,6 +83,16 @@ class BatchService:
         return batch
 
     @staticmethod
+    def advance_stage(db: Session, batch_id: str, stage: BatchStage) -> BatchModel:
+        batch = BatchService.get_batch(db, batch_id)
+        batch.current_stage = stage
+        if stage in (BatchStage.HATCHED, BatchStage.COMPLETED):
+            batch.status = BatchStatus.COMPLETED
+        db.commit()
+        db.refresh(batch)
+        return batch
+
+    @staticmethod
     def get_batch_summary(db: Session, batch_id: str) -> BatchSummaryResponse:
         batch = BatchService.get_batch(db, batch_id)
 

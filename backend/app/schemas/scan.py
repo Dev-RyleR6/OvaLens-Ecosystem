@@ -68,3 +68,8 @@ class ScanDetailResponse(BaseModel):
     detections: List[Dict[str, Any]]
     scanned_at: datetime
     synced_at: datetime
+
+
+class ScanOverridePayload(BaseModel):
+    final_class: FertilityClass
+    reason: Optional[str] = None

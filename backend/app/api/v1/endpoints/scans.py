@@ -8,7 +8,7 @@ from sqlalchemy import desc
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.scan import EggScanModel, FertilityClass
-from app.schemas.scan import ScanSyncPayload, ScanSyncResponse, ScanListItem, ScanDetailResponse
+from app.schemas.scan import ScanSyncPayload, ScanSyncResponse, ScanListItem, ScanDetailResponse, ScanOverridePayload
 from app.services.scan_service import ScanService
 from app.api.deps import verify_api_key
 
@@ -75,3 +75,12 @@ def get_scan(scan_id: UUID, db: Session = Depends(get_db)):
     if not scan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Scan '{scan_id}' not found.")
     return scan
+
+
+@router.patch("/{scan_id}/override", response_model=ScanDetailResponse, summary="Operator Human-in-the-Loop classification override")
+def override_scan(
+    scan_id: UUID,
+    payload: ScanOverridePayload,
+    db: Session = Depends(get_db)
+):
+    return ScanService.override_scan(db, scan_id, payload.final_class)

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.batch import DuckBreed, BatchStatus
 from app.models.user import UserModel
-from app.schemas.batch import BatchCreate, BatchUpdate, BatchResponse, BatchSummaryResponse
+from app.schemas.batch import BatchCreate, BatchUpdate, BatchResponse, BatchSummaryResponse, AdvanceStagePayload
 from app.services.batch_service import BatchService
 from app.api.deps import get_current_user, require_manager_or_admin
 
@@ -49,6 +49,15 @@ def update_batch(
     current_user: UserModel = Depends(require_manager_or_admin)
 ):
     return BatchService.update_batch(db, batch_id, payload)
+
+
+@router.post("/{batch_id}/advance-stage", response_model=BatchResponse, summary="Advance batch incubation milestone stage")
+def advance_batch_stage(
+    batch_id: str,
+    payload: AdvanceStagePayload,
+    db: Session = Depends(get_db)
+):
+    return BatchService.advance_stage(db, batch_id, payload.stage)
 
 
 @router.get("/{batch_id}/summary", response_model=BatchSummaryResponse, summary="Get comprehensive batch metrics summary")
