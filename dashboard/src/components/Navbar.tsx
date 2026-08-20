@@ -83,7 +83,7 @@ export const Navbar: React.FC = () => {
         isOpen={showLogoutModal}
         onClose={() => setShowLogoutModal(false)}
         onConfirm={logout}
-        userName={user?.full_name}
+        user={user}
       />
     </>
   );
