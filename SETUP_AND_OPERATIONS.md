@@ -71,7 +71,7 @@ Capstone/
 
 5. **Start the FastAPI Development Server**:
    ```bash
-   uvicorn app.main:app --reload --port 8000
+   python -m uvicorn app.main:app --reload --port 8000
    ```
    * **Interactive OpenAPI Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
    * **Health Endpoint**: [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health)

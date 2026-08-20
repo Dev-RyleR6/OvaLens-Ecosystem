@@ -199,10 +199,11 @@ cd edge
 python -m pytest tests/test_edge_pipeline.py -v
 ```
 
-### 3. Test Database Seeder
+### 3. Run FastAPI Dev Server Locally
 ```bash
 cd backend
-python -m seed.seed_db --reset
+python -m uvicorn app.main:app --reload --port 8000
+# OpenAPI Docs available at http://localhost:8000/docs
 ```
 
 ### 4. Build React Dashboard

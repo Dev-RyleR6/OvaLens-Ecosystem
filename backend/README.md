@@ -68,7 +68,7 @@ python -m seed.seed_db --reset
 
 ### 4. Start Development Server
 ```bash
-uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 8000
 ```
 * **Interactive OpenAPI (Swagger) Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 * **API Health Check**: [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health)

@@ -211,7 +211,7 @@ npm run dev
 ```bash
 cd backend
 python -m seed.seed_db --reset
-uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
 ### 4. Run Edge Operator GUI Locally
