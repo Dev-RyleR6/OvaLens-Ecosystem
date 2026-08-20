@@ -98,16 +98,6 @@
   animation: pulseGlow 4s ease-in-out infinite;
 }
 
-@keyframes scanProgress {
-  0% { transform: translateX(-100%); }
-  50% { transform: translateX(0%); }
-  100% { transform: translateX(100%); }
-}
-
-.animate-scan-line {
-  animation: scanProgress 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   20%, 60% { transform: translateX(-4px); }
