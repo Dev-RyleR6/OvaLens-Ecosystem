@@ -19,6 +19,8 @@ import {
   FertilityClass,
   PenoySalvageRecord,
   HistoricalRecordSummary,
+  LoginCredentials,
+  AuthResponse,
 } from '../types';
 import {
   mockOverview,
@@ -44,7 +46,70 @@ const api = axios.create({
   timeout: 4000,
 });
 
+// Auto-attach JWT Bearer Token from localStorage
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('ovalens_auth_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export const apiClient = {
+  // Authentication & Security
+  login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
+    try {
+      const res = await api.post<AuthResponse>('/auth/login', credentials);
+      if (res.data?.access_token) {
+        localStorage.setItem('ovalens_auth_token', res.data.access_token);
+        localStorage.setItem('ovalens_user', JSON.stringify(res.data.user));
+      }
+      return res.data;
+    } catch {
+      // Mock fallback for offline / demo defense presentation
+      const fallbackUser: User = credentials.email.includes('admin')
+        ? {
+            user_id: 'usr-admin-01',
+            email: credentials.email || 'admin@foundationu.com',
+            full_name: 'Ryle Gabotero (Lead Researcher)',
+            role: 'ADMIN',
+            is_active: true,
+            created_at: new Date().toISOString(),
+          }
+        : {
+            user_id: 'usr-op-01',
+            email: credentials.email || 'operator@foundationu.com',
+            full_name: 'Hatchery Operator',
+            role: 'OPERATOR',
+            is_active: true,
+            created_at: new Date().toISOString(),
+          };
+      const mockAuth: AuthResponse = {
+        access_token: 'mock-jwt-token-' + Date.now(),
+        token_type: 'bearer',
+        user: fallbackUser,
+      };
+      localStorage.setItem('ovalens_auth_token', mockAuth.access_token);
+      localStorage.setItem('ovalens_user', JSON.stringify(mockAuth.user));
+      return mockAuth;
+    }
+  },
+
+  getMe: async (): Promise<User> => {
+    try {
+      const res = await api.get<User>('/auth/me');
+      return res.data;
+    } catch {
+      const stored = localStorage.getItem('ovalens_user');
+      if (stored) return JSON.parse(stored);
+      return mockUsers[0];
+    }
+  },
+
+  logout: () => {
+    localStorage.removeItem('ovalens_auth_token');
+    localStorage.removeItem('ovalens_user');
+  },
   // Analytics
   getOverview: async (): Promise<AnalyticsOverview> => {
     try {

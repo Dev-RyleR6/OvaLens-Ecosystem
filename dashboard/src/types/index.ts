@@ -6,6 +6,17 @@ export type RoutingAction = 'ACCEPT' | 'REJECT';
 export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
 export type UserRole = 'ADMIN' | 'MANAGER' | 'OPERATOR';
 
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
 export interface User {
   user_id: string;
   email: string;
