@@ -4,48 +4,26 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 0 100% 25.1%; /* #800000 Foundation University Maroon */
+    --background: 224 30% 6%; /* #0B0D13 Deep Charcoal Canvas */
+    --foreground: 210 20% 98%;
+    --card: 222 28% 10%;      /* #121620 Bento Card */
+    --card-foreground: 210 20% 98%;
+    --popover: 222 28% 10%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 0 100% 32%;    /* Foundation University Maroon */
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --secondary: 222 22% 16%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 222 22% 15%;
+    --muted-foreground: 215 16% 62%;
+    --accent: 222 22% 16%;
+    --accent-foreground: 210 20% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 0 100% 25.1%;
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 5.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 5.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 100% 32%; /* slightly brighter maroon for dark mode */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 0 100% 32%;
+    --border: 222 22% 18%;    /* #1F2636 */
+    --input: 222 22% 18%;
+    --ring: 0 100% 35%;
+    --radius: 0.75rem;
   }
 
   * {
@@ -53,26 +31,49 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-[#0B0D13] text-foreground font-sans antialiased selection:bg-[#800000] selection:text-white;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
 
-/* Subtle clean scrollbars */
+/* Precision Subtle Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #0B0D13;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.2);
+  background: #1F2636;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.35);
+  background: #323E56;
+}
+
+/* Glass & Bento Container Classes */
+.bento-card {
+  @apply bg-[#121620] border border-[#1F2636] rounded-2xl shadow-bento transition-all duration-200 hover:border-[#2A344A];
+}
+
+.bento-card-inner {
+  @apply bg-[#161B27] border border-[#222A3B] rounded-xl;
+}
+
+.pill-button {
+  @apply inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-[#161B27] hover:bg-[#1E2536] text-slate-200 border border-[#222A3B] transition-all cursor-pointer;
+}
+
+/* Keyframe for subtle ambient breathing glow */
+@keyframes ambientGlow {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.96); }
+}
+
+.animate-ambient {
+  animation: ambientGlow 4s ease-in-out infinite;
 }

@@ -14,7 +14,7 @@ export const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <Navbar sidebarOpen={!isCollapsed} setSidebarOpen={() => setIsCollapsed(prev => !prev)} />
+      <Navbar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full">

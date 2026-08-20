@@ -44,24 +44,43 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        maroon: {
-          50: '#fdf2f2',
-          100: '#fde8e8',
-          200: '#fbd5d5',
-          300: '#f8b4b4',
-          400: '#f98080',
-          500: '#e02424',
-          600: '#c81e1e',
-          700: '#9b1c1c',
-          800: '#800000', // FU Primary Maroon
-          900: '#5c0000',
+        // Hynex-inspired deep charcoal & neon palette
+        bento: {
+          bg: "#0B0D13",
+          card: "#121620",
+          cardHover: "#161B27",
+          subtle: "#1B202D",
+          border: "#1F2636",
+          borderLight: "rgba(255, 255, 255, 0.08)",
+          textMuted: "#8E98A8",
         },
+        maroon: {
+          DEFAULT: "#800000",
+          glow: "rgba(128, 0, 0, 0.35)",
+          dark: "#5C0000",
+          light: "#991B1B",
+        },
+        neon: {
+          green: "#10B981",
+          greenGlow: "rgba(16, 185, 129, 0.3)",
+          cyan: "#06B6D4",
+          cyanGlow: "rgba(6, 182, 212, 0.3)",
+          amber: "#F59E0B",
+          amberGlow: "rgba(245, 158, 11, 0.3)",
+          rose: "#EF4444",
+        }
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        '2xl': '1rem',
+        '3xl': '1.5rem',
       },
+      boxShadow: {
+        'bento': '0 8px 30px rgba(0, 0, 0, 0.45)',
+        'glow-cyan': '0 0 25px rgba(6, 182, 212, 0.25)',
+        'glow-green': '0 0 25px rgba(16, 185, 129, 0.25)',
+        'glow-maroon': '0 0 25px rgba(128, 0, 0, 0.35)',
+        'glow-amber': '0 0 25px rgba(245, 158, 11, 0.25)',
+      }
     },
   },
   plugins: [],
