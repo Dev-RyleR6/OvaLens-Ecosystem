@@ -32,7 +32,7 @@ export const LoginPage: React.FC = () => {
   });
   const [lockoutTimer, setLockoutTimer] = useState<number>(0);
 
-  // Redirect if already logged in
+  // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
       const from = (location.state as any)?.from?.pathname || '/';
@@ -100,10 +100,10 @@ export const LoginPage: React.FC = () => {
 
       if (attempts >= MAX_FAILED_ATTEMPTS) {
         setLockoutTimer(LOCKOUT_SECONDS);
-        setErrorMessage(`Too many failed attempts. Try again in ${LOCKOUT_SECONDS} seconds.`);
+        setErrorMessage(`Too many failed attempts. Account locked for ${LOCKOUT_SECONDS}s.`);
       } else {
         setErrorMessage(
-          err.response?.data?.detail || 'Invalid email or password.'
+          err.response?.data?.detail || 'Invalid email or password. Please try again.'
         );
       }
     } finally {
@@ -123,38 +123,39 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] flex flex-col justify-center items-center px-4 py-12">
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center items-center px-4 py-12 font-sans text-[#0F172A]">
       <div className="w-full max-w-sm">
         
-        {/* Header */}
+        {/* University / Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#800000] text-white font-bold text-lg mb-3 shadow-md">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#800000] text-white font-bold text-lg mb-3 shadow-xs">
             FU
           </div>
-          <h1 className="text-xl font-bold text-white tracking-tight">OvaLens Hatchery</h1>
-          <p className="text-xs text-slate-400 mt-1">Sign in to your account</p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">OvaLens Hatchery</h1>
+          <p className="text-xs text-slate-500 mt-1">Foundation University Duck Egg Management</p>
         </div>
 
-        {/* Card */}
-        <div className="bg-[#1E293B] border border-[#334155] rounded-xl p-6 shadow-xl">
+        {/* Login Card */}
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
           
-          {/* Quick Demo Credentials */}
-          <div className="mb-6">
-            <label className="block text-xs font-semibold text-slate-400 mb-2">
-              Demo Credentials
-            </label>
+          {/* Demo Accounts Quick-Select */}
+          <div className="mb-5 pb-4 border-b border-slate-100">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-700">Test Accounts</span>
+              <span className="text-[11px] text-slate-400">Click to fill</span>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => fillCredentials('admin')}
-                className="py-2 px-3 text-xs font-medium rounded-lg border border-[#334155] bg-slate-800/60 hover:bg-slate-800 text-slate-200 hover:border-slate-500 transition-colors text-center"
+                className="py-1.5 px-3 text-xs font-medium rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-700 transition-colors text-center cursor-pointer"
               >
                 Admin
               </button>
               <button
                 type="button"
                 onClick={() => fillCredentials('operator')}
-                className="py-2 px-3 text-xs font-medium rounded-lg border border-[#334155] bg-slate-800/60 hover:bg-slate-800 text-slate-200 hover:border-slate-500 transition-colors text-center"
+                className="py-1.5 px-3 text-xs font-medium rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 text-slate-700 transition-colors text-center cursor-pointer"
               >
                 Operator
               </button>
@@ -163,24 +164,24 @@ export const LoginPage: React.FC = () => {
 
           {/* Error Message */}
           {errorMessage && (
-            <div className="mb-4 p-3 bg-red-950/50 border border-red-900/80 rounded-lg text-xs text-red-200 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
               <span>{errorMessage}</span>
             </div>
           )}
 
           {/* Lockout Notice */}
           {lockoutTimer > 0 && (
-            <div className="mb-4 p-3 bg-amber-950/50 border border-amber-900/80 rounded-lg text-xs text-amber-200 text-center">
-              Account temporarily locked. Try again in <strong>{lockoutTimer}s</strong>.
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 text-center">
+              Account locked. Please wait <strong>{lockoutTimer}s</strong>.
             </div>
           )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Email
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Email address
               </label>
               <input
                 type="email"
@@ -190,12 +191,12 @@ export const LoginPage: React.FC = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@foundationu.com"
                 autoComplete="email"
-                className="w-full h-10 px-3 text-sm bg-[#0F172A] border border-[#334155] rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#800000] focus:ring-1 focus:ring-[#800000] transition-colors disabled:opacity-50"
+                className="w-full h-10 px-3 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 transition-colors disabled:bg-slate-50 disabled:text-slate-500"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 Password
               </label>
               <div className="relative">
@@ -207,12 +208,12 @@ export const LoginPage: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className="w-full h-10 pl-3 pr-10 text-sm bg-[#0F172A] border border-[#334155] rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#800000] focus:ring-1 focus:ring-[#800000] transition-colors disabled:opacity-50"
+                  className="w-full h-10 pl-3 pr-10 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 transition-colors disabled:bg-slate-50 disabled:text-slate-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-1"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -220,22 +221,22 @@ export const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center justify-between pt-0.5">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 accent-[#800000] rounded"
+                  className="w-4 h-4 accent-[#800000] rounded cursor-pointer"
                 />
-                <span className="text-xs text-slate-400">Remember me</span>
+                <span className="text-xs text-slate-600">Remember me</span>
               </label>
             </div>
 
             <button
               type="submit"
               disabled={lockoutTimer > 0 || isLoading}
-              className="w-full h-10 bg-[#800000] hover:bg-[#6b0000] active:bg-[#520000] text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer mt-2"
+              className="w-full h-10 bg-[#800000] hover:bg-[#660000] active:bg-[#4d0000] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer mt-2"
             >
               {isLoading ? (
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -246,8 +247,8 @@ export const LoginPage: React.FC = () => {
           </form>
         </div>
 
-        {/* Footer */}
-        <div className="mt-6 text-center text-xs text-slate-500">
+        {/* Institutional Footer */}
+        <div className="mt-6 text-center text-xs text-slate-400">
           Foundation University • Team DevIn
         </div>
 
