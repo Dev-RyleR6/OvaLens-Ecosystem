@@ -6,17 +6,13 @@ import {
   CheckCircle2,
   ArrowRight,
   TrendingUp,
-  ExternalLink,
   Download,
+  Flame,
+  Radio,
+  FileText,
+  Clock,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-} from 'recharts';
 
 import { StatCard } from '../components/StatCard';
 import { Badge } from '../components/Badge';
@@ -51,22 +47,25 @@ export const OverviewPage: React.FC = () => {
     fetchDashboardData();
   }, []);
 
-  const fertilityData = [
-    { name: 'Fertile (Viable)', count: overview?.total_fertile || 1812, color: '#15803D' },
-    { name: 'Infertile (Penoy)', count: overview?.total_infertile || 168, color: '#D97706' },
-    { name: 'Abnormal (Dead)', count: overview?.total_abnormal || 70, color: '#DC2626' },
-  ];
+  const totalScanned = overview?.total_eggs_scanned || 2050;
+  const fertileCount = overview?.total_fertile || 1812;
+  const penoyCount = overview?.total_infertile || 168;
+  const abnormalCount = overview?.total_abnormal || 70;
+
+  const fertilePct = ((fertileCount / totalScanned) * 100).toFixed(1);
+  const penoyPct = ((penoyCount / totalScanned) * 100).toFixed(1);
+  const abnormalPct = ((abnormalCount / totalScanned) * 100).toFixed(1);
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Page Header */}
+      {/* Institutional Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
           <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
             Hatchery Operations Command
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Real-time duck egg candling classification, 28-day incubation stages, and Penoy economic salvage.
+            Duck egg candling classification, 28-day incubation stages, and Day 10 Penoy economic salvage.
           </p>
         </div>
 
@@ -81,11 +80,11 @@ export const OverviewPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 4 Clean High-Contrast KPI Cards */}
+      {/* Sleek Operational KPI Ribbon */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Eggs Candled"
-          value={overview ? overview.total_eggs_scanned.toLocaleString() : '2,050'}
+          value={totalScanned.toLocaleString()}
           unit="eggs"
           subtitle="ONNX YOLOv8 FP16 Verified"
           icon={Activity}
@@ -93,16 +92,16 @@ export const OverviewPage: React.FC = () => {
         />
         <StatCard
           title="Overall Fertility Rate"
-          value={overview ? `${overview.overall_fertility_rate}%` : '88.4%'}
-          subtitle={`${overview?.total_fertile || 1812} viable spider embryos`}
+          value={`${overview?.overall_fertility_rate || '88.4'}%`}
+          subtitle={`${fertileCount.toLocaleString()} viable spider embryos`}
           icon={CheckCircle2}
-          trend={{ value: '+2.1%', isPositive: true, label: 'vs last cycle' }}
+          trend={{ value: '+2.1%', isPositive: true, label: 'vs previous cohort' }}
           highlightColor="green"
         />
         <StatCard
           title="Day-10 Penoy Salvage"
-          value={`₱${((overview?.total_infertile || 168) * 14.0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          subtitle={`${overview?.total_infertile || 168} eggs @ ₱14.00/egg market`}
+          value={`₱${((penoyCount) * 14.0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle={`${penoyCount} eggs @ ₱14.00/egg market rate`}
           icon={Coins}
           highlightColor="amber"
         />
@@ -116,7 +115,7 @@ export const OverviewPage: React.FC = () => {
         />
       </div>
 
-      {/* Active Batch 28-Day Milestone Timeline Card */}
+      {/* Active Incubation Cohort Stage Tracker */}
       {selectedBatch && (
         <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
@@ -144,97 +143,101 @@ export const OverviewPage: React.FC = () => {
         </div>
       )}
 
-      {/* Split Operational View: Biological Distribution & Recent Scans Table */}
+      {/* Split Operational Command: Biological Yield Distribution & Live Candling Scans */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left 5 Cols: Biological Yield Donut Chart */}
+        {/* Left 5 Cols: Biological Yield & Salvage Breakdown */}
         <div className="lg:col-span-5">
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs h-full flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <h3 className="text-sm font-bold text-[#0F172A]">
-                  Biological Classification Yield
-                </h3>
-                <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  88.4% Viable
-                </span>
-              </div>
-
-              {/* Donut Chart */}
-              <div className="h-48 relative flex items-center justify-center my-3">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={fertilityData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={72}
-                      paddingAngle={3}
-                      dataKey="count"
-                    >
-                      {fertilityData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#FFFFFF',
-                        borderColor: '#E2E8F0',
-                        borderRadius: '0.5rem',
-                        fontSize: '12px',
-                        color: '#0F172A',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.08)'
-                      }}
-                      formatter={(val: any, name: any) => [`${val} eggs`, name]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-2xl font-bold tracking-tight text-[#0F172A]">
-                    {overview ? `${overview.overall_fertility_rate}%` : '88.4%'}
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
-                    Fertility
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Classification Count Grid */}
-            <div className="grid grid-cols-3 gap-2 text-center text-xs pt-3 border-t border-slate-100">
-              <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200">
-                <span className="text-base font-bold text-emerald-800 block">
-                  {overview?.total_fertile || 1812}
-                </span>
-                <span className="text-[11px] text-emerald-700 font-medium">Fertile</span>
-              </div>
-              <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200">
-                <span className="text-base font-bold text-amber-800 block">
-                  {overview?.total_infertile || 168}
-                </span>
-                <span className="text-[11px] text-amber-700 font-medium">Penoy</span>
-              </div>
-              <div className="p-2.5 rounded-lg bg-red-50 border border-red-200">
-                <span className="text-base font-bold text-red-800 block">
-                  {overview?.total_abnormal || 70}
-                </span>
-                <span className="text-[11px] text-red-700 font-medium">Dead</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right 7 Cols: Recent Candling Activity Table */}
-        <div className="lg:col-span-7">
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs h-full flex flex-col justify-between">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs h-full flex flex-col justify-between space-y-4">
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="text-sm font-bold text-[#0F172A]">
-                    Recent Candling Scans
+                    Biological Classification Breakdown
                   </h3>
-                  <p className="text-xs text-slate-500">Live verified classifications from sorting conveyor</p>
+                  <p className="text-xs text-slate-500">Candling yield and salvage distribution</p>
+                </div>
+                <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+                  {fertilePct}% Viability
+                </span>
+              </div>
+
+              {/* Linear Spectrum Proportion Bar */}
+              <div className="mt-4 space-y-2">
+                <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-2xs">
+                  <div style={{ width: `${fertilePct}%` }} className="bg-emerald-600 h-full" title={`Fertile: ${fertilePct}%`} />
+                  <div style={{ width: `${penoyPct}%` }} className="bg-amber-500 h-full" title={`Penoy: ${penoyPct}%`} />
+                  <div style={{ width: `${abnormalPct}%` }} className="bg-red-600 h-full" title={`Dead: ${abnormalPct}%`} />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Total Throughput: <strong>{totalScanned} eggs</strong></span>
+                  <span><strong>{fertileCount}</strong> Active Embryos</span>
+                </div>
+              </div>
+
+              {/* 3 Biological Category Rows */}
+              <div className="space-y-2.5 mt-4 text-xs">
+                <div className="p-3 rounded-lg bg-emerald-50/60 border border-emerald-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 flex-shrink-0" />
+                    <div>
+                      <span className="font-bold text-emerald-950 block">Fertile Embryo (Accept)</span>
+                      <span className="text-[11px] text-emerald-700">Active spider blood network $\to$ Day 18 hatcher transfer</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-extrabold text-emerald-900 text-sm block">{fertileCount}</span>
+                    <span className="text-[11px] text-emerald-700 font-semibold">{fertilePct}%</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-amber-50/60 border border-amber-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-600 flex-shrink-0" />
+                    <div>
+                      <span className="font-bold text-amber-950 block">Infertile / Penoy (Salvage)</span>
+                      <span className="text-[11px] text-amber-700">Clear unfertilized yolk $\to$ Diverted to food market @ ₱14</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-extrabold text-amber-900 text-sm block">{penoyCount}</span>
+                    <span className="text-[11px] text-amber-700 font-semibold">{penoyPct}%</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-red-50/60 border border-red-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-600 flex-shrink-0" />
+                    <div>
+                      <span className="font-bold text-red-950 block">Abnormal / Dead (Discard)</span>
+                      <span className="text-[11px] text-red-700">Corrupted yolk / blood ring $\to$ Discarded to prevent bursting</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-extrabold text-red-900 text-sm block">{abnormalCount}</span>
+                    <span className="text-[11px] text-red-700 font-semibold">{abnormalPct}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Economic Summary Footer */}
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+              <span>Day 10 Food Salvage Value:</span>
+              <strong className="text-amber-800 text-sm">₱{((penoyCount) * 14.0).toFixed(2)}</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Right 7 Cols: Live Verified Candling Scans Table */}
+        <div className="lg:col-span-7">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs h-full flex flex-col justify-between space-y-3">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                  <h3 className="text-sm font-bold text-[#0F172A]">
+                    Live Candling Scans
+                  </h3>
+                  <p className="text-xs text-slate-500">Verified YOLOv8 FP16 classifications & diverter telemetry</p>
                 </div>
                 <Link
                   to="/scans"
@@ -254,7 +257,7 @@ export const OverviewPage: React.FC = () => {
                       <th className="py-2.5 px-2">Batch</th>
                       <th className="py-2.5 px-2">Class</th>
                       <th className="py-2.5 px-2">Confidence</th>
-                      <th className="py-2.5 px-2">Action</th>
+                      <th className="py-2.5 px-2">Diverter</th>
                       <th className="py-2.5 px-2 text-right">Time</th>
                     </tr>
                   </thead>
@@ -291,15 +294,15 @@ export const OverviewPage: React.FC = () => {
             </div>
 
             {/* Table Footer */}
-            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span>Automatic pneumatic diverter response time: <strong>26.4 ms</strong></span>
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              <span>Sorting Actuation Response: <strong>26.4 ms</strong></span>
               <span className="font-semibold text-emerald-700">Conveyor Synchronized</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Embedded 42-Egg Tray Heatmap Grid */}
+      {/* Embedded 42-Egg Tray Matrix Component */}
       <TrayMatrix
         batchCode={selectedBatch?.batch_code || "BATCH-2026-08-KAY-01"}
         trayNumber={1}
