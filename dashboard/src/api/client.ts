@@ -13,6 +13,9 @@ import {
   User,
   AuditLog,
   HatcherySettings,
+  ModelCheckpoint,
+  TrainingLossEpoch,
+  ModelOpsSummary,
 } from '../types';
 import {
   mockOverview,
@@ -26,6 +29,9 @@ import {
   mockUsers,
   mockAuditLogs,
   mockSettings,
+  mockModelCheckpoints,
+  mockTrainingLoss,
+  mockModelOpsSummary,
 } from './mockData';
 
 const api = axios.create({
@@ -260,6 +266,31 @@ export const apiClient = {
   updateSettings: async (settings: Partial<HatcherySettings>): Promise<HatcherySettings> => {
     Object.assign(mockSettings, settings);
     return mockSettings;
+  },
+
+  // MLOps & Model Metrics
+  getModelOpsSummary: async (): Promise<ModelOpsSummary> => {
+    return mockModelOpsSummary;
+  },
+
+  getModelCheckpoints: async (): Promise<ModelCheckpoint[]> => {
+    return mockModelCheckpoints;
+  },
+
+  getTrainingLoss: async (): Promise<TrainingLossEpoch[]> => {
+    return mockTrainingLoss;
+  },
+
+  deployModelCheckpoint: async (modelId: string): Promise<ModelCheckpoint> => {
+    const found = mockModelCheckpoints.find(m => m.model_id === modelId);
+    if (found) {
+      mockModelCheckpoints.forEach(m => { m.is_active = false; m.deployed_stations = []; });
+      found.is_active = true;
+      found.deployed_stations = ["STATION-01-RP5", "STATION-02-PC"];
+      mockModelOpsSummary.active_model_version = found.version_tag;
+      return found;
+    }
+    throw new Error("Model checkpoint not found");
   },
 
   // Reports

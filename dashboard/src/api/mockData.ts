@@ -10,6 +10,9 @@ import {
   User,
   AuditLog,
   HatcherySettings,
+  ModelCheckpoint,
+  TrainingLossEpoch,
+  ModelOpsSummary,
 } from '../types';
 
 export const mockOverview: AnalyticsOverview = {
@@ -203,6 +206,94 @@ export const mockSettings: HatcherySettings = {
   optical_debounce_ms: 600,
 };
 
+export const mockModelCheckpoints: ModelCheckpoint[] = [
+  {
+    model_id: "mdl-onnx-v1.2",
+    version_tag: "yolov8n-fp16-v1.2.onnx",
+    format: "ONNX_FP16",
+    architecture: "YOLOv8 Nano (Candling Customized)",
+    file_size_mb: 6.2,
+    map50: 0.958,
+    map50_95: 0.784,
+    precision: 0.942,
+    recall: 0.961,
+    avg_latency_ms: 24.6,
+    is_active: true,
+    deployed_stations: ["STATION-01-RP5", "STATION-02-PC"],
+    created_at: new Date(Date.now() - 7 * 86400000).toISOString(),
+  },
+  {
+    model_id: "mdl-onnx-v1.1",
+    version_tag: "yolov8s-fp16-v1.1.onnx",
+    format: "ONNX_FP16",
+    architecture: "YOLOv8 Small (High Capacity)",
+    file_size_mb: 22.4,
+    map50: 0.964,
+    map50_95: 0.798,
+    precision: 0.951,
+    recall: 0.968,
+    avg_latency_ms: 38.2,
+    is_active: false,
+    deployed_stations: [],
+    created_at: new Date(Date.now() - 21 * 86400000).toISOString(),
+  },
+  {
+    model_id: "mdl-pt-baseline",
+    version_tag: "best.pt (PyTorch Baseline)",
+    format: "PYTORCH_PT",
+    architecture: "YOLOv8 Nano (Unquantized FP32)",
+    file_size_mb: 12.4,
+    map50: 0.958,
+    map50_95: 0.784,
+    precision: 0.942,
+    recall: 0.961,
+    avg_latency_ms: 68.4,
+    is_active: false,
+    deployed_stations: [],
+    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+  },
+];
+
+export const mockTrainingLoss: TrainingLossEpoch[] = [
+  { epoch: 10, train_box_loss: 0.142, val_box_loss: 0.158, train_cls_loss: 0.198, val_cls_loss: 0.210, map50: 0.62 },
+  { epoch: 20, train_box_loss: 0.108, val_box_loss: 0.119, train_cls_loss: 0.142, val_cls_loss: 0.151, map50: 0.74 },
+  { epoch: 30, train_box_loss: 0.086, val_box_loss: 0.094, train_cls_loss: 0.104, val_cls_loss: 0.112, map50: 0.81 },
+  { epoch: 40, train_box_loss: 0.071, val_box_loss: 0.078, train_cls_loss: 0.082, val_cls_loss: 0.089, map50: 0.86 },
+  { epoch: 50, train_box_loss: 0.060, val_box_loss: 0.065, train_cls_loss: 0.068, val_cls_loss: 0.072, map50: 0.89 },
+  { epoch: 60, train_box_loss: 0.052, val_box_loss: 0.057, train_cls_loss: 0.056, val_cls_loss: 0.061, map50: 0.91 },
+  { epoch: 70, train_box_loss: 0.046, val_box_loss: 0.051, train_cls_loss: 0.048, val_cls_loss: 0.052, map50: 0.93 },
+  { epoch: 80, train_box_loss: 0.041, val_box_loss: 0.045, train_cls_loss: 0.041, val_cls_loss: 0.045, map50: 0.94 },
+  { epoch: 90, train_box_loss: 0.038, val_box_loss: 0.042, train_cls_loss: 0.036, val_cls_loss: 0.040, map50: 0.95 },
+  { epoch: 100, train_box_loss: 0.035, val_box_loss: 0.039, train_cls_loss: 0.032, val_cls_loss: 0.036, map50: 0.958 },
+];
+
+export const mockModelOpsSummary: ModelOpsSummary = {
+  active_model_version: "yolov8n-fp16-v1.2.onnx",
+  total_training_images: 4850,
+  dataset_distribution: {
+    fertile: 2800,
+    infertile: 1450,
+    abnormal: 600,
+  },
+  overall_map50: 0.958,
+  overall_precision: 0.942,
+  overall_recall: 0.961,
+  avg_latency_ms: 24.6,
+  confusion_matrix: {
+    classes: ["FERTILE", "INFERTILE (Penoy)", "ABNORMAL (Dead)"],
+    matrix: [
+      [96.4, 2.1, 1.5],  // Actual Fertile -> Pred Fertile (96.4%), Penoy (2.1%), Dead (1.5%)
+      [3.2, 94.8, 2.0],  // Actual Penoy -> Pred Fertile (3.2%), Penoy (94.8%), Dead (2.0%)
+      [4.2, 3.7, 92.1],  // Actual Dead -> Pred Fertile (4.2%), Penoy (3.7%), Dead (92.1%)
+    ],
+    raw_counts: [
+      [2700, 59, 41],
+      [46, 1375, 29],
+      [25, 22, 553],
+    ],
+  },
+};
+
 export const mockSessions: CandlingSession[] = [
   {
     session_id: "sess-kay-day10",
@@ -348,7 +439,7 @@ export const mockDevices: Device[] = [
     device_name: "Primary Raspberry Pi 5 Sorting Station",
     ip_address: "192.168.1.120",
     hardware_platform: "Raspberry Pi 5 (8GB)",
-    model_version: "yolov8n-fp16-v1.0",
+    model_version: "yolov8n-fp16-v1.2",
     status: "ONLINE",
     last_heartbeat: new Date().toISOString(),
     conveyor_speed_cm_s: 12.50,
@@ -361,7 +452,7 @@ export const mockDevices: Device[] = [
     device_name: "Secondary Workstation Station",
     ip_address: "192.168.1.125",
     hardware_platform: "Windows 11 x86_64",
-    model_version: "yolov8n-fp16-v1.0",
+    model_version: "yolov8n-fp16-v1.2",
     status: "OFFLINE",
     last_heartbeat: new Date(Date.now() - 2 * 3600000).toISOString(),
     conveyor_speed_cm_s: 10.00,

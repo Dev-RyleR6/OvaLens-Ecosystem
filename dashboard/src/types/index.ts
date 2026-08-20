@@ -154,3 +154,47 @@ export interface HatcherySettings {
   sqlite_retention_days: number;
   optical_debounce_ms: number;
 }
+
+export interface ModelCheckpoint {
+  model_id: string;
+  version_tag: string;
+  format: 'ONNX_FP16' | 'ONNX_FP32' | 'PYTORCH_PT';
+  architecture: string;
+  file_size_mb: number;
+  map50: number;
+  map50_95: number;
+  precision: number;
+  recall: number;
+  avg_latency_ms: number;
+  is_active: boolean;
+  deployed_stations: string[];
+  created_at: string;
+}
+
+export interface TrainingLossEpoch {
+  epoch: number;
+  train_box_loss: number;
+  val_box_loss: number;
+  train_cls_loss: number;
+  val_cls_loss: number;
+  map50: number;
+}
+
+export interface ModelOpsSummary {
+  active_model_version: string;
+  total_training_images: number;
+  dataset_distribution: {
+    fertile: number;
+    infertile: number;
+    abnormal: number;
+  };
+  overall_map50: number;
+  overall_precision: number;
+  overall_recall: number;
+  avg_latency_ms: number;
+  confusion_matrix: {
+    classes: string[];
+    matrix: number[][]; // 3x3 normalized percentage [ [96.4, 2.1, 1.5], [3.2, 94.8, 2.0], [4.2, 3.7, 92.1] ]
+    raw_counts: number[][];
+  };
+}

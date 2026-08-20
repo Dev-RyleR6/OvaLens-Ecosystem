@@ -6,6 +6,7 @@ import {
   ScanLine,
   TrendingUp,
   Cpu,
+  Brain,
   Users,
   FileText,
   Settings,
@@ -23,6 +24,7 @@ export const Sidebar: React.FC = () => {
   ];
 
   const adminNav = [
+    { to: '/models', label: 'AI Models & MLOps', icon: Brain },
     { to: '/users', label: 'User & Access', icon: Users },
     { to: '/logs', label: 'Audit Trail Logs', icon: FileText },
     { to: '/settings', label: 'Hatchery Settings', icon: Settings },
@@ -63,7 +65,7 @@ export const Sidebar: React.FC = () => {
         {/* Administration Section */}
         <div className="space-y-1">
           <p className="px-3 pb-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            Administration
+            Administration & AI
           </p>
 
           {adminNav.map((item) => {
