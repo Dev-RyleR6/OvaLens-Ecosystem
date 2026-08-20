@@ -11,6 +11,8 @@ import {
   User,
   Activity,
   CheckCircle2,
+  Zap,
+  Award,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { BatchSummary, DuckBreed, BatchStage, CandlingSession } from '../types';
@@ -18,6 +20,7 @@ import { Badge } from '../components/Badge';
 import { BatchProgressTimeline } from '../components/BatchProgressTimeline';
 import { Dialog } from '../components/ui/dialog';
 import { Sheet } from '../components/ui/sheet';
+import { CandlingCertificateModal } from '../components/CandlingCertificateModal';
 
 export const BatchesPage: React.FC = () => {
   const [batches, setBatches] = useState<BatchSummary[]>([]);
@@ -28,6 +31,8 @@ export const BatchesPage: React.FC = () => {
   const [selectedBatch, setSelectedBatch] = useState<BatchSummary | null>(null);
   const [batchSessions, setBatchSessions] = useState<CandlingSession[]>([]);
   const [isAdvancing, setIsAdvancing] = useState(false);
+  const [isCertificateOpen, setIsCertificateOpen] = useState(false);
+  const [certificateBatch, setCertificateBatch] = useState<BatchSummary | null>(null);
 
   // New Batch Form State
   const [batchCode, setBatchCode] = useState('');
@@ -49,6 +54,12 @@ export const BatchesPage: React.FC = () => {
     setSelectedBatch(b);
     const sessions = await apiClient.getSessions(b.batch_id);
     setBatchSessions(sessions);
+  };
+
+  const handleOpenCertificate = (b: BatchSummary, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setCertificateBatch(b);
+    setIsCertificateOpen(true);
   };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -106,10 +117,10 @@ export const BatchesPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
           <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
-            Incubation Batches
+            Incubation Batches & Candling Sessions
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Manage 28-day incubation cohorts, monitor operator candling sessions, and export official audit reports.
+            Track 28-day duck egg incubation cohorts, operator candling speeds (120 eggs/min), and official quality certificates.
           </p>
         </div>
 
@@ -204,7 +215,16 @@ export const BatchesPage: React.FC = () => {
                     <Badge type="status" value={b.status} />
                   </td>
                   <td className="py-3 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={(e) => handleOpenCertificate(b, e)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded bg-maroon-50 hover:bg-maroon-100 text-[#800000] border border-maroon-200 transition-colors cursor-pointer"
+                        title="View Official Candling Certificate"
+                      >
+                        <Award className="w-3.5 h-3.5" />
+                        <span>Certificate</span>
+                      </button>
+
                       <a
                         href={apiClient.downloadCSVUrl(b.batch_id)}
                         download
@@ -212,15 +232,6 @@ export const BatchesPage: React.FC = () => {
                         title="Export CSV Data"
                       >
                         <Download className="w-4 h-4" />
-                      </a>
-                      <a
-                        href={apiClient.downloadPDFUrl(b.batch_id)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="p-1.5 rounded-md hover:bg-slate-100 text-[#800000] hover:text-[#5C0000] transition-colors inline-block"
-                        title="Download PDF Audit Certificate"
-                      >
-                        <FileText className="w-4 h-4" />
                       </a>
                       <button
                         className="p-1.5 text-slate-400 hover:text-slate-700 cursor-pointer"
@@ -390,28 +401,31 @@ export const BatchesPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Candling Sessions Shift Log */}
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+            {/* Candling Sessions Shift Log with Throughput Speed */}
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
               <div className="flex items-center justify-between">
                 <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-slate-600" />
-                  <span>Operator Candling Sessions</span>
+                  <span>Operator Candling Sessions & Throughput</span>
                 </h4>
                 <span className="text-[10px] font-semibold text-slate-500">{batchSessions.length} recorded</span>
               </div>
 
               {batchSessions.length > 0 ? (
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {batchSessions.map((s) => (
-                    <div key={s.session_id} className="p-2 bg-white rounded-lg border border-slate-200 space-y-1">
+                    <div key={s.session_id} className="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5 shadow-2xs">
                       <div className="flex items-center justify-between font-medium">
-                        <span className="font-bold text-[#0F172A]">{s.stage} Candling</span>
-                        <span className="text-[11px] text-slate-500 font-mono">{s.device_id}</span>
+                        <span className="font-bold text-[#0F172A]">{s.stage} Candling Run</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded">
+                          <Zap className="w-3 h-3 text-emerald-600" />
+                          120 eggs/min (2.0 /sec)
+                        </span>
                       </div>
                       <div className="flex items-center justify-between text-[11px] text-slate-600">
                         <span className="flex items-center gap-1">
                           <User className="w-3 h-3 text-slate-400" />
-                          {s.operator_name}
+                          {s.operator_name} • {s.device_id}
                         </span>
                         <span className="font-bold text-emerald-700">
                           {s.fertile_count} / {s.total_scanned} Fertile ({s.avg_inference_ms.toFixed(1)}ms)
@@ -425,8 +439,17 @@ export const BatchesPage: React.FC = () => {
               )}
             </div>
 
-            {/* Official Report Exports */}
+            {/* Official Report Exports & Certificate Trigger */}
             <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => handleOpenCertificate(selectedBatch)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-maroon-50 text-[#800000] border border-maroon-200 hover:bg-maroon-100 transition-colors cursor-pointer"
+              >
+                <Award className="w-3.5 h-3.5" />
+                <span>View Quality Certificate</span>
+              </button>
+
               <a
                 href={apiClient.downloadCSVUrl(selectedBatch.batch_id)}
                 download
@@ -435,19 +458,17 @@ export const BatchesPage: React.FC = () => {
                 <Download className="w-3.5 h-3.5" />
                 <span>Export CSV</span>
               </a>
-              <a
-                href={apiClient.downloadPDFUrl(selectedBatch.batch_id)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white transition-colors"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Download Official PDF Certificate</span>
-              </a>
             </div>
           </div>
         )}
       </Sheet>
+
+      {/* Official Candling Quality Certificate Modal */}
+      <CandlingCertificateModal
+        isOpen={isCertificateOpen}
+        onClose={() => setIsCertificateOpen(false)}
+        batch={certificateBatch}
+      />
     </div>
   );
 };

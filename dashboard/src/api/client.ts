@@ -16,6 +16,7 @@ import {
   ModelCheckpoint,
   TrainingLossEpoch,
   ModelOpsSummary,
+  FertilityClass,
 } from '../types';
 import {
   mockOverview,
@@ -176,6 +177,33 @@ export const apiClient = {
         filtered = filtered.filter(s => s.final_class === params.final_class);
       }
       return filtered.slice(0, params?.limit || 50);
+    }
+  },
+
+  overrideScanClassification: async (scanId: string, newClass: FertilityClass, reason?: string): Promise<EggScan> => {
+    try {
+      const res = await api.patch<EggScan>(`/scans/${scanId}/override`, { final_class: newClass, reason });
+      return res.data;
+    } catch {
+      const found = mockScans.find(s => s.scan_id === scanId);
+      if (found) {
+        found.final_class = newClass;
+        found.routing_action = newClass === 'FERTILE' ? 'ACCEPT' : 'REJECT';
+        mockAuditLogs.unshift({
+          log_id: Date.now(),
+          user_id: 'usr-admin-01',
+          operator_name: 'Ryle Gabotero',
+          action: 'MANUAL_CLASSIFICATION_OVERRIDE',
+          entity_type: 'SCAN',
+          entity_id: scanId,
+          details: { new_class: newClass, reason: reason || 'Operator visual review', previous_class: found.final_class },
+          ip_address: '192.168.1.110',
+          severity: 'WARNING',
+          created_at: new Date().toISOString(),
+        });
+        return found;
+      }
+      throw new Error("Scan not found");
     }
   },
 
