@@ -10,6 +10,7 @@ jobs:
   backend-tests:
     name: Backend API & Database Test Suite
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     services:
       postgres:
@@ -70,6 +71,7 @@ jobs:
   edge-tests:
     name: Edge CV Pipeline Test Suite
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout Code
@@ -80,11 +82,6 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-
-      - name: Install Linux System Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0 python3-tk
 
       - name: Install Edge Dependencies
         run: |
@@ -99,6 +96,7 @@ jobs:
   dashboard-build:
     name: React Dashboard Typecheck & Production Build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout Code
