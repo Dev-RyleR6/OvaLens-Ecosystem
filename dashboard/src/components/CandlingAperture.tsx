@@ -22,14 +22,14 @@ export const CandlingAperture: React.FC<CandlingApertureProps> = ({
   const isAbnormal = finalClass === 'ABNORMAL';
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 group">
       {/* Visual Transillumination Canvas */}
-      <div className="relative w-full h-52 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center justify-center">
-        {/* Candling Strobe Light Source */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(245,158,11,0.22)_0%,_rgba(0,0,0,0.85)_75%)]" />
+      <div className="relative w-full h-52 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center justify-center transition-all duration-300 group-hover:border-slate-700">
+        {/* Candling Strobe Light Source with subtle pulse */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(245,158,11,0.25)_0%,_rgba(0,0,0,0.85)_75%)] animate-pulse-glow" />
 
         {/* SVG Duck Egg Graphic */}
-        <svg viewBox="0 0 400 500" className="w-32 h-44 z-10 filter drop-shadow-[0_0_12px_rgba(245,158,11,0.3)]">
+        <svg viewBox="0 0 400 500" className="w-32 h-44 z-10 filter drop-shadow-[0_0_14px_rgba(245,158,11,0.35)] transition-transform duration-300 group-hover:scale-105">
           <defs>
             <radialGradient id="eggGlowLight" cx="45%" cy="42%" r="60%">
               {isFertile && (
@@ -94,9 +94,9 @@ export const CandlingAperture: React.FC<CandlingApertureProps> = ({
         </svg>
 
         {/* Optical Metadata Overlay */}
-        <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-[11px] text-white/90 bg-black/60 px-3 py-1 rounded-md border border-white/10">
+        <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-[11px] text-white/90 bg-black/60 px-3 py-1 rounded-lg border border-white/10 backdrop-blur-xs">
           <span>YOLOv8 FP16 Transillumination</span>
-          <span className="font-semibold">{(confidence * 100).toFixed(1)}% Conf</span>
+          <span className="font-bold text-amber-400">{(confidence * 100).toFixed(1)}% Conf</span>
         </div>
       </div>
 

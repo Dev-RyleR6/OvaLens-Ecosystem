@@ -4,13 +4,8 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
-  Filter,
-  CheckCircle2,
-  AlertCircle,
   Download,
   Play,
-  RotateCcw,
-  Layers,
   X,
 } from 'lucide-react';
 import { FertilityClass } from '../types';
@@ -157,18 +152,18 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
   };
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden">
+    <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden hover:border-slate-300 transition-colors">
       {/* Header Bar */}
       <div className="p-4 sm:p-5 border-b border-slate-100">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#800000]">Incubation Tray</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#800000]">Incubation Tray</span>
               <span className="text-slate-300">•</span>
               <h3 className="text-sm font-bold text-[#0F172A]">
                 Tray #{currentTray} of {totalTrays} (42-Egg Setter Caddy)
               </h3>
-              <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                 {trayFertilityRate}% Viable
               </span>
             </div>
@@ -248,7 +243,7 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
         {/* Filter Strip */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3 pt-3 border-t border-slate-100">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Filter:</span>
+            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mr-1">Filter:</span>
             <button
               onClick={() => setFilterClass('ALL')}
               className={`px-2.5 py-0.5 rounded text-xs font-semibold transition-colors cursor-pointer border ${
@@ -317,7 +312,7 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
                 <button
                   key={t.trayNumber}
                   onClick={() => setCurrentTray(t.trayNumber)}
-                  className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer hover-lift ${
                     isActive
                       ? 'bg-white border-[#800000] ring-2 ring-[#800000]/20 shadow-xs'
                       : 'bg-white border-slate-200 hover:border-slate-300'
@@ -390,13 +385,13 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
                       let dotBg = "bg-slate-400";
 
                       if (slot.status === 'FERTILE') {
-                        cellBg = "bg-emerald-50/50 border-emerald-200 hover:border-emerald-500 text-emerald-950";
+                        cellBg = "bg-emerald-50/60 border-emerald-200 hover:border-emerald-500 text-emerald-950";
                         dotBg = "bg-emerald-600";
                       } else if (slot.status === 'INFERTILE') {
-                        cellBg = "bg-amber-50/50 border-amber-200 hover:border-amber-500 text-amber-950";
+                        cellBg = "bg-amber-50/60 border-amber-200 hover:border-amber-500 text-amber-950";
                         dotBg = "bg-amber-500";
                       } else if (slot.status === 'ABNORMAL') {
-                        cellBg = "bg-red-50/50 border-red-200 hover:border-red-500 text-red-950";
+                        cellBg = "bg-red-50/60 border-red-200 hover:border-red-500 text-red-950";
                         dotBg = "bg-red-600";
                       }
 
@@ -406,10 +401,10 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
                           onClick={() => handleSlotClick(slot)}
                           onMouseEnter={() => setHoveredSlot(slot)}
                           onMouseLeave={() => setHoveredSlot(null)}
-                          className={`p-2 rounded-lg border transition-all flex flex-col items-center justify-between aspect-square cursor-pointer ${cellBg} ${
-                            isDimmed ? 'opacity-20 scale-95' : 'opacity-100 hover:scale-102'
-                          } ${isSelected ? 'ring-2 ring-[#800000] border-[#800000] bg-white shadow-xs' : ''} ${
-                            isSimActive ? 'ring-3 ring-emerald-500 bg-emerald-100 scale-105' : ''
+                          className={`p-2 rounded-xl border transition-all duration-150 flex flex-col items-center justify-between aspect-square cursor-pointer ${cellBg} ${
+                            isDimmed ? 'opacity-20 scale-95' : 'opacity-100 hover:scale-105 hover:shadow-xs'
+                          } ${isSelected ? 'ring-2 ring-[#800000] border-[#800000] bg-white shadow-xs scale-105' : ''} ${
+                            isSimActive ? 'ring-3 ring-emerald-500 bg-emerald-100 scale-110 shadow-sm' : ''
                           }`}
                           title={`Slot ${slot.slot_id}: ${slot.status} • ${(slot.confidence * 100).toFixed(1)}%`}
                         >
@@ -417,7 +412,7 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
                             {slot.slot_id}
                           </span>
 
-                          <span className={`w-3.5 h-3.5 rounded-full ${dotBg}`} />
+                          <span className={`w-3.5 h-3.5 rounded-full ${dotBg} transition-transform group-hover:scale-110`} />
 
                           <span className="text-[10px] font-extrabold text-slate-700">
                             {slot.confidence > 0 ? `${(slot.confidence * 100).toFixed(0)}%` : '—'}
@@ -433,10 +428,10 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
 
           {/* Diagnostic Inspection Sheet */}
           {selectedSlot && (
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3 mt-2">
+            <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200 space-y-3 mt-2 animate-fade-in-up">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-200">
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <span className="px-2 py-0.5 rounded bg-slate-900 text-white text-xs font-mono font-bold">
+                  <span className="px-2.5 py-0.5 rounded-md bg-slate-900 text-white text-xs font-mono font-bold">
                     Slot {selectedSlot.slot_id}
                   </span>
                   <span className="text-xs text-slate-600 font-mono">
@@ -449,7 +444,7 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
                   <span className="text-xs text-slate-500">Scanned at <strong>{selectedSlot.candled_at}</strong></span>
                   <button
                     onClick={() => setSelectedSlot(null)}
-                    className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    className="p-1 rounded-md hover:bg-slate-200 text-slate-400 hover:text-slate-700 cursor-pointer transition-colors"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
