@@ -105,4 +105,23 @@ export interface EconomicYield {
   incubator_energy_saved_kwh: number;
   energy_savings_php: number;
   total_economic_benefit_php: number;
+  duckling_sales_projected_php?: number;
+}
+
+export interface MortalityTrends {
+  day_10_early_mortality_rate: number;
+  day_18_mid_mortality_rate: number;
+  day_25_late_mortality_rate: number;
+  total_culled_eggs: number;
+}
+
+export interface BreedMetricItem {
+  breed: string;
+  total_eggs: number;
+  fertile_count: number;
+  infertile_count: number;
+  abnormal_count: number;
+  fertility_rate: number;
+  hatched_count: number;
+  hatchability_rate: number;
 }

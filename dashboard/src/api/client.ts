@@ -5,14 +5,21 @@ import {
   EggScan,
   Device,
   AnalyticsOverview,
-  EconomicYield
+  EconomicYield,
+  CandlingSession,
+  MortalityTrends,
+  BreedMetricItem,
+  BatchStage,
 } from '../types';
 import {
   mockOverview,
   mockEconomicYield,
   mockBatches,
   mockDevices,
-  mockScans
+  mockScans,
+  mockSessions,
+  mockMortalityTrends,
+  mockBreedComparison,
 } from './mockData';
 
 const api = axios.create({
@@ -37,6 +44,24 @@ export const apiClient = {
       return res.data;
     } catch {
       return mockEconomicYield;
+    }
+  },
+
+  getMortalityTrends: async (): Promise<MortalityTrends> => {
+    try {
+      const res = await api.get<MortalityTrends>('/analytics/mortality-trends');
+      return res.data;
+    } catch {
+      return mockMortalityTrends;
+    }
+  },
+
+  getBreedComparison: async (): Promise<BreedMetricItem[]> => {
+    try {
+      const res = await api.get<{ breeds: BreedMetricItem[] }>('/analytics/breed-comparison');
+      return res.data.breeds;
+    } catch {
+      return mockBreedComparison;
     }
   },
 
@@ -66,7 +91,6 @@ export const apiClient = {
       const res = await api.post<Batch>('/batches', data);
       return res.data;
     } catch {
-      // Mock creation
       const newBatch: BatchSummary = {
         batch_id: data.batch_code || `BATCH-${Date.now()}`,
         batch_code: data.batch_code || `BATCH-${Date.now()}`,
@@ -94,6 +118,38 @@ export const apiClient = {
     }
   },
 
+  advanceBatchStage: async (batchId: string, nextStage: BatchStage): Promise<BatchSummary> => {
+    try {
+      const res = await api.post<BatchSummary>(`/batches/${batchId}/advance-stage`, { stage: nextStage });
+      return res.data;
+    } catch {
+      const found = mockBatches.find(b => b.batch_id === batchId);
+      if (found) {
+        found.current_stage = nextStage;
+        if (nextStage === 'HATCHED' || nextStage === 'COMPLETED') {
+          found.status = 'COMPLETED';
+          found.hatched_count = Math.round(found.initial_egg_count * 0.88);
+          found.unhatched_count = found.initial_egg_count - found.hatched_count;
+        }
+        return found;
+      }
+      throw new Error("Batch not found");
+    }
+  },
+
+  // Sessions
+  getSessions: async (batchId?: string): Promise<CandlingSession[]> => {
+    try {
+      const res = await api.get<CandlingSession[]>('/sessions', { params: { batch_id: batchId } });
+      return res.data;
+    } catch {
+      if (batchId) {
+        return mockSessions.filter(s => s.batch_id === batchId);
+      }
+      return mockSessions;
+    }
+  },
+
   // Scans
   getScans: async (params?: { batch_id?: string; final_class?: string; limit?: number }): Promise<EggScan[]> => {
     try {
@@ -118,6 +174,20 @@ export const apiClient = {
       return res.data;
     } catch {
       return mockDevices;
+    }
+  },
+
+  updateDeviceCalibration: async (deviceId: string, data: Partial<Device>): Promise<Device> => {
+    try {
+      const res = await api.patch<Device>(`/devices/${deviceId}`, data);
+      return res.data;
+    } catch {
+      const found = mockDevices.find(d => d.device_id === deviceId);
+      if (found) {
+        Object.assign(found, data);
+        return found;
+      }
+      throw new Error("Device not found");
     }
   },
 

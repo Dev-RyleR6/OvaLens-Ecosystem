@@ -1,4 +1,13 @@
-import { BatchSummary, EggScan, Device, AnalyticsOverview, EconomicYield } from '../types';
+import {
+  BatchSummary,
+  EggScan,
+  Device,
+  AnalyticsOverview,
+  EconomicYield,
+  CandlingSession,
+  MortalityTrends,
+  BreedMetricItem,
+} from '../types';
 
 export const mockOverview: AnalyticsOverview = {
   total_eggs_scanned: 2050,
@@ -16,8 +25,97 @@ export const mockEconomicYield: EconomicYield = {
   salvage_revenue_php: 2352.00,
   incubator_energy_saved_kwh: 45.36,
   energy_savings_php: 544.32,
-  total_economic_benefit_php: 2896.32,
+  duckling_sales_projected_php: 21280.00, // 532 * ₱40
+  total_economic_benefit_php: 24176.32,
 };
+
+export const mockMortalityTrends: MortalityTrends = {
+  day_10_early_mortality_rate: 8.8,
+  day_18_mid_mortality_rate: 3.2,
+  day_25_late_mortality_rate: 1.4,
+  total_culled_eggs: 238,
+};
+
+export const mockBreedComparison: BreedMetricItem[] = [
+  {
+    breed: "KAYUMANGGI",
+    total_eggs: 1000,
+    fertile_count: 902,
+    infertile_count: 74,
+    abnormal_count: 24,
+    fertility_rate: 90.2,
+    hatched_count: 785,
+    hatchability_rate: 87.03,
+  },
+  {
+    breed: "ITIM",
+    total_eggs: 450,
+    fertile_count: 396,
+    infertile_count: 38,
+    abnormal_count: 16,
+    fertility_rate: 88.0,
+    hatched_count: 348,
+    hatchability_rate: 87.88,
+  },
+  {
+    breed: "KHAKI",
+    total_eggs: 600,
+    fertile_count: 546,
+    infertile_count: 42,
+    abnormal_count: 12,
+    fertility_rate: 91.0,
+    hatched_count: 532,
+    hatchability_rate: 88.67,
+  },
+];
+
+export const mockSessions: CandlingSession[] = [
+  {
+    session_id: "sess-kay-day10",
+    batch_id: "BATCH-2026-08-KAY-01",
+    device_id: "STATION-01-RP5",
+    stage: "DAY_10",
+    operator_name: "Ryle Gabotero",
+    started_at: new Date(Date.now() - 4 * 3600000).toISOString(),
+    ended_at: new Date(Date.now() - 3 * 3600000).toISOString(),
+    total_scanned: 500,
+    fertile_count: 451,
+    infertile_count: 37,
+    abnormal_count: 12,
+    avg_inference_ms: 26.4,
+    created_at: new Date(Date.now() - 4 * 3600000).toISOString(),
+  },
+  {
+    session_id: "sess-itm-day18",
+    batch_id: "BATCH-2026-08-ITM-01",
+    device_id: "STATION-01-RP5",
+    stage: "DAY_18",
+    operator_name: "Pedro Penduko",
+    started_at: new Date(Date.now() - 24 * 3600000).toISOString(),
+    ended_at: new Date(Date.now() - 23 * 3600000).toISOString(),
+    total_scanned: 450,
+    fertile_count: 396,
+    infertile_count: 38,
+    abnormal_count: 16,
+    avg_inference_ms: 25.8,
+    created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
+  },
+  {
+    session_id: "sess-khk-day25",
+    batch_id: "BATCH-2026-07-KHK-01",
+    device_id: "STATION-02-PC",
+    stage: "DAY_25",
+    operator_name: "Juan Dela Cruz",
+    started_at: new Date(Date.now() - 48 * 3600000).toISOString(),
+    ended_at: new Date(Date.now() - 47 * 3600000).toISOString(),
+    total_scanned: 600,
+    fertile_count: 546,
+    infertile_count: 42,
+    abnormal_count: 12,
+    avg_inference_ms: 24.1,
+    created_at: new Date(Date.now() - 48 * 3600000).toISOString(),
+  },
+];
 
 export const mockBatches: BatchSummary[] = [
   {
