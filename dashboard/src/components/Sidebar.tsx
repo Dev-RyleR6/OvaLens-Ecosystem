@@ -33,7 +33,7 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-64 border-r border-[#E2E8F0] bg-white flex flex-col justify-between flex-shrink-0 z-30 min-h-[calc(100vh-4rem)]">
+    <aside className="w-64 border-r border-[#E2E8F0] bg-white flex flex-col justify-between flex-shrink-0 z-30 h-full overflow-y-auto">
       {/* Navigation List */}
       <div className="p-4 space-y-5">
         {/* Operations Section */}
