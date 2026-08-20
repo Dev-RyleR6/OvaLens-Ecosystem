@@ -13,10 +13,6 @@
     --primary-foreground: #FFFFFF;
     --border: #E2E8F0;
     --input: #E2E8F0;
-
-    /* Refined Easing Variables */
-    --ease-refined: cubic-bezier(0.25, 1, 0.5, 1);
-    --ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   body {
@@ -25,7 +21,7 @@
   }
 }
 
-/* Crisp Clean Scrollbars */
+/* Crisp Industrial Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -37,84 +33,28 @@
 
 ::-webkit-scrollbar-thumb {
   background: #CBD5E1;
-  border-radius: 9999px;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
 }
 
-/* Animations & Keyframes */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulseGlow {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.75;
-    transform: scale(1.08);
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-.animate-fade-in-up {
-  animation: fadeInUp 0.28s var(--ease-refined) forwards;
-}
-
-.animate-pulse-glow {
-  animation: pulseGlow 2.2s infinite ease-in-out;
-}
-
-/* Interactive Utility Classes */
-.hover-lift {
-  transition: transform 0.2s var(--ease-refined), box-shadow 0.2s var(--ease-refined), border-color 0.2s var(--ease-refined);
-}
-
-.hover-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px -4px rgba(15, 23, 42, 0.08), 0 4px 6px -2px rgba(15, 23, 42, 0.03);
-}
-
-.btn-press {
-  transition: transform 0.15s var(--ease-snap), background-color 0.15s var(--ease-snap), box-shadow 0.15s var(--ease-snap);
-}
-
-.btn-press:active {
-  transform: scale(0.97);
-}
-
+/* Crisp Clean Card & Button Utilities */
 .fu-card {
-  @apply bg-white border border-[#E2E8F0] rounded-xl shadow-xs transition-all duration-200;
+  @apply bg-white border border-[#E2E8F0] rounded-xl shadow-xs transition-colors duration-150;
 }
 
 .fu-card:hover {
-  @apply border-slate-300 shadow-sm;
+  @apply border-slate-300;
 }
 
-/* Glassmorphism Surface */
-.glass-surface {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+.btn-press {
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-press:active {
+  transform: scale(0.98);
 }
 
 /* Reduced Motion Accessibility */

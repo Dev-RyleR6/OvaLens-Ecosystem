@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Activity,
   Layers,
@@ -6,12 +6,8 @@ import {
   CheckCircle2,
   ArrowRight,
   Zap,
-  Award,
-  Sparkles,
+  Info,
   X,
-  Play,
-  TrendingUp,
-  Cpu,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
@@ -113,8 +109,8 @@ export const OverviewPage: React.FC = () => {
             <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
               Hatchery Operations Command
             </h1>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
               Live Sorter Feed
             </span>
           </div>
@@ -134,49 +130,49 @@ export const OverviewPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Operator Onboarding Quick Guide (/onboard) */}
+      {/* Operator Onboarding Quick Guide */}
       {showOnboarding && (
-        <div className="relative p-5 bg-gradient-to-r from-slate-900 via-slate-900 to-[#5C0000] rounded-xl text-white shadow-sm border border-slate-800 space-y-3.5 animate-fade-in-up">
+        <div className="relative p-4 bg-slate-900 rounded-xl text-white shadow-xs border border-slate-800 space-y-3">
           <button
             onClick={handleDismissOnboarding}
-            className="absolute top-3.5 right-3.5 text-slate-400 hover:text-white p-1 rounded-md transition-colors cursor-pointer"
+            className="absolute top-3 right-3 text-slate-400 hover:text-white p-1 rounded-md transition-colors cursor-pointer"
             title="Dismiss Guide"
           >
             <X className="w-4 h-4" />
           </button>
 
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            <h3 className="font-bold text-sm text-white">Operator Quickstart: 3-Step Automated Candling Workflow</h3>
+            <Info className="w-4 h-4 text-slate-300" />
+            <h3 className="font-bold text-xs text-white uppercase tracking-wider">Hatchery Sorting Workflow</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-            <div className="p-3 bg-white/10 rounded-lg border border-white/10 backdrop-blur-xs space-y-1">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700 space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-amber-300">STEP 1: Cohort Setup</span>
+                <span className="text-[11px] font-bold text-slate-200">1. Cohort Setup</span>
                 <span className="text-[10px] text-slate-400 font-mono">Day 0</span>
               </div>
-              <p className="text-xs text-slate-200">
+              <p className="text-xs text-slate-300">
                 Register batch identifier, select breed (Kayumanggi / Native / Khaki), and load into setter cabinet.
               </p>
             </div>
 
-            <div className="p-3 bg-white/10 rounded-lg border border-white/10 backdrop-blur-xs space-y-1">
+            <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700 space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-300">STEP 2: Vision Candling</span>
+                <span className="text-[11px] font-bold text-slate-200">2. Vision Candling</span>
                 <span className="text-[10px] text-slate-400 font-mono">Day 10 (120/min)</span>
               </div>
-              <p className="text-xs text-slate-200">
-                Conveyor belt feeds eggs under high-strobe optical light. YOLOv8 FP16 executes 24.6ms automated sorting.
+              <p className="text-xs text-slate-300">
+                Conveyor belt feeds eggs under optical candling box. YOLOv8 FP16 executes 24.6ms automated sorting.
               </p>
             </div>
 
-            <div className="p-3 bg-white/10 rounded-lg border border-white/10 backdrop-blur-xs space-y-1">
+            <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700 space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-rose-300">STEP 3: Food Salvage</span>
+                <span className="text-[11px] font-bold text-slate-200">3. Food Salvage</span>
                 <span className="text-[10px] text-slate-400 font-mono">Penoy @ ₱14</span>
               </div>
-              <p className="text-xs text-slate-200">
+              <p className="text-xs text-slate-300">
                 Unfertilized yolks are cleanly salvaged for food markets; viable embryos transfer to Day 18 hatchers.
               </p>
             </div>
@@ -184,7 +180,7 @@ export const OverviewPage: React.FC = () => {
         </div>
       )}
 
-      {/* Sleek Operational KPI Ribbon */}
+      {/* Operational KPI Ribbon */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Eggs Candled"
@@ -247,7 +243,7 @@ export const OverviewPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modern Visualizations Row: Candling Spectrum Donut + Live Conveyor Velocity Stream */}
+      {/* Visualizations Row: Candling Spectrum Donut + Live Conveyor Velocity Stream */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left 5 Cols: Biological Spectrum Donut */}
         <div className="lg:col-span-5">
@@ -343,7 +339,7 @@ export const OverviewPage: React.FC = () => {
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-emerald-700" />
+                    <Zap className="w-4 h-4 text-slate-700" />
                     <h3 className="text-sm font-bold text-[#0F172A]">
                       Conveyor Velocity & Inference Latency Stream
                     </h3>
@@ -389,7 +385,7 @@ export const OverviewPage: React.FC = () => {
                 </div>
                 <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
                   <span className="text-[10px] text-slate-500 block">Avg Inference</span>
-                  <strong className="text-emerald-700 text-sm">24.6 ms</strong>
+                  <strong className="text-slate-900 text-sm">24.6 ms</strong>
                 </div>
                 <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
                   <span className="text-[10px] text-slate-500 block">Diverter Actuation</span>
@@ -400,8 +396,8 @@ export const OverviewPage: React.FC = () => {
 
             <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
               <span>60 FPS OpenCV DirectShow Frame Grabber</span>
-              <span className="font-semibold text-emerald-700 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+              <span className="font-semibold text-slate-700 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
                 Conveyor Synchronized
               </span>
             </div>

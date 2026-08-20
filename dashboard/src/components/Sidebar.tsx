@@ -6,7 +6,7 @@ import {
   ScanLine,
   TrendingUp,
   Cpu,
-  Brain,
+  Microscope,
   Users,
   FileText,
   Settings,
@@ -26,7 +26,7 @@ export const Sidebar: React.FC = () => {
 
   const adminNav = [
     { to: '/records', label: 'Historical Records', icon: Archive },
-    { to: '/models', label: 'AI Models & MLOps', icon: Brain },
+    { to: '/models', label: 'Vision Model (ONNX)', icon: Microscope },
     { to: '/users', label: 'User & Access', icon: Users },
     { to: '/logs', label: 'Audit Trail Logs', icon: FileText },
     { to: '/settings', label: 'Hatchery Settings', icon: Settings },
@@ -38,7 +38,7 @@ export const Sidebar: React.FC = () => {
       <div className="p-4 space-y-5">
         {/* Operations Section */}
         <div className="space-y-1">
-          <p className="px-3 pb-2 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+          <p className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             Operations Command
           </p>
 
@@ -50,14 +50,14 @@ export const Sidebar: React.FC = () => {
                 to={item.to}
                 className={({ isActive }) =>
                   cn(
-                    "group flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 btn-press",
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-colors btn-press",
                     isActive
-                      ? "bg-gradient-to-r from-[#800000] to-[#6B0000] text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50/90 hover:translate-x-0.5"
+                      ? "bg-[#800000] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   )
                 }
               >
-                <Icon className="w-4 h-4 flex-shrink-0 transition-transform duration-150 group-hover:scale-110" />
+                <Icon className="w-4 h-4 flex-shrink-0" />
                 <span>{item.label}</span>
               </NavLink>
             );
@@ -66,7 +66,7 @@ export const Sidebar: React.FC = () => {
 
         {/* Administration Section */}
         <div className="space-y-1">
-          <p className="px-3 pb-2 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+          <p className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             Administration & Archives
           </p>
 
@@ -78,14 +78,14 @@ export const Sidebar: React.FC = () => {
                 to={item.to}
                 className={({ isActive }) =>
                   cn(
-                    "group flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 btn-press",
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-colors btn-press",
                     isActive
-                      ? "bg-gradient-to-r from-[#800000] to-[#6B0000] text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50/90 hover:translate-x-0.5"
+                      ? "bg-[#800000] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   )
                 }
               >
-                <Icon className="w-4 h-4 flex-shrink-0 transition-transform duration-150 group-hover:scale-110" />
+                <Icon className="w-4 h-4 flex-shrink-0" />
                 <span>{item.label}</span>
               </NavLink>
             );
@@ -94,17 +94,14 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Bottom Hardware Status Card */}
-      <div className="p-3.5 m-4 rounded-xl bg-slate-50/80 border border-slate-200/90 space-y-1.5 hover:border-slate-300 transition-colors">
+      <div className="p-3.5 m-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <HardDrive className="w-3.5 h-3.5 text-slate-700" />
             <span className="text-xs font-bold text-slate-800">Station-01-RP5</span>
           </div>
           <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600" />
-            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
             Online
           </span>
         </div>
