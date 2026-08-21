@@ -731,11 +731,31 @@ class OvaLensOperatorApp(ctk.CTk):
         # Update FPS
         self.fps_label.configure(text=f"FPS: {self.camera.current_fps:.1f}")
 
-        # Update Network Sync Status
+        # Update Network Sync Status & Offline Queue Count
+        try:
+            unsynced_count = self.db.get_unsynced_count()
+        except Exception:
+            unsynced_count = 0
+
         if self.sync_worker.is_online:
-            self.net_status_badge.configure(text="SYNC: ONLINE", fg_color=FUTheme.FERTILE_GREEN_BG, text_color=FUTheme.FERTILE_GREEN)
+            if unsynced_count > 0:
+                self.net_status_badge.configure(
+                    text=f"SYNC: {unsynced_count} PENDING",
+                    fg_color=FUTheme.INFERTILE_AMBER_BG,
+                    text_color=FUTheme.INFERTILE_AMBER
+                )
+            else:
+                self.net_status_badge.configure(
+                    text="SYNC: ONLINE",
+                    fg_color=FUTheme.FERTILE_GREEN_BG,
+                    text_color=FUTheme.FERTILE_GREEN
+                )
         else:
-            self.net_status_badge.configure(text="SYNC: OFFLINE", fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_MUTED)
+            self.net_status_badge.configure(
+                text=f"SYNC: OFFLINE ({unsynced_count} WAL)",
+                fg_color=FUTheme.PANEL_LIGHT_ALT,
+                text_color=FUTheme.TEXT_MUTED
+            )
 
         # Update ESP32 IoT Status
         if self.iot.is_connected:

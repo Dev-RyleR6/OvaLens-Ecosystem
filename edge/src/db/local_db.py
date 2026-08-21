@@ -140,8 +140,14 @@ class LocalDatabaseManager:
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 
+    def get_unsynced_count(self) -> int:
+        """Return total number of scans pending network synchronization."""
+        with self._get_connection() as conn:
+            cursor = conn.execute("SELECT COUNT(*) FROM local_scans WHERE is_synced = 0;")
+            return cursor.fetchone()[0]
+
     def mark_scans_synced(self, scan_ids: List[str]):
-        """Mark a batch of scan UUIDs as successfully committed to the central PostgreSQL database."""
+        """Mark a batch of scan UUIDs as successfully committed to central PostgreSQL."""
         if not scan_ids:
             return
         now = datetime.now(timezone.utc).isoformat()

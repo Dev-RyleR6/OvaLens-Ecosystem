@@ -1,6 +1,6 @@
 """
 Candling Heuristics & Optical Quality Verification
-Ensures egg detections satisfy biological geometry and optical luminance constraints.
+Ensures egg detections satisfy biological geometry, optical luminance, and vascularization constraints.
 """
 
 from typing import Tuple, Optional, Dict, Any
@@ -11,7 +11,7 @@ import cv2
 class CandlingHeuristics:
     MIN_ASPECT_RATIO = 0.65
     MAX_ASPECT_RATIO = 1.45
-    MIN_CANDLING_LUMINANCE = 35.0  # Minimum average brightness in candling aperture
+    MIN_CANDLING_LUMINANCE = 30.0  # Minimum average brightness in candling aperture
     MIN_EGG_AREA_PX = 4000         # Minimum pixel area for a valid duck egg
 
     @staticmethod
@@ -37,7 +37,7 @@ class CandlingHeuristics:
         y2 = min(h_img, int((yc + h / 2.0) * h_img))
 
         if x2 <= x1 or y2 <= y1:
-            return {"mean_luminance": 0.0, "std_luminance": 0.0, "area_px": 0}
+            return {"mean_luminance": 0.0, "std_luminance": 0.0, "area_px": 0, "vascular_index": 0.0}
 
         roi = frame[y1:y2, x1:x2]
         hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
@@ -47,10 +47,19 @@ class CandlingHeuristics:
         std_v = float(np.std(v_channel))
         area_px = int((x2 - x1) * (y2 - y1))
 
+        # Biological Vascularization / Blood Vein Webbing Metric:
+        # Measures ratio of red absorption and high-frequency edge texture inside embryo zone
+        b, g, r = cv2.split(roi)
+        red_dominance = float(np.mean(r)) / max(1.0, float(np.mean(g)) + float(np.mean(b)))
+        laplacian = cv2.Laplacian(v_channel, cv2.CV_64F)
+        texture_var = float(np.var(laplacian))
+        vascular_index = round((red_dominance * 0.5) + (min(100.0, texture_var) / 100.0 * 0.5), 3)
+
         return {
             "mean_luminance": round(mean_v, 2),
             "std_luminance": round(std_v, 2),
-            "area_px": area_px
+            "area_px": area_px,
+            "vascular_index": vascular_index
         }
 
     @classmethod
@@ -81,12 +90,13 @@ class CandlingHeuristics:
             dist_from_center = np.sqrt((xc - 0.5) ** 2 + (yc - 0.5) ** 2)
             centrality_weight = max(0.0, 1.0 - dist_from_center)
 
-            total_score = (conf * 0.7) + (centrality_weight * 0.3)
+            total_score = (conf * 0.65) + (centrality_weight * 0.35)
 
             valid_candidates.append({
                 **det,
                 "score": total_score,
                 "luminance": lum_info["mean_luminance"],
+                "vascular_index": lum_info["vascular_index"],
                 "area_px": lum_info["area_px"]
             })
 
