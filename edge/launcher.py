@@ -1,6 +1,7 @@
 """
 OvaLens Edge Operator Launcher
-Bootstraps the quad-thread CV pipeline and CustomTkinter desktop interface.
+Bootstraps the CV pipeline, ESP32 IoT driver, SQLite WAL, and CustomTkinter desktop interface.
+Camera stream initializes on-demand when an egg sorting session starts.
 """
 
 import os
@@ -39,11 +40,10 @@ def main():
     db_manager = LocalDatabaseManager()
     print("  [OK] Local database ready.")
 
-    # 2. Initialize Camera Grabber
-    print("\n[2/5] Initializing Camera Stream...")
+    # 2. Prepare Camera Grabber (Starts on-demand with active session)
+    print("\n[2/5] Preparing Camera Driver (Standby Mode)...")
     camera = CameraGrabber(camera_index=camera_index)
-    camera.start()
-    print("  [OK] Camera thread started.")
+    print("  [OK] Camera driver ready on standby.")
 
     # 3. Initialize AI Vision Inference Engine (ONNX Runtime / PyTorch)
     print("\n[3/5] Initializing AI Inference Engine...")
@@ -74,7 +74,8 @@ def main():
 
     def on_closing():
         print("\n[*] Shutting down OvaLens Edge Subsystems...")
-        camera.stop()
+        if camera.is_running:
+            camera.stop()
         iot.stop()
         sync_worker.stop()
         app.destroy()

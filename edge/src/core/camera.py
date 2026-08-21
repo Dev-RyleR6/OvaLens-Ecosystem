@@ -1,6 +1,7 @@
 """
 Thread-Safe Camera Frame Grabber
 Continuously pulls frames from OpenCV VideoCapture into an atomic buffer to prevent hardware queue lag.
+Supports clean session on-demand start/stop lifecycle.
 """
 
 import time
@@ -53,7 +54,6 @@ class CameraGrabber:
             self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimum buffer to prevent lag
             self._is_mock_mode = False
         else:
-            print(f"[WARN] Physical camera {self.camera_index} not detected. Enabling Synthetic Egg Generator.")
             self._is_mock_mode = True
 
     def _capture_loop(self):
@@ -106,22 +106,24 @@ class CameraGrabber:
             ey = int(center[1] - 15 + np.sin(angle) * 75)
             cv2.line(img, (center[0] - 20, center[1] - 15), (ex, ey), (15, 50, 180), 2)
 
-        # Text overlay
-        cv2.putText(img, "OvaLens Synthetic Candling Stream", (20, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 200), 2)
-
         return img
 
     def get_latest_frame(self) -> Optional[np.ndarray]:
         """Return the most recent video frame atomically."""
+        if not self._is_running:
+            return None
         with self._lock:
             if self._latest_frame is not None:
                 return self._latest_frame.copy()
             return None
 
     @property
+    def is_running(self) -> bool:
+        return self._is_running
+
+    @property
     def current_fps(self) -> float:
-        return self._current_fps
+        return self._current_fps if self._is_running else 0.0
 
     @property
     def is_mock_mode(self) -> bool:
@@ -132,6 +134,10 @@ class CameraGrabber:
         self._is_running = False
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1.0)
+            self._thread = None
         if self.cap and self.cap.isOpened():
             self.cap.release()
             self.cap = None
+        with self._lock:
+            self._latest_frame = None
+        self._current_fps = 0.0

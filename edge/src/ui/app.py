@@ -1,7 +1,7 @@
 """
 OvaLens Operator Desktop GUI (CustomTkinter 60 FPS)
 Foundation University Automated Duck Egg Candling & Conveyor Sorting System.
-Automated End-to-End Sorting Cycle: Conveyor Advance -> Chamber Pause -> AI Candling Scan -> Servo Ejection -> Auto-Repeat.
+On-Demand Camera Lifecycle + Real-Time Live AI Bounding Box & Class Detection Overlays.
 """
 
 import os
@@ -59,6 +59,10 @@ class OvaLensOperatorApp(ctk.CTk):
         # Automated Cycle Threading
         self._auto_cycle_thread: Optional[threading.Thread] = None
         self._stop_cycle_event = threading.Event()
+
+        # Live Real-time Inference Cache
+        self._latest_detections: List[Dict[str, Any]] = []
+        self._last_live_infer_time = 0.0
 
         # Live Counters
         self.total_count = 0
@@ -140,7 +144,7 @@ class OvaLensOperatorApp(ctk.CTk):
         right_container.pack(side="right", padx=18)
 
         self.fps_label = ctk.CTkLabel(
-            right_container, text="FPS: --", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_MUTED
+            right_container, text="FPS: 0.0", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_MUTED
         )
         self.fps_label.pack(side="left", padx=8)
 
@@ -180,20 +184,22 @@ class OvaLensOperatorApp(ctk.CTk):
         self.cycle_status_dot.pack(side="left", padx=(12, 6))
 
         self.cycle_status_label = ctk.CTkLabel(
-            self.cycle_hud, text="CONVEYOR IDLE — CLICK 'START AUTO SORTING' TO BEGIN",
+            self.cycle_hud, text="CAMERA & CONVEYOR STANDBY — CLICK 'START AUTO SORTING' TO ACTIVATE",
             font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY
         )
         self.cycle_status_label.pack(side="left")
 
         # Inner container with disabled propagation to lock video dimensions
-        self.video_container = ctk.CTkFrame(self.left_panel, fg_color="#000000", corner_radius=8)
+        self.video_container = ctk.CTkFrame(self.left_panel, fg_color="#0F172A", corner_radius=8)
         self.video_container.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         self.video_container.pack_propagate(False)
 
         # Video HUD Canvas
         self.video_label = ctk.CTkLabel(
-            self.video_container, text="Initializing Camera Stream...",
-            fg_color="#000000", text_color="#FFFFFF"
+            self.video_container,
+            text="📷 CAMERA IN STANDBY\n\nClick 'START AUTO SORTING' to activate live video stream\nand real-time YOLOv8 egg classification",
+            font=(FUTheme.FONT_FAMILY, 13, "bold"),
+            fg_color="#0F172A", text_color=FUTheme.TEXT_MUTED
         )
         self.video_label.place(relx=0.5, rely=0.5, anchor="center")
 
@@ -321,7 +327,7 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         self.footer_frame.pack(side="bottom", fill="x")
 
-        # Automated Cycle Button (Primary Full Industrial Cycle)
+        # Automated Cycle Button (Starts Camera & Sorting Loop)
         self.session_btn = ctk.CTkButton(
             self.footer_frame, text="▶ START AUTO SORTING", font=(FUTheme.FONT_FAMILY, 13, "bold"),
             fg_color=FUTheme.FERTILE_GREEN, hover_color=FUTheme.FERTILE_GREEN_HOVER,
@@ -367,9 +373,13 @@ class OvaLensOperatorApp(ctk.CTk):
         self.settings_btn.pack(side="right", padx=8, pady=13)
 
     def toggle_auto_session(self):
-        """Toggle automated full conveyor sorting cycle."""
+        """Toggle automated full conveyor sorting cycle with on-demand camera start."""
         if not self.is_session_active:
-            # Start New Session & Auto Conveyor Cycle
+            # 1. Start Camera Stream On-Demand
+            if not self.camera.is_running:
+                self.camera.start()
+
+            # 2. Start New Session & Auto Conveyor Cycle
             self.current_session_id = str(uuid.uuid4())
             self.is_session_active = True
             self.is_auto_cycle_running = True
@@ -411,7 +421,7 @@ class OvaLensOperatorApp(ctk.CTk):
             self._auto_cycle_thread = threading.Thread(target=self._auto_conveyor_cycle_loop, daemon=True, name="OvaLens-ConveyorCycle")
             self._auto_cycle_thread.start()
         else:
-            # Stop Session & Conveyor
+            # Stop Session & Release Camera
             self._stop_auto_cycle()
 
     def _stop_auto_cycle(self):
@@ -420,11 +430,19 @@ class OvaLensOperatorApp(ctk.CTk):
         self._stop_cycle_event.set()
         self.iot.set_conveyor(False)
 
+        # Stop Camera Stream on Session End
+        if self.camera.is_running:
+            self.camera.stop()
+
         self.session_btn.configure(
             text="▶ START AUTO SORTING", fg_color=FUTheme.FERTILE_GREEN,
             hover_color=FUTheme.FERTILE_GREEN_HOVER
         )
-        self._update_cycle_hud("●", FUTheme.TEXT_MUTED, "CONVEYOR STOPPED — SESSION IDLE")
+        self._update_cycle_hud("●", FUTheme.TEXT_MUTED, "CAMERA & CONVEYOR STANDBY — SESSION IDLE")
+        self.video_label.configure(
+            image=None,
+            text="📷 CAMERA IN STANDBY\n\nClick 'START AUTO SORTING' to activate live video stream\nand real-time YOLOv8 egg classification"
+        )
         self._log(f"[OK] Auto sorting ended. Completed {self.total_count}/{self.target_egg_count} eggs.")
 
     def _auto_conveyor_cycle_loop(self):
@@ -438,7 +456,6 @@ class OvaLensOperatorApp(ctk.CTk):
         """
         while self.is_auto_cycle_running and not self._stop_cycle_event.is_set():
             if self.total_count >= self.target_egg_count:
-                # Batch Target Complete!
                 self.after(0, lambda: self._on_batch_target_complete())
                 break
 
@@ -476,12 +493,16 @@ class OvaLensOperatorApp(ctk.CTk):
 
     def trigger_candling_scan(self):
         """Perform instant snapshot inference and trigger conveyor actuator if rejected."""
+        # Ensure camera is running if triggered manually in single scan
+        if not self.camera.is_running:
+            self.camera.start()
+            time.sleep(0.1)
+
         frame = self.camera.get_latest_frame()
         if frame is None:
             return
 
         if not self.is_session_active:
-            # Single scan without auto-cycle
             self.current_session_id = self.current_session_id or str(uuid.uuid4())
             self.is_session_active = True
             self.db.create_session(
@@ -502,6 +523,9 @@ class OvaLensOperatorApp(ctk.CTk):
         action = result["routing_action"]
         lat_ms = result["inference_ms"]
         detections = result["detections"]
+
+        # Cache detections for live overlay
+        self._latest_detections = detections
 
         # If rejected, schedule ESP32 conveyor kicker
         if action == "REJECT":
@@ -573,36 +597,83 @@ class OvaLensOperatorApp(ctk.CTk):
         self.box_abnormal.configure(text=str(self.abnormal_count))
 
     def _update_video_frame(self):
-        """Optimized video render loop at ~30 FPS with strictly clamped aspect-ratio scaling."""
-        frame = self.camera.get_latest_frame()
-        if frame is not None:
-            # Candling crosshairs & aperture guidelines
-            h, w = frame.shape[:2]
-            cv2.circle(frame, (w // 2, h // 2), 5, (0, 255, 0), -1)
-            cv2.ellipse(frame, (w // 2, h // 2), (180, 240), 0, 0, 360, (0, 200, 255), 1)
+        """
+        Live video render loop at ~30 FPS with dynamic AI bounding box & classification overlays.
+        Only grabs and renders active camera frames when a session is in progress.
+        """
+        if self.camera.is_running:
+            frame = self.camera.get_latest_frame()
+            if frame is not None:
+                h, w = frame.shape[:2]
 
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # Run live detection if not recently computed (every ~100ms)
+                now = time.time()
+                if now - self._last_live_infer_time > 0.10:
+                    infer_res = self.engine.predict(frame)
+                    self._latest_detections = infer_res.get("detections", [])
+                    self._last_live_infer_time = now
 
-            container_w = max(100, self.video_container.winfo_width())
-            container_h = max(100, self.video_container.winfo_height())
+                # 1. Draw Centering Aperture Guidelines
+                cv2.circle(frame, (w // 2, h // 2), 5, (0, 255, 0), -1)
+                cv2.ellipse(frame, (w // 2, h // 2), (180, 240), 0, 0, 360, (0, 200, 255), 1)
 
-            frame_aspect = w / max(1, h)
-            container_aspect = container_w / max(1, container_h)
+                # 2. Draw Live AI Bounding Boxes & Classification Labels
+                for det in self._latest_detections:
+                    bbox = det.get("bbox", [])
+                    cls_name = det.get("class", "FERTILE")
+                    conf = det.get("confidence", 0.90)
 
-            if container_aspect > frame_aspect:
-                target_h = container_h
-                target_w = int(target_h * frame_aspect)
-            else:
-                target_w = container_w
-                target_h = int(target_w / frame_aspect)
+                    if len(bbox) == 4:
+                        # Convert normalized [xc, yc, w, h] to pixel coordinates [x1, y1, x2, y2]
+                        xc, yc, bw, bh = bbox
+                        x1 = int((xc - bw / 2) * w)
+                        y1 = int((yc - bh / 2) * h)
+                        x2 = int((xc + bw / 2) * w)
+                        y2 = int((yc + bh / 2) * h)
 
-            target_w = max(160, min(target_w, container_w))
-            target_h = max(120, min(target_h, container_h))
+                        # Color Palette
+                        if cls_name == "FERTILE":
+                            box_bgr = (56, 122, 53)     # Agri-Green
+                            label_str = f"FERTILE: {conf*100:.1f}%"
+                        elif cls_name == "INFERTILE":
+                            box_bgr = (6, 119, 217)     # Penoy Amber
+                            label_str = f"INFERTILE (PENOY): {conf*100:.1f}%"
+                        else:
+                            box_bgr = (38, 38, 220)     # Reject Red
+                            label_str = f"ABNORMAL: {conf*100:.1f}%"
 
-            resized = cv2.resize(rgb_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
-            pil_img = Image.fromarray(resized)
-            ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(target_w, target_h))
-            self.video_label.configure(image=ctk_img, text="")
+                        # Draw Bounding Box Rectangle
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), box_bgr, 2)
+
+                        # Draw Pill Label Header
+                        (tw, th), _ = cv2.getTextSize(label_str, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
+                        cv2.rectangle(frame, (x1, y1 - th - 8), (x1 + tw + 10, y1), box_bgr, -1)
+                        cv2.putText(frame, label_str, (x1 + 5, y1 - 4),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA)
+
+                # 3. Letterbox scale and display inside CTk video container
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                container_w = max(100, self.video_container.winfo_width())
+                container_h = max(100, self.video_container.winfo_height())
+
+                frame_aspect = w / max(1, h)
+                container_aspect = container_w / max(1, container_h)
+
+                if container_aspect > frame_aspect:
+                    target_h = container_h
+                    target_w = int(target_h * frame_aspect)
+                else:
+                    target_w = container_w
+                    target_h = int(target_w / frame_aspect)
+
+                target_w = max(160, min(target_w, container_w))
+                target_h = max(120, min(target_h, container_h))
+
+                resized = cv2.resize(rgb_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                pil_img = Image.fromarray(resized)
+                ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(target_w, target_h))
+                self.video_label.configure(image=ctk_img, text="")
 
         self.after(33, self._update_video_frame)
 
