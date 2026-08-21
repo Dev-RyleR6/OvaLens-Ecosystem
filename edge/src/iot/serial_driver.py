@@ -1,6 +1,6 @@
 """
 Non-blocking PySerial Driver for ESP32 Conveyor Actuator
-Handles optical interrupt events and delayed servo kick commands (Δt = D/v).
+Handles optical interrupt events, motor stepping/pauses, and delayed servo kick commands (Δt = D/v).
 """
 
 import time
@@ -91,6 +91,11 @@ class ESP32SerialDriver:
         """Trigger immediate manual ejection."""
         self._send_raw("CMD:EJECT_NOW\n")
 
+    def set_conveyor(self, is_running: bool):
+        """Start or stop conveyor belt motor."""
+        cmd = "CMD:MOTOR:START\n" if is_running else "CMD:MOTOR:STOP\n"
+        self._send_raw(cmd)
+
     def set_candling_light(self, brightness_0_to_255: int):
         """Adjust candling lamp PWM brightness."""
         val = max(0, min(255, brightness_0_to_255))
@@ -109,7 +114,7 @@ class ESP32SerialDriver:
                 except Exception as e:
                     print(f"[ERROR] Serial write failure ({e})")
         else:
-            # Mock mode log
+            # Mock mode pass-through
             pass
 
     @property

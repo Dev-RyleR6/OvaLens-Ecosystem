@@ -1,6 +1,7 @@
 """
 OvaLens Operator Desktop GUI (CustomTkinter 60 FPS)
-Foundation University Automated Duck Egg Candling & Sorting Interface (Light Institutional Theme).
+Foundation University Automated Duck Egg Candling & Conveyor Sorting System.
+Automated End-to-End Sorting Cycle: Conveyor Advance -> Chamber Pause -> AI Candling Scan -> Servo Ejection -> Auto-Repeat.
 """
 
 import os
@@ -36,10 +37,12 @@ class OvaLensOperatorApp(ctk.CTk):
         self.sync_worker = sync_worker
         self.device_id = device_id
 
-        # Conveyor Calibration Defaults
+        # Conveyor & Chamber Timing Defaults
         self.conveyor_speed_cm_s = 12.50
         self.conveyor_dist_cm = 25.00
         self.servo_pulse_ms = 250
+        self.chamber_pause_ms = 350       # Time conveyor pauses inside chamber for blur-free candling
+        self.conveyor_advance_ms = 900     # Time conveyor moves between consecutive eggs
 
         # Batch & Session Configuration
         self.current_session_id: Optional[str] = None
@@ -50,7 +53,12 @@ class OvaLensOperatorApp(ctk.CTk):
         self.incubator_id: str = "INCUBATOR-A1"
         self.operator_name: str = "Pedro Penduko"
         self.is_session_active: bool = False
+        self.is_auto_cycle_running: bool = False
         self.scan_sequence: int = 0
+
+        # Automated Cycle Threading
+        self._auto_cycle_thread: Optional[threading.Thread] = None
+        self._stop_cycle_event = threading.Event()
 
         # Live Counters
         self.total_count = 0
@@ -60,7 +68,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Window Configuration (Light Institutional Theme)
         self.title("OvaLens — Automated Duck Egg Candling System (Foundation University)")
-        self.geometry("1280x840")
+        self.geometry("1280x850")
         self.minsize(1024, 720)
         ctk.set_appearance_mode("light")
         self.configure(fg_color=FUTheme.BG_LIGHT)
@@ -154,16 +162,32 @@ class OvaLensOperatorApp(ctk.CTk):
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
         self.main_container.pack(fill="both", expand=True, padx=16, pady=12)
 
-        # Left Column: Live Candling Viewport (Fixed container preventing expansion bug)
+        # Left Column: Live Candling Viewport & Conveyor Status HUD
         self.left_panel = ctk.CTkFrame(
             self.main_container, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12,
             border_width=1, border_color=FUTheme.BORDER
         )
         self.left_panel.pack(side="left", fill="both", expand=True, padx=(0, 10))
 
-        # Inner container with disabled propagation to strictly lock video dimensions
+        # Top of Left Panel: Live Automated Cycle State Indicator
+        self.cycle_hud = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.PANEL_LIGHT_ALT, height=36, corner_radius=8)
+        self.cycle_hud.pack(fill="x", padx=10, pady=(10, 6))
+        self.cycle_hud.pack_propagate(False)
+
+        self.cycle_status_dot = ctk.CTkLabel(
+            self.cycle_hud, text="●", font=(FUTheme.FONT_FAMILY, 12, "bold"), text_color=FUTheme.TEXT_MUTED
+        )
+        self.cycle_status_dot.pack(side="left", padx=(12, 6))
+
+        self.cycle_status_label = ctk.CTkLabel(
+            self.cycle_hud, text="CONVEYOR IDLE — CLICK 'START AUTO SORTING' TO BEGIN",
+            font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY
+        )
+        self.cycle_status_label.pack(side="left")
+
+        # Inner container with disabled propagation to lock video dimensions
         self.video_container = ctk.CTkFrame(self.left_panel, fg_color="#000000", corner_radius=8)
-        self.video_container.pack(fill="both", expand=True, padx=10, pady=10)
+        self.video_container.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         self.video_container.pack_propagate(False)
 
         # Video HUD Canvas
@@ -202,13 +226,13 @@ class OvaLensOperatorApp(ctk.CTk):
         self.latency_label.pack(side="right")
 
         self.result_title = ctk.CTkLabel(
-            self.result_banner, text="Ready for Scan",
+            self.result_banner, text="Ready for Auto Sorting",
             font=(FUTheme.FONT_FAMILY, 18, "bold"), text_color=FUTheme.TEXT_PRIMARY
         )
         self.result_title.pack(anchor="w", padx=16, pady=(2, 1))
 
         self.result_subtitle = ctk.CTkLabel(
-            self.result_banner, text="Press [SPACE] or trigger optical sensor on conveyor",
+            self.result_banner, text="Conveyor automatically advances, pauses inside chamber, and sorts",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
         )
         self.result_subtitle.pack(anchor="w", padx=16)
@@ -230,7 +254,7 @@ class OvaLensOperatorApp(ctk.CTk):
         c_title.pack(side="left")
 
         self.progress_pct_label = ctk.CTkLabel(
-            c_header, text="0.0% Complete", font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            c_header, text="0.0% (0 / 500)", font=(FUTheme.FONT_FAMILY, 10, "bold"),
             text_color=FUTheme.PRIMARY_MAROON
         )
         self.progress_pct_label.pack(side="right")
@@ -247,7 +271,7 @@ class OvaLensOperatorApp(ctk.CTk):
         grid.pack(fill="x", padx=10, pady=(0, 12))
 
         # 4 Clean Stat Tiles
-        self.box_total = self._create_stat_box(grid, "TOTAL SCANNED", "0 / 500", 0, 0, accent_color=FUTheme.TEXT_PRIMARY)
+        self.box_total = self._create_stat_box(grid, "TOTAL SCANNED", f"0 / {self.target_egg_count}", 0, 0, accent_color=FUTheme.TEXT_PRIMARY)
         self.box_fertile = self._create_stat_box(grid, "FERTILE (ACCEPT)", "0 (0%)", 0, 1, accent_color=FUTheme.FERTILE_GREEN)
         self.box_infertile = self._create_stat_box(grid, "INFERTILE (PENOY)", "0", 1, 0, accent_color=FUTheme.INFERTILE_AMBER)
         self.box_abnormal = self._create_stat_box(grid, "ABNORMAL (REJECT)", "0", 1, 1, accent_color=FUTheme.ABNORMAL_RED)
@@ -297,186 +321,58 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         self.footer_frame.pack(side="bottom", fill="x")
 
-        # Session Toggle Button (Outline / Secondary)
+        # Automated Cycle Button (Primary Full Industrial Cycle)
         self.session_btn = ctk.CTkButton(
-            self.footer_frame, text="▶ Start Session", font=(FUTheme.FONT_FAMILY, 13, "bold"),
-            fg_color="transparent", border_width=1, border_color=FUTheme.FERTILE_GREEN,
-            text_color=FUTheme.FERTILE_GREEN, hover_color=FUTheme.FERTILE_GREEN_BG,
-            command=self.toggle_session, width=160, height=40, corner_radius=8
+            self.footer_frame, text="▶ START AUTO SORTING", font=(FUTheme.FONT_FAMILY, 13, "bold"),
+            fg_color=FUTheme.FERTILE_GREEN, hover_color=FUTheme.FERTILE_GREEN_HOVER,
+            text_color=FUTheme.TEXT_WHITE, command=self.toggle_auto_session,
+            width=210, height=42, corner_radius=8
         )
-        self.session_btn.pack(side="left", padx=(18, 8), pady=14)
+        self.session_btn.pack(side="left", padx=(18, 8), pady=13)
 
-        # Trigger Scan Button (Primary Action)
+        # Single Trigger Scan Button (Manual Override)
         self.scan_btn = ctk.CTkButton(
-            self.footer_frame, text="⚡ Trigger Scan  [SPACE]", font=(FUTheme.FONT_FAMILY, 13, "bold"),
+            self.footer_frame, text="⚡ Single Scan [SPACE]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.PRIMARY_MAROON, hover_color=FUTheme.HOVER_MAROON,
             text_color=FUTheme.TEXT_WHITE, command=self.trigger_candling_scan,
-            width=220, height=40, corner_radius=8
+            width=180, height=42, corner_radius=8
         )
-        self.scan_btn.pack(side="left", padx=8, pady=14)
+        self.scan_btn.pack(side="left", padx=8, pady=13)
 
         # Manual Eject Button
         self.eject_btn = ctk.CTkButton(
-            self.footer_frame, text="⏏ Manual Eject  [R]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
+            self.footer_frame, text="⏏ Manual Eject [R]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.ABNORMAL_RED_BG,
             text_color=FUTheme.TEXT_PRIMARY, command=self.trigger_manual_eject,
-            width=160, height=40, corner_radius=8
+            width=150, height=42, corner_radius=8
         )
-        self.eject_btn.pack(side="left", padx=8, pady=14)
+        self.eject_btn.pack(side="left", padx=8, pady=13)
 
         # Batch Setup Quick Button
         self.batch_setup_btn = ctk.CTkButton(
             self.footer_frame, text="📋 Batch Setup", font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.BORDER,
             text_color=FUTheme.TEXT_PRIMARY, command=self.open_batch_setup_dialog,
-            width=130, height=40, corner_radius=8
+            width=130, height=42, corner_radius=8
         )
-        self.batch_setup_btn.pack(side="right", padx=(8, 18), pady=14)
+        self.batch_setup_btn.pack(side="right", padx=(8, 18), pady=13)
 
         # Conveyor Settings Button
         self.settings_btn = ctk.CTkButton(
             self.footer_frame, text="⚙ Conveyor Config", font=(FUTheme.FONT_FAMILY, 12),
             fg_color="transparent", border_width=1, border_color=FUTheme.BORDER,
             text_color=FUTheme.TEXT_MUTED, hover_color=FUTheme.PANEL_LIGHT_ALT,
-            command=self.open_calibration_dialog, width=140, height=40, corner_radius=8
+            command=self.open_calibration_dialog, width=140, height=42, corner_radius=8
         )
-        self.settings_btn.pack(side="right", padx=8, pady=14)
+        self.settings_btn.pack(side="right", padx=8, pady=13)
 
-    def open_batch_setup_dialog(self):
-        """Robust Modal for Batch creation, selection, and candling stage setup."""
-        if self.is_session_active:
-            self._log("[WARN] Please end the current active session before changing batch parameters.")
-
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("Egg Batch & Candling Setup")
-        dialog.geometry("480x560")
-        dialog.configure(fg_color=FUTheme.BG_LIGHT)
-        dialog.transient(self)
-        dialog.grab_set()
-
-        # Header
-        ctk.CTkLabel(
-            dialog, text="Egg Batch & Candling Setup",
-            font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.TEXT_PRIMARY
-        ).pack(pady=(18, 4))
-        ctk.CTkLabel(
-            dialog, text="Select duck breed, candling stage, and initial egg quantity",
-            font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
-        ).pack(pady=(0, 16))
-
-        content = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
-        content.pack(fill="both", expand=True, padx=20, pady=(0, 16))
-
-        # 1. Batch Code / Identifier
-        batch_header = ctk.CTkFrame(content, fg_color="transparent")
-        batch_header.pack(fill="x", padx=16, pady=(14, 2))
-        ctk.CTkLabel(batch_header, text="Batch Code / Identifier:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(side="left")
-
-        batch_entry = ctk.CTkEntry(content, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=36)
-        batch_entry.insert(0, self.current_batch_id)
-        batch_entry.pack(fill="x", padx=16, pady=(0, 10))
-
-        # 2. Duck Breed Selection
-        ctk.CTkLabel(content, text="Duck Breed:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=16, pady=(4, 2))
-        breed_opts = ["KAYUMANGGI (Itik Pinas)", "PEKIN (Cherry Valley)", "MUSCOVY (Pato)", "KHAKI_CAMPBELL (Layer)"]
-        breed_dropdown = ctk.CTkOptionMenu(
-            content, values=breed_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.BORDER, button_hover_color=FUTheme.PRIMARY_MAROON, height=36
-        )
-        # Select current
-        for b in breed_opts:
-            if self.current_breed in b:
-                breed_dropdown.set(b)
-                break
-        breed_dropdown.pack(fill="x", padx=16, pady=(0, 10))
-
-        # 3. Candling Stage
-        ctk.CTkLabel(content, text="Candling Stage:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=16, pady=(4, 2))
-        stage_opts = ["DAY_7 (Initial Blood Ring Check)", "DAY_10 (Primary Penoy Salvage)", "DAY_14 (Mid Embryo Vitality)", "DAY_18 (Pre-Hatcher Transfer)"]
-        stage_dropdown = ctk.CTkOptionMenu(
-            content, values=stage_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.BORDER, button_hover_color=FUTheme.PRIMARY_MAROON, height=36
-        )
-        for s in stage_opts:
-            if self.current_stage in s:
-                stage_dropdown.set(s)
-                break
-        stage_dropdown.pack(fill="x", padx=16, pady=(0, 10))
-
-        # 4. Target Egg Quantity & Operator Row
-        qty_row = ctk.CTkFrame(content, fg_color="transparent")
-        qty_row.pack(fill="x", padx=16, pady=(4, 12))
-
-        col1 = ctk.CTkFrame(qty_row, fg_color="transparent")
-        col1.pack(side="left", fill="x", expand=True, padx=(0, 6))
-        ctk.CTkLabel(col1, text="Total Eggs in Batch:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        qty_entry = ctk.CTkEntry(col1, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=36)
-        qty_entry.insert(0, str(self.target_egg_count))
-        qty_entry.pack(fill="x")
-
-        col2 = ctk.CTkFrame(qty_row, fg_color="transparent")
-        col2.pack(side="right", fill="x", expand=True, padx=(6, 0))
-        ctk.CTkLabel(col2, text="Operator Name:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        op_entry = ctk.CTkEntry(col2, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=36)
-        op_entry.insert(0, self.operator_name)
-        op_entry.pack(fill="x")
-
-        # Save & Apply Callback
-        def apply_batch():
-            raw_batch = batch_entry.get().strip()
-            raw_qty = qty_entry.get().strip()
-            raw_op = op_entry.get().strip()
-            raw_breed = breed_dropdown.get().split(" ")[0]
-            raw_stage = stage_dropdown.get().split(" ")[0]
-
-            if not raw_batch:
-                return
-
-            try:
-                parsed_qty = max(1, int(raw_qty))
-            except ValueError:
-                parsed_qty = 500
-
-            self.current_batch_id = raw_batch
-            self.current_breed = raw_breed
-            self.current_stage = raw_stage
-            self.target_egg_count = parsed_qty
-            self.operator_name = raw_op or "Operator"
-
-            # Reset session stats if batch changed and not currently running
-            if not self.is_session_active:
-                self.total_count = 0
-                self.fertile_count = 0
-                self.infertile_count = 0
-                self.abnormal_count = 0
-
-            # Update UI indicators
-            self.batch_btn.configure(text=f"📋 Batch: {self.current_batch_id}  ({self.current_stage})  ▾")
-            self._update_counters_ui()
-            self._log(f"[BATCH] Configured: {self.current_batch_id} | Breed: {self.current_breed} | Stage: {self.current_stage} | Target: {self.target_egg_count} eggs")
-            dialog.destroy()
-
-        # Action Buttons
-        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
-        btn_row.pack(fill="x", padx=20, pady=(0, 16))
-
-        ctk.CTkButton(
-            btn_row, text="Cancel", fg_color="transparent", border_width=1, border_color=FUTheme.BORDER,
-            text_color=FUTheme.TEXT_MUTED, hover_color=FUTheme.PANEL_LIGHT_ALT, command=dialog.destroy,
-            width=100, height=38
-        ).pack(side="left")
-
-        ctk.CTkButton(
-            btn_row, text="Save & Set Active Batch", fg_color=FUTheme.PRIMARY_MAROON,
-            hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE,
-            font=(FUTheme.FONT_FAMILY, 12, "bold"), command=apply_batch, height=38
-        ).pack(side="right", fill="x", expand=True, padx=(10, 0))
-
-    def toggle_session(self):
+    def toggle_auto_session(self):
+        """Toggle automated full conveyor sorting cycle."""
         if not self.is_session_active:
-            # Start Session
+            # Start New Session & Auto Conveyor Cycle
             self.current_session_id = str(uuid.uuid4())
             self.is_session_active = True
+            self.is_auto_cycle_running = True
             self.scan_sequence = 0
             self.total_count = 0
             self.fertile_count = 0
@@ -492,7 +388,7 @@ class OvaLensOperatorApp(ctk.CTk):
                 operator_name=self.operator_name
             )
 
-            # Register session with background sync worker
+            # Sync session creation to FastAPI backend
             self.sync_worker.register_session({
                 "session_id": self.current_session_id,
                 "batch_id": self.current_batch_id,
@@ -502,20 +398,81 @@ class OvaLensOperatorApp(ctk.CTk):
                 "started_at": datetime.now(timezone.utc).isoformat()
             })
 
+            # Update UI state
             self.session_btn.configure(
-                text="⏹ End Session", border_color=FUTheme.ABNORMAL_RED,
-                text_color=FUTheme.ABNORMAL_RED, hover_color=FUTheme.ABNORMAL_RED_BG
+                text="⏹ STOP AUTO SORTING", fg_color=FUTheme.ABNORMAL_RED,
+                hover_color=FUTheme.ABNORMAL_RED_HOVER
             )
             self._update_counters_ui()
-            self._log(f"[*] Session active: {self.current_session_id[:8]}... (Batch: {self.current_batch_id})")
+            self._log(f"[*] AUTO SESSION STARTED: {self.current_session_id[:8]}... (Batch: {self.current_batch_id}, Target: {self.target_egg_count} eggs)")
+
+            # Launch Automated Conveyor Cycle Worker Thread
+            self._stop_cycle_event.clear()
+            self._auto_cycle_thread = threading.Thread(target=self._auto_conveyor_cycle_loop, daemon=True, name="OvaLens-ConveyorCycle")
+            self._auto_cycle_thread.start()
         else:
-            # End Session
-            self.is_session_active = False
-            self.session_btn.configure(
-                text="▶ Start Session", border_color=FUTheme.FERTILE_GREEN,
-                text_color=FUTheme.FERTILE_GREEN, hover_color=FUTheme.FERTILE_GREEN_BG
-            )
-            self._log(f"[OK] Session ended. Scanned {self.total_count} total eggs.")
+            # Stop Session & Conveyor
+            self._stop_auto_cycle()
+
+    def _stop_auto_cycle(self):
+        self.is_session_active = False
+        self.is_auto_cycle_running = False
+        self._stop_cycle_event.set()
+        self.iot.set_conveyor(False)
+
+        self.session_btn.configure(
+            text="▶ START AUTO SORTING", fg_color=FUTheme.FERTILE_GREEN,
+            hover_color=FUTheme.FERTILE_GREEN_HOVER
+        )
+        self._update_cycle_hud("●", FUTheme.TEXT_MUTED, "CONVEYOR STOPPED — SESSION IDLE")
+        self._log(f"[OK] Auto sorting ended. Completed {self.total_count}/{self.target_egg_count} eggs.")
+
+    def _auto_conveyor_cycle_loop(self):
+        """
+        Industrial Automated Conveyor State Machine:
+        1. Motor Advances Conveyor
+        2. Egg enters dark candling chamber (Conveyor Pauses for blur-free optical capture)
+        3. AI Vision inference executes
+        4. Servo diverter actuates if rejected; lets egg pass to incubator lane if fertile
+        5. Automatically repeats until target batch count is satisfied
+        """
+        while self.is_auto_cycle_running and not self._stop_cycle_event.is_set():
+            if self.total_count >= self.target_egg_count:
+                # Batch Target Complete!
+                self.after(0, lambda: self._on_batch_target_complete())
+                break
+
+            # PHASE 1: Motor Advance (Transport egg to candling aperture)
+            self.after(0, lambda: self._update_cycle_hud("🟢", FUTheme.FERTILE_GREEN, f"CONVEYOR ADVANCING EGG #{self.total_count + 1}..."))
+            self.iot.set_conveyor(True)
+            time.sleep(self.conveyor_advance_ms / 1000.0)
+
+            if self._stop_cycle_event.is_set():
+                break
+
+            # PHASE 2: Chamber Entry & Stabilization Pause
+            self.after(0, lambda: self._update_cycle_hud("🟡", FUTheme.INFERTILE_AMBER, f"EGG #{self.total_count + 1} IN CHAMBER — PAUSED FOR CANDLING"))
+            self.iot.set_conveyor(False)
+            time.sleep(self.chamber_pause_ms / 1000.0)
+
+            if self._stop_cycle_event.is_set():
+                break
+
+            # PHASE 3: AI Candling Scan & Actuation
+            self.after(0, lambda: self._update_cycle_hud("🔵", FUTheme.PRIMARY_MAROON, f"AI INFERENCE — SCANNING EGG #{self.total_count + 1}..."))
+            self.after(0, self.trigger_candling_scan)
+
+            # Settle time between cycles
+            time.sleep(0.4)
+
+    def _on_batch_target_complete(self):
+        self._stop_auto_cycle()
+        self._update_cycle_hud("🏁", FUTheme.FERTILE_GREEN, f"BATCH COMPLETE: ALL {self.target_egg_count} EGGS SORTED!")
+        self._log(f"[COMPLETE] Batch {self.current_batch_id} fully scanned ({self.target_egg_count}/{self.target_egg_count} eggs).")
+
+    def _update_cycle_hud(self, dot_icon: str, dot_color: str, status_text: str):
+        self.cycle_status_dot.configure(text=dot_icon, text_color=dot_color)
+        self.cycle_status_label.configure(text=status_text)
 
     def trigger_candling_scan(self):
         """Perform instant snapshot inference and trigger conveyor actuator if rejected."""
@@ -524,12 +481,21 @@ class OvaLensOperatorApp(ctk.CTk):
             return
 
         if not self.is_session_active:
-            self.toggle_session()
+            # Single scan without auto-cycle
+            self.current_session_id = self.current_session_id or str(uuid.uuid4())
+            self.is_session_active = True
+            self.db.create_session(
+                session_id=self.current_session_id,
+                batch_id=self.current_batch_id,
+                device_id=self.device_id,
+                stage=self.current_stage,
+                operator_name=self.operator_name
+            )
 
         self.scan_sequence += 1
         scan_id = str(uuid.uuid4())
 
-        # Run AI Model Inference
+        # Run AI Model Inference (YOLOv8 + ONNX Runtime)
         result = self.engine.predict(frame)
         final_cls = result["final_class"]
         conf = result["confidence"]
@@ -577,15 +543,15 @@ class OvaLensOperatorApp(ctk.CTk):
         if final_cls == "FERTILE":
             badge_color = FUTheme.FERTILE_GREEN
             title_text = f"FERTILE — ACCEPT ({conf*100:.1f}%)"
-            sub_text = "Embryo development active • Routed to Incubator"
+            sub_text = "Embryo active • Routed along incubator conveyor"
         elif final_cls == "INFERTILE":
             badge_color = FUTheme.INFERTILE_AMBER
             title_text = f"INFERTILE — REJECT ({conf*100:.1f}%)"
-            sub_text = "Penoy salvage candidate @ ₱14 • Diverted"
+            sub_text = "Penoy cull @ ₱14 • Servo diverter gate actuated"
         else:
             badge_color = FUTheme.ABNORMAL_RED
             title_text = f"ABNORMAL — REJECT ({conf*100:.1f}%)"
-            sub_text = "Corrupted yolk / Dead embryo • Ejected"
+            sub_text = "Dead embryo / Corrupted yolk • Ejected to cull bin"
 
         self.result_badge.configure(text=action, fg_color=badge_color, text_color=FUTheme.TEXT_WHITE)
         self.latency_label.configure(text=f"Latency: {lat_ms}ms")
@@ -598,7 +564,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Update Progress Bar & Percentage
         self.progress_bar.set(batch_pct / 100.0)
-        self.progress_pct_label.configure(text=f"{batch_pct:.1f}% ({self.total_count}/{self.target_egg_count})")
+        self.progress_pct_label.configure(text=f"{batch_pct:.1f}% ({self.total_count} / {self.target_egg_count})")
 
         # Update Counter Tiles
         self.box_total.configure(text=f"{self.total_count} / {self.target_egg_count}")
@@ -607,10 +573,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.box_abnormal.configure(text=str(self.abnormal_count))
 
     def _update_video_frame(self):
-        """
-        Optimized video render loop at ~30 FPS with strictly clamped aspect-ratio scaling.
-        Avoids the infinite geometry expansion loop by using fixed container dimensions.
-        """
+        """Optimized video render loop at ~30 FPS with strictly clamped aspect-ratio scaling."""
         frame = self.camera.get_latest_frame()
         if frame is not None:
             # Candling crosshairs & aperture guidelines
@@ -620,11 +583,9 @@ class OvaLensOperatorApp(ctk.CTk):
 
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            # Strictly measure container without feedback loop
             container_w = max(100, self.video_container.winfo_width())
             container_h = max(100, self.video_container.winfo_height())
 
-            # Maintain 16:9 or frame aspect ratio within the container box
             frame_aspect = w / max(1, h)
             container_aspect = container_w / max(1, container_h)
 
@@ -670,57 +631,179 @@ class OvaLensOperatorApp(ctk.CTk):
         self.log_textbox.see("end")
         self.log_textbox.configure(state="disabled")
 
-    def open_calibration_dialog(self):
+    def open_batch_setup_dialog(self):
+        """Robust Modal for Batch creation, selection, and candling stage setup."""
+        if self.is_session_active:
+            self._log("[WARN] Please stop the current active auto session before changing batch parameters.")
+
         dialog = ctk.CTkToplevel(self)
-        dialog.title("Conveyor Calibration")
-        dialog.geometry("420x360")
+        dialog.title("Egg Batch & Candling Setup")
+        dialog.geometry("480x560")
         dialog.configure(fg_color=FUTheme.BG_LIGHT)
         dialog.transient(self)
         dialog.grab_set()
 
         ctk.CTkLabel(
-            dialog, text="Conveyor Actuation Calibration",
+            dialog, text="Egg Batch & Candling Setup",
+            font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.TEXT_PRIMARY
+        ).pack(pady=(18, 4))
+        ctk.CTkLabel(
+            dialog, text="Select duck breed, candling stage, and initial egg quantity",
+            font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
+        ).pack(pady=(0, 16))
+
+        content = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
+        content.pack(fill="both", expand=True, padx=20, pady=(0, 16))
+
+        # 1. Batch Code / Identifier
+        batch_header = ctk.CTkFrame(content, fg_color="transparent")
+        batch_header.pack(fill="x", padx=16, pady=(14, 2))
+        ctk.CTkLabel(batch_header, text="Batch Code / Identifier:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(side="left")
+
+        batch_entry = ctk.CTkEntry(content, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=36)
+        batch_entry.insert(0, self.current_batch_id)
+        batch_entry.pack(fill="x", padx=16, pady=(0, 10))
+
+        # 2. Duck Breed Selection
+        ctk.CTkLabel(content, text="Duck Breed:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=16, pady=(4, 2))
+        breed_opts = ["KAYUMANGGI (Itik Pinas)", "PEKIN (Cherry Valley)", "MUSCOVY (Pato)", "KHAKI_CAMPBELL (Layer)"]
+        breed_dropdown = ctk.CTkOptionMenu(
+            content, values=breed_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
+            button_color=FUTheme.BORDER, button_hover_color=FUTheme.PRIMARY_MAROON, height=36
+        )
+        for b in breed_opts:
+            if self.current_breed in b:
+                breed_dropdown.set(b)
+                break
+        breed_dropdown.pack(fill="x", padx=16, pady=(0, 10))
+
+        # 3. Candling Stage
+        ctk.CTkLabel(content, text="Candling Stage:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=16, pady=(4, 2))
+        stage_opts = ["DAY_7 (Initial Blood Ring Check)", "DAY_10 (Primary Penoy Salvage)", "DAY_14 (Mid Embryo Vitality)", "DAY_18 (Pre-Hatcher Transfer)"]
+        stage_dropdown = ctk.CTkOptionMenu(
+            content, values=stage_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
+            button_color=FUTheme.BORDER, button_hover_color=FUTheme.PRIMARY_MAROON, height=36
+        )
+        for s in stage_opts:
+            if self.current_stage in s:
+                stage_dropdown.set(s)
+                break
+        stage_dropdown.pack(fill="x", padx=16, pady=(0, 10))
+
+        # 4. Target Egg Quantity & Operator Row
+        qty_row = ctk.CTkFrame(content, fg_color="transparent")
+        qty_row.pack(fill="x", padx=16, pady=(4, 12))
+
+        col1 = ctk.CTkFrame(qty_row, fg_color="transparent")
+        col1.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        ctk.CTkLabel(col1, text="Total Eggs in Batch:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
+        qty_entry = ctk.CTkEntry(col1, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=36)
+        qty_entry.insert(0, str(self.target_egg_count))
+        qty_entry.pack(fill="x")
+
+        col2 = ctk.CTkFrame(qty_row, fg_color="transparent")
+        col2.pack(side="right", fill="x", expand=True, padx=(6, 0))
+        ctk.CTkLabel(col2, text="Operator Name:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
+        op_entry = ctk.CTkEntry(col2, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=36)
+        op_entry.insert(0, self.operator_name)
+        op_entry.pack(fill="x")
+
+        def apply_batch():
+            raw_batch = batch_entry.get().strip()
+            raw_qty = qty_entry.get().strip()
+            raw_op = op_entry.get().strip()
+            raw_breed = breed_dropdown.get().split(" ")[0]
+            raw_stage = stage_dropdown.get().split(" ")[0]
+
+            if not raw_batch:
+                return
+
+            try:
+                parsed_qty = max(1, int(raw_qty))
+            except ValueError:
+                parsed_qty = 500
+
+            self.current_batch_id = raw_batch
+            self.current_breed = raw_breed
+            self.current_stage = raw_stage
+            self.target_egg_count = parsed_qty
+            self.operator_name = raw_op or "Operator"
+
+            if not self.is_session_active:
+                self.total_count = 0
+                self.fertile_count = 0
+                self.infertile_count = 0
+                self.abnormal_count = 0
+
+            self.batch_btn.configure(text=f"📋 Batch: {self.current_batch_id}  ({self.current_stage})  ▾")
+            self._update_counters_ui()
+            self._log(f"[BATCH] Configured: {self.current_batch_id} | Breed: {self.current_breed} | Stage: {self.current_stage} | Target: {self.target_egg_count} eggs")
+            dialog.destroy()
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(fill="x", padx=20, pady=(0, 16))
+
+        ctk.CTkButton(
+            btn_row, text="Cancel", fg_color="transparent", border_width=1, border_color=FUTheme.BORDER,
+            text_color=FUTheme.TEXT_MUTED, hover_color=FUTheme.PANEL_LIGHT_ALT, command=dialog.destroy,
+            width=100, height=38
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            btn_row, text="Save & Set Active Batch", fg_color=FUTheme.PRIMARY_MAROON,
+            hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE,
+            font=(FUTheme.FONT_FAMILY, 12, "bold"), command=apply_batch, height=38
+        ).pack(side="right", fill="x", expand=True, padx=(10, 0))
+
+    def open_calibration_dialog(self):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Conveyor Calibration & Cycle Timing")
+        dialog.geometry("450x440")
+        dialog.configure(fg_color=FUTheme.BG_LIGHT)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        ctk.CTkLabel(
+            dialog, text="Conveyor & Sorting Cycle Calibration",
             font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY
-        ).pack(pady=(16, 12))
+        ).pack(pady=(16, 10))
 
         # Speed
-        ctk.CTkLabel(
-            dialog, text="Conveyor Linear Speed (cm/s):",
-            font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
-        ).pack(anchor="w", padx=24)
+        ctk.CTkLabel(dialog, text="Conveyor Linear Speed (cm/s):", font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=24)
         speed_entry = ctk.CTkEntry(dialog, fg_color=FUTheme.PANEL_LIGHT, text_color=FUTheme.TEXT_PRIMARY)
         speed_entry.insert(0, str(self.conveyor_speed_cm_s))
-        speed_entry.pack(fill="x", padx=24, pady=(2, 10))
+        speed_entry.pack(fill="x", padx=24, pady=(2, 8))
+
+        # Chamber Pause
+        ctk.CTkLabel(dialog, text="Chamber Candling Pause Duration (ms):", font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=24)
+        pause_entry = ctk.CTkEntry(dialog, fg_color=FUTheme.PANEL_LIGHT, text_color=FUTheme.TEXT_PRIMARY)
+        pause_entry.insert(0, str(self.chamber_pause_ms))
+        pause_entry.pack(fill="x", padx=24, pady=(2, 8))
+
+        # Advance Duration
+        ctk.CTkLabel(dialog, text="Egg Advance Transport Duration (ms):", font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=24)
+        adv_entry = ctk.CTkEntry(dialog, fg_color=FUTheme.PANEL_LIGHT, text_color=FUTheme.TEXT_PRIMARY)
+        adv_entry.insert(0, str(self.conveyor_advance_ms))
+        adv_entry.pack(fill="x", padx=24, pady=(2, 8))
 
         # Distance
-        ctk.CTkLabel(
-            dialog, text="Camera to Diverter Gate Distance (cm):",
-            font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
-        ).pack(anchor="w", padx=24)
+        ctk.CTkLabel(dialog, text="Camera to Diverter Gate Distance (cm):", font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=24)
         dist_entry = ctk.CTkEntry(dialog, fg_color=FUTheme.PANEL_LIGHT, text_color=FUTheme.TEXT_PRIMARY)
         dist_entry.insert(0, str(self.conveyor_dist_cm))
-        dist_entry.pack(fill="x", padx=24, pady=(2, 10))
-
-        # Servo Pulse Duration
-        ctk.CTkLabel(
-            dialog, text="Servo Kicker Pulse Duration (ms):",
-            font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
-        ).pack(anchor="w", padx=24)
-        pulse_entry = ctk.CTkEntry(dialog, fg_color=FUTheme.PANEL_LIGHT, text_color=FUTheme.TEXT_PRIMARY)
-        pulse_entry.insert(0, str(self.servo_pulse_ms))
-        pulse_entry.pack(fill="x", padx=24, pady=(2, 16))
+        dist_entry.pack(fill="x", padx=24, pady=(2, 14))
 
         def save():
             try:
                 self.conveyor_speed_cm_s = float(speed_entry.get())
+                self.chamber_pause_ms = int(pause_entry.get())
+                self.conveyor_advance_ms = int(adv_entry.get())
                 self.conveyor_dist_cm = float(dist_entry.get())
-                self.servo_pulse_ms = int(pulse_entry.get())
-                self._log(f"[CONFIG] Calibration updated: Speed={self.conveyor_speed_cm_s}cm/s, Dist={self.conveyor_dist_cm}cm, Pulse={self.servo_pulse_ms}ms")
+                self._log(f"[CONFIG] Updated: Speed={self.conveyor_speed_cm_s}cm/s, Pause={self.chamber_pause_ms}ms, Advance={self.conveyor_advance_ms}ms")
                 dialog.destroy()
             except ValueError:
                 pass
 
         ctk.CTkButton(
-            dialog, text="Save Settings", fg_color=FUTheme.PRIMARY_MAROON,
+            dialog, text="Save Calibration", fg_color=FUTheme.PRIMARY_MAROON,
             hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE, command=save
         ).pack(pady=10)
