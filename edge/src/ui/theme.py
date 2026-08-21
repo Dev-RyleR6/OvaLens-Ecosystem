@@ -15,16 +15,19 @@ class FUTheme:
     FERTILE_GREEN_HOVER = "#14532D"
     FERTILE_GREEN_BG = "#DCFCE7"      # High-contrast light green tint
     FERTILE_GREEN_BORDER = "#86EFAC"
+    FERTILE_GREEN_TEXT = "#4ADE80"    # High-contrast green text for dark container chips
 
     INFERTILE_AMBER = "#B45309"       # Penoy Amber Deep
     INFERTILE_AMBER_HOVER = "#92400E"
     INFERTILE_AMBER_BG = "#FEF3C7"    # High-contrast light amber tint
     INFERTILE_AMBER_BORDER = "#FCD34D"
+    INFERTILE_AMBER_TEXT = "#FBBF24"  # High-contrast amber text for dark container chips
 
     ABNORMAL_RED = "#B91C1C"          # Reject Red Deep
     ABNORMAL_RED_HOVER = "#991B1B"
     ABNORMAL_RED_BG = "#FEE2E2"       # High-contrast light red tint
     ABNORMAL_RED_BORDER = "#FCA5A5"
+    ABNORMAL_RED_TEXT = "#F87171"    # High-contrast red text for dark container chips
 
     # Clean High-Contrast Light Surfaces
     BG_LIGHT = "#F1F5F9"              # Crisp Slate-100 Canvas
@@ -41,6 +44,7 @@ class FUTheme:
     TEXT_MUTED = "#64748B"            # Slate-500
     TEXT_DIM = "#94A3B8"              # Slate-400
     TEXT_WHITE = "#FFFFFF"            # Pure White for dark buttons
+    TEXT_ACCENT = "#FDE047"           # Gold / Amber highlight
 
     # Standard Typography
     FONT_FAMILY = "Segoe UI"
