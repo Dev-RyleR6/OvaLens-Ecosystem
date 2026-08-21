@@ -272,7 +272,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Manual Eject Button
         self.eject_btn = ctk.CTkButton(
-            self.footer_frame, text="⏏ Manual Eject  [R]", font=(FUTheme.FONT_FAMILY, 12, "semibold"),
+            self.footer_frame, text="⏏ Manual Eject  [R]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.PANEL_DARK_ALT, hover_color=FUTheme.ABNORMAL_RED_BG,
             text_color=FUTheme.TEXT_PRIMARY, command=self.trigger_manual_eject,
             width=170, height=40, corner_radius=8
