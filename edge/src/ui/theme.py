@@ -1,6 +1,6 @@
 """
-Foundation University Theme Tokens for CustomTkinter Operator GUI
-Clean, ergonomic industrial palette for candling darkroom operations.
+Foundation University Light Theme Tokens for CustomTkinter Operator GUI
+Clean, modern, high-contrast white & maroon theme matching the OvaLens Dashboard.
 """
 
 class FUTheme:
@@ -10,31 +10,34 @@ class FUTheme:
     LIGHT_MAROON = "#991B1B"
     HOVER_MAROON = "#6B0000"
 
-    # Semantic Biological Classes
+    # Semantic Biological Classes (Light Mode)
     FERTILE_GREEN = "#357a38"
     FERTILE_GREEN_HOVER = "#2d6630"
-    FERTILE_GREEN_BG = "#1b381d"
+    FERTILE_GREEN_BG = "#E8F5E9"
+    FERTILE_GREEN_TEXT = "#1B5E20"
 
     INFERTILE_AMBER = "#D97706"
     INFERTILE_AMBER_HOVER = "#B45309"
-    INFERTILE_AMBER_BG = "#3d2607"
+    INFERTILE_AMBER_BG = "#FEF3C7"
+    INFERTILE_AMBER_TEXT = "#92400E"
 
     ABNORMAL_RED = "#DC2626"
     ABNORMAL_RED_HOVER = "#B91C1C"
-    ABNORMAL_RED_BG = "#3b1111"
+    ABNORMAL_RED_BG = "#FEE2E2"
+    ABNORMAL_RED_TEXT = "#991B1B"
 
-    # Ergonomic Darkroom Slate Surfaces
-    BG_DARK = "#0F172A"         # Main Window Background
-    PANEL_DARK = "#1E293B"      # Card Surfaces
-    PANEL_DARK_ALT = "#334155"  # Nested Rows / Secondary Cards
-    BORDER = "#334155"          # Subtle Borders
-    BORDER_LIGHT = "#475569"    # Hover / Focused Borders
+    # Clean Light Surfaces
+    BG_LIGHT = "#F8FAFC"        # Main Window Background
+    PANEL_LIGHT = "#FFFFFF"     # Primary Cards
+    PANEL_LIGHT_ALT = "#F1F5F9" # Secondary / Nested Rows
+    BORDER = "#E2E8F0"          # Card Borders
+    BORDER_LIGHT = "#CBD5E1"    # Focus / Hover Borders
 
-    # Typography
-    TEXT_PRIMARY = "#F8FAFC"    # High-contrast white/slate
-    TEXT_MUTED = "#94A3B8"      # Medium slate secondary
-    TEXT_DIM = "#64748B"        # Subtle tertiary labels
-    TEXT_ACCENT = "#FDE047"     # Accent highlight
+    # Typography (Dark on Light)
+    TEXT_PRIMARY = "#0F172A"    # High-contrast slate-900
+    TEXT_MUTED = "#64748B"      # Medium slate-500
+    TEXT_DIM = "#94A3B8"        # Subtle slate-400
+    TEXT_WHITE = "#FFFFFF"      # For dark button labels
 
     # Standard Typography
     FONT_FAMILY = "Segoe UI"
