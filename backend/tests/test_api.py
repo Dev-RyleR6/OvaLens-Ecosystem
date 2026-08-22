@@ -64,3 +64,37 @@ def test_pdf_and_csv_reports():
     pdf_resp = client.get("/api/v1/reports/batch/BATCH-2026-08-KAY-01/pdf")
     assert pdf_resp.status_code == 200
     assert pdf_resp.headers["content-type"] == "application/pdf"
+
+
+def test_settings_endpoint():
+    # Get settings
+    resp = client.get("/api/v1/settings")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["penoy_unit_price_php"] == 14.00
+    assert data["duckling_unit_price_php"] == 40.00
+
+
+def test_mortality_progression():
+    resp = client.get("/api/v1/analytics/mortality-progression")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["overall_stages"]) == 3
+    assert len(data["breed_breakdown"]) >= 3
+
+
+def test_batch_analytics_and_milestones():
+    # Check milestones
+    ms_resp = client.post("/api/v1/batches/check-milestones")
+    assert ms_resp.status_code == 200
+    ms_data = ms_resp.json()
+    assert "evaluated_batches" in ms_data
+
+    # Batch Analytics
+    an_resp = client.get("/api/v1/batches/BATCH-2026-08-KAY-01/analytics")
+    assert an_resp.status_code == 200
+    an_data = an_resp.json()
+    assert an_data["batch_id"] == "BATCH-2026-08-KAY-01"
+    assert "day_10_fertility_rate" in an_data
+    assert "penoy_salvage_value_php" in an_data
+

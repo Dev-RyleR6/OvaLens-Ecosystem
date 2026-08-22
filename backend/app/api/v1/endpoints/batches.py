@@ -1,17 +1,21 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.batch import DuckBreed, BatchStatus
 from app.models.user import UserModel
-from app.schemas.batch import BatchCreate, BatchUpdate, BatchResponse, BatchSummaryResponse, AdvanceStagePayload
+from app.models.audit import AuditLogModel
+from app.schemas.batch import (
+    BatchCreate, BatchUpdate, BatchResponse, BatchSummaryResponse, AdvanceStagePayload,
+    BatchAnalyticsResponse, FinalizeHatchPayload, MilestoneCheckResponse
+)
 from app.services.batch_service import BatchService
 from app.api.deps import get_current_user, require_manager_or_admin
 
 router = APIRouter(prefix="/batches", tags=["Incubation Batches"])
 
 
-@router.get("", response_model=List[BatchResponse], summary="List all incubation batches")
+@router.get("", response_model=List[BatchSummaryResponse], summary="List all incubation batches with metrics")
 def list_batches(
     status: Optional[BatchStatus] = None,
     breed: Optional[DuckBreed] = None,
@@ -19,12 +23,18 @@ def list_batches(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db)
 ):
-    return BatchService.list_batches(db, status=status, breed=breed, limit=limit, offset=offset)
+    batches = BatchService.list_batches(db, status=status, breed=breed, limit=limit, offset=offset)
+    return [BatchService.get_batch_summary(db, b.batch_id) for b in batches]
 
 
 @router.get("/active", response_model=List[BatchResponse], summary="List active incubation batches for Edge selection")
 def list_active_batches(db: Session = Depends(get_db)):
     return BatchService.list_batches(db, status=BatchStatus.INCUBATING)
+
+
+@router.post("/check-milestones", response_model=MilestoneCheckResponse, summary="Evaluate elapsed incubation days and flag due candling/transfer milestones")
+def check_milestones(db: Session = Depends(get_db)):
+    return BatchService.check_due_milestones(db)
 
 
 @router.post("", response_model=BatchResponse, summary="Create a new incubation batch")
@@ -39,6 +49,11 @@ def create_batch(
 @router.get("/{batch_id}", response_model=BatchResponse, summary="Get batch details by ID")
 def get_batch(batch_id: str, db: Session = Depends(get_db)):
     return BatchService.get_batch(db, batch_id)
+
+
+@router.get("/{batch_id}/analytics", response_model=BatchAnalyticsResponse, summary="Get deep batch analytics and embryo mortality breakdown")
+def get_batch_analytics(batch_id: str, db: Session = Depends(get_db)):
+    return BatchService.get_batch_deep_analytics(db, batch_id)
 
 
 @router.put("/{batch_id}", response_model=BatchResponse, summary="Update batch status or hatch counts")
@@ -60,6 +75,49 @@ def advance_batch_stage(
     return BatchService.advance_stage(db, batch_id, payload.stage)
 
 
+@router.post("/{batch_id}/finalize-hatch", response_model=BatchResponse, summary="Finalize Day 28 hatch trial and record duckling count")
+def finalize_hatch(
+    batch_id: str,
+    payload: FinalizeHatchPayload,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(require_manager_or_admin)
+):
+    batch = BatchService.finalize_hatch(db, batch_id, payload)
+    
+    # Audit log
+    audit = AuditLogModel(
+        user_id=current_user.user_id,
+        action="BATCH_HATCH_FINALIZED",
+        entity_type="BATCH",
+        entity_id=batch_id,
+        details={"hatched_count": payload.hatched_count, "unhatched_count": batch.unhatched_count, "finalized_by": current_user.email}
+    )
+    db.add(audit)
+    db.commit()
+    return batch
+
+
 @router.get("/{batch_id}/summary", response_model=BatchSummaryResponse, summary="Get comprehensive batch metrics summary")
 def get_batch_summary(batch_id: str, db: Session = Depends(get_db)):
     return BatchService.get_batch_summary(db, batch_id)
+
+
+@router.delete("/{batch_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete or archive an incubation batch")
+def delete_batch(
+    batch_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(require_manager_or_admin)
+):
+    BatchService.delete_batch(db, batch_id)
+    
+    audit = AuditLogModel(
+        user_id=current_user.user_id,
+        action="BATCH_DELETED",
+        entity_type="BATCH",
+        entity_id=batch_id,
+        details={"deleted_by": current_user.email}
+    )
+    db.add(audit)
+    db.commit()
+    return None
+

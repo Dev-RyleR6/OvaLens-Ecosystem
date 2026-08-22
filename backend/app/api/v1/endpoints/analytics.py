@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schemas.analytics import (
-    HatcheryOverviewKPIs, BreedComparisonResponse, MortalityTrendsResponse, EconomicYieldResponse
+    HatcheryOverviewKPIs, BreedComparisonResponse, MortalityTrendsResponse,
+    EconomicYieldResponse, MortalityProgressionResponse
 )
 from app.services.analytics_service import AnalyticsService
 
@@ -24,6 +25,12 @@ def get_mortality_trends(db: Session = Depends(get_db)):
     return AnalyticsService.get_mortality_trends(db)
 
 
+@router.get("/mortality-progression", response_model=MortalityProgressionResponse, summary="Get early vs mid vs late embryo mortality progression by breed")
+def get_mortality_progression(db: Session = Depends(get_db)):
+    return AnalyticsService.get_mortality_progression(db)
+
+
 @router.get("/economic-yield", response_model=EconomicYieldResponse, summary="Get Day-10 Penoy salvage revenue & financial ROI")
 def get_economic_yield(db: Session = Depends(get_db)):
     return AnalyticsService.get_economic_yield(db)
+

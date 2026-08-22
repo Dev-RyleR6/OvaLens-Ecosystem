@@ -50,6 +50,90 @@ export interface BatchSummary extends Batch {
   abnormal_count: number;
   fertility_rate: number;
   hatchability_rate: number;
+  elapsed_days?: number;
+  milestone_alert?: string;
+}
+
+export interface SessionSummaryItem {
+  session_id: string;
+  stage: string;
+  operator_name: string;
+  started_at: string;
+  total_scanned: number;
+  fertile_count: number;
+  infertile_count: number;
+  abnormal_count: number;
+  fertility_rate: number;
+  avg_inference_ms: number;
+}
+
+export interface BatchAnalyticsResponse {
+  batch_id: string;
+  batch_code: string;
+  breed: DuckBreed;
+  incubator_id: string;
+  initial_egg_count: number;
+  set_date: string;
+  target_hatch_date: string;
+  current_stage: BatchStage;
+  status: BatchStatus;
+  elapsed_days: number;
+  total_scanned_day_10: number;
+  fertile_day_10: number;
+  infertile_penoy_day_10: number;
+  abnormal_day_10: number;
+  day_10_fertility_rate: number;
+  penoy_salvage_value_php: number;
+  electricity_saved_php: number;
+  projected_duckling_revenue_php: number;
+  hatched_count: number;
+  unhatched_count: number;
+  actual_hatchability_rate: number;
+  sessions: SessionSummaryItem[];
+}
+
+export interface FinalizeHatchPayload {
+  hatched_count: number;
+  unhatched_count?: number;
+  notes?: string;
+}
+
+export interface StageMortalityItem {
+  stage_name: string;
+  day_marker: number;
+  culled_count: number;
+  cull_rate_percentage: number;
+  description: string;
+}
+
+export interface BreedMortalityProgression {
+  breed: string;
+  initial_eggs: number;
+  day_10_infertile_penoy: number;
+  day_10_early_dead: number;
+  day_18_mid_dead: number;
+  day_25_late_dead: number;
+  hatched_ducklings: number;
+  early_mortality_rate: number;
+  mid_mortality_rate: number;
+  late_mortality_rate: number;
+  final_hatchability_rate: number;
+}
+
+export interface MortalityProgressionResponse {
+  overall_stages: StageMortalityItem[];
+  breed_breakdown: BreedMortalityProgression[];
+}
+
+export interface MilestoneCheckResponse {
+  evaluated_batches: number;
+  updated_batches: number;
+  alerts: Array<{
+    batch_id: string;
+    batch_code: string;
+    elapsed_days: number;
+    alert: string;
+  }>;
 }
 
 export interface CandlingSession {

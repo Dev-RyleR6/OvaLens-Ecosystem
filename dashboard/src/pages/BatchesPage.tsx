@@ -24,6 +24,9 @@ import { BatchProgressTimeline } from '../components/BatchProgressTimeline';
 import { Dialog } from '../components/ui/dialog';
 import { Sheet } from '../components/ui/sheet';
 import { CandlingCertificateModal } from '../components/CandlingCertificateModal';
+import { BatchAnalyticsModal } from '../components/BatchAnalyticsModal';
+import { FinalizeHatchModal } from '../components/FinalizeHatchModal';
+import { Activity, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
 type ViewMode = 'TABLE' | 'GRID';
 type SortField = 'batch_code' | 'set_date' | 'initial_egg_count' | 'fertility_rate';
@@ -50,6 +53,14 @@ export const BatchesPage: React.FC = () => {
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   const [certificateBatch, setCertificateBatch] = useState<BatchSummary | null>(null);
+
+  // New Analytics & Finalize Modals
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [analyticsBatchId, setAnalyticsBatchId] = useState<string | null>(null);
+  const [isFinalizeOpen, setIsFinalizeOpen] = useState(false);
+  const [finalizeBatch, setFinalizeBatch] = useState<BatchSummary | null>(null);
+  const [milestoneMsg, setMilestoneMsg] = useState<string | null>(null);
+  const [isCheckingMilestones, setIsCheckingMilestones] = useState(false);
 
   // New Batch Form State
   const [batchCode, setBatchCode] = useState('');
@@ -118,6 +129,38 @@ export const BatchesPage: React.FC = () => {
     } finally {
       setIsAdvancing(false);
     }
+  };
+
+  const handleOpenAnalytics = (b: BatchSummary, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setAnalyticsBatchId(b.batch_id);
+    setIsAnalyticsOpen(true);
+  };
+
+  const handleOpenFinalize = (b: BatchSummary, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setFinalizeBatch(b);
+    setIsFinalizeOpen(true);
+  };
+
+  const handleCheckMilestones = async () => {
+    setIsCheckingMilestones(true);
+    try {
+      const res = await apiClient.checkBatchMilestones();
+      setMilestoneMsg(`Evaluated ${res.evaluated_batches} active cohorts. ${res.updated_batches} milestone alerts updated.`);
+      fetchBatches();
+      setTimeout(() => setMilestoneMsg(null), 4000);
+    } finally {
+      setIsCheckingMilestones(false);
+    }
+  };
+
+  const handleDeleteBatch = async (batchId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm(`Are you sure you want to delete batch '${batchId}'?`)) return;
+    await apiClient.deleteBatch(batchId);
+    if (selectedBatch?.batch_id === batchId) setSelectedBatch(null);
+    fetchBatches();
   };
 
   // Filtered & Sorted Batches
@@ -205,18 +248,37 @@ export const BatchesPage: React.FC = () => {
             Incubation Batches & Candling Sessions
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Track 28-day duck egg incubation cohorts, operator candling speeds (120 eggs/min), and official quality certificates.
+            Track 28-day duck egg incubation cohorts, automated stage milestones, operator candling throughput, and official quality certificates.
           </p>
         </div>
 
-        <button
-          onClick={() => setIsCreateOpen(true)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Set New Incubation Batch</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCheckMilestones}
+            disabled={isCheckingMilestones}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+            title="Evaluate elapsed incubation days and flag due candling/transfer milestones"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isCheckingMilestones ? 'animate-spin text-[#800000]' : 'text-slate-500'}`} />
+            <span>Check Milestones</span>
+          </button>
+
+          <button
+            onClick={() => setIsCreateOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Set New Cohort</span>
+          </button>
+        </div>
       </div>
+
+      {milestoneMsg && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-800 flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{milestoneMsg}</span>
+        </div>
+      )}
 
       {/* Enterprise Filter Toolbar */}
       <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xs space-y-3">
@@ -380,15 +442,29 @@ export const BatchesPage: React.FC = () => {
                           <Layers className="w-3.5 h-3.5 text-[#800000]" />
                           <span>{b.batch_code}</span>
                         </div>
-                        <span className="text-[11px] text-slate-500 font-normal block mt-0.5">
-                          Set: {new Date(b.set_date).toLocaleDateString()}
-                        </span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[11px] text-slate-500 font-normal">
+                            Set: {new Date(b.set_date).toLocaleDateString()}
+                          </span>
+                          {b.elapsed_days !== undefined && (
+                            <span className="text-[10px] text-slate-400 font-semibold">
+                              (Day {b.elapsed_days})
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-700">{b.breed}</td>
                       <td className="py-3 px-4 text-slate-600 font-medium">{b.incubator_id}</td>
                       <td className="py-3 px-4 text-slate-800 font-bold">{b.initial_egg_count} eggs</td>
                       <td className="py-3 px-4">
-                        <Badge type="stage" value={b.current_stage} />
+                        <div className="space-y-1">
+                          <Badge type="stage" value={b.current_stage} />
+                          {b.milestone_alert && (
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+                              {b.milestone_alert.split(':')[0]}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4 font-bold text-slate-900">
                         {b.fertility_rate > 0 ? `${b.fertility_rate}%` : 'Pending Day 10'}
@@ -399,22 +475,41 @@ export const BatchesPage: React.FC = () => {
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                           <button
+                            onClick={(e) => handleOpenAnalytics(b, e)}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition-colors cursor-pointer"
+                            title="Deep Batch Analytics & Embryo Mortality"
+                          >
+                            <Activity className="w-3.5 h-3.5 text-[#800000]" />
+                            <span>Analytics</span>
+                          </button>
+
+                          {(b.current_stage === 'DAY_25' || b.current_stage === 'HATCHED' || b.current_stage === 'COMPLETED') && (
+                            <button
+                              onClick={(e) => handleOpenFinalize(b, e)}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-colors cursor-pointer"
+                              title="Finalize Day 28 Hatch Trial"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Hatch</span>
+                            </button>
+                          )}
+
+                          <button
                             onClick={(e) => handleOpenCertificate(b, e)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded bg-maroon-50 hover:bg-maroon-100 text-[#800000] border border-maroon-200 transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded bg-maroon-50 hover:bg-maroon-100 text-[#800000] border border-maroon-200 transition-colors cursor-pointer"
                             title="View Official Candling Certificate"
                           >
                             <Award className="w-3.5 h-3.5" />
-                            <span>Certificate</span>
                           </button>
 
-                          <a
-                            href={apiClient.downloadCSVUrl(b.batch_id)}
-                            download
-                            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors inline-block"
-                            title="Export CSV Data"
+                          <button
+                            onClick={(e) => handleDeleteBatch(b.batch_id, e)}
+                            className="p-1.5 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+                            title="Delete / Archive Cohort"
                           >
-                            <Download className="w-4 h-4" />
-                          </a>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+
                           <button
                             className="p-1.5 text-slate-400 hover:text-slate-700 cursor-pointer"
                             onClick={() => handleSelectBatch(b)}
@@ -752,6 +847,29 @@ export const BatchesPage: React.FC = () => {
         isOpen={isCertificateOpen}
         onClose={() => setIsCertificateOpen(false)}
         batch={certificateBatch}
+      />
+
+      {/* Deep Batch Analytics & Embryo Mortality Modal */}
+      <BatchAnalyticsModal
+        isOpen={isAnalyticsOpen}
+        batchId={analyticsBatchId}
+        onClose={() => {
+          setIsAnalyticsOpen(false);
+          setAnalyticsBatchId(null);
+        }}
+      />
+
+      {/* Finalize Day 28 Hatch Modal */}
+      <FinalizeHatchModal
+        isOpen={isFinalizeOpen}
+        batch={finalizeBatch}
+        onClose={() => {
+          setIsFinalizeOpen(false);
+          setFinalizeBatch(null);
+        }}
+        onSuccess={() => {
+          fetchBatches();
+        }}
       />
     </div>
   );

@@ -8,38 +8,66 @@ import {
   Coins,
   ShieldCheck,
   RotateCcw,
+  Zap,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
-import { HatcherySettings } from '../types';
 
 export const SettingsPage: React.FC = () => {
-  const [settings, setSettings] = useState<HatcherySettings | null>(null);
+  const [facilityName, setFacilityName] = useState('Foundation University Automated Hatchery');
+  const [institution, setInstitution] = useState('Foundation University - Dumaguete City');
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.85);
+  const [penoyPrice, setPenoyPrice] = useState(14.00);
+  const [ducklingPrice, setDucklingPrice] = useState(40.00);
+  const [kwhRate, setKwhRate] = useState(12.50);
+  const [kwhSavedPerEgg, setKwhSavedPerEgg] = useState(0.20);
+  const [conveyorSpeed, setConveyorSpeed] = useState(10.0);
+  const [conveyorDistance, setConveyorDistance] = useState(25.0);
+
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
       const data = await apiClient.getSettings();
-      setSettings({ ...data });
+      if (data) {
+        if (data.facility_name) setFacilityName(data.facility_name);
+        if (data.institution) setInstitution(data.institution);
+        if (data.confidence_threshold !== undefined) setConfidenceThreshold(data.confidence_threshold);
+        if (data.penoy_unit_price_php !== undefined) setPenoyPrice(data.penoy_unit_price_php);
+        else if (data.penoy_unit_price !== undefined) setPenoyPrice(data.penoy_unit_price);
+        if (data.duckling_unit_price_php !== undefined) setDucklingPrice(data.duckling_unit_price_php);
+        else if (data.duckling_unit_price !== undefined) setDucklingPrice(data.duckling_unit_price);
+        if (data.electricity_kwh_rate_php !== undefined) setKwhRate(data.electricity_kwh_rate_php);
+        else if (data.kwh_rate_php !== undefined) setKwhRate(data.kwh_rate_php);
+        if (data.kwh_saved_per_culled_egg !== undefined) setKwhSavedPerEgg(data.kwh_saved_per_culled_egg);
+        if (data.conveyor_speed_cm_s !== undefined) setConveyorSpeed(data.conveyor_speed_cm_s);
+        if (data.conveyor_distance_cm !== undefined) setConveyorDistance(data.conveyor_distance_cm);
+      }
     };
     fetchSettings();
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!settings) return;
-
     setIsSaving(true);
     try {
-      await apiClient.updateSettings(settings);
+      await apiClient.updateSettings({
+        facility_name: facilityName,
+        institution,
+        confidence_threshold: confidenceThreshold,
+        penoy_unit_price_php: penoyPrice,
+        duckling_unit_price_php: ducklingPrice,
+        electricity_kwh_rate_php: kwhRate,
+        kwh_saved_per_culled_egg: kwhSavedPerEgg,
+        conveyor_speed_cm_s: conveyorSpeed,
+        conveyor_distance_cm: conveyorDistance,
+      });
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setTimeout(() => setSaveSuccess(false), 3500);
     } finally {
       setIsSaving(false);
     }
   };
-
-  if (!settings) return null;
 
   return (
     <div className="space-y-6 pb-8">
@@ -65,9 +93,9 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {saveSuccess && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-800 flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-          <span>Configuration saved and propagated to Edge Stations.</span>
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-800 flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+          <span>Configuration saved and live economic calculations updated!</span>
         </div>
       )}
 
@@ -86,8 +114,8 @@ export const SettingsPage: React.FC = () => {
               <label className="font-semibold text-slate-700">Hatchery Facility Name</label>
               <input
                 type="text"
-                value={settings.facility_name}
-                onChange={(e) => setSettings({ ...settings, facility_name: e.target.value })}
+                value={facilityName}
+                onChange={(e) => setFacilityName(e.target.value)}
                 className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
               />
             </div>
@@ -96,18 +124,8 @@ export const SettingsPage: React.FC = () => {
               <label className="font-semibold text-slate-700">Parent University / Institution</label>
               <input
                 type="text"
-                value={settings.institution}
-                onChange={(e) => setSettings({ ...settings, institution: e.target.value })}
-                className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
-              />
-            </div>
-
-            <div className="space-y-1.5 md:col-span-2">
-              <label className="font-semibold text-slate-700">Physical Location</label>
-              <input
-                type="text"
-                value={settings.location}
-                onChange={(e) => setSettings({ ...settings, location: e.target.value })}
+                value={institution}
+                onChange={(e) => setInstitution(e.target.value)}
                 className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
               />
             </div>
@@ -119,7 +137,7 @@ export const SettingsPage: React.FC = () => {
           <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
             <Cpu className="w-4 h-4 text-[#800000]" />
             <h3 className="text-sm font-bold text-[#0F172A]">
-              Optical Candling & AI Inference Thresholds
+              Optical Candling & Sorter Kinematics
             </h3>
           </div>
 
@@ -127,15 +145,15 @@ export const SettingsPage: React.FC = () => {
             <div className="space-y-1.5 p-3 bg-slate-50 rounded-lg border border-slate-200">
               <div className="flex justify-between font-semibold text-slate-700">
                 <span>Minimum Confidence:</span>
-                <span className="font-bold text-[#800000]">{(settings.min_confidence_threshold * 100).toFixed(0)}%</span>
+                <span className="font-bold text-[#800000]">{(confidenceThreshold * 100).toFixed(0)}%</span>
               </div>
               <input
                 type="range"
                 min="0.30"
-                max="0.90"
+                max="0.95"
                 step="0.05"
-                value={settings.min_confidence_threshold}
-                onChange={(e) => setSettings({ ...settings, min_confidence_threshold: Number(e.target.value) })}
+                value={confidenceThreshold}
+                onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
                 className="w-full accent-[#800000] cursor-pointer"
               />
               <span className="text-[11px] text-slate-500 block">YOLOv8 FP16 detection filter threshold</span>
@@ -143,36 +161,36 @@ export const SettingsPage: React.FC = () => {
 
             <div className="space-y-1.5 p-3 bg-slate-50 rounded-lg border border-slate-200">
               <div className="flex justify-between font-semibold text-slate-700">
-                <span>Min Aspect Ratio:</span>
-                <span className="font-bold text-slate-900">{settings.aspect_ratio_min}</span>
+                <span>Conveyor Speed (cm/s):</span>
+                <span className="font-bold text-slate-900">{conveyorSpeed} cm/s</span>
               </div>
               <input
-                type="range"
-                min="0.50"
-                max="0.80"
-                step="0.05"
-                value={settings.aspect_ratio_min}
-                onChange={(e) => setSettings({ ...settings, aspect_ratio_min: Number(e.target.value) })}
-                className="w-full accent-[#800000] cursor-pointer"
+                type="number"
+                step="0.5"
+                min="1"
+                max="50"
+                value={conveyorSpeed}
+                onChange={(e) => setConveyorSpeed(Number(e.target.value))}
+                className="w-full h-8 px-2 bg-white border border-slate-200 rounded text-slate-800 focus:outline-none focus:border-[#800000]"
               />
-              <span className="text-[11px] text-slate-500 block">Duck egg geometric ovality lower bound</span>
+              <span className="text-[11px] text-slate-500 block">Belt linear velocity ($v$)</span>
             </div>
 
             <div className="space-y-1.5 p-3 bg-slate-50 rounded-lg border border-slate-200">
               <div className="flex justify-between font-semibold text-slate-700">
-                <span>Max Aspect Ratio:</span>
-                <span className="font-bold text-slate-900">{settings.aspect_ratio_max}</span>
+                <span>Sensor Distance (cm):</span>
+                <span className="font-bold text-slate-900">{conveyorDistance} cm</span>
               </div>
               <input
-                type="range"
-                min="1.10"
-                max="1.80"
-                step="0.05"
-                value={settings.aspect_ratio_max}
-                onChange={(e) => setSettings({ ...settings, aspect_ratio_max: Number(e.target.value) })}
-                className="w-full accent-[#800000] cursor-pointer"
+                type="number"
+                step="0.5"
+                min="1"
+                max="100"
+                value={conveyorDistance}
+                onChange={(e) => setConveyorDistance(Number(e.target.value))}
+                className="w-full h-8 px-2 bg-white border border-slate-200 rounded text-slate-800 focus:outline-none focus:border-[#800000]"
               />
-              <span className="text-[11px] text-slate-500 block">Duck egg geometric ovality upper bound</span>
+              <span className="text-[11px] text-slate-500 block">Distance to diverter servo ($D$)</span>
             </div>
           </div>
         </div>
@@ -182,29 +200,29 @@ export const SettingsPage: React.FC = () => {
           <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
             <Coins className="w-4 h-4 text-[#800000]" />
             <h3 className="text-sm font-bold text-[#0F172A]">
-              Commercial Valuation & Economic Rates
+              Commercial Valuation & Economic Market Rates
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
             <div className="space-y-1.5">
               <label className="font-semibold text-slate-700">Day 10 Penoy Salvage (₱ / egg)</label>
               <input
                 type="number"
                 step="0.50"
-                value={settings.penoy_unit_price}
-                onChange={(e) => setSettings({ ...settings, penoy_unit_price: Number(e.target.value) })}
+                value={penoyPrice}
+                onChange={(e) => setPenoyPrice(Number(e.target.value))}
                 className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="font-semibold text-slate-700">Day-Old Duckling Selling Price (₱)</label>
+              <label className="font-semibold text-slate-700">Duckling Selling Price (₱ / bird)</label>
               <input
                 type="number"
                 step="1.00"
-                value={settings.duckling_unit_price}
-                onChange={(e) => setSettings({ ...settings, duckling_unit_price: Number(e.target.value) })}
+                value={ducklingPrice}
+                onChange={(e) => setDucklingPrice(Number(e.target.value))}
                 className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
               />
             </div>
@@ -214,8 +232,19 @@ export const SettingsPage: React.FC = () => {
               <input
                 type="number"
                 step="0.25"
-                value={settings.kwh_rate_php}
-                onChange={(e) => setSettings({ ...settings, kwh_rate_php: Number(e.target.value) })}
+                value={kwhRate}
+                onChange={(e) => setKwhRate(Number(e.target.value))}
+                className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-semibold text-slate-700">kWh Saved / Culled Egg</label>
+              <input
+                type="number"
+                step="0.01"
+                value={kwhSavedPerEgg}
+                onChange={(e) => setKwhSavedPerEgg(Number(e.target.value))}
                 className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
               />
             </div>

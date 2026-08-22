@@ -219,6 +219,104 @@ export const apiClient = {
     }
   },
 
+  getBatchAnalytics: async (batchId: string): Promise<any> => {
+    try {
+      const res = await api.get(`/batches/${batchId}/analytics`);
+      return res.data;
+    } catch {
+      const batch = mockBatches.find(b => b.batch_id === batchId) || mockBatches[0];
+      return {
+        batch_id: batch.batch_id,
+        batch_code: batch.batch_code,
+        breed: batch.breed,
+        incubator_id: batch.incubator_id,
+        initial_egg_count: batch.initial_egg_count,
+        set_date: batch.set_date,
+        target_hatch_date: batch.target_hatch_date,
+        current_stage: batch.current_stage,
+        status: batch.status,
+        elapsed_days: 12,
+        total_scanned_day_10: batch.total_scanned || 500,
+        fertile_day_10: batch.fertile_count || 440,
+        infertile_penoy_day_10: batch.infertile_count || 46,
+        abnormal_day_10: batch.abnormal_count || 14,
+        day_10_fertility_rate: batch.fertility_rate || 88.0,
+        penoy_salvage_value_php: (batch.infertile_count || 46) * 14.0,
+        electricity_saved_php: ((batch.infertile_count || 46) + (batch.abnormal_count || 14)) * 2.50,
+        projected_duckling_revenue_php: (batch.hatched_count || 400) * 40.0,
+        hatched_count: batch.hatched_count || 0,
+        unhatched_count: batch.unhatched_count || 0,
+        actual_hatchability_rate: batch.hatchability_rate || 0,
+        sessions: [
+          {
+            session_id: 'sess-01',
+            stage: 'DAY_10',
+            operator_name: 'Pedro Penduko',
+            started_at: batch.set_date,
+            total_scanned: batch.total_scanned || 500,
+            fertile_count: batch.fertile_count || 440,
+            infertile_count: batch.infertile_count || 46,
+            abnormal_count: batch.abnormal_count || 14,
+            fertility_rate: batch.fertility_rate || 88.0,
+            avg_inference_ms: 28.5
+          }
+        ]
+      };
+    }
+  },
+
+  finalizeBatchHatch: async (batchId: string, payload: { hatched_count: number; unhatched_count?: number; notes?: string }): Promise<BatchSummary> => {
+    try {
+      const res = await api.post<BatchSummary>(`/batches/${batchId}/finalize-hatch`, payload);
+      return res.data;
+    } catch {
+      const found = mockBatches.find(b => b.batch_id === batchId);
+      if (found) {
+        found.hatched_count = payload.hatched_count;
+        found.unhatched_count = payload.unhatched_count ?? (found.initial_egg_count - payload.hatched_count);
+        found.current_stage = 'HATCHED';
+        found.status = 'COMPLETED';
+        found.hatchability_rate = Math.round((payload.hatched_count / found.initial_egg_count) * 1000) / 10;
+        return found;
+      }
+      throw new Error("Batch not found");
+    }
+  },
+
+  checkBatchMilestones: async (): Promise<any> => {
+    try {
+      const res = await api.post('/batches/check-milestones');
+      return res.data;
+    } catch {
+      return { evaluated_batches: 3, updated_batches: 0, alerts: [] };
+    }
+  },
+
+  deleteBatch: async (batchId: string): Promise<void> => {
+    try {
+      await api.delete(`/batches/${batchId}`);
+    } catch {
+      const idx = mockBatches.findIndex(b => b.batch_id === batchId);
+      if (idx !== -1) mockBatches.splice(idx, 1);
+    }
+  },
+
+  getMortalityProgression: async (): Promise<any> => {
+    try {
+      const res = await api.get('/analytics/mortality-progression');
+      return res.data;
+    } catch {
+      return {
+        overall_stages: [
+          { stage_name: "Day 10 (Early Candling)", day_marker: 10, culled_count: 60, cull_rate_percentage: 12.0, description: "Infertile penoy & early dead" },
+          { stage_name: "Day 18 (Hatcher Transfer)", day_marker: 18, culled_count: 24, cull_rate_percentage: 5.3, description: "Mid-term dead-in-shell" },
+          { stage_name: "Day 25 (Pipping Watch)", day_marker: 25, culled_count: 18, cull_rate_percentage: 4.2, description: "Late unhatched embryos" }
+        ],
+        breed_breakdown: []
+      };
+    }
+  },
+
   // Sessions
   getSessions: async (batchId?: string): Promise<CandlingSession[]> => {
     try {
@@ -365,13 +463,23 @@ export const apiClient = {
   },
 
   // Hatchery Settings
-  getSettings: async (): Promise<HatcherySettings> => {
-    return mockSettings;
+  getSettings: async (): Promise<any> => {
+    try {
+      const res = await api.get('/settings');
+      return res.data;
+    } catch {
+      return mockSettings;
+    }
   },
 
-  updateSettings: async (settings: Partial<HatcherySettings>): Promise<HatcherySettings> => {
-    Object.assign(mockSettings, settings);
-    return mockSettings;
+  updateSettings: async (settings: any): Promise<any> => {
+    try {
+      const res = await api.put('/settings', settings);
+      return res.data;
+    } catch {
+      Object.assign(mockSettings, settings);
+      return mockSettings;
+    }
   },
 
   // MLOps & Model Metrics
