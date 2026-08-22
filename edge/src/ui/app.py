@@ -534,7 +534,7 @@ class OvaLensOperatorApp(ctk.CTk):
                 break
 
             # PHASE 1: Motor Advance (Transport egg to candling aperture)
-            self.after(0, lambda: self._update_cycle_hud("🟢", FUTheme.FERTILE_GREEN, f"CONVEYOR ADVANCING EGG #{self.total_count + 1}..."))
+            self.after(0, lambda: self._update_cycle_hud("🟢", FUTheme.FERTILE_GREEN, f"CONVEYOR ADVANCING EGG #{self.total_count + 1} (120 EGGS/MIN)...", bg_color=FUTheme.FERTILE_GREEN_CARD))
             self.iot.set_conveyor(True)
             time.sleep(self.conveyor_advance_ms / 1000.0)
 
@@ -542,7 +542,7 @@ class OvaLensOperatorApp(ctk.CTk):
                 break
 
             # PHASE 2: Chamber Entry & Stabilization Pause
-            self.after(0, lambda: self._update_cycle_hud("🟡", FUTheme.INFERTILE_AMBER, f"EGG #{self.total_count + 1} IN CHAMBER — PAUSED FOR CANDLING"))
+            self.after(0, lambda: self._update_cycle_hud("🟡", FUTheme.INFERTILE_AMBER, f"EGG #{self.total_count + 1} IN CHAMBER — OPTICAL CANDLING", bg_color=FUTheme.INFERTILE_AMBER_CARD))
             self.iot.set_conveyor(False)
             time.sleep(self.chamber_pause_ms / 1000.0)
 
@@ -550,7 +550,7 @@ class OvaLensOperatorApp(ctk.CTk):
                 break
 
             # PHASE 3: AI Candling Scan & Actuation
-            self.after(0, lambda: self._update_cycle_hud("🔵", FUTheme.PRIMARY_MAROON, f"AI INFERENCE — SCANNING EGG #{self.total_count + 1}..."))
+            self.after(0, lambda: self._update_cycle_hud("🔵", FUTheme.PRIMARY_MAROON, f"AI INFERENCE — SCANNING EGG #{self.total_count + 1}...", bg_color=FUTheme.PRIMARY_MAROON_BG))
             self.after(0, self.trigger_candling_scan)
 
             # Settle time between cycles
@@ -558,12 +558,14 @@ class OvaLensOperatorApp(ctk.CTk):
 
     def _on_batch_target_complete(self):
         self._stop_auto_cycle()
-        self._update_cycle_hud("🏁", FUTheme.FERTILE_GREEN, f"BATCH COMPLETE: ALL {self.target_egg_count} EGGS SORTED!")
+        self._update_cycle_hud("🏁", FUTheme.PRIMARY_MAROON, f"BATCH COMPLETE: ALL {self.target_egg_count} EGGS SORTED!", bg_color=FUTheme.PRIMARY_MAROON_BG)
         self._log(f"[COMPLETE] Batch {self.current_batch_id} fully scanned ({self.target_egg_count}/{self.target_egg_count} eggs).")
 
-    def _update_cycle_hud(self, dot_icon: str, dot_color: str, status_text: str):
+    def _update_cycle_hud(self, dot_icon: str, dot_color: str, status_text: str, bg_color: str = None):
+        hud_bg = bg_color or FUTheme.PANEL_LIGHT_ALT
+        self.cycle_hud.configure(fg_color=hud_bg)
         self.cycle_status_dot.configure(text=dot_icon, text_color=dot_color)
-        self.cycle_status_label.configure(text=status_text)
+        self.cycle_status_label.configure(text=status_text, text_color=dot_color if dot_color != FUTheme.TEXT_MUTED else FUTheme.TEXT_PRIMARY)
 
     def trigger_candling_scan(self):
         """Perform instant snapshot inference and trigger conveyor actuator if rejected."""
