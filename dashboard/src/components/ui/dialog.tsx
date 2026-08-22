@@ -41,11 +41,11 @@ export const Dialog: React.FC<DialogProps> = ({
   if (!shouldRender) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity",
+          "fixed inset-0 bg-slate-900/65 backdrop-blur-xs transition-opacity",
           isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
         )}
         onClick={onClose}
@@ -54,7 +54,7 @@ export const Dialog: React.FC<DialogProps> = ({
       {/* Dialog content */}
       <div
         className={cn(
-          "relative w-full rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl transition-all z-10",
+          "relative w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-6 text-slate-900 shadow-2xl transition-all z-10 custom-scrollbar my-auto",
           isClosing ? "animate-modal-content-exit" : "animate-modal-content",
           maxWidth,
           className
@@ -62,21 +62,21 @@ export const Dialog: React.FC<DialogProps> = ({
       >
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
+          className="absolute right-3.5 top-3.5 p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#800000]/20 cursor-pointer z-20"
         >
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </button>
 
         {(title || description) && (
-          <div className="flex flex-col space-y-1.5 text-left mb-4">
+          <div className="flex flex-col space-y-1.5 text-left mb-4 pr-6">
             {title && (
-              <h2 className="text-lg font-semibold leading-none tracking-tight">
+              <h2 className="text-base sm:text-lg font-bold leading-snug tracking-tight text-slate-900">
                 {title}
               </h2>
             )}
             {description && (
-              <p className="text-sm text-muted-foreground">{description}</p>
+              <p className="text-xs sm:text-sm text-slate-500">{description}</p>
             )}
           </div>
         )}

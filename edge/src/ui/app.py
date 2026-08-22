@@ -216,15 +216,21 @@ class OvaLensOperatorApp(ctk.CTk):
         self.net_status_badge.pack(side="left", padx=4)
 
     def _center_window(self, dialog, width: int, height: int):
-        """Center modal dialog relative to root window and trigger smooth fade-in."""
+        """Center modal dialog relative to root window and clamp to screen bounds."""
         self.update_idletasks()
         rx = self.winfo_x()
         ry = self.winfo_y()
         rw = max(width, self.winfo_width())
         rh = max(height, self.winfo_height())
-        x = rx + max(0, (rw - width) // 2)
-        y = ry + max(0, (rh - height) // 2)
-        dialog.geometry(f"{width}x{height}+{x}+{y}")
+
+        # Clamp dimensions to prevent modal overflowing lower-res screens / Raspberry Pi touchscreens
+        target_w = min(width, max(320, self.winfo_width() - 24))
+        target_h = min(height, max(300, self.winfo_height() - 32))
+
+        x = rx + max(0, (rw - target_w) // 2)
+        y = ry + max(0, (rh - target_h) // 2)
+        dialog.geometry(f"{target_w}x{target_h}+{x}+{y}")
+        dialog.minsize(min(target_w, 360), min(target_h, 280))
         self._animate_modal_open(dialog)
 
     def _animate_modal_open(self, dialog, duration_ms: int = 150):
@@ -239,10 +245,10 @@ class OvaLensOperatorApp(ctk.CTk):
         except Exception:
             pass
 
-    def _animate_modal_close(self, dialog, on_close=None, duration_ms: int = 150):
+    def _animate_modal_close(self, dialog, on_close=None, duration_ms: int = 140):
         """Smooth alpha fade-out before destroying dialog."""
         try:
-            steps = 6
+            steps = 5
             step_time = max(15, duration_ms // steps)
             for i in range(steps):
                 alpha = 1.0 - (i / steps)
@@ -685,15 +691,20 @@ class OvaLensOperatorApp(ctk.CTk):
         btn_row.pack(fill="x", padx=16, pady=(0, 10))
 
         def confirm_end():
-            dialog.destroy()
-            self.stop_or_cancel_session()
-            self._log(f"[OK] Session ended with {self.total_count} records saved.")
+            self._animate_modal_close(
+                dialog,
+                on_close=lambda: (
+                    self.stop_or_cancel_session(),
+                    self._log(f"[OK] Session ended with {self.total_count} records saved.")
+                )
+            )
 
         def resume():
-            dialog.destroy()
-            if was_auto_running and self.is_auto_cycle_running:
-                self.iot.set_conveyor(True)
-                self._log("[INFO] Session resumed.")
+            def do_resume():
+                if was_auto_running and self.is_auto_cycle_running:
+                    self.iot.set_conveyor(True)
+                    self._log("[INFO] Session resumed.")
+            self._animate_modal_close(dialog, on_close=do_resume)
 
         ctk.CTkButton(
             btn_row, text="⏹ Confirm & End Session", fg_color=FUTheme.ABNORMAL_RED_BG,
@@ -1187,18 +1198,19 @@ class OvaLensOperatorApp(ctk.CTk):
             btn_row, text="↩ Return to App", fg_color=FUTheme.PANEL_LIGHT_ALT,
             hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER_DARK,
             text_color=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 11, "bold"),
-            command=dialog.destroy, width=160, height=38, corner_radius=8
+            command=lambda: self._animate_modal_close(dialog), width=160, height=38, corner_radius=8
         ).pack(side="left")
 
         def do_exit():
-            dialog.destroy()
-            print("\n[*] Shutting down OvaLens Edge Subsystems...")
-            if self.camera.is_running:
-                self.camera.stop()
-            self.iot.stop()
-            self.sync_worker.stop()
-            self.destroy()
-            print("[OK] Graceful shutdown complete.")
+            def actual_shutdown():
+                print("\n[*] Shutting down OvaLens Edge Subsystems...")
+                if self.camera.is_running:
+                    self.camera.stop()
+                self.iot.stop()
+                self.sync_worker.stop()
+                self.destroy()
+                print("[OK] Graceful shutdown complete.")
+            self._animate_modal_close(dialog, on_close=actual_shutdown)
 
         ctk.CTkButton(
             btn_row, text="⏻ Exit System", fg_color=FUTheme.PRIMARY_MAROON,
@@ -1492,14 +1504,15 @@ class OvaLensOperatorApp(ctk.CTk):
             self.batch_btn.configure(text=f"📋 Batch: {self.current_batch_id}  ({self.current_stage})  ▾")
             self._update_counters_ui()
             self._log(f"[BATCH] Configured: {self.current_batch_id} | Breed: {self.current_breed} | Stage: {self.current_stage} | Target: {self.target_egg_count} eggs")
-            dialog.destroy()
+            self._animate_modal_close(dialog)
 
         btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
         btn_row.pack(fill="x", padx=20, pady=(0, 16))
 
         ctk.CTkButton(
             btn_row, text="Cancel", fg_color="transparent", border_width=1, border_color=FUTheme.BORDER,
-            text_color=FUTheme.TEXT_MUTED, hover_color=FUTheme.PANEL_ACCENT, command=dialog.destroy,
+            text_color=FUTheme.TEXT_MUTED, hover_color=FUTheme.PANEL_ACCENT,
+            command=lambda: self._animate_modal_close(dialog),
             width=100, height=38
         ).pack(side="left")
 
@@ -1595,7 +1608,8 @@ class OvaLensOperatorApp(ctk.CTk):
         ctk.CTkButton(
             f_row, text="Got It! Close Guide", fg_color=FUTheme.PRIMARY_MAROON,
             hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE,
-            font=(FUTheme.FONT_FAMILY, 12, "bold"), command=dialog.destroy, height=38
+            font=(FUTheme.FONT_FAMILY, 12, "bold"),
+            command=lambda: self._animate_modal_close(dialog), height=38
         ).pack(fill="x")
 
     def open_calibration_dialog(self):
@@ -1643,14 +1657,23 @@ class OvaLensOperatorApp(ctk.CTk):
                 self.conveyor_advance_ms = int(adv_entry.get())
                 self.conveyor_dist_cm = float(dist_entry.get())
                 self._log(f"[CONFIG] Updated: Speed={self.conveyor_speed_cm_s}cm/s, Pause={self.chamber_pause_ms}ms, Advance={self.conveyor_advance_ms}ms")
-                dialog.destroy()
+                self._animate_modal_close(dialog)
             except ValueError:
                 pass
 
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(fill="x", padx=24, pady=10)
+
         ctk.CTkButton(
-            dialog, text="Save Calibration", fg_color=FUTheme.PRIMARY_MAROON,
-            hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE, command=save
-        ).pack(pady=10)
+            btn_row, text="Cancel", fg_color="transparent", border_width=1, border_color=FUTheme.BORDER,
+            text_color=FUTheme.TEXT_MUTED, hover_color=FUTheme.PANEL_ACCENT,
+            command=lambda: self._animate_modal_close(dialog), width=100, height=36
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            btn_row, text="Save Calibration", fg_color=FUTheme.PRIMARY_MAROON,
+            hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE, command=save, height=36
+        ).pack(side="right", fill="x", expand=True, padx=(10, 0))
 
     def toggle_fullscreen(self, event=None):
         """Toggle borderless kiosk fullscreen for industrial touchscreens."""
@@ -1755,8 +1778,7 @@ class OvaLensOperatorApp(ctk.CTk):
         btn_row.pack(fill="x", padx=16, pady=(0, 12))
 
         def start_next():
-            dialog.destroy()
-            self.open_batch_setup_dialog()
+            self._animate_modal_close(dialog, on_close=self.open_batch_setup_dialog)
 
         ctk.CTkButton(
             btn_row, text="🔁 Setup Next Batch", fg_color=FUTheme.PRIMARY_MAROON,
@@ -1768,7 +1790,7 @@ class OvaLensOperatorApp(ctk.CTk):
         ctk.CTkButton(
             btn_row, text="Done & Close", fg_color=FUTheme.PANEL_LIGHT_ALT,
             hover_color=FUTheme.PANEL_ACCENT, text_color=FUTheme.TEXT_SECONDARY,
-            font=(FUTheme.FONT_FAMILY, 11), command=dialog.destroy,
+            font=(FUTheme.FONT_FAMILY, 11), command=lambda: self._animate_modal_close(dialog),
             height=38, corner_radius=8, width=110
         ).pack(side="right")
 
@@ -2039,5 +2061,5 @@ class OvaLensOperatorApp(ctk.CTk):
         ctk.CTkButton(
             b_bar, text="Close", fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
             text_color=FUTheme.TEXT_SECONDARY, font=(FUTheme.FONT_FAMILY, 11),
-            command=dialog.destroy, height=36, corner_radius=8, width=80
+            command=lambda: self._animate_modal_close(dialog), height=36, corner_radius=8, width=80
         ).pack(side="right")

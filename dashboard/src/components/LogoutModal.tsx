@@ -51,7 +51,7 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Soft Blurred Backdrop */}
       <div
         className={cn(
@@ -66,7 +66,7 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
       {/* Main Dialog Card */}
       <div
         className={cn(
-          "relative w-full max-w-md bg-white rounded-2xl p-6 sm:p-7 shadow-2xl border border-slate-200/90 z-10 font-sans text-slate-900",
+          "relative w-full max-w-md bg-white rounded-2xl p-5 sm:p-7 shadow-2xl border border-slate-200/90 z-10 font-sans text-slate-900 my-auto max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-y-auto custom-scrollbar",
           isClosing ? "animate-modal-content-exit" : "animate-modal-content"
         )}
       >

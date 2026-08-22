@@ -69,11 +69,11 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
     : [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity",
+          "fixed inset-0 bg-slate-900/65 backdrop-blur-xs transition-opacity",
           isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
         )}
         onClick={onClose}
@@ -81,19 +81,19 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
 
       <div
         className={cn(
-          "bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto z-10",
+          "bg-white border border-slate-200/90 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] flex flex-col overflow-hidden z-10 my-auto",
           isClosing ? "animate-modal-content-exit" : "animate-modal-content"
         )}
       >
         {/* Modal Header */}
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-xs z-10">
+        <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-white/95 backdrop-blur-xs flex-shrink-0 z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#800000]/10 text-[#800000] flex items-center justify-center font-black">
-              <Activity className="w-5 h-5" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#800000]/10 text-[#800000] flex items-center justify-center font-black flex-shrink-0">
+              <Activity className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
                   {data?.batch_code || batchId} Analytics
                 </h2>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#800000]/10 text-[#800000] border border-[#800000]/20">
@@ -103,7 +103,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                   {data?.incubator_id}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
                 Embryo viability, Day 10 candling breakdown, and financial salvage metrics.
               </p>
             </div>
@@ -111,14 +111,14 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer flex-shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Modal Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
           {isLoading ? (
             <div className="py-20 text-center text-xs text-slate-500 font-medium">
               Loading deep batch analytics...

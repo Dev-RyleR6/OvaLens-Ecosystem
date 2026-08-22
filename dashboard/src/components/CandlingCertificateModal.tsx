@@ -47,6 +47,7 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
       onClose={onClose}
       title=""
       description=""
+      maxWidth="max-w-3xl"
     >
       <div className="space-y-6 text-slate-800 print:m-0 print:p-0">
         {/* Certificate Container */}

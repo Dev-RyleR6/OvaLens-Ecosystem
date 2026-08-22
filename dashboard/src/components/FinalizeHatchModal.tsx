@@ -60,11 +60,11 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity",
+          "fixed inset-0 bg-slate-900/65 backdrop-blur-xs transition-opacity",
           isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
         )}
         onClick={onClose}
@@ -72,12 +72,12 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
 
       <div
         className={cn(
-          "bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden z-10",
+          "bg-white border border-slate-200/90 rounded-2xl shadow-2xl max-w-md w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] flex flex-col overflow-hidden z-10 my-auto",
           isClosing ? "animate-modal-content-exit" : "animate-modal-content"
         )}
       >
         {/* Modal Header */}
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-white flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#800000]/10 text-[#800000] flex items-center justify-center font-black">
               <Award className="w-5 h-5" />
