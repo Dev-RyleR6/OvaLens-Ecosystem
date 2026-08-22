@@ -152,3 +152,36 @@ def test_sync_worker_diagnostics(tmp_path):
     worker.start()
     time.sleep(0.2)
     worker.stop()
+
+
+def test_csv_session_export(tmp_path):
+    """Verify offline local CSV report generator creates valid files with proper headers and rows."""
+    test_db_path = str(tmp_path / "test_csv.db")
+    export_dir = str(tmp_path / "exports")
+    db = LocalDatabaseManager(db_path=test_db_path)
+
+    sess_id = str(uuid.uuid4())
+    db.create_session(
+        session_id=sess_id,
+        batch_id="BATCH-2026-08-KAY-01",
+        device_id="STATION-1",
+        stage="DAY_10",
+        operator_name="Operator"
+    )
+
+    s1 = str(uuid.uuid4())
+    s2 = str(uuid.uuid4())
+    db.record_scan(s1, sess_id, "BATCH-2026-08-KAY-01", 1, "FERTILE", 0.96, 20, "ACCEPT", [])
+    db.record_scan(s2, sess_id, "BATCH-2026-08-KAY-01", 2, "INFERTILE", 0.91, 18, "REJECT", [])
+
+    csv_path = db.export_session_csv(sess_id, output_dir=export_dir)
+    assert os.path.exists(csv_path)
+    assert "BATCH-2026-08-KAY-01" in csv_path
+
+    with open(csv_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+        assert len(lines) == 3  # Header + 2 scans
+        assert "Classification" in lines[0]
+        assert "FERTILE" in lines[1]
+        assert "INFERTILE" in lines[2]
+

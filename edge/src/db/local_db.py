@@ -24,9 +24,12 @@ class LocalDatabaseManager:
     def _get_connection(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=10.0)
         conn.row_factory = sqlite3.Row
-        # Enable WAL mode for high-concurrency read/write
+        # Enable WAL mode and memory cache pragmas for zero-lag high-throughput recording
         conn.execute("PRAGMA journal_mode = WAL;")
         conn.execute("PRAGMA synchronous = NORMAL;")
+        conn.execute("PRAGMA cache_size = -8000;")       # 8MB memory cache
+        conn.execute("PRAGMA mmap_size = 268435456;")     # 256MB memory map
+        conn.execute("PRAGMA temp_store = MEMORY;")
         return conn
 
     def _init_db(self):
@@ -69,6 +72,7 @@ class LocalDatabaseManager:
 
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_sync ON local_scans(is_synced);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_session ON local_scans(session_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_batch_seq ON local_scans(batch_id, sequence_number);")
             conn.commit()
 
     def create_session(self, session_id: str, batch_id: str, device_id: str, stage: str, operator_name: str) -> Dict[str, Any]:
@@ -177,3 +181,44 @@ class LocalDatabaseManager:
                 LIMIT ?;
             """, (limit,))
             return [dict(row) for row in cursor.fetchall()]
+
+    def export_session_csv(self, session_id: str, output_dir: Optional[str] = None) -> str:
+        """Generate a complete, timestamped CSV export report of an egg sorting run."""
+        import csv
+        if output_dir is None:
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            output_dir = os.path.join(base_dir, "exports")
+        os.makedirs(output_dir, exist_ok=True)
+
+        session_stats = self.get_session_stats(session_id)
+        batch_id = session_stats.get("batch_id", "BATCH-UNKNOWN")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"OvaLens_Report_{batch_id}_{timestamp}.csv"
+        filepath = os.path.join(output_dir, filename)
+
+        with self._get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT sequence_number, scan_id, batch_id, final_class, confidence, routing_action, inference_ms, scanned_at, is_synced
+                FROM local_scans
+                WHERE session_id = ?
+                ORDER BY sequence_number ASC;
+            """, (session_id,))
+            rows = cursor.fetchall()
+
+        with open(filepath, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["#", "Scan ID", "Batch Code", "Classification", "Confidence", "Action", "Latency (ms)", "Timestamp (UTC)", "Server Synced"])
+            for r in rows:
+                writer.writerow([
+                    r["sequence_number"],
+                    r["scan_id"],
+                    r["batch_id"],
+                    r["final_class"],
+                    f"{r['confidence']*100:.2f}%",
+                    r["routing_action"],
+                    r["inference_ms"],
+                    r["scanned_at"],
+                    "YES" if r["is_synced"] else "NO"
+                ])
+
+        return filepath

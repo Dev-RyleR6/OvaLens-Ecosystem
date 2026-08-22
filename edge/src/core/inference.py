@@ -66,7 +66,9 @@ class InferenceEngine:
 
                 opts = ort.SessionOptions()
                 opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-                opts.intra_op_num_threads = 4
+                opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+                opts.enable_mem_pattern = True
+                opts.intra_op_num_threads = min(4, os.cpu_count() or 4)
 
                 self.onnx_session = ort.InferenceSession(self.onnx_path, sess_options=opts, providers=providers)
                 self.engine_type = f"ONNX Runtime ({providers[0]})"
@@ -170,10 +172,10 @@ class InferenceEngine:
 
     def _infer_onnx(self, frame: np.ndarray) -> Dict[str, Any]:
         """Inference via ONNX Runtime."""
-        # Preprocessing: Resize & Normalize
-        img = cv2.resize(frame, (self.imgsz, self.imgsz))
+        # Preprocessing: Resize & Normalize with contiguous memory buffer
+        img = cv2.resize(frame, (self.imgsz, self.imgsz), interpolation=cv2.INTER_LINEAR)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = img.astype(np.float32) / 255.0
+        img = np.ascontiguousarray(img, dtype=np.float32) / 255.0
         img = np.transpose(img, (2, 0, 1))  # HWC -> CHW
         img = np.expand_dims(img, axis=0)   # BCHW
 
