@@ -114,7 +114,7 @@ class OvaLensOperatorApp(ctk.CTk):
         badge = ctk.CTkLabel(
             brand_container, text=" FU ", fg_color=FUTheme.PRIMARY_MAROON,
             text_color=FUTheme.TEXT_WHITE, font=(FUTheme.FONT_FAMILY, 13, "bold"),
-            corner_radius=6, padx=4, pady=2
+            corner_radius=6, padx=6, pady=2
         )
         badge.pack(side="left", padx=(0, 10))
 
@@ -129,7 +129,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         subtitle = ctk.CTkLabel(
             title_box, text="Foundation University • Team DevIn",
-            font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.PRIMARY_MAROON
+            font=(FUTheme.FONT_FAMILY, 10), text_color=FUTheme.TEXT_MUTED
         )
         subtitle.pack(anchor="w")
 
@@ -154,7 +154,7 @@ class OvaLensOperatorApp(ctk.CTk):
             text="📘 Quick Guide [F1]",
             font=(FUTheme.FONT_FAMILY, 11, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT,
-            text_color=FUTheme.PRIMARY_MAROON,
+            text_color=FUTheme.TEXT_PRIMARY,
             hover_color=FUTheme.PANEL_ACCENT,
             border_width=1,
             border_color=FUTheme.BORDER,
@@ -181,10 +181,21 @@ class OvaLensOperatorApp(ctk.CTk):
 
         self.net_status_badge = ctk.CTkLabel(
             right_container, text="SYNC: ONLINE", fg_color=FUTheme.FERTILE_GREEN_BG,
-            text_color=FUTheme.FERTILE_GREEN, font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            text_color=FUTheme.FERTILE_GREEN_TEXT, font=(FUTheme.FONT_FAMILY, 10, "bold"),
             corner_radius=4, padx=8, pady=3
         )
         self.net_status_badge.pack(side="left", padx=4)
+
+    def _center_window(self, dialog, width: int, height: int):
+        """Center modal dialog relative to root window."""
+        self.update_idletasks()
+        rx = self.winfo_x()
+        ry = self.winfo_y()
+        rw = max(width, self.winfo_width())
+        rh = max(height, self.winfo_height())
+        x = rx + max(0, (rw - width) // 2)
+        y = ry + max(0, (rh - height) // 2)
+        dialog.geometry(f"{width}x{height}+{x}+{y}")
 
     def _build_main_layout(self):
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
@@ -412,12 +423,12 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         self.scan_btn.pack(side="left", padx=8, pady=13)
 
-        # Manual Eject Button
+        # Manual Eject Button with High-Contrast Luminous Text
         self.eject_btn = ctk.CTkButton(
             self.footer_frame, text="⏏ Manual Eject [R]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.ABNORMAL_RED_BG, hover_color=FUTheme.ABNORMAL_RED_HOVER,
             border_width=1, border_color=FUTheme.ABNORMAL_RED_BORDER,
-            text_color=FUTheme.ABNORMAL_RED, command=self.trigger_manual_eject,
+            text_color=FUTheme.ABNORMAL_RED_TEXT, command=self.trigger_manual_eject,
             width=150, height=42, corner_radius=8
         )
         self.eject_btn.pack(side="left", padx=8, pady=13)
@@ -428,15 +439,15 @@ class OvaLensOperatorApp(ctk.CTk):
             fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
             border_width=1, border_color=FUTheme.BORDER_DARK,
             text_color=FUTheme.TEXT_PRIMARY, command=self.open_batch_setup_dialog,
-            width=130, height=42, corner_radius=8
+            width=140, height=42, corner_radius=8
         )
         self.batch_setup_btn.pack(side="right", padx=(8, 18), pady=13)
 
         # Conveyor Settings Button
         self.settings_btn = ctk.CTkButton(
             self.footer_frame, text="⚙ Conveyor Config", font=(FUTheme.FONT_FAMILY, 12),
-            fg_color="transparent", border_width=1, border_color=FUTheme.BORDER,
-            text_color=FUTheme.TEXT_MUTED, hover_color=FUTheme.PANEL_ACCENT,
+            fg_color=FUTheme.PANEL_LIGHT_ALT, border_width=1, border_color=FUTheme.BORDER,
+            text_color=FUTheme.TEXT_SECONDARY, hover_color=FUTheme.PANEL_ACCENT,
             command=self.open_calibration_dialog, width=140, height=42, corner_radius=8
         )
         self.settings_btn.pack(side="right", padx=8, pady=13)
@@ -813,6 +824,7 @@ class OvaLensOperatorApp(ctk.CTk):
         dialog.configure(fg_color=FUTheme.BG_LIGHT)
         dialog.transient(self)
         dialog.grab_set()
+        self._center_window(dialog, 480, 280)
 
         card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
         card.pack(fill="both", expand=True, padx=16, pady=16)
@@ -879,6 +891,7 @@ class OvaLensOperatorApp(ctk.CTk):
         dialog.configure(fg_color=FUTheme.BG_LIGHT)
         dialog.transient(self)
         dialog.grab_set()
+        self._center_window(dialog, 520, 660)
 
         ctk.CTkLabel(
             dialog, text="Egg Batch & Candling Setup",
@@ -1177,6 +1190,7 @@ class OvaLensOperatorApp(ctk.CTk):
         dialog.configure(fg_color=FUTheme.BG_LIGHT)
         dialog.transient(self)
         dialog.grab_set()
+        self._center_window(dialog, 600, 680)
 
         # Header
         hdr = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=0, height=60, border_width=1, border_color=FUTheme.BORDER)
@@ -1264,6 +1278,7 @@ class OvaLensOperatorApp(ctk.CTk):
         dialog.configure(fg_color=FUTheme.BG_LIGHT)
         dialog.transient(self)
         dialog.grab_set()
+        self._center_window(dialog, 450, 440)
 
         ctk.CTkLabel(
             dialog, text="Conveyor & Sorting Cycle Calibration",
