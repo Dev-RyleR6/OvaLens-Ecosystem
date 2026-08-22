@@ -428,7 +428,7 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
 
           {/* Diagnostic Inspection Sheet */}
           {selectedSlot && (
-            <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200 space-y-3 mt-2 animate-fade-in-up">
+            <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200 space-y-3 mt-2 animate-slide-up">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-200">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <span className="px-2.5 py-0.5 rounded-md bg-slate-900 text-white text-xs font-mono font-bold">
