@@ -104,7 +104,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.bind("<F11>", self.toggle_fullscreen)
         self.bind("c", self.toggle_crosshairs)
         self.bind("C", self.toggle_crosshairs)
-        self.bind("<Escape>", lambda event: self.stop_or_cancel_session())
+        self.bind("<Escape>", lambda event: self.open_end_session_modal() if (self.is_session_active or self.camera.is_running) else None)
 
         # Start Standby Display & Status Loop
         self._render_standby_hud()
@@ -250,12 +250,12 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         self.cycle_status_label.pack(side="left")
 
-        # Quick Standby / Cancel Button on HUD Bar (dynamically revealed during active sessions)
+        # Quick End Session Button on HUD Bar (dynamically revealed during active sessions)
         self.hud_cancel_btn = ctk.CTkButton(
-            self.cycle_hud, text="✕ Standby [ESC]", font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            self.cycle_hud, text="⏹ End Session [ESC]", font=(FUTheme.FONT_FAMILY, 10, "bold"),
             fg_color="transparent", hover_color=FUTheme.ABNORMAL_RED_BG,
             text_color=FUTheme.TEXT_MUTED, border_width=1, border_color=FUTheme.BORDER,
-            command=self.stop_or_cancel_session, height=26, width=110, corner_radius=6
+            command=self.open_end_session_modal, height=26, width=135, corner_radius=6
         )
         # Note: Packed dynamically when session starts
 
@@ -472,10 +472,10 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Dedicated Terminate / Cancel / End Session Button (hidden in Standby, visible when active)
         self.cancel_btn = ctk.CTkButton(
-            self.footer_frame, text="⏹ Cancel Session [ESC]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
+            self.footer_frame, text="⏹ End Session [ESC]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.ABNORMAL_RED_BG,
             border_width=1, border_color=FUTheme.BORDER_DARK,
-            text_color=FUTheme.TEXT_PRIMARY, command=self.stop_or_cancel_session,
+            text_color=FUTheme.TEXT_PRIMARY, command=self.open_end_session_modal,
             width=165, height=42, corner_radius=8
         )
         # Note: Packed dynamically when a session/camera is started
@@ -528,6 +528,135 @@ class OvaLensOperatorApp(ctk.CTk):
                 text="▶ START AUTO SORTING", fg_color=FUTheme.PRIMARY_MAROON,
                 hover_color=FUTheme.HOVER_MAROON
             )
+
+    def open_end_session_modal(self, event=None):
+        """Interactive End Session modal with run summary statistics and direct CSV export."""
+        # If no scans recorded and camera is idle, instantly stop without prompt
+        if self.total_count == 0 and not self.is_auto_cycle_running and not self.camera.is_running:
+            self.stop_or_cancel_session()
+            return
+
+        # If automated conveyor is currently moving, pause conveyor motor while modal is open
+        was_auto_running = self.is_auto_cycle_running
+        if was_auto_running:
+            self.iot.set_conveyor(False)
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(f"End Candling Session — {self.current_batch_id}")
+        dialog.geometry("560x630")
+        dialog.configure(fg_color=FUTheme.BG_LIGHT)
+        dialog.transient(self)
+        dialog.grab_set()
+        self._center_window(dialog, 560, 630)
+
+        card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
+        card.pack(fill="both", expand=True, padx=16, pady=16)
+
+        # Header with Alert / Session Icon
+        icon_row = ctk.CTkFrame(card, fg_color="transparent")
+        icon_row.pack(fill="x", padx=16, pady=(16, 2))
+
+        ctk.CTkLabel(
+            icon_row, text="⏹ End Active Candling Session?",
+            font=(FUTheme.FONT_FAMILY, 17, "bold"), text_color=FUTheme.TEXT_PRIMARY
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            card,
+            text=f"Batch: {self.current_batch_id}  •  Breed: {self.current_breed}  •  Stage: {self.current_stage}\nOperator: {self.operator_name}  •  Device: {self.device_id}",
+            font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED, justify="left"
+        ).pack(anchor="w", padx=16, pady=(2, 12))
+
+        # Metrics Summary Grid
+        grid = ctk.CTkFrame(card, fg_color="transparent")
+        grid.pack(fill="x", padx=16, pady=(0, 12))
+        grid.columnconfigure(0, weight=1)
+        grid.columnconfigure(1, weight=1)
+
+        pct = (self.fertile_count / max(1, self.total_count)) * 100.0 if self.total_count > 0 else 0.0
+        penoy_salvage_val = self.infertile_count * 14.00
+
+        # Tile 1: Total Processed
+        t1 = ctk.CTkFrame(grid, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
+        t1.grid(row=0, column=0, padx=4, pady=4, sticky="nsew")
+        ctk.CTkLabel(t1, text="TOTAL SCANNED", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=10, pady=(6, 0))
+        ctk.CTkLabel(t1, text=f"{self.total_count} / {self.target_egg_count} Eggs", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=10, pady=(0, 6))
+
+        # Tile 2: Fertile Embryos
+        t2 = ctk.CTkFrame(grid, fg_color=FUTheme.FERTILE_GREEN_CARD, corner_radius=8, border_width=1, border_color=FUTheme.FERTILE_GREEN_BORDER)
+        t2.grid(row=0, column=1, padx=4, pady=4, sticky="nsew")
+        ctk.CTkLabel(t2, text="FERTILE (ACCEPT)", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.FERTILE_GREEN_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
+        ctk.CTkLabel(t2, text=f"{self.fertile_count} ({pct:.1f}%)", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.FERTILE_GREEN_TEXT).pack(anchor="w", padx=10, pady=(0, 6))
+
+        # Tile 3: Penoy Salvage
+        t3 = ctk.CTkFrame(grid, fg_color=FUTheme.INFERTILE_AMBER_CARD, corner_radius=8, border_width=1, border_color=FUTheme.INFERTILE_AMBER_BORDER)
+        t3.grid(row=1, column=0, padx=4, pady=4, sticky="nsew")
+        ctk.CTkLabel(t3, text="PENOY SALVAGE YIELD", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.INFERTILE_AMBER_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
+        ctk.CTkLabel(t3, text=f"{self.infertile_count} eggs -> ₱{penoy_salvage_val:,.2f}", font=(FUTheme.FONT_FAMILY, 14, "bold"), text_color=FUTheme.INFERTILE_AMBER).pack(anchor="w", padx=10, pady=(0, 6))
+
+        # Tile 4: Abnormal Culls
+        t4 = ctk.CTkFrame(grid, fg_color=FUTheme.ABNORMAL_RED_CARD, corner_radius=8, border_width=1, border_color=FUTheme.ABNORMAL_RED_BORDER)
+        t4.grid(row=1, column=1, padx=4, pady=4, sticky="nsew")
+        ctk.CTkLabel(t4, text="ABNORMAL (REJECT)", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.ABNORMAL_RED_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
+        ctk.CTkLabel(t4, text=f"{self.abnormal_count} Eggs", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.ABNORMAL_RED).pack(anchor="w", padx=10, pady=(0, 6))
+
+        # Direct CSV Export Section Box
+        export_box = ctk.CTkFrame(card, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=10, border_width=1, border_color=FUTheme.BORDER)
+        export_box.pack(fill="x", padx=16, pady=(0, 14))
+
+        ctk.CTkLabel(
+            export_box, text="💾 EXPORT SESSION RECORDS DIRECTLY TO CSV",
+            font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY
+        ).pack(anchor="w", padx=14, pady=(10, 4))
+
+        status_msg = ctk.CTkLabel(
+            export_box, text="Save session log containing classification results, timestamps, and confidence scores.",
+            font=(FUTheme.FONT_FAMILY, 10), text_color=FUTheme.TEXT_MUTED, justify="left"
+        )
+        status_msg.pack(anchor="w", padx=14, pady=(0, 8))
+
+        def export_csv():
+            try:
+                path = self.db.export_session_csv(self.current_session_id)
+                status_msg.configure(text=f"✓ Exported successfully: {os.path.basename(path)}", text_color=FUTheme.FERTILE_GREEN_TEXT)
+                self._log(f"[EXPORT] CSV Report saved: {path}")
+            except Exception as e:
+                status_msg.configure(text=f"Export failed: {e}", text_color=FUTheme.ABNORMAL_RED_TEXT)
+
+        ctk.CTkButton(
+            export_box, text="📄 Export Records directly into CSV", fg_color=FUTheme.PRIMARY_MAROON,
+            hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE, font=(FUTheme.FONT_FAMILY, 12, "bold"),
+            command=export_csv, height=36, corner_radius=8
+        ).pack(fill="x", padx=14, pady=(0, 10))
+
+        # Bottom Actions Row
+        btn_row = ctk.CTkFrame(card, fg_color="transparent")
+        btn_row.pack(fill="x", padx=16, pady=(0, 10))
+
+        def confirm_end():
+            dialog.destroy()
+            self.stop_or_cancel_session()
+            self._log(f"[OK] Session ended with {self.total_count} records saved.")
+
+        def resume():
+            dialog.destroy()
+            if was_auto_running and self.is_auto_cycle_running:
+                self.iot.set_conveyor(True)
+                self._log("[INFO] Session resumed.")
+
+        ctk.CTkButton(
+            btn_row, text="⏹ Confirm & End Session", fg_color=FUTheme.ABNORMAL_RED_BG,
+            hover_color=FUTheme.ABNORMAL_RED_HOVER, border_width=1, border_color=FUTheme.ABNORMAL_RED_BORDER,
+            text_color=FUTheme.ABNORMAL_RED_TEXT, font=(FUTheme.FONT_FAMILY, 12, "bold"),
+            command=confirm_end, height=40, corner_radius=8
+        ).pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        ctk.CTkButton(
+            btn_row, text="↩ Resume Session", fg_color=FUTheme.PANEL_LIGHT_ALT,
+            hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER,
+            text_color=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 12),
+            command=resume, height=40, corner_radius=8, width=140
+        ).pack(side="right")
 
     def stop_or_cancel_session(self):
         """Universal Stop / Cancel action: halts auto cycle or closes manual camera feed back to Standby."""
@@ -1376,7 +1505,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         s4_body = ctk.CTkLabel(
             s4,
-            text="• [SPACEBAR]: Trigger Single Test Scan (Manual Candling)\n• [ESC] key: Stop / Cancel & Close Camera (Return to Standby)\n• [R] key: Emergency Manual Servo Eject\n• [F11] key: Toggle Kiosk / Fullscreen Mode\n• [C] key: Toggle Optical Alignment Crosshairs\n• [B] key: Open Batch Setup Modal\n• [F1] / [H]: Open this Operator Quick Guide",
+            text="• [SPACEBAR]: Trigger Single Test Scan (Manual Candling)\n• [ESC] key: End Session (Run Summary & Direct CSV Export)\n• [R] key: Emergency Manual Servo Eject\n• [F11] key: Toggle Kiosk / Fullscreen Mode\n• [C] key: Toggle Optical Alignment Crosshairs\n• [B] key: Open Batch Setup Modal\n• [F1] / [H]: Open this Operator Quick Guide",
             font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s4_body.pack(anchor="w", padx=14, pady=(2, 10))
