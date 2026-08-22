@@ -235,4 +235,15 @@ def test_session_completion_and_batch_querying(tmp_path):
         lines = f.readlines()
         assert len(lines) == 3  # Header + 2 fertile scans
 
+    # Test Distinct Batches listing
+    distinct = db.get_distinct_batches()
+    assert len(distinct) >= 1
+    assert distinct[0]["batch_id"] == "BATCH-TEST-EXPLORER"
+    assert distinct[0]["total_scans"] == 4
+
+    # Test Search Query Filtering (e.g. sequence number #3)
+    searched = db.get_scans_by_batch("BATCH-TEST-EXPLORER", search_query="3")
+    assert len(searched) == 1
+    assert searched[0]["sequence_number"] == 3
+
 

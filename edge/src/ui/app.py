@@ -1717,48 +1717,79 @@ class OvaLensOperatorApp(ctk.CTk):
         ).pack(side="right")
 
     def open_scan_history_modal(self, event=None):
-        """Interactive Scan History & Explorer modal with real-time class filters and CSV export."""
+        """Interactive Scan History & Explorer modal with batch selector, live search, class filters, and CSV export."""
         dialog = ctk.CTkToplevel(self)
         dialog.title(f"Scan Explorer & History — Batch {self.current_batch_id}")
-        dialog.geometry("740x660")
+        dialog.geometry("780x700")
         dialog.configure(fg_color=FUTheme.BG_LIGHT)
         dialog.transient(self)
         dialog.grab_set()
-        self._center_window(dialog, 740, 660)
+        self._center_window(dialog, 780, 700)
 
         card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
         card.pack(fill="both", expand=True, padx=16, pady=16)
 
         # Header Row
         hdr = ctk.CTkFrame(card, fg_color="transparent")
-        hdr.pack(fill="x", padx=16, pady=(16, 8))
+        hdr.pack(fill="x", padx=16, pady=(14, 8))
 
         ctk.CTkLabel(
             hdr, text="🔍 Scan Explorer & Candling History",
             font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.TEXT_PRIMARY
         ).pack(side="left")
 
-        # Active Batch & Stage Badge
-        ctk.CTkLabel(
-            hdr, text=f"Batch: {self.current_batch_id}  •  {self.current_stage}",
-            font=(FUTheme.FONT_FAMILY, 11, "bold"), fg_color=FUTheme.PANEL_LIGHT_ALT,
-            text_color=FUTheme.TEXT_SECONDARY, corner_radius=6, padx=10, pady=4
-        ).pack(side="right")
-
-        # Filter Tabs Row
-        filter_row = ctk.CTkFrame(card, fg_color="transparent")
-        filter_row.pack(fill="x", padx=16, pady=(0, 10))
-
+        # Current Batch State Management
+        selected_batch = [self.current_batch_id]
         current_filter = ["ALL"]
 
-        # Counts
-        total_scans = self.db.get_scans_by_batch(self.current_batch_id, limit=5000, class_filter="ALL")
-        n_total = len(total_scans)
-        n_fertile = sum(1 for s in total_scans if s["final_class"] == "FERTILE")
-        n_infertile = sum(1 for s in total_scans if s["final_class"] == "INFERTILE")
-        n_abnormal = sum(1 for s in total_scans if s["final_class"] == "ABNORMAL")
+        # Batch Selection & Search Bar
+        control_bar = ctk.CTkFrame(card, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
+        control_bar.pack(fill="x", padx=16, pady=(0, 10))
+
+        ctk.CTkLabel(
+            control_bar, text="BATCH:", font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            text_color=FUTheme.TEXT_MUTED
+        ).pack(side="left", padx=(10, 4), pady=8)
+
+        # Distinct Batches Query
+        distinct_batches = self.db.get_distinct_batches()
+        batch_ids = [b["batch_id"] for b in distinct_batches]
+        if self.current_batch_id not in batch_ids:
+            batch_ids.insert(0, self.current_batch_id)
+        batch_options = batch_ids + (["ALL (All Batches)"] if len(batch_ids) > 1 else [])
+
+        batch_dropdown = ctk.CTkOptionMenu(
+            control_bar, values=batch_options, font=(FUTheme.FONT_FAMILY, 11, "bold"),
+            fg_color=FUTheme.PRIMARY_MAROON, button_color=FUTheme.HOVER_MAROON,
+            text_color=FUTheme.TEXT_WHITE, dropdown_fg_color=FUTheme.PANEL_LIGHT,
+            dropdown_hover_color=FUTheme.PANEL_ACCENT, dropdown_text_color=FUTheme.TEXT_PRIMARY,
+            height=30, width=220
+        )
+        batch_dropdown.set(self.current_batch_id)
+        batch_dropdown.pack(side="left", padx=(0, 10), pady=6)
+
+        # Live Search Field
+        search_entry = ctk.CTkEntry(
+            control_bar, placeholder_text="Search #Seq or Scan ID...",
+            font=(FUTheme.FONT_FAMILY, 11), fg_color=FUTheme.PANEL_LIGHT,
+            text_color=FUTheme.TEXT_PRIMARY, border_width=1, border_color=FUTheme.BORDER,
+            height=30, width=200
+        )
+        search_entry.pack(side="right", padx=(0, 10), pady=6)
+
+        # Filter Tabs & Live Stats Bar
+        filter_row = ctk.CTkFrame(card, fg_color="transparent")
+        filter_row.pack(fill="x", padx=16, pady=(0, 8))
+
+        stats_summary_label = ctk.CTkLabel(
+            filter_row, text="", font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            text_color=FUTheme.TEXT_MUTED
+        )
+        stats_summary_label.pack(side="right")
 
         tab_btns = {}
+        tab_container = ctk.CTkFrame(filter_row, fg_color="transparent")
+        tab_container.pack(side="left")
 
         # Scrollable table container
         table_container = ctk.CTkScrollableFrame(card, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8)
@@ -1768,16 +1799,47 @@ class OvaLensOperatorApp(ctk.CTk):
         toast_label = ctk.CTkLabel(card, text="", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.FERTILE_GREEN_TEXT)
         toast_label.pack(pady=(0, 4))
 
-        def render_table():
+        def get_active_batch_id():
+            val = batch_dropdown.get()
+            if "ALL" in val:
+                return "ALL"
+            return val
+
+        def update_tabs_and_stats():
+            b_id = get_active_batch_id()
+            all_b_scans = self.db.get_scans_by_batch(b_id, limit=5000, class_filter="ALL")
+            n_tot = len(all_b_scans)
+            n_fert = sum(1 for s in all_b_scans if s["final_class"] == "FERTILE")
+            n_inf = sum(1 for s in all_b_scans if s["final_class"] == "INFERTILE")
+            n_abn = sum(1 for s in all_b_scans if s["final_class"] == "ABNORMAL")
+            fert_pct = (n_fert / max(1, n_tot)) * 100.0 if n_tot > 0 else 0.0
+
+            stats_summary_label.configure(
+                text=f"Total: {n_tot} • Fertile: {fert_pct:.1f}% • Penoy: ₱{n_inf*14:,.0f} • Cull: {n_abn}"
+            )
+
+            # Update tab label text
+            if "ALL" in tab_btns:
+                tab_btns["ALL"].configure(text=f"All ({n_tot})")
+            if "FERTILE" in tab_btns:
+                tab_btns["FERTILE"].configure(text=f"🟢 Fertile ({n_fert})")
+            if "INFERTILE" in tab_btns:
+                tab_btns["INFERTILE"].configure(text=f"🟡 Infertile ({n_inf})")
+            if "ABNORMAL" in tab_btns:
+                tab_btns["ABNORMAL"].configure(text=f"🔴 Abnormal ({n_abn})")
+
+        def render_table(*args):
             for child in table_container.winfo_children():
                 child.destroy()
 
+            b_id = get_active_batch_id()
             flt = current_filter[0]
-            scans = self.db.get_scans_by_batch(self.current_batch_id, limit=200, class_filter=flt)
+            query = search_entry.get().strip()
+            scans = self.db.get_scans_by_batch(b_id, limit=250, class_filter=flt, search_query=query if query else None)
 
             if not scans:
                 empty = ctk.CTkLabel(
-                    table_container, text=f"No scans found for filter '{flt}' in Batch {self.current_batch_id}.",
+                    table_container, text=f"No scans found matching filter '{flt}' (Batch: {b_id}).",
                     font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED
                 )
                 empty.pack(pady=40)
@@ -1788,6 +1850,7 @@ class OvaLensOperatorApp(ctk.CTk):
                 conf_pct = f"{s['confidence']*100:.1f}%"
                 seq_num = s["sequence_number"]
                 action = s["routing_action"]
+                b_code = s["batch_id"]
                 lat = f"{s['inference_ms']}ms"
                 time_str = s["scanned_at"].split("T")[1][:8] if "T" in s["scanned_at"] else s["scanned_at"]
 
@@ -1813,27 +1876,35 @@ class OvaLensOperatorApp(ctk.CTk):
                 # Col 1: Sequence #
                 ctk.CTkLabel(
                     row_card, text=f"#{seq_num:03d}", font=(FUTheme.FONT_FAMILY, 11, "bold"),
-                    text_color=FUTheme.TEXT_PRIMARY, width=50
-                ).pack(side="left", padx=(10, 4), pady=8)
+                    text_color=FUTheme.TEXT_PRIMARY, width=45
+                ).pack(side="left", padx=(10, 4), pady=7)
 
                 # Col 2: Classification Badge Pill
                 cls_lbl = ctk.CTkLabel(
                     row_card, text=pill, font=(FUTheme.FONT_FAMILY, 10, "bold"),
                     fg_color=badge_fg, text_color=badge_text, corner_radius=5, padx=8, pady=2
                 )
-                cls_lbl.pack(side="left", padx=6, pady=8)
+                cls_lbl.pack(side="left", padx=4, pady=7)
 
-                # Col 3: Confidence & Action
+                # Col 3: Batch Code Pill (if viewing ALL batches)
+                if b_id == "ALL":
+                    ctk.CTkLabel(
+                        row_card, text=b_code, font=(FUTheme.FONT_FAMILY, 9, "bold"),
+                        fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_MUTED,
+                        corner_radius=4, padx=6, pady=2
+                    ).pack(side="left", padx=4, pady=7)
+
+                # Col 4: Confidence & Action
                 ctk.CTkLabel(
-                    row_card, text=f"Conf: {conf_pct}  •  Action: {action}",
-                    font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_SECONDARY
-                ).pack(side="left", padx=10, pady=8)
+                    row_card, text=f"Conf: {conf_pct}  •  {action}",
+                    font=(FUTheme.FONT_FAMILY, 10), text_color=FUTheme.TEXT_SECONDARY
+                ).pack(side="left", padx=8, pady=7)
 
-                # Col 4 (Right): Time & Latency
+                # Col 5 (Right): Time & Latency
                 meta_txt = f"{time_str}  ({lat})"
                 ctk.CTkLabel(
                     row_card, text=meta_txt, font=("Consolas", 10), text_color=FUTheme.TEXT_MUTED
-                ).pack(side="right", padx=(4, 12), pady=8)
+                ).pack(side="right", padx=(4, 12), pady=7)
 
         def set_filter(flt: str):
             current_filter[0] = flt
@@ -1844,17 +1915,24 @@ class OvaLensOperatorApp(ctk.CTk):
                     btn.configure(fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY)
             render_table()
 
+        def on_batch_change(new_val):
+            update_tabs_and_stats()
+            render_table()
+
+        batch_dropdown.configure(command=on_batch_change)
+        search_entry.bind("<KeyRelease>", lambda e: render_table())
+
         # Build Filter Tabs
         tabs_spec = [
-            ("ALL", f"All Scans ({n_total})"),
-            ("FERTILE", f"🟢 Fertile ({n_fertile})"),
-            ("INFERTILE", f"🟡 Infertile ({n_infertile})"),
-            ("ABNORMAL", f"🔴 Abnormal ({n_abnormal})"),
+            ("ALL", "All"),
+            ("FERTILE", "🟢 Fertile"),
+            ("INFERTILE", "🟡 Infertile"),
+            ("ABNORMAL", "🔴 Abnormal"),
         ]
 
         for key, label in tabs_spec:
             btn = ctk.CTkButton(
-                filter_row, text=label, font=(FUTheme.FONT_FAMILY, 10, "bold"),
+                tab_container, text=label, font=(FUTheme.FONT_FAMILY, 10, "bold"),
                 fg_color=FUTheme.PRIMARY_MAROON if key == "ALL" else FUTheme.PANEL_LIGHT_ALT,
                 text_color=FUTheme.TEXT_WHITE if key == "ALL" else FUTheme.TEXT_PRIMARY,
                 hover_color=FUTheme.HOVER_MAROON, height=28, corner_radius=6,
@@ -1863,24 +1941,27 @@ class OvaLensOperatorApp(ctk.CTk):
             btn.pack(side="left", padx=(0, 6))
             tab_btns[key] = btn
 
+        update_tabs_and_stats()
         render_table()
 
         # Bottom Actions / Export Toolbar
         b_bar = ctk.CTkFrame(card, fg_color="transparent")
-        b_bar.pack(fill="x", padx=16, pady=(0, 12))
+        b_bar.pack(fill="x", padx=16, pady=(0, 10))
 
         def export_current():
             try:
+                b_id = get_active_batch_id()
                 flt = current_filter[0]
-                path = self.db.export_batch_csv(self.current_batch_id, class_filter=flt)
+                path = self.db.export_batch_csv(b_id, class_filter=flt)
                 toast_label.configure(text=f"✓ Exported {flt} scans to: {os.path.basename(path)}", text_color=FUTheme.FERTILE_GREEN_TEXT)
-                self._log(f"[EXPORT] CSV saved: {path}")
+                self._log(f"[EXPORT] Filtered CSV saved: {path}")
             except Exception as e:
                 toast_label.configure(text=f"Export error: {e}", text_color=FUTheme.ABNORMAL_RED_TEXT)
 
         def export_all():
             try:
-                path = self.db.export_batch_csv(self.current_batch_id, class_filter="ALL")
+                b_id = get_active_batch_id()
+                path = self.db.export_batch_csv(b_id, class_filter="ALL")
                 toast_label.configure(text=f"✓ Exported ALL batch scans to: {os.path.basename(path)}", text_color=FUTheme.FERTILE_GREEN_TEXT)
                 self._log(f"[EXPORT] Complete batch CSV saved: {path}")
             except Exception as e:
@@ -1893,7 +1974,7 @@ class OvaLensOperatorApp(ctk.CTk):
         ).pack(side="left", fill="x", expand=True, padx=(0, 6))
 
         ctk.CTkButton(
-            b_bar, text="💾 Export Full Batch (CSV)", fg_color=FUTheme.PANEL_LIGHT_ALT,
+            b_bar, text="💾 Export Selected Batch (CSV)", fg_color=FUTheme.PANEL_LIGHT_ALT,
             hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER_DARK,
             text_color=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 11, "bold"),
             command=export_all, height=36, corner_radius=8

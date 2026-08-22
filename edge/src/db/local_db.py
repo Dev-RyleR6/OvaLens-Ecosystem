@@ -73,7 +73,90 @@ class LocalDatabaseManager:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_sync ON local_scans(is_synced);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_session ON local_scans(session_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_batch_seq ON local_scans(batch_id, sequence_number);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_batch_class ON local_scans(batch_id, final_class, sequence_number);")
             conn.commit()
+
+    def get_distinct_batches(self) -> List[Dict[str, Any]]:
+        """Fetch all unique batches stored in local SQLite with scan counts and latest timestamp."""
+        with self._get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT 
+                    batch_id,
+                    COUNT(*) as total_scans,
+                    SUM(CASE WHEN final_class = 'FERTILE' THEN 1 ELSE 0 END) as fertile_count,
+                    SUM(CASE WHEN final_class = 'INFERTILE' THEN 1 ELSE 0 END) as infertile_count,
+                    SUM(CASE WHEN final_class = 'ABNORMAL' THEN 1 ELSE 0 END) as abnormal_count,
+                    MAX(scanned_at) as last_scanned_at
+                FROM local_scans
+                GROUP BY batch_id
+                ORDER BY last_scanned_at DESC;
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_scans_by_batch(self, batch_id: str, limit: int = 300, class_filter: Optional[str] = None, search_query: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Fetch scans for a batch or ALL batches with optional class and text filtering."""
+        with self._get_connection() as conn:
+            query = """
+                SELECT sequence_number, scan_id, batch_id, session_id, final_class, confidence, inference_ms, routing_action, scanned_at, is_synced
+                FROM local_scans
+                WHERE 1=1
+            """
+            params: List[Any] = []
+
+            if batch_id and batch_id != "ALL":
+                query += " AND batch_id = ?"
+                params.append(batch_id)
+
+            if class_filter and class_filter != "ALL":
+                query += " AND final_class = ?"
+                params.append(class_filter)
+
+            if search_query:
+                clean_query = search_query.lstrip("#").strip()
+                if clean_query.isdigit():
+                    query += " AND sequence_number = ?"
+                    params.append(int(clean_query))
+                else:
+                    query += " AND (scan_id LIKE ? OR final_class LIKE ?)"
+                    params.extend([f"%{clean_query}%", f"%{clean_query}%"])
+
+            query += " ORDER BY sequence_number DESC LIMIT ?"
+            params.append(limit)
+
+            cursor = conn.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def export_batch_csv(self, batch_id: str, class_filter: Optional[str] = None, output_dir: Optional[str] = None) -> str:
+        """Export batch scans to CSV, optionally filtered by class."""
+        import csv
+        if output_dir is None:
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            output_dir = os.path.join(base_dir, "exports")
+        os.makedirs(output_dir, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        batch_tag = "ALL_BATCHES" if batch_id == "ALL" else batch_id
+        filter_tag = f"_{class_filter.lower()}" if class_filter and class_filter != "ALL" else ""
+        filename = f"OvaLens_{batch_tag}{filter_tag}_{timestamp}.csv"
+        filepath = os.path.join(output_dir, filename)
+
+        scans = self.get_scans_by_batch(batch_id, limit=10000, class_filter=class_filter)
+        with open(filepath, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["#", "Scan ID", "Batch Code", "Classification", "Confidence", "Action", "Latency (ms)", "Timestamp (UTC)", "Server Synced"])
+            for r in scans:
+                writer.writerow([
+                    r["sequence_number"],
+                    r["scan_id"],
+                    r["batch_id"],
+                    r["final_class"],
+                    f"{r['confidence']*100:.2f}%",
+                    r["routing_action"],
+                    r["inference_ms"],
+                    r["scanned_at"],
+                    "YES" if r["is_synced"] else "NO"
+                ])
+        return filepath
 
     def create_session(self, session_id: str, batch_id: str, device_id: str, stage: str, operator_name: str) -> Dict[str, Any]:
         started_at = datetime.now(timezone.utc).isoformat()
@@ -200,57 +283,7 @@ class LocalDatabaseManager:
                 pass
         return self.get_session_stats(session_id)
 
-    def get_scans_by_batch(self, batch_id: str, limit: int = 300, class_filter: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Fetch scans for a batch with optional class filtering (FERTILE, INFERTILE, ABNORMAL)."""
-        with self._get_connection() as conn:
-            if class_filter and class_filter != "ALL":
-                cursor = conn.execute("""
-                    SELECT sequence_number, scan_id, batch_id, session_id, final_class, confidence, inference_ms, routing_action, scanned_at, is_synced
-                    FROM local_scans
-                    WHERE batch_id = ? AND final_class = ?
-                    ORDER BY sequence_number DESC
-                    LIMIT ?;
-                """, (batch_id, class_filter, limit))
-            else:
-                cursor = conn.execute("""
-                    SELECT sequence_number, scan_id, batch_id, session_id, final_class, confidence, inference_ms, routing_action, scanned_at, is_synced
-                    FROM local_scans
-                    WHERE batch_id = ?
-                    ORDER BY sequence_number DESC
-                    LIMIT ?;
-                """, (batch_id, limit))
-            return [dict(row) for row in cursor.fetchall()]
 
-    def export_batch_csv(self, batch_id: str, class_filter: Optional[str] = None, output_dir: Optional[str] = None) -> str:
-        """Export batch scans to CSV, optionally filtered by class."""
-        import csv
-        if output_dir is None:
-            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            output_dir = os.path.join(base_dir, "exports")
-        os.makedirs(output_dir, exist_ok=True)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filter_tag = f"_{class_filter.lower()}" if class_filter and class_filter != "ALL" else ""
-        filename = f"OvaLens_{batch_id}{filter_tag}_{timestamp}.csv"
-        filepath = os.path.join(output_dir, filename)
-
-        scans = self.get_scans_by_batch(batch_id, limit=5000, class_filter=class_filter)
-        with open(filepath, mode="w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(["#", "Scan ID", "Batch Code", "Classification", "Confidence", "Action", "Latency (ms)", "Timestamp (UTC)", "Server Synced"])
-            for r in scans:
-                writer.writerow([
-                    r["sequence_number"],
-                    r["scan_id"],
-                    r["batch_id"],
-                    r["final_class"],
-                    f"{r['confidence']*100:.2f}%",
-                    r["routing_action"],
-                    r["inference_ms"],
-                    r["scanned_at"],
-                    "YES" if r["is_synced"] else "NO"
-                ])
-        return filepath
 
     def export_session_csv(self, session_id: str, output_dir: Optional[str] = None) -> str:
         """Generate a complete, timestamped CSV export report of an egg sorting run."""
