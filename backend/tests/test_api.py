@@ -98,3 +98,46 @@ def test_batch_analytics_and_milestones():
     assert "day_10_fertility_rate" in an_data
     assert "penoy_salvage_value_php" in an_data
 
+
+def test_human_in_the_loop_override_audit_logging():
+    # 1. Login to get token
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@ovalens.fu.edu.ph", "password": "Admin@123"}
+    )
+    assert login_resp.status_code == 200
+    token = login_resp.json()["access_token"]
+    auth_headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. Fetch scans
+    scans_resp = client.get("/api/v1/scans?limit=5")
+    assert scans_resp.status_code == 200
+    scans = scans_resp.json()
+    assert len(scans) > 0
+    target_scan = scans[0]
+    scan_id = target_scan["scan_id"]
+
+    # 3. Perform Human-in-the-loop override
+    new_class = "INFERTILE" if target_scan["final_class"] == "FERTILE" else "FERTILE"
+    override_resp = client.patch(
+        f"/api/v1/scans/{scan_id}/override",
+        json={"final_class": new_class, "reason": "Operator visual review confirmed embryo vein status"},
+        headers=auth_headers
+    )
+    assert override_resp.status_code == 200
+    updated_scan = override_resp.json()
+    assert updated_scan["final_class"] == new_class
+    assert updated_scan["routing_action"] == ("ACCEPT" if new_class == "FERTILE" else "REJECT")
+
+    # 4. Verify audit log was recorded
+    audit_resp = client.get("/api/v1/audit-logs?action=MANUAL_CLASSIFICATION_OVERRIDE", headers=auth_headers)
+    assert audit_resp.status_code == 200
+    audit_logs = audit_resp.json()
+    assert len(audit_logs) > 0
+    matching_log = next((l for l in audit_logs if l["entity_id"] == str(scan_id)), None)
+    assert matching_log is not None
+    assert matching_log["action"] == "MANUAL_CLASSIFICATION_OVERRIDE"
+    assert matching_log["details"]["new_class"] == new_class
+    assert "reason" in matching_log["details"]
+
+

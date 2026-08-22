@@ -2,15 +2,16 @@ import os
 import shutil
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.scan import EggScanModel, FertilityClass
+from app.models.user import UserModel
 from app.schemas.scan import ScanSyncPayload, ScanSyncResponse, ScanListItem, ScanDetailResponse, ScanOverridePayload
 from app.services.scan_service import ScanService
-from app.api.deps import verify_api_key
+from app.api.deps import verify_api_key, get_optional_current_user
 
 router = APIRouter(prefix="/scans", tags=["Egg Scans & Ingestion"])
 
@@ -81,6 +82,17 @@ def get_scan(scan_id: UUID, db: Session = Depends(get_db)):
 def override_scan(
     scan_id: UUID,
     payload: ScanOverridePayload,
-    db: Session = Depends(get_db)
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserModel] = Depends(get_optional_current_user),
 ):
-    return ScanService.override_scan(db, scan_id, payload.final_class)
+    user_id = current_user.user_id if current_user else None
+    client_ip = request.client.host if request.client else None
+    return ScanService.override_scan(
+        db=db,
+        scan_id=scan_id,
+        final_class=payload.final_class,
+        reason=payload.reason,
+        user_id=user_id,
+        ip_address=client_ip,
+    )

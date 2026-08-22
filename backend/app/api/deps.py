@@ -54,6 +54,23 @@ def get_current_user(
     return user
 
 
+def get_optional_current_user(
+    db: Session = Depends(get_db),
+    token: Optional[str] = Depends(oauth2_scheme)
+) -> Optional[UserModel]:
+    """Optionally extracts the current user from JWT token without raising 401."""
+    if not token:
+        return None
+    payload = decode_access_token(token)
+    if not payload or not payload.get("sub"):
+        return None
+    try:
+        user_id = UUID(payload["sub"])
+        return db.query(UserModel).filter(UserModel.user_id == user_id, UserModel.is_active == True).first()
+    except Exception:
+        return None
+
+
 def require_admin(current_user: UserModel = Depends(get_current_user)) -> UserModel:
     """Restricts access to System Administrators."""
     if current_user.role != UserRole.ADMIN:

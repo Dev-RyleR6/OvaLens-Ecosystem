@@ -1,7 +1,7 @@
 from typing import List
 from uuid import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case
 from sqlalchemy.dialects.postgresql import insert
 
 from app.models.scan import EggScanModel, FertilityClass, RoutingAction
@@ -61,9 +61,9 @@ class ScanService:
         # Recalculate and update session rollup totals atomically
         aggregates = db.query(
             func.count(EggScanModel.scan_id).label("total"),
-            func.coalesce(func.sum(func.case((EggScanModel.final_class == FertilityClass.FERTILE, 1), else_=0)), 0).label("fertile"),
-            func.coalesce(func.sum(func.case((EggScanModel.final_class == FertilityClass.INFERTILE, 1), else_=0)), 0).label("infertile"),
-            func.coalesce(func.sum(func.case((EggScanModel.final_class == FertilityClass.ABNORMAL, 1), else_=0)), 0).label("abnormal"),
+            func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.FERTILE, 1), else_=0)), 0).label("fertile"),
+            func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.INFERTILE, 1), else_=0)), 0).label("infertile"),
+            func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.ABNORMAL, 1), else_=0)), 0).label("abnormal"),
             func.coalesce(func.avg(EggScanModel.inference_ms), 0.0).label("avg_lat")
         ).filter(EggScanModel.session_id == session_id).first()
 
@@ -84,21 +84,48 @@ class ScanService:
         )
 
     @staticmethod
-    def override_scan(db: Session, scan_id: UUID, final_class: FertilityClass) -> EggScanModel:
+    def override_scan(
+        db: Session,
+        scan_id: UUID,
+        final_class: FertilityClass,
+        reason: str = None,
+        user_id: UUID = None,
+        ip_address: str = None,
+    ) -> EggScanModel:
+        from app.models.audit import AuditLogModel
+
         scan = db.query(EggScanModel).filter(EggScanModel.scan_id == scan_id).first()
         if not scan:
             raise EntityNotFoundException(f"Scan '{scan_id}' not found.")
 
+        previous_class = scan.final_class
         scan.final_class = final_class
         scan.routing_action = RoutingAction.ACCEPT if final_class == FertilityClass.FERTILE else RoutingAction.REJECT
         db.flush()
 
+        # Record immutable audit log
+        audit = AuditLogModel(
+            user_id=user_id,
+            action="MANUAL_CLASSIFICATION_OVERRIDE",
+            entity_type="SCAN",
+            entity_id=str(scan_id),
+            details={
+                "previous_class": previous_class.value if hasattr(previous_class, "value") else str(previous_class),
+                "new_class": final_class.value if hasattr(final_class, "value") else str(final_class),
+                "reason": reason or "Operator visual review",
+                "batch_id": scan.batch_id,
+                "sequence_number": scan.sequence_number,
+            },
+            ip_address=ip_address,
+        )
+        db.add(audit)
+
         # Recalculate parent session rollup counters
         aggregates = db.query(
             func.count(EggScanModel.scan_id).label("total"),
-            func.coalesce(func.sum(func.case((EggScanModel.final_class == FertilityClass.FERTILE, 1), else_=0)), 0).label("fertile"),
-            func.coalesce(func.sum(func.case((EggScanModel.final_class == FertilityClass.INFERTILE, 1), else_=0)), 0).label("infertile"),
-            func.coalesce(func.sum(func.case((EggScanModel.final_class == FertilityClass.ABNORMAL, 1), else_=0)), 0).label("abnormal"),
+            func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.FERTILE, 1), else_=0)), 0).label("fertile"),
+            func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.INFERTILE, 1), else_=0)), 0).label("infertile"),
+            func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.ABNORMAL, 1), else_=0)), 0).label("abnormal"),
             func.coalesce(func.avg(EggScanModel.inference_ms), 0.0).label("avg_lat")
         ).filter(EggScanModel.session_id == scan.session_id).first()
 
