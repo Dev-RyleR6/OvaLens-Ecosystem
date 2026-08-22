@@ -74,7 +74,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.title("OvaLens — Automated Duck Egg Candling System (Foundation University)")
         self.geometry("1280x860")
         self.minsize(1024, 720)
-        ctk.set_appearance_mode("light")
+        ctk.set_appearance_mode("dark")
         self.configure(fg_color=FUTheme.BG_LIGHT)
 
         # Standard Window Exit Confirmation
@@ -806,10 +806,10 @@ class OvaLensOperatorApp(ctk.CTk):
         self.log_textbox.configure(state="disabled")
 
     def confirm_exit_dialog(self):
-        """Clean confirmation dialog before closing the application."""
+        """High-contrast modal confirmation prompt before stopping operations or shutting down."""
         dialog = ctk.CTkToplevel(self)
         dialog.title("Confirm Exit — OvaLens Operator")
-        dialog.geometry("420x240")
+        dialog.geometry("480x280")
         dialog.configure(fg_color=FUTheme.BG_LIGHT)
         dialog.transient(self)
         dialog.grab_set()
@@ -817,39 +817,55 @@ class OvaLensOperatorApp(ctk.CTk):
         card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
         card.pack(fill="both", expand=True, padx=16, pady=16)
 
+        # Header with Warning Icon
         ctk.CTkLabel(
             card, text="⚠️  Exit OvaLens Operator System?",
             font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY
         ).pack(pady=(16, 6))
 
-        msg = "Are you sure you want to exit?\nAll sorting records are safely stored in local SQLite WAL."
+        if self.is_session_active or self.is_auto_cycle_running:
+            warning_box = ctk.CTkFrame(card, fg_color=FUTheme.INFERTILE_AMBER_BG, corner_radius=8)
+            warning_box.pack(fill="x", padx=16, pady=(0, 10))
+            ctk.CTkLabel(
+                warning_box,
+                text="⚡ ACTIVE SORTING SESSION IN PROGRESS\nConveyor motors will halt and remaining eggs stay safely queued.",
+                font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.INFERTILE_AMBER_TEXT,
+                justify="center", padx=10, pady=8
+            ).pack()
+            msg = "Local scans are saved to SQLite WAL.\nAre you sure you want to stop operations and exit?"
+        else:
+            msg = "All local database records are safely synchronized.\nAre you sure you want to close the operator station?"
+
         ctk.CTkLabel(
             card, text=msg, font=(FUTheme.FONT_FAMILY, 11),
             text_color=FUTheme.TEXT_MUTED, justify="center"
         ).pack(pady=(0, 16))
 
         btn_row = ctk.CTkFrame(card, fg_color="transparent")
-        btn_row.pack(fill="x", padx=20, pady=(0, 12))
+        btn_row.pack(fill="x", padx=16, pady=(0, 12))
 
         ctk.CTkButton(
-            btn_row, text="Return to App", fg_color=FUTheme.PANEL_LIGHT_ALT,
+            btn_row, text="↩ Return to App", fg_color=FUTheme.PANEL_LIGHT_ALT,
             hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER_DARK,
-            text_color=FUTheme.TEXT_PRIMARY, command=dialog.destroy, width=140, height=38, corner_radius=8
+            text_color=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 11, "bold"),
+            command=dialog.destroy, width=160, height=38, corner_radius=8
         ).pack(side="left")
 
         def do_exit():
             dialog.destroy()
+            print("\n[*] Shutting down OvaLens Edge Subsystems...")
             if self.camera.is_running:
                 self.camera.stop()
             self.iot.stop()
             self.sync_worker.stop()
             self.destroy()
+            print("[OK] Graceful shutdown complete.")
 
         ctk.CTkButton(
-            btn_row, text="Exit System", fg_color=FUTheme.PRIMARY_MAROON,
+            btn_row, text="⏻ Exit System", fg_color=FUTheme.PRIMARY_MAROON,
             hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE,
             font=(FUTheme.FONT_FAMILY, 12, "bold"), command=do_exit,
-            width=140, height=38, corner_radius=8
+            width=160, height=38, corner_radius=8
         ).pack(side="right")
 
     def open_batch_setup_dialog(self):
@@ -911,9 +927,9 @@ class OvaLensOperatorApp(ctk.CTk):
         ym_col.pack(side="left", fill="x", expand=True, padx=(0, 4))
         ctk.CTkLabel(ym_col, text="Setting Month:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
         ym_dropdown = ctk.CTkOptionMenu(
-            ym_col, values=months_opts, fg_color="#FFFFFF", text_color=FUTheme.TEXT_PRIMARY,
+            ym_col, values=months_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
             button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color="#FFFFFF", dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
+            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
             height=34, corner_radius=8
         )
         ym_dropdown.set(cur_year_month)
@@ -925,9 +941,9 @@ class OvaLensOperatorApp(ctk.CTk):
         ctk.CTkLabel(batch_col, text="Batch #:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
         batch_num_opts = [f"{i:02d}" for i in range(1, 13)]
         batch_num_dropdown = ctk.CTkOptionMenu(
-            batch_col, values=batch_num_opts, fg_color="#FFFFFF", text_color=FUTheme.TEXT_PRIMARY,
+            batch_col, values=batch_num_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
             button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color="#FFFFFF", dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
+            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
             height=34, corner_radius=8
         )
         batch_num_dropdown.set("01")
@@ -943,9 +959,9 @@ class OvaLensOperatorApp(ctk.CTk):
             "MUS (Muscovy Pato)": ("MUS", "MUSCOVY"),
         }
         breed_builder_dropdown = ctk.CTkOptionMenu(
-            builder_frame, values=list(breed_map.keys()), fg_color="#FFFFFF", text_color=FUTheme.TEXT_PRIMARY,
+            builder_frame, values=list(breed_map.keys()), fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
             button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color="#FFFFFF", dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
+            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
             height=34, corner_radius=8
         )
         breed_builder_dropdown.set("KAY (Kayumanggi / Itik Pinas)")
@@ -960,10 +976,10 @@ class OvaLensOperatorApp(ctk.CTk):
 
         p_top = ctk.CTkFrame(preview_frame, fg_color="transparent")
         p_top.pack(fill="x", padx=12, pady=(6, 0))
-        ctk.CTkLabel(p_top, text="LIVE BATCH CODE:", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.PRIMARY_MAROON).pack(side="left")
+        ctk.CTkLabel(p_top, text="LIVE BATCH CODE:", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(side="left")
         ctk.CTkLabel(p_top, text="● READY FOR CONVEYOR", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.FERTILE_GREEN).pack(side="right")
 
-        preview_label = ctk.CTkLabel(preview_frame, text="BATCH-2026-08-KAY-01", font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.DARK_MAROON)
+        preview_label = ctk.CTkLabel(preview_frame, text="BATCH-2026-08-KAY-01", font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.TEXT_PRIMARY)
         preview_label.pack(anchor="w", padx=12, pady=(0, 6))
 
         def update_preview(*args):
@@ -981,9 +997,9 @@ class OvaLensOperatorApp(ctk.CTk):
         # 2. SAVED OFFICE BATCHES CONTROLS
         ctk.CTkLabel(server_frame, text="Active Incubator Batches (from Office):", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
         server_dropdown = ctk.CTkOptionMenu(
-            server_frame, values=["Loading active batches from server..."], fg_color="#FFFFFF", text_color=FUTheme.TEXT_PRIMARY,
+            server_frame, values=["Loading active batches from server..."], fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
             button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color="#FFFFFF", dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
+            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
             height=36, corner_radius=8
         )
         server_dropdown.pack(fill="x", pady=(0, 10))
@@ -1043,9 +1059,9 @@ class OvaLensOperatorApp(ctk.CTk):
             "DAY_7 (Initial Blood Ring Check)"
         ]
         stage_dropdown = ctk.CTkOptionMenu(
-            content, values=stage_opts, fg_color="#FFFFFF", text_color=FUTheme.TEXT_PRIMARY,
+            content, values=stage_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
             button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color="#FFFFFF", dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
+            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
             height=34, corner_radius=8
         )
         for s in stage_opts:
@@ -1094,8 +1110,8 @@ class OvaLensOperatorApp(ctk.CTk):
                 ym = ym_dropdown.get()
                 b_key = breed_builder_dropdown.get()
                 b_code, full_breed = breed_map.get(b_key, ("KAY", "KAYUMANGGI"))
-                c_num = cohort_dropdown.get()
-                final_batch_id = f"BATCH-{ym}-{b_code}-{c_num}"
+                b_num = batch_num_dropdown.get()
+                final_batch_id = f"BATCH-{ym}-{b_code}-{b_num}"
                 final_breed = full_breed
             elif "Server" in mode:
                 sel = server_dropdown.get()

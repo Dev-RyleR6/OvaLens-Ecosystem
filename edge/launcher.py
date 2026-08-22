@@ -72,16 +72,8 @@ def main():
         device_id=device_id
     )
 
-    def on_closing():
-        print("\n[*] Shutting down OvaLens Edge Subsystems...")
-        if camera.is_running:
-            camera.stop()
-        iot.stop()
-        sync_worker.stop()
-        app.destroy()
-        print("[OK] Graceful shutdown complete.")
-
-    app.protocol("WM_DELETE_WINDOW", on_closing)
+    # Safe exit confirmation protocol
+    app.protocol("WM_DELETE_WINDOW", app.confirm_exit_dialog)
     app.mainloop()
 
 
