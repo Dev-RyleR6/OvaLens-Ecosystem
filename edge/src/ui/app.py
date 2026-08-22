@@ -250,14 +250,14 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         self.cycle_status_label.pack(side="left")
 
-        # Quick Standby / Cancel Button on HUD Bar
+        # Quick Standby / Cancel Button on HUD Bar (dynamically revealed during active sessions)
         self.hud_cancel_btn = ctk.CTkButton(
             self.cycle_hud, text="✕ Standby [ESC]", font=(FUTheme.FONT_FAMILY, 10, "bold"),
             fg_color="transparent", hover_color=FUTheme.ABNORMAL_RED_BG,
             text_color=FUTheme.TEXT_MUTED, border_width=1, border_color=FUTheme.BORDER,
             command=self.stop_or_cancel_session, height=26, width=110, corner_radius=6
         )
-        self.hud_cancel_btn.pack(side="right", padx=(0, 8), pady=5)
+        # Note: Packed dynamically when session starts
 
         # Inner container with disabled propagation to lock video dimensions
         self.video_container = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.DARKROOM_VIEWPORT, corner_radius=8)
@@ -470,7 +470,7 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         self.scan_btn.pack(side="left", padx=6, pady=13)
 
-        # Dedicated Terminate / Cancel / End Session Button
+        # Dedicated Terminate / Cancel / End Session Button (hidden in Standby, visible when active)
         self.cancel_btn = ctk.CTkButton(
             self.footer_frame, text="⏹ Cancel Session [ESC]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.ABNORMAL_RED_BG,
@@ -478,7 +478,7 @@ class OvaLensOperatorApp(ctk.CTk):
             text_color=FUTheme.TEXT_PRIMARY, command=self.stop_or_cancel_session,
             width=165, height=42, corner_radius=8
         )
-        self.cancel_btn.pack(side="left", padx=6, pady=13)
+        # Note: Packed dynamically when a session/camera is started
 
         # Manual Eject Button with High-Contrast Luminous Text
         self.eject_btn = ctk.CTkButton(
@@ -509,6 +509,26 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         self.settings_btn.pack(side="right", padx=6, pady=13)
 
+    def _set_session_active_state(self, is_active: bool):
+        """Dynamically show/hide cancel controls and toggle main session button appearance."""
+        if is_active:
+            # Reveal cancel buttons dynamically when active
+            self.cancel_btn.pack(side="left", padx=6, pady=13, after=self.scan_btn)
+            self.hud_cancel_btn.pack(side="right", padx=(0, 8), pady=5)
+            if self.is_auto_cycle_running:
+                self.session_btn.configure(
+                    text="⏹ STOP AUTO SORTING", fg_color=FUTheme.ABNORMAL_RED,
+                    hover_color=FUTheme.ABNORMAL_RED_HOVER
+                )
+        else:
+            # Hide cancel buttons when in standby
+            self.cancel_btn.pack_forget()
+            self.hud_cancel_btn.pack_forget()
+            self.session_btn.configure(
+                text="▶ START AUTO SORTING", fg_color=FUTheme.PRIMARY_MAROON,
+                hover_color=FUTheme.HOVER_MAROON
+            )
+
     def stop_or_cancel_session(self):
         """Universal Stop / Cancel action: halts auto cycle or closes manual camera feed back to Standby."""
         if self.is_auto_cycle_running:
@@ -523,8 +543,10 @@ class OvaLensOperatorApp(ctk.CTk):
             self._render_standby_hud()
             self.standby_frame.place(relx=0.5, rely=0.5, anchor="center")
             self._update_cycle_hud("●", FUTheme.TEXT_MUTED, "CONVEYOR STANDBY — CAMERA CLOSED")
+            self._set_session_active_state(False)
             self._log("[ACTION] Session ended. Camera closed and returned to Standby.")
         else:
+            self._set_session_active_state(False)
             self._log("[INFO] System already in Standby.")
 
     def toggle_auto_session(self):
@@ -569,11 +591,8 @@ class OvaLensOperatorApp(ctk.CTk):
             # Record session start time for live throughput computation
             self._session_start_time = time.time()
 
-            # Update UI state
-            self.session_btn.configure(
-                text="⏹ STOP AUTO SORTING", fg_color=FUTheme.ABNORMAL_RED,
-                hover_color=FUTheme.ABNORMAL_RED_HOVER
-            )
+            # Update UI state & reveal cancel button
+            self._set_session_active_state(True)
             self._update_counters_ui()
             self._log(f"[*] AUTO SESSION STARTED: {self.current_session_id[:8]}... (Batch: {self.current_batch_id}, Target: {self.target_egg_count} eggs)")
 
@@ -596,10 +615,7 @@ class OvaLensOperatorApp(ctk.CTk):
         if self.camera.is_running:
             self.camera.stop()
 
-        self.session_btn.configure(
-            text="▶ START AUTO SORTING", fg_color=FUTheme.PRIMARY_MAROON,
-            hover_color=FUTheme.HOVER_MAROON
-        )
+        self._set_session_active_state(False)
         self._update_cycle_hud("●", FUTheme.TEXT_MUTED, "CONVEYOR STANDBY — SESSION IDLE")
         
         # Clear video canvas and display standby HUD
@@ -664,6 +680,7 @@ class OvaLensOperatorApp(ctk.CTk):
         if not self.camera.is_running:
             self.camera.start()
             self.standby_frame.place_forget()
+            self._set_session_active_state(True)
             time.sleep(0.1)
 
         frame = self.camera.get_latest_frame()
