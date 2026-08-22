@@ -104,6 +104,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.bind("<F11>", self.toggle_fullscreen)
         self.bind("c", self.toggle_crosshairs)
         self.bind("C", self.toggle_crosshairs)
+        self.bind("<Escape>", lambda event: self.stop_or_cancel_session())
 
         # Start Standby Display & Status Loop
         self._render_standby_hud()
@@ -414,7 +415,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         hint = ctk.CTkLabel(
             hint_box,
-            text="⚡ Press [SPACEBAR] for Single Scan  •  Click 'START AUTO SORTING' below for Continuous Sorting",
+            text="⚡ [SPACE] Single Candling Scan  •  [START AUTO SORTING] Continuous Conveyor  •  [ESC] Standby / Cancel",
             font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_WHITE, padx=14, pady=6, justify="center"
         )
         hint.pack()
@@ -490,6 +491,19 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         self.settings_btn.pack(side="right", padx=8, pady=13)
 
+    def stop_or_cancel_session(self):
+        """Universal Stop / Cancel action: halts auto cycle or closes manual camera feed back to Standby."""
+        if self.is_auto_cycle_running:
+            self._stop_auto_cycle()
+            self._log("[ACTION] Automated conveyor sorting stopped by operator.")
+        elif self.camera.is_running:
+            self.camera.stop()
+            self.video_label.configure(image=None)
+            self._render_standby_hud()
+            self.standby_frame.place(relx=0.5, rely=0.5, anchor="center")
+            self._update_cycle_hud("●", FUTheme.TEXT_MUTED, "CONVEYOR STANDBY — CAMERA CLOSED")
+            self._log("[ACTION] Camera feed closed. Viewport returned to Standby.")
+
     def toggle_auto_session(self):
         """Toggle automated full conveyor sorting cycle with on-demand camera start."""
         if not self.is_session_active:
@@ -546,7 +560,7 @@ class OvaLensOperatorApp(ctk.CTk):
             self._auto_cycle_thread.start()
         else:
             # Stop Session & Release Camera
-            self._stop_auto_cycle()
+            self.stop_or_cancel_session()
 
     def _stop_auto_cycle(self):
         self.is_session_active = False
@@ -690,8 +704,12 @@ class OvaLensOperatorApp(ctk.CTk):
         self._log(f"#{self.scan_sequence:03d} | {final_cls:<9} | {conf*100:5.1f}% | {action:<6} | {lat_ms}ms")
 
     def trigger_manual_eject(self):
-        """Fire servo kicker immediately."""
+        """Fire servo kicker immediately with visual confirmation on UI."""
         self.iot.trigger_ejection_now()
+        self.result_banner.configure(fg_color=FUTheme.ABNORMAL_RED_CARD, border_color=FUTheme.ABNORMAL_RED_BORDER)
+        self.result_badge.configure(text="MANUAL EJECT", fg_color=FUTheme.ABNORMAL_RED_BG, text_color=FUTheme.ABNORMAL_RED_TEXT)
+        self.result_title.configure(text="⏏ Manual Ejection Triggered", text_color=FUTheme.ABNORMAL_RED)
+        self.result_subtitle.configure(text="Hardware servo diverter gate pulsed via ESP32 GPIO override")
         self._log("[ACTION] Manual Ejection Triggered.")
 
     def _update_result_banner(self, final_cls: str, conf: float, action: str, lat_ms: int):
@@ -1318,7 +1336,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         s4_body = ctk.CTkLabel(
             s4,
-            text="• [SPACEBAR]: Trigger Single Test Scan (Manual Candling)\n• [R] key: Emergency Manual Servo Eject\n• [B] key: Open Batch Setup Modal\n• [F1] / [H] key: Open this Operator Quick Guide",
+            text="• [SPACEBAR]: Trigger Single Test Scan (Manual Candling)\n• [ESC] key: Stop / Cancel & Close Camera (Return to Standby)\n• [R] key: Emergency Manual Servo Eject\n• [F11] key: Toggle Kiosk / Fullscreen Mode\n• [C] key: Toggle Optical Alignment Crosshairs\n• [B] key: Open Batch Setup Modal\n• [F1] / [H]: Open this Operator Quick Guide",
             font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s4_body.pack(anchor="w", padx=14, pady=(2, 10))
