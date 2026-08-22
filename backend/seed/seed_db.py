@@ -52,6 +52,20 @@ def seed_database(reset: bool = False):
             db.add(admin)
             print(f"  + Created Admin: {admin_email} / Admin@123")
 
+        # Also seed foundationu.com admin
+        fu_admin = db.query(UserModel).filter(UserModel.email == "admin@foundationu.com").first()
+        if not fu_admin:
+            fu_admin = UserModel(
+                user_id=uuid.uuid4(),
+                email="admin@foundationu.com",
+                hashed_password=get_password_hash("admin123"),
+                full_name="Ryle Gabotero (Lead Researcher)",
+                role=UserRole.ADMIN,
+                is_active=True
+            )
+            db.add(fu_admin)
+            print("  + Created Admin: admin@foundationu.com / admin123")
+
         manager_email = "manager@ovalens.fu.edu.ph"
         if not db.query(UserModel).filter(UserModel.email == manager_email).first():
             manager = UserModel(
@@ -77,6 +91,20 @@ def seed_database(reset: bool = False):
             )
             db.add(operator)
             print(f"  + Created Operator: {operator_email} / Operator@123")
+
+        # Also seed foundationu.com operator
+        fu_operator = db.query(UserModel).filter(UserModel.email == "operator@foundationu.com").first()
+        if not fu_operator:
+            fu_operator = UserModel(
+                user_id=uuid.uuid4(),
+                email="operator@foundationu.com",
+                hashed_password=get_password_hash("operator123"),
+                full_name="Hatchery Shift Operator",
+                role=UserRole.OPERATOR,
+                is_active=True
+            )
+            db.add(fu_operator)
+            print("  + Created Operator: operator@foundationu.com / operator123")
 
         db.commit()
 

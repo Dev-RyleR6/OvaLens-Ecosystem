@@ -120,6 +120,8 @@ export const LoginPage: React.FC = () => {
       if (attempts >= MAX_FAILED_ATTEMPTS) {
         setLockoutTimer(LOCKOUT_SECONDS);
         setErrorMessage(`Too many failed attempts. Account locked for ${LOCKOUT_SECONDS}s.`);
+      } else if (!err.response) {
+        setErrorMessage('Cannot connect to OvaLens Backend API (http://localhost:8000). Please check if python uvicorn server is running.');
       } else {
         setErrorMessage(
           err.response?.data?.detail || 'Invalid email or password. Please try again.'

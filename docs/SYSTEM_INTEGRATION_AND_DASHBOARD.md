@@ -1,8 +1,8 @@
-# 🐣 OvaLens Dashboard & System Integration Architecture
+# 🐣 OvaLens System Integration & Dashboard Documentation
 
-> **Subsystem**: `dashboard/`  
-> **Platform**: Web (React 18 + Vite 5 + TypeScript + TailwindCSS + TanStack Query)  
-> **License**: Apache License 2.0  
+> **Subsystem**: `docs/` & `dashboard/`  
+> **Topic**: System Integration Architecture, Data Flow, and Dashboard Capabilities  
+> **Purpose**: Capstone Research Manuscript, Technical Documentation, and Operator Guide  
 > **Institution**: Foundation University  
 
 ---
@@ -25,7 +25,7 @@
    - [10. Hatchery & System Settings](#10-hatchery--system-settings)
 4. [Hardware & Software Subsystem Mapping](#-hardware--software-subsystem-mapping)
 5. [Data Protocol & Synchronization Specifications](#-data-protocol--synchronization-specifications)
-6. [Local Development & Deployment Guide](#-local-development--deployment-guide)
+6. [Brand Identity & UI Tokens](#-brand-identity--ui-tokens)
 
 ---
 
@@ -195,42 +195,7 @@ Content-Type: application/json
 
 ---
 
-## 🛠️ Local Development & Deployment Guide
-
-### 1. Prerequisites
-* **Node.js**: v18.0+ or v20.0+
-* **npm**: v9.0+
-
-### 2. Install Dependencies
-```bash
-cd dashboard
-npm install
-```
-
-### 3. Start Development Server
-```bash
-npm run dev
-# Dashboard accessible at http://localhost:5173
-```
-
-### 4. Build Production Artifacts
-```bash
-npm run build
-# Compiles optimized static assets to dashboard/dist/
-```
-
-### 5. Run via Docker
-```bash
-# Build standalone container
-docker build -t ovalens-dashboard .
-
-# Run with Nginx reverse proxy
-docker run -d -p 3000:80 --name ovalens-dashboard-app ovalens-dashboard
-```
-
----
-
-## 🏛️ Brand Guidelines & Color Tokens
+## 🏛️ Brand Identity & UI Tokens
 
 | Token Name | Hex Code | Purpose in UI |
 | :--- | :--- | :--- |

@@ -58,41 +58,12 @@ api.interceptors.request.use((config) => {
 export const apiClient = {
   // Authentication & Security
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    try {
-      const res = await api.post<AuthResponse>('/auth/login', credentials);
-      if (res.data?.access_token) {
-        localStorage.setItem('ovalens_auth_token', res.data.access_token);
-        localStorage.setItem('ovalens_user', JSON.stringify(res.data.user));
-      }
-      return res.data;
-    } catch {
-      // Mock fallback for offline / demo defense presentation
-      const fallbackUser: User = credentials.email.includes('admin')
-        ? {
-            user_id: 'usr-admin-01',
-            email: credentials.email || 'admin@foundationu.com',
-            full_name: 'Ryle Gabotero (Lead Researcher)',
-            role: 'ADMIN',
-            is_active: true,
-            created_at: new Date().toISOString(),
-          }
-        : {
-            user_id: 'usr-op-01',
-            email: credentials.email || 'operator@foundationu.com',
-            full_name: 'Hatchery Operator',
-            role: 'OPERATOR',
-            is_active: true,
-            created_at: new Date().toISOString(),
-          };
-      const mockAuth: AuthResponse = {
-        access_token: 'mock-jwt-token-' + Date.now(),
-        token_type: 'bearer',
-        user: fallbackUser,
-      };
-      localStorage.setItem('ovalens_auth_token', mockAuth.access_token);
-      localStorage.setItem('ovalens_user', JSON.stringify(mockAuth.user));
-      return mockAuth;
+    const res = await api.post<AuthResponse>('/auth/login', credentials);
+    if (res.data?.access_token) {
+      localStorage.setItem('ovalens_auth_token', res.data.access_token);
+      localStorage.setItem('ovalens_user', JSON.stringify(res.data.user));
     }
+    return res.data;
   },
 
   getMe: async (): Promise<User> => {
