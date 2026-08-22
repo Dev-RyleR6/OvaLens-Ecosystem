@@ -21,6 +21,7 @@ import { EggScan, FertilityClass, BatchSummary } from '../types';
 import { Badge } from '../components/Badge';
 import { CandlingAperture } from '../components/CandlingAperture';
 import { Sheet } from '../components/ui/sheet';
+import { HumanInTheLoopOverrideModal } from '../components/HumanInTheLoopOverrideModal';
 
 type ViewMode = 'TABLE' | 'GRID';
 type SortField = 'sequence_number' | 'confidence' | 'inference_ms' | 'scanned_at';
@@ -73,8 +74,10 @@ export const ScanExplorerPage: React.FC = () => {
   const [isLiveAutoRefresh, setIsLiveAutoRefresh] = useState(false);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
 
+  // Human-in-the-Loop Override Prompt Modal State
+  const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
+  const [pendingOverrideClass, setPendingOverrideClass] = useState<FertilityClass | null>(null);
   const [overrideToast, setOverrideToast] = useState<string | null>(null);
-  const [overrideReason, setOverrideReason] = useState('Visual confirmation by operator');
 
   const fetchScans = async () => {
     try {
@@ -124,19 +127,26 @@ export const ScanExplorerPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [isLiveAutoRefresh, classFilter, batchFilter]);
 
-  const handleOverride = async (newClass: FertilityClass) => {
+  const handlePromptOverride = (targetClass: FertilityClass) => {
+    if (!selectedScan) return;
+    setPendingOverrideClass(targetClass);
+    setIsOverrideModalOpen(true);
+  };
+
+  const handleConfirmOverride = async (targetClass: FertilityClass, reason: string) => {
     if (!selectedScan) return;
     try {
-      const updated = await apiClient.overrideScanClassification(selectedScan.scan_id, newClass, overrideReason);
+      const updated = await apiClient.overrideScanClassification(selectedScan.scan_id, targetClass, reason);
       setSelectedScan({ ...updated });
       fetchScans();
       if (isSoundEnabled) {
-        playAcousticFeedback(newClass === 'FERTILE');
+        playAcousticFeedback(targetClass === 'FERTILE');
       }
-      setOverrideToast(`Scan #${selectedScan.sequence_number ?? 0} reclassified to ${newClass}. Logged in Audit Trail.`);
-      setTimeout(() => setOverrideToast(null), 3500);
+      setOverrideToast(`Scan #${selectedScan.sequence_number ?? 0} reclassified to ${targetClass}. Logged in Audit Trail.`);
+      setTimeout(() => setOverrideToast(null), 4000);
     } catch (err) {
       console.error('Error overriding scan:', err);
+      throw err;
     }
   };
 
@@ -595,7 +605,7 @@ export const ScanExplorerPage: React.FC = () => {
               <div className="flex flex-wrap gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => handleOverride('FERTILE')}
+                  onClick={() => handlePromptOverride('FERTILE')}
                   className={`px-2.5 py-1 text-xs font-bold rounded border transition-colors cursor-pointer ${
                     selectedScan.final_class === 'FERTILE'
                       ? 'bg-emerald-700 text-white border-emerald-800'
@@ -607,7 +617,7 @@ export const ScanExplorerPage: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={() => handleOverride('INFERTILE')}
+                  onClick={() => handlePromptOverride('INFERTILE')}
                   className={`px-2.5 py-1 text-xs font-bold rounded border transition-colors cursor-pointer ${
                     selectedScan.final_class === 'INFERTILE'
                       ? 'bg-amber-700 text-white border-amber-800'
@@ -619,7 +629,7 @@ export const ScanExplorerPage: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={() => handleOverride('ABNORMAL')}
+                  onClick={() => handlePromptOverride('ABNORMAL')}
                   className={`px-2.5 py-1 text-xs font-bold rounded border transition-colors cursor-pointer ${
                     selectedScan.final_class === 'ABNORMAL'
                       ? 'bg-rose-700 text-white border-rose-800'
@@ -654,6 +664,18 @@ export const ScanExplorerPage: React.FC = () => {
           </div>
         )}
       </Sheet>
+
+      {/* Human-in-the-Loop Override Confirmation Modal */}
+      <HumanInTheLoopOverrideModal
+        isOpen={isOverrideModalOpen}
+        scan={selectedScan}
+        targetClass={pendingOverrideClass}
+        onClose={() => {
+          setIsOverrideModalOpen(false);
+          setPendingOverrideClass(null);
+        }}
+        onConfirm={handleConfirmOverride}
+      />
     </div>
   );
 };
