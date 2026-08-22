@@ -299,11 +299,11 @@ class OvaLensOperatorApp(ctk.CTk):
         grid = ctk.CTkFrame(counters_frame, fg_color="transparent")
         grid.pack(fill="x", padx=10, pady=(0, 12))
 
-        # 4 High-Contrast White Stat Tiles with Semantic Accents
-        self.box_total = self._create_stat_box(grid, "TOTAL SCANNED", f"0 / {self.target_egg_count}", 0, 0, accent_color=FUTheme.PRIMARY_MAROON)
-        self.box_fertile = self._create_stat_box(grid, "FERTILE (ACCEPT)", "0 (0%)", 0, 1, accent_color=FUTheme.FERTILE_GREEN)
-        self.box_infertile = self._create_stat_box(grid, "INFERTILE (PENOY)", "0", 1, 0, accent_color=FUTheme.INFERTILE_AMBER)
-        self.box_abnormal = self._create_stat_box(grid, "ABNORMAL (REJECT)", "0", 1, 1, accent_color=FUTheme.ABNORMAL_RED)
+        # 4 High-Contrast White Stat Tiles with Semantic Accent Card Fills
+        self.box_total = self._create_stat_box(grid, "TOTAL SCANNED", f"0 / {self.target_egg_count}", 0, 0, accent_color=FUTheme.PRIMARY_MAROON, bg_color=FUTheme.PANEL_LIGHT_ALT)
+        self.box_fertile = self._create_stat_box(grid, "FERTILE (ACCEPT)", "0 (0%)", 0, 1, accent_color=FUTheme.FERTILE_GREEN, bg_color=FUTheme.FERTILE_GREEN_CARD)
+        self.box_infertile = self._create_stat_box(grid, "INFERTILE (PENOY)", "0", 1, 0, accent_color=FUTheme.INFERTILE_AMBER, bg_color=FUTheme.INFERTILE_AMBER_CARD)
+        self.box_abnormal = self._create_stat_box(grid, "ABNORMAL (REJECT)", "0", 1, 1, accent_color=FUTheme.ABNORMAL_RED, bg_color=FUTheme.ABNORMAL_RED_CARD)
 
         # 3. Recent Scans Log
         log_frame = ctk.CTkFrame(
@@ -370,18 +370,19 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         hint.pack()
 
-    def _create_stat_box(self, parent, label_text: str, val_text: str, row: int, col: int, accent_color: str):
-        f = ctk.CTkFrame(parent, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
+    def _create_stat_box(self, parent, label_text: str, val_text: str, row: int, col: int, accent_color: str, bg_color: str = None):
+        card_bg = bg_color or FUTheme.PANEL_LIGHT_ALT
+        f = ctk.CTkFrame(parent, fg_color=card_bg, corner_radius=10, border_width=1, border_color=FUTheme.BORDER)
         f.grid(row=row, column=col, padx=4, pady=4, sticky="nsew")
         parent.grid_columnconfigure(col, weight=1)
 
-        top_strip = ctk.CTkFrame(f, fg_color=accent_color, height=3, corner_radius=2)
+        top_strip = ctk.CTkFrame(f, fg_color=accent_color, height=4, corner_radius=2)
         top_strip.pack(fill="x", side="top")
 
         lbl = ctk.CTkLabel(f, text=label_text, font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED)
         lbl.pack(anchor="w", padx=10, pady=(6, 0))
 
-        val = ctk.CTkLabel(f, text=val_text, font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY)
+        val = ctk.CTkLabel(f, text=val_text, font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=accent_color if accent_color != FUTheme.PRIMARY_MAROON else FUTheme.TEXT_PRIMARY)
         val.pack(anchor="w", padx=10, pady=(0, 6))
         return val
 
@@ -637,24 +638,34 @@ class OvaLensOperatorApp(ctk.CTk):
 
     def _update_result_banner(self, final_cls: str, conf: float, action: str, lat_ms: int):
         if final_cls == "FERTILE":
+            card_bg = FUTheme.FERTILE_GREEN_CARD
+            card_border = FUTheme.FERTILE_GREEN_BORDER
             badge_bg = FUTheme.FERTILE_GREEN_BG
             badge_text_color = FUTheme.FERTILE_GREEN
-            title_text = f"FERTILE — ACCEPT ({conf*100:.1f}%)"
-            sub_text = "Embryo active • Routed along incubator conveyor"
+            title_color = FUTheme.FERTILE_GREEN
+            title_text = f"🟢 FERTILE — ACCEPT ({conf*100:.1f}%)"
+            sub_text = "Viable spider embryo network verified • Routed to setter tray"
         elif final_cls == "INFERTILE":
+            card_bg = FUTheme.INFERTILE_AMBER_CARD
+            card_border = FUTheme.INFERTILE_AMBER_BORDER
             badge_bg = FUTheme.INFERTILE_AMBER_BG
             badge_text_color = FUTheme.INFERTILE_AMBER
-            title_text = f"INFERTILE — REJECT ({conf*100:.1f}%)"
-            sub_text = "Penoy cull @ ₱14 • Servo diverter gate actuated"
+            title_color = FUTheme.INFERTILE_AMBER
+            title_text = f"🟡 INFERTILE — REJECT ({conf*100:.1f}%)"
+            sub_text = "Clear unfertilized yolk • Diverted to Penoy salvage @ ₱14.00"
         else:
+            card_bg = FUTheme.ABNORMAL_RED_CARD
+            card_border = FUTheme.ABNORMAL_RED_BORDER
             badge_bg = FUTheme.ABNORMAL_RED_BG
             badge_text_color = FUTheme.ABNORMAL_RED
-            title_text = f"ABNORMAL — REJECT ({conf*100:.1f}%)"
+            title_color = FUTheme.ABNORMAL_RED
+            title_text = f"🔴 ABNORMAL — REJECT ({conf*100:.1f}%)"
             sub_text = "Dead embryo / Corrupted yolk • Ejected to cull bin"
 
+        self.result_banner.configure(fg_color=card_bg, border_color=card_border)
         self.result_badge.configure(text=action, fg_color=badge_bg, text_color=badge_text_color)
         self.latency_label.configure(text=f"Latency: {lat_ms}ms")
-        self.result_title.configure(text=title_text)
+        self.result_title.configure(text=title_text, text_color=title_color)
         self.result_subtitle.configure(text=sub_text)
 
     def _update_counters_ui(self):
@@ -898,8 +909,10 @@ class OvaLensOperatorApp(ctk.CTk):
         ym_col.pack(side="left", fill="x", expand=True, padx=(0, 4))
         ctk.CTkLabel(ym_col, text="Setting Month:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
         ym_dropdown = ctk.CTkOptionMenu(
-            ym_col, values=months_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=32
+            ym_col, values=months_opts, fg_color="#FFFFFF", text_color=FUTheme.TEXT_PRIMARY,
+            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
+            dropdown_fg_color="#FFFFFF", dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
+            height=34, corner_radius=8
         )
         ym_dropdown.set(cur_year_month)
         ym_dropdown.pack(fill="x")
@@ -910,8 +923,10 @@ class OvaLensOperatorApp(ctk.CTk):
         ctk.CTkLabel(batch_col, text="Batch #:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
         batch_num_opts = [f"{i:02d}" for i in range(1, 13)]
         batch_num_dropdown = ctk.CTkOptionMenu(
-            batch_col, values=batch_num_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=32
+            batch_col, values=batch_num_opts, fg_color="#FFFFFF", text_color=FUTheme.TEXT_PRIMARY,
+            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
+            dropdown_fg_color="#FFFFFF", dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
+            height=34, corner_radius=8
         )
         batch_num_dropdown.set("01")
         batch_num_dropdown.pack(fill="x")
@@ -926,18 +941,28 @@ class OvaLensOperatorApp(ctk.CTk):
             "MUS (Muscovy Pato)": ("MUS", "MUSCOVY"),
         }
         breed_builder_dropdown = ctk.CTkOptionMenu(
-            builder_frame, values=list(breed_map.keys()), fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=32
+            builder_frame, values=list(breed_map.keys()), fg_color="#FFFFFF", text_color=FUTheme.TEXT_PRIMARY,
+            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
+            dropdown_fg_color="#FFFFFF", dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
+            height=34, corner_radius=8
         )
         breed_builder_dropdown.set("KAY (Kayumanggi / Itik Pinas)")
         breed_builder_dropdown.pack(fill="x", pady=(0, 8))
 
-        # Live Code Preview Box
-        preview_frame = ctk.CTkFrame(builder_frame, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
-        preview_frame.pack(fill="x", pady=(0, 8), ipady=4)
-        ctk.CTkLabel(preview_frame, text="GENERATED BATCH CODE:", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=10, pady=(2, 0))
-        preview_label = ctk.CTkLabel(preview_frame, text="BATCH-2026-08-KAY-01", font=(FUTheme.FONT_FAMILY, 14, "bold"), text_color=FUTheme.PRIMARY_MAROON)
-        preview_label.pack(anchor="w", padx=10, pady=(0, 2))
+        # Live Code Preview Box with Rich Light Maroon Color Fill & Green Status
+        preview_frame = ctk.CTkFrame(
+            builder_frame, fg_color=FUTheme.PRIMARY_MAROON_BG, corner_radius=10,
+            border_width=1, border_color=FUTheme.PRIMARY_MAROON_BORDER
+        )
+        preview_frame.pack(fill="x", pady=(2, 10), ipady=4)
+
+        p_top = ctk.CTkFrame(preview_frame, fg_color="transparent")
+        p_top.pack(fill="x", padx=12, pady=(6, 0))
+        ctk.CTkLabel(p_top, text="LIVE BATCH CODE:", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.PRIMARY_MAROON).pack(side="left")
+        ctk.CTkLabel(p_top, text="● READY FOR CONVEYOR", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.FERTILE_GREEN).pack(side="right")
+
+        preview_label = ctk.CTkLabel(preview_frame, text="BATCH-2026-08-KAY-01", font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.DARK_MAROON)
+        preview_label.pack(anchor="w", padx=12, pady=(0, 6))
 
         def update_preview(*args):
             ym = ym_dropdown.get()
@@ -954,8 +979,10 @@ class OvaLensOperatorApp(ctk.CTk):
         # 2. SAVED OFFICE BATCHES CONTROLS
         ctk.CTkLabel(server_frame, text="Active Incubator Batches (from Office):", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
         server_dropdown = ctk.CTkOptionMenu(
-            server_frame, values=["Loading active batches from server..."], fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=36
+            server_frame, values=["Loading active batches from server..."], fg_color="#FFFFFF", text_color=FUTheme.TEXT_PRIMARY,
+            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
+            dropdown_fg_color="#FFFFFF", dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
+            height=36, corner_radius=8
         )
         server_dropdown.pack(fill="x", pady=(0, 10))
 
@@ -1014,8 +1041,10 @@ class OvaLensOperatorApp(ctk.CTk):
             "DAY_7 (Initial Blood Ring Check)"
         ]
         stage_dropdown = ctk.CTkOptionMenu(
-            content, values=stage_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=34
+            content, values=stage_opts, fg_color="#FFFFFF", text_color=FUTheme.TEXT_PRIMARY,
+            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
+            dropdown_fg_color="#FFFFFF", dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
+            height=34, corner_radius=8
         )
         for s in stage_opts:
             if self.current_stage in s:
