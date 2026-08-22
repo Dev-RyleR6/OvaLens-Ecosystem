@@ -85,10 +85,15 @@ class OvaLensOperatorApp(ctk.CTk):
         self._build_main_layout()
         self._build_footer()
 
-        # Keyboard Accelerators
+        # Keyboard Accelerators & Operator Hotkeys
         self.bind("<space>", lambda event: self.trigger_candling_scan())
         self.bind("r", lambda event: self.trigger_manual_eject())
         self.bind("R", lambda event: self.trigger_manual_eject())
+        self.bind("b", lambda event: self.open_batch_setup_dialog())
+        self.bind("B", lambda event: self.open_batch_setup_dialog())
+        self.bind("<F1>", lambda event: self.open_onboarding_guide())
+        self.bind("h", lambda event: self.open_onboarding_guide())
+        self.bind("H", lambda event: self.open_onboarding_guide())
 
         # Start Standby Display & Status Loop
         self._render_standby_hud()
@@ -139,9 +144,24 @@ class OvaLensOperatorApp(ctk.CTk):
             border_width=1,
             border_color=FUTheme.BORDER_DARK,
             command=self.open_batch_setup_dialog,
-            height=34, corner_radius=6
+            height=36, corner_radius=8
         )
-        self.batch_btn.pack(side="left", padx=20)
+        self.batch_btn.pack(side="left", padx=(18, 8))
+
+        # Quick Onboarding / Help Guide Button
+        self.help_btn = ctk.CTkButton(
+            self.header_frame,
+            text="📘 Quick Guide [F1]",
+            font=(FUTheme.FONT_FAMILY, 11, "bold"),
+            fg_color=FUTheme.PANEL_LIGHT_ALT,
+            text_color=FUTheme.PRIMARY_MAROON,
+            hover_color=FUTheme.PANEL_ACCENT,
+            border_width=1,
+            border_color=FUTheme.BORDER,
+            command=self.open_onboarding_guide,
+            height=36, corner_radius=8
+        )
+        self.help_btn.pack(side="left", padx=4)
 
         # Right: Status Telemetry Badges
         right_container = ctk.CTkFrame(self.header_frame, fg_color="transparent")
@@ -1005,7 +1025,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Target Quantity & Operator
         qty_row = ctk.CTkFrame(content, fg_color="transparent")
-        qty_row.pack(fill="x", padx=16, pady=(0, 10))
+        qty_row.pack(fill="x", padx=16, pady=(0, 4))
 
         col1 = ctk.CTkFrame(qty_row, fg_color="transparent")
         col1.pack(side="left", fill="x", expand=True, padx=(0, 4))
@@ -1020,6 +1040,22 @@ class OvaLensOperatorApp(ctk.CTk):
         op_entry = ctk.CTkEntry(col2, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=34)
         op_entry.insert(0, self.operator_name)
         op_entry.pack(fill="x")
+
+        # Quantity Quick Preset Chips
+        chips_frame = ctk.CTkFrame(content, fg_color="transparent")
+        chips_frame.pack(fill="x", padx=16, pady=(0, 10))
+
+        def set_preset_qty(q: int):
+            qty_entry.delete(0, "end")
+            qty_entry.insert(0, str(q))
+
+        for q_label, q_val in [("500 (12 Trays)", 500), ("250 (6 Trays)", 250), ("100 Eggs", 100), ("42 (1 Tray)", 42)]:
+            ctk.CTkButton(
+                chips_frame, text=q_label, font=(FUTheme.FONT_FAMILY, 9, "bold"),
+                fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_SECONDARY,
+                hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER,
+                height=26, corner_radius=6, command=lambda v=q_val: set_preset_qty(v)
+            ).pack(side="left", padx=(0, 4), expand=True, fill="x")
 
         def apply_batch():
             mode = mode_segmented.get()
@@ -1085,6 +1121,94 @@ class OvaLensOperatorApp(ctk.CTk):
             hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE,
             font=(FUTheme.FONT_FAMILY, 12, "bold"), command=apply_batch, height=38
         ).pack(side="right", fill="x", expand=True, padx=(10, 0))
+
+    def open_onboarding_guide(self):
+        """Interactive visual operator onboarding guide & hotkey reference modal."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("OvaLens Operator Quick Guide & Onboarding")
+        dialog.geometry("600x680")
+        dialog.configure(fg_color=FUTheme.BG_LIGHT)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        # Header
+        hdr = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=0, height=60, border_width=1, border_color=FUTheme.BORDER)
+        hdr.pack(fill="x", side="top")
+
+        ctk.CTkLabel(
+            hdr, text="📘 OvaLens Operator Quick Guide",
+            font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY
+        ).pack(side="left", padx=20, pady=16)
+
+        # Scrollable / Structured Content
+        content = ctk.CTkScrollableFrame(dialog, fg_color="transparent")
+        content.pack(fill="both", expand=True, padx=20, pady=14)
+
+        # Step 1 Card: Batch Setup
+        s1 = ctk.CTkFrame(content, fg_color=FUTheme.PANEL_LIGHT, corner_radius=10, border_width=1, border_color=FUTheme.BORDER)
+        s1.pack(fill="x", pady=(0, 10))
+        s1_hdr = ctk.CTkFrame(s1, fg_color=FUTheme.PRIMARY_MAROON, height=28, corner_radius=6)
+        s1_hdr.pack(fill="x", padx=6, pady=6)
+        ctk.CTkLabel(s1_hdr, text="STEP 1: SELECT OR BUILD BATCH CODE", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_WHITE).pack(side="left", padx=10)
+
+        s1_body = ctk.CTkLabel(
+            s1,
+            text="• Online: Pulls active incubator cohorts from the central server.\n• Offline: Use the 100% Dropdown Format Builder (Year-Month + Breed + Cohort #).\n• Example standard format: BATCH-2026-08-KAY-01.",
+            font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_PRIMARY, justify="left"
+        )
+        s1_body.pack(anchor="w", padx=14, pady=(2, 10))
+
+        # Step 2 Card: Conveyor Sorting Loop
+        s2 = ctk.CTkFrame(content, fg_color=FUTheme.PANEL_LIGHT, corner_radius=10, border_width=1, border_color=FUTheme.BORDER)
+        s2.pack(fill="x", pady=(0, 10))
+        s2_hdr = ctk.CTkFrame(s2, fg_color=FUTheme.FERTILE_GREEN, height=28, corner_radius=6)
+        s2_hdr.pack(fill="x", padx=6, pady=6)
+        ctk.CTkLabel(s2_hdr, text="STEP 2: AUTOMATED CANDLING & CONVEYOR SORTING", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_WHITE).pack(side="left", padx=10)
+
+        s2_body = ctk.CTkLabel(
+            s2,
+            text="• Click [START AUTO SORTING] in footer to activate camera & motor.\n• Sorter advances eggs into the dark candling chamber at 120 eggs/min.\n• High-speed YOLOv8 ONNX model classifies embryo vitality in < 25ms.\n• Machine automatically stops and chimes when all target eggs are sorted.",
+            font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_PRIMARY, justify="left"
+        )
+        s2_body.pack(anchor="w", padx=14, pady=(2, 10))
+
+        # Step 3 Card: 3 Biological Actions
+        s3 = ctk.CTkFrame(content, fg_color=FUTheme.PANEL_LIGHT, corner_radius=10, border_width=1, border_color=FUTheme.BORDER)
+        s3.pack(fill="x", pady=(0, 10))
+        s3_hdr = ctk.CTkFrame(s3, fg_color=FUTheme.INFERTILE_AMBER, height=28, corner_radius=6)
+        s3_hdr.pack(fill="x", padx=6, pady=6)
+        ctk.CTkLabel(s3_hdr, text="STEP 3: 3-CLASS SORTING & DIVERTER ACTIONS", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_WHITE).pack(side="left", padx=10)
+
+        s3_body = ctk.CTkLabel(
+            s3,
+            text="🟢 FERTILE (Accept): Spider blood veins verified -> stays on tray to Day 18.\n🟡 INFERTILE (Reject): Clear yolk -> servo diverts to Penoy salvage @ ₱14.00.\n🔴 ABNORMAL (Reject): Dead embryo / blood ring -> ejected to cull bin.",
+            font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_PRIMARY, justify="left"
+        )
+        s3_body.pack(anchor="w", padx=14, pady=(2, 10))
+
+        # Step 4 Card: Keyboard Shortcuts
+        s4 = ctk.CTkFrame(content, fg_color=FUTheme.PANEL_LIGHT, corner_radius=10, border_width=1, border_color=FUTheme.BORDER)
+        s4.pack(fill="x", pady=(0, 10))
+        s4_hdr = ctk.CTkFrame(s4, fg_color=FUTheme.PANEL_ACCENT, height=28, corner_radius=6)
+        s4_hdr.pack(fill="x", padx=6, pady=6)
+        ctk.CTkLabel(s4_hdr, text="⌨️ KEYBOARD SHORTCUTS & HARDWARE HOTKEYS", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(side="left", padx=10)
+
+        s4_body = ctk.CTkLabel(
+            s4,
+            text="• [SPACEBAR]: Trigger Single Test Scan (Manual Candling)\n• [R] key: Emergency Manual Servo Eject\n• [B] key: Open Batch Setup Modal\n• [F1] / [H] key: Open this Operator Quick Guide",
+            font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY, justify="left"
+        )
+        s4_body.pack(anchor="w", padx=14, pady=(2, 10))
+
+        # Footer Button
+        f_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        f_row.pack(fill="x", padx=20, pady=(0, 14))
+
+        ctk.CTkButton(
+            f_row, text="Got It! Close Guide", fg_color=FUTheme.PRIMARY_MAROON,
+            hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE,
+            font=(FUTheme.FONT_FAMILY, 12, "bold"), command=dialog.destroy, height=38
+        ).pack(fill="x")
 
     def open_calibration_dialog(self):
         dialog = ctk.CTkToplevel(self)
