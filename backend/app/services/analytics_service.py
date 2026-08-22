@@ -19,9 +19,10 @@ class AnalyticsService:
         # Class distribution
         fertile_count = db.query(func.count(EggScanModel.scan_id)).filter(EggScanModel.final_class == FertilityClass.FERTILE).scalar() or 0
         infertile_count = db.query(func.count(EggScanModel.scan_id)).filter(EggScanModel.final_class == FertilityClass.INFERTILE).scalar() or 0
+        abnormal_count = db.query(func.count(EggScanModel.scan_id)).filter(EggScanModel.final_class == FertilityClass.ABNORMAL).scalar() or 0
         
         fertility_rate = (fertile_count / total_scans * 100.0) if total_scans > 0 else 0.0
-        cull_rate = (infertile_count / total_scans * 100.0) if total_scans > 0 else 0.0
+        cull_rate = ((infertile_count + abnormal_count) / total_scans * 100.0) if total_scans > 0 else 0.0
 
         # Hatched ducklings & total eggs set across all batches
         batch_totals = db.query(
