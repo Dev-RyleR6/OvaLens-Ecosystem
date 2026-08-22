@@ -24,12 +24,22 @@ export const CandlingAperture: React.FC<CandlingApertureProps> = ({
   return (
     <div className="space-y-3 group">
       {/* Visual Transillumination Canvas */}
-      <div className="relative w-full h-52 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center justify-center transition-all duration-300 group-hover:border-slate-700">
+      <div className="relative w-full h-56 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center justify-center transition-all duration-300 group-hover:border-slate-700 shadow-inner">
         {/* Candling Strobe Light Source with subtle pulse */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(245,158,11,0.25)_0%,_rgba(0,0,0,0.85)_75%)] animate-pulse-glow" />
 
+        {/* Optical Scanning Laser Line */}
+        <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-[0_0_12px_#F59E0B] pointer-events-none animate-candling-laser z-20 opacity-75" />
+
+        {/* Optical Grid Crosshairs */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 z-0">
+          <div className="w-full h-[1px] bg-slate-400" />
+          <div className="absolute h-full w-[1px] bg-slate-400" />
+          <div className="absolute w-36 h-48 border border-slate-400 rounded-full" />
+        </div>
+
         {/* SVG Duck Egg Graphic */}
-        <svg viewBox="0 0 400 500" className="w-32 h-44 z-10 filter drop-shadow-[0_0_14px_rgba(245,158,11,0.35)] transition-transform duration-300 group-hover:scale-105">
+        <svg viewBox="0 0 400 500" className="w-32 h-44 z-10 filter drop-shadow-[0_0_16px_rgba(245,158,11,0.4)] transition-transform duration-300 group-hover:scale-105">
           <defs>
             <radialGradient id="eggGlowLight" cx="45%" cy="42%" r="60%">
               {isFertile && (
@@ -94,23 +104,26 @@ export const CandlingAperture: React.FC<CandlingApertureProps> = ({
         </svg>
 
         {/* Optical Metadata Overlay */}
-        <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-[11px] text-white/90 bg-black/60 px-3 py-1 rounded-lg border border-white/10 backdrop-blur-xs">
-          <span>YOLOv8 FP16 Transillumination</span>
+        <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-[11px] text-white/90 bg-black/60 px-3 py-1 rounded-lg border border-white/10 backdrop-blur-xs z-30">
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            YOLOv8 FP16 Transillumination
+          </span>
           <span className="font-bold text-amber-400">{(confidence * 100).toFixed(1)}% Conf</span>
         </div>
       </div>
 
       {/* Metrics Row */}
       <div className="grid grid-cols-3 gap-2 text-xs">
-        <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+        <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 hover-lift">
           <span className="text-[10px] text-slate-500 font-medium block">Class</span>
           <Badge type="fertility" value={finalClass} />
         </div>
-        <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+        <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 hover-lift">
           <span className="text-[10px] text-slate-500 font-medium block">Aspect Ratio</span>
           <span className="font-bold text-[#0F172A]">{aspectRatio.toFixed(2)}</span>
         </div>
-        <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+        <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 hover-lift">
           <span className="text-[10px] text-slate-500 font-medium block">Inference</span>
           <span className="font-bold text-[#0F172A]">{inferenceMs.toFixed(1)} ms</span>
         </div>

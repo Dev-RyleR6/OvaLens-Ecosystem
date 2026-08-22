@@ -110,8 +110,8 @@ export const DevicesPage: React.FC = () => {
       )}
 
       {/* Edge Devices Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {devices.map((device) => {
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-slide-up stagger-1">
+        {devices.map((device, index) => {
           const cal = calibration[device.device_id] || {
             speed: device.conveyor_speed_cm_s || 12.5,
             dist: device.conveyor_dist_cm || 25.0,
@@ -121,12 +121,20 @@ export const DevicesPage: React.FC = () => {
           const calculatedDelayMs = Math.round((cal.dist / cal.speed) * 1000);
 
           return (
-            <div key={device.device_id} className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs space-y-4">
-              {/* Device Header */}
+            <div
+              key={device.device_id}
+              className={`bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs space-y-4 hover-lift transition-all animate-slide-up stagger-${index + 1}`}
+            >
+              {/* Device Header with Live Radar Beacon */}
               <div className="flex items-start justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-maroon-50 text-[#800000] border border-maroon-200 flex items-center justify-center font-bold">
-                    <Cpu className="w-5 h-5" />
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-lg bg-maroon-50 text-[#800000] border border-maroon-200 flex items-center justify-center font-bold">
+                      <Cpu className="w-5 h-5" />
+                    </div>
+                    {device.status === 'ONLINE' && (
+                      <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-600 animate-radar-green" />
+                    )}
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-[#0F172A]">{device.device_name}</h3>

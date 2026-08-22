@@ -125,6 +125,36 @@
   50% { transform: translateY(100%); opacity: 0.3; }
 }
 
+@keyframes radarPing {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(21, 128, 61, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(21, 128, 61, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(21, 128, 61, 0);
+  }
+}
+
+@keyframes opticalLaser {
+  0% {
+    top: 0%;
+    opacity: 0.85;
+  }
+  50% {
+    top: 100%;
+    opacity: 0.4;
+  }
+  100% {
+    top: 0%;
+    opacity: 0.85;
+  }
+}
+
 @keyframes subtleFloat {
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-5px); }
@@ -165,6 +195,14 @@
   animation: pulseGlow 3s ease-in-out infinite;
 }
 
+.animate-radar-green {
+  animation: radarPing 2.5s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.animate-candling-laser {
+  animation: opticalLaser 3s ease-in-out infinite;
+}
+
 .animate-shake {
   animation: shake 0.35s ease-in-out;
 }
@@ -178,6 +216,17 @@
 .stagger-2 { animation-delay: 100ms; }
 .stagger-3 { animation-delay: 150ms; }
 .stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+.stagger-6 { animation-delay: 300ms; }
+
+/* Interactive Enterprise Table Transitions */
+.table-row-hover {
+  transition: background-color 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.table-row-hover:hover {
+  background-color: rgba(248, 250, 252, 0.95);
+}
 
 /* Reduced Motion Accessibility */
 @media (prefers-reduced-motion: reduce) {

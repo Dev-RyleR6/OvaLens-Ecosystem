@@ -262,14 +262,14 @@ export const ScanExplorerPage: React.FC = () => {
       </div>
 
       {overrideToast && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs font-semibold text-amber-900 flex items-center gap-2 shadow-xs">
-          <AlertTriangle className="w-4 h-4 text-amber-700 flex-shrink-0" />
+        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs font-semibold text-amber-900 flex items-center gap-2.5 shadow-xs animate-slide-down">
+          <AlertTriangle className="w-4 h-4 text-amber-700 flex-shrink-0 animate-pulse" />
           <span>{overrideToast}</span>
         </div>
       )}
 
       {/* Enterprise Filter Toolbar */}
-      <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xs space-y-3">
+      <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xs space-y-3 animate-slide-up">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
           <div className="relative w-full sm:w-80">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -281,14 +281,14 @@ export const ScanExplorerPage: React.FC = () => {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] shadow-xs"
+              className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 shadow-xs transition-all"
             />
           </div>
 
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 self-end sm:self-auto">
             <button
               onClick={() => setViewMode('TABLE')}
-              className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+              className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-all btn-press ${
                 viewMode === 'TABLE' ? 'bg-white text-[#800000] shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
               title="Table View"
@@ -298,7 +298,7 @@ export const ScanExplorerPage: React.FC = () => {
             </button>
             <button
               onClick={() => setViewMode('GRID')}
-              className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+              className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-all btn-press ${
                 viewMode === 'GRID' ? 'bg-white text-[#800000] shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
               title="Aperture Grid Cards View"
@@ -316,7 +316,7 @@ export const ScanExplorerPage: React.FC = () => {
               setClassFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
+            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer hover:border-slate-300 transition-colors"
           >
             <option value="ALL">All Classes</option>
             <option value="FERTILE">Fertile (Accept)</option>
@@ -330,7 +330,7 @@ export const ScanExplorerPage: React.FC = () => {
               setBatchFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
+            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer hover:border-slate-300 transition-colors"
           >
             <option value="ALL">All Batches</option>
             {batchOptions.map((code) => (
@@ -346,19 +346,19 @@ export const ScanExplorerPage: React.FC = () => {
               setConfidenceFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
+            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer hover:border-slate-300 transition-colors"
           >
-            <option value="ALL">All Confidence Scores</option>
+            <option value="ALL">All Confidence Levels</option>
             <option value="HIGH">High Confidence (≥ 90%)</option>
-            <option value="MEDIUM">Medium Confidence (80% - 89%)</option>
-            <option value="LOW">Low Confidence (&lt; 80%)</option>
+            <option value="MID">Medium Confidence (70% - 89%)</option>
+            <option value="LOW">Low Confidence (&lt; 70%)</option>
           </select>
         </div>
       </div>
 
-      {/* View Mode: Table vs Grid */}
+      {/* Main View Container (Table vs. Cards Grid) */}
       {viewMode === 'TABLE' ? (
-        <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden animate-slide-up stagger-1">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
@@ -416,10 +416,10 @@ export const ScanExplorerPage: React.FC = () => {
                   paginatedScans.map((scan) => (
                     <tr
                       key={scan.scan_id}
-                      className="hover:bg-slate-50 transition-colors cursor-pointer"
+                      className="table-row-hover cursor-pointer group"
                       onClick={() => setSelectedScan(scan)}
                     >
-                      <td className="py-3 px-4 font-mono font-bold text-slate-700">
+                      <td className="py-3 px-4 font-mono font-bold text-slate-700 group-hover:text-[#800000] transition-colors">
                         #{((scan.sequence_number ?? 0)).toString().padStart(3, '0')}
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-900">{scan.batch_id || 'N/A'}</td>
