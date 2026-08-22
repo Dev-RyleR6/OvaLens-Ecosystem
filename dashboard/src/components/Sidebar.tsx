@@ -15,7 +15,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
   const operationsNav = [
     { to: '/', label: 'Overview', icon: LayoutDashboard },
     { to: '/batches', label: 'Incubation Batches', icon: Layers },
@@ -33,83 +38,101 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-64 border-r border-[#E2E8F0] bg-white flex flex-col justify-between flex-shrink-0 z-30 h-full overflow-y-auto">
-      {/* Navigation List */}
-      <div className="p-4 space-y-5">
-        {/* Operations Section */}
-        <div className="space-y-1">
-          <p className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            Operations Command
-          </p>
+    <>
+      {/* Mobile Backdrop Overlay */}
+      {isOpen && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 lg:hidden transition-opacity animate-fade-in"
+        />
+      )}
 
-          {operationsNav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-colors btn-press",
-                    isActive
-                      ? "bg-[#800000] text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  )
-                }
-              >
-                <Icon className="w-4 h-4 flex-shrink-0" />
-                <span>{item.label}</span>
-              </NavLink>
-            );
-          })}
-        </div>
+      <aside
+        className={cn(
+          "w-64 border-r border-[#E2E8F0] bg-white flex flex-col justify-between flex-shrink-0 z-50 h-full overflow-y-auto transition-transform duration-300 ease-in-out",
+          "fixed lg:static inset-y-0 left-0",
+          isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
+        )}
+      >
+        {/* Navigation List */}
+        <div className="p-4 space-y-5">
+          {/* Operations Section */}
+          <div className="space-y-1">
+            <p className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Operations Command
+            </p>
 
-        {/* Administration Section */}
-        <div className="space-y-1">
-          <p className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            Administration & Archives
-          </p>
-
-          {adminNav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-colors btn-press",
-                    isActive
-                      ? "bg-[#800000] text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  )
-                }
-              >
-                <Icon className="w-4 h-4 flex-shrink-0" />
-                <span>{item.label}</span>
-              </NavLink>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Bottom Hardware Status Card */}
-      <div className="p-3.5 m-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <HardDrive className="w-3.5 h-3.5 text-slate-700" />
-            <span className="text-xs font-bold text-slate-800">Station-01-RP5</span>
+            {operationsNav.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => onClose?.()}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all btn-press",
+                      isActive
+                        ? "bg-[#800000] text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    )
+                  }
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span>{item.label}</span>
+                </NavLink>
+              );
+            })}
           </div>
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-            Online
-          </span>
+
+          {/* Administration Section */}
+          <div className="space-y-1">
+            <p className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Administration & Archives
+            </p>
+
+            {adminNav.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => onClose?.()}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all btn-press",
+                      isActive
+                        ? "bg-[#800000] text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    )
+                  }
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span>{item.label}</span>
+                </NavLink>
+              );
+            })}
+          </div>
         </div>
 
-        <p className="text-[11px] text-slate-500 leading-snug">
-          ONNX FP16 Vision Engine active on conveyor lane 1.
-        </p>
-      </div>
-    </aside>
+        {/* Bottom Hardware Status Card */}
+        <div className="p-3.5 m-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 hover:border-slate-300 transition-colors">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <HardDrive className="w-3.5 h-3.5 text-slate-700" />
+              <span className="text-xs font-bold text-slate-800">Station-01-RP5</span>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+              Online
+            </span>
+          </div>
+
+          <p className="text-[11px] text-slate-500 leading-snug">
+            ONNX FP16 Vision Engine active on conveyor lane 1.
+          </p>
+        </div>
+      </aside>
+    </>
   );
 };

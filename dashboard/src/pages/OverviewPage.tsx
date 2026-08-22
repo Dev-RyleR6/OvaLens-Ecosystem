@@ -215,10 +215,10 @@ export const OverviewPage: React.FC = () => {
         />
       </div>
 
-      {/* Active Incubation Batch Stage Tracker */}
+      {/* Active Incubation Batch Stage Tracker with Quick Batch Switcher */}
       {selectedBatch && (
-        <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs hover:border-slate-300 transition-colors">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs hover:border-slate-300 transition-all animate-slide-up">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold uppercase tracking-wider text-[#800000]">Active Batch:</span>
@@ -228,7 +228,26 @@ export const OverviewPage: React.FC = () => {
                 Breed: <strong>{selectedBatch.breed}</strong> • Incubator: <strong>{selectedBatch.incubator_id}</strong> • Initial Set: <strong>{selectedBatch.initial_egg_count} eggs</strong>
               </p>
             </div>
-            <div className="flex items-center gap-2">
+
+            {/* Quick Switcher Tabs */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {batches.length > 1 && (
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                  {batches.slice(0, 4).map((b) => (
+                    <button
+                      key={b.batch_id}
+                      onClick={() => setSelectedBatch(b)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all btn-press cursor-pointer ${
+                        selectedBatch.batch_id === b.batch_id
+                          ? 'bg-[#800000] text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                      }`}
+                    >
+                      {b.batch_code.slice(-6)}
+                    </button>
+                  ))}
+                </div>
+              )}
               <Badge type="status" value={selectedBatch.status} />
               <Badge type="stage" value={selectedBatch.current_stage} />
             </div>
@@ -244,7 +263,7 @@ export const OverviewPage: React.FC = () => {
       )}
 
       {/* Visualizations Row: Candling Spectrum Donut + Live Conveyor Velocity Stream */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-slide-up stagger-1">
         {/* Left 5 Cols: Biological Spectrum Donut */}
         <div className="lg:col-span-5">
           <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs h-full flex flex-col justify-between space-y-3">
