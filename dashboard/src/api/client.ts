@@ -81,6 +81,15 @@ export const apiClient = {
     localStorage.removeItem('ovalens_auth_token');
     localStorage.removeItem('ovalens_user');
   },
+
+  checkHealth: async (): Promise<boolean> => {
+    try {
+      const res = await api.get('/health');
+      return res.data?.status === 'healthy';
+    } catch {
+      return false;
+    }
+  },
   // Analytics
   getOverview: async (): Promise<AnalyticsOverview> => {
     try {

@@ -1,11 +1,23 @@
-import React, { useState } from 'react';
-import { Database, LogOut, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Database, LogOut, ShieldCheck, Server } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { LogoutModal } from './LogoutModal';
+import { apiClient } from '../api/client';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isApiOnline, setIsApiOnline] = useState(true);
+
+  useEffect(() => {
+    const checkBackend = async () => {
+      const healthy = await apiClient.checkHealth();
+      setIsApiOnline(healthy);
+    };
+    checkBackend();
+    const interval = setInterval(checkBackend, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const getInitials = (name?: string) => {
     if (!name) return 'OP';
@@ -38,8 +50,17 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Controls: Database Sync Status & User Profile */}
+        {/* Right Controls: Connection Indicators & User Profile */}
         <div className="flex items-center gap-3.5">
+          {/* Live Backend Connection Indicator */}
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+            <span className={`w-2 h-2 rounded-full ${isApiOnline ? 'bg-emerald-600 animate-pulse' : 'bg-amber-500'}`} />
+            <span className="font-medium text-slate-600">FastAPI Backend:</span>
+            <span className={`font-bold ${isApiOnline ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {isApiOnline ? 'Connected' : 'Offline'}
+            </span>
+          </div>
+
           {/* Offline-First Edge Sync Pill */}
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
             <span className="w-2 h-2 rounded-full bg-emerald-600" />
@@ -88,4 +109,3 @@ export const Navbar: React.FC = () => {
     </>
   );
 };
-
