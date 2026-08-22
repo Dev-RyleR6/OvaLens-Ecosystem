@@ -856,23 +856,23 @@ class OvaLensOperatorApp(ctk.CTk):
             font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.TEXT_PRIMARY
         ).pack(pady=(16, 2))
         ctk.CTkLabel(
-            dialog, text="Select active batch from server or use standard offline format builder",
+            dialog, text="Select active batch from office or create one using the quick builder",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
         ).pack(pady=(0, 12))
 
         content = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
         content.pack(fill="both", expand=True, padx=20, pady=(0, 14))
 
-        # Mode Switcher (Format Builder vs Online Server Batches vs Custom)
+        # Mode Switcher (Quick Batch Builder vs Office Batches vs Custom)
         mode_var = ctk.StringVar(value="BUILDER")
 
         mode_segmented = ctk.CTkSegmentedButton(
-            content, values=["⚡ Format Builder", "🌐 Server Batches", "✏️ Custom Code"],
+            content, values=["⚡ Quick Batch Builder", "🌐 Saved Office Batches", "✏️ Custom Code"],
             selected_color=FUTheme.PRIMARY_MAROON, selected_hover_color=FUTheme.HOVER_MAROON,
             unselected_color=FUTheme.PANEL_LIGHT_ALT, unselected_hover_color=FUTheme.PANEL_ACCENT,
             text_color=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 11, "bold"), height=32
         )
-        mode_segmented.set("⚡ Format Builder")
+        mode_segmented.set("⚡ Quick Batch Builder")
         mode_segmented.pack(fill="x", padx=16, pady=(12, 10))
 
         # Dynamic Container Frames
@@ -880,7 +880,7 @@ class OvaLensOperatorApp(ctk.CTk):
         server_frame = ctk.CTkFrame(content, fg_color="transparent")
         custom_frame = ctk.CTkFrame(content, fg_color="transparent")
 
-        # 1. FORMAT BUILDER CONTROLS
+        # 1. QUICK BATCH BUILDER CONTROLS
         # Current Year-Month default
         now = datetime.now()
         cur_year_month = now.strftime("%Y-%m")
@@ -896,7 +896,7 @@ class OvaLensOperatorApp(ctk.CTk):
         # Year-Month
         ym_col = ctk.CTkFrame(ym_row, fg_color="transparent")
         ym_col.pack(side="left", fill="x", expand=True, padx=(0, 4))
-        ctk.CTkLabel(ym_col, text="Year-Month:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
+        ctk.CTkLabel(ym_col, text="Setting Month:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
         ym_dropdown = ctk.CTkOptionMenu(
             ym_col, values=months_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
             button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=32
@@ -904,20 +904,20 @@ class OvaLensOperatorApp(ctk.CTk):
         ym_dropdown.set(cur_year_month)
         ym_dropdown.pack(fill="x")
 
-        # Cohort Number
-        cohort_col = ctk.CTkFrame(ym_row, fg_color="transparent")
-        cohort_col.pack(side="right", fill="x", expand=True, padx=(4, 0))
-        ctk.CTkLabel(cohort_col, text="Cohort Run #:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        cohort_opts = [f"{i:02d}" for i in range(1, 13)]
-        cohort_dropdown = ctk.CTkOptionMenu(
-            cohort_col, values=cohort_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
+        # Batch Number (Group #)
+        batch_col = ctk.CTkFrame(ym_row, fg_color="transparent")
+        batch_col.pack(side="right", fill="x", expand=True, padx=(4, 0))
+        ctk.CTkLabel(batch_col, text="Batch #:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
+        batch_num_opts = [f"{i:02d}" for i in range(1, 13)]
+        batch_num_dropdown = ctk.CTkOptionMenu(
+            batch_col, values=batch_num_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
             button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=32
         )
-        cohort_dropdown.set("01")
-        cohort_dropdown.pack(fill="x")
+        batch_num_dropdown.set("01")
+        batch_num_dropdown.pack(fill="x")
 
         # Breed Dropdown
-        ctk.CTkLabel(builder_frame, text="Duck Breed Code:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(2, 2))
+        ctk.CTkLabel(builder_frame, text="Duck Breed:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(2, 2))
         breed_map = {
             "KAY (Kayumanggi / Itik Pinas)": ("KAY", "KAYUMANGGI"),
             "ITM (Itim / Native Black)": ("ITM", "ITIM"),
@@ -943,16 +943,16 @@ class OvaLensOperatorApp(ctk.CTk):
             ym = ym_dropdown.get()
             b_key = breed_builder_dropdown.get()
             b_code = breed_map.get(b_key, ("KAY", "KAYUMANGGI"))[0]
-            c_num = cohort_dropdown.get()
-            preview_label.configure(text=f"BATCH-{ym}-{b_code}-{c_num}")
+            b_num = batch_num_dropdown.get()
+            preview_label.configure(text=f"BATCH-{ym}-{b_code}-{b_num}")
 
         ym_dropdown.configure(command=update_preview)
         breed_builder_dropdown.configure(command=update_preview)
-        cohort_dropdown.configure(command=update_preview)
+        batch_num_dropdown.configure(command=update_preview)
         update_preview()
 
-        # 2. SERVER ACTIVE BATCHES CONTROLS
-        ctk.CTkLabel(server_frame, text="Active Incubator Batches (Synced from Server):", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
+        # 2. SAVED OFFICE BATCHES CONTROLS
+        ctk.CTkLabel(server_frame, text="Active Incubator Batches (from Office):", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
         server_dropdown = ctk.CTkOptionMenu(
             server_frame, values=["Loading active batches from server..."], fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
             button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=36
@@ -1149,11 +1149,11 @@ class OvaLensOperatorApp(ctk.CTk):
         s1.pack(fill="x", pady=(0, 10))
         s1_hdr = ctk.CTkFrame(s1, fg_color=FUTheme.PRIMARY_MAROON, height=28, corner_radius=6)
         s1_hdr.pack(fill="x", padx=6, pady=6)
-        ctk.CTkLabel(s1_hdr, text="STEP 1: SELECT OR BUILD BATCH CODE", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_WHITE).pack(side="left", padx=10)
+        ctk.CTkLabel(s1_hdr, text="STEP 1: SELECT OR CREATE BATCH CODE", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_WHITE).pack(side="left", padx=10)
 
         s1_body = ctk.CTkLabel(
             s1,
-            text="• Online: Pulls active incubator cohorts from the central server.\n• Offline: Use the 100% Dropdown Format Builder (Year-Month + Breed + Cohort #).\n• Example standard format: BATCH-2026-08-KAY-01.",
+            text="• Online: Select active batch registered from the office dashboard.\n• Offline: Use the 100% Dropdown Quick Batch Builder (Month + Breed + Batch #).\n• Example batch code: BATCH-2026-08-KAY-01.",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s1_body.pack(anchor="w", padx=14, pady=(2, 10))

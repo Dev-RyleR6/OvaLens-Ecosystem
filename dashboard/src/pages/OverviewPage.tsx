@@ -149,7 +149,7 @@ export const OverviewPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700 space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-200">1. Cohort Setup</span>
+                <span className="text-[11px] font-bold text-slate-200">1. Batch Setup</span>
                 <span className="text-[10px] text-slate-400 font-mono">Day 0</span>
               </div>
               <p className="text-xs text-slate-300">
@@ -215,13 +215,13 @@ export const OverviewPage: React.FC = () => {
         />
       </div>
 
-      {/* Active Incubation Cohort Stage Tracker */}
+      {/* Active Incubation Batch Stage Tracker */}
       {selectedBatch && (
         <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs hover:border-slate-300 transition-colors">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#800000]">Active Cohort:</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#800000]">Active Batch:</span>
                 <h3 className="text-base font-bold text-[#0F172A]">{selectedBatch.batch_code}</h3>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">

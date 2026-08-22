@@ -248,7 +248,7 @@ export const BatchesPage: React.FC = () => {
             Incubation Batches & Candling Sessions
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Track 28-day duck egg incubation cohorts, automated stage milestones, operator candling throughput, and official quality certificates.
+            Track 28-day duck egg incubation batches, automated stage milestones, operator candling throughput, and official quality certificates.
           </p>
         </div>
 
@@ -268,7 +268,7 @@ export const BatchesPage: React.FC = () => {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Set New Cohort</span>
+            <span>Add New Batch</span>
           </button>
         </div>
       </div>
@@ -632,7 +632,7 @@ export const BatchesPage: React.FC = () => {
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         title="Set New Incubation Batch"
-        description="Initialize a new 28-day duck egg incubation cohort in the hatchery."
+        description="Register a new 28-day duck egg incubation batch in the hatchery."
       >
         <form onSubmit={handleCreateSubmit} className="space-y-4 text-sm">
           <div className="space-y-1.5">
@@ -705,7 +705,7 @@ export const BatchesPage: React.FC = () => {
               type="submit"
               className="px-4 py-2 text-xs font-bold text-white bg-[#800000] hover:bg-[#6B0000] rounded-lg shadow-xs cursor-pointer"
             >
-              Initialize Cohort
+              Save & Register Batch
             </button>
           </div>
         </form>
