@@ -820,13 +820,13 @@ class OvaLensOperatorApp(ctk.CTk):
         ).pack(side="right")
 
     def open_batch_setup_dialog(self):
-        """Robust Modal for Batch creation, selection, and candling stage setup."""
+        """Robust Modal for Batch creation, selection, and candling stage setup with Offline Format Builder."""
         if self.is_session_active:
             self._log("[WARN] Please stop the current active auto session before changing batch parameters.")
 
         dialog = ctk.CTkToplevel(self)
         dialog.title("Egg Batch & Candling Setup")
-        dialog.geometry("480x560")
+        dialog.geometry("520x660")
         dialog.configure(fg_color=FUTheme.BG_LIGHT)
         dialog.transient(self)
         dialog.grab_set()
@@ -834,85 +834,227 @@ class OvaLensOperatorApp(ctk.CTk):
         ctk.CTkLabel(
             dialog, text="Egg Batch & Candling Setup",
             font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.TEXT_PRIMARY
-        ).pack(pady=(18, 4))
+        ).pack(pady=(16, 2))
         ctk.CTkLabel(
-            dialog, text="Select duck breed, candling stage, and initial egg quantity",
+            dialog, text="Select active batch from server or use standard offline format builder",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
-        ).pack(pady=(0, 16))
+        ).pack(pady=(0, 12))
 
         content = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
-        content.pack(fill="both", expand=True, padx=20, pady=(0, 16))
+        content.pack(fill="both", expand=True, padx=20, pady=(0, 14))
 
-        # 1. Batch Code / Identifier
-        batch_header = ctk.CTkFrame(content, fg_color="transparent")
-        batch_header.pack(fill="x", padx=16, pady=(14, 2))
-        ctk.CTkLabel(batch_header, text="Batch Code / Identifier:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(side="left")
+        # Mode Switcher (Format Builder vs Online Server Batches vs Custom)
+        mode_var = ctk.StringVar(value="BUILDER")
 
-        batch_entry = ctk.CTkEntry(content, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=36)
-        batch_entry.insert(0, self.current_batch_id)
-        batch_entry.pack(fill="x", padx=16, pady=(0, 10))
+        mode_segmented = ctk.CTkSegmentedButton(
+            content, values=["⚡ Format Builder", "🌐 Server Batches", "✏️ Custom Code"],
+            selected_color=FUTheme.PRIMARY_MAROON, selected_hover_color=FUTheme.HOVER_MAROON,
+            unselected_color=FUTheme.PANEL_LIGHT_ALT, unselected_hover_color=FUTheme.PANEL_ACCENT,
+            text_color=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 11, "bold"), height=32
+        )
+        mode_segmented.set("⚡ Format Builder")
+        mode_segmented.pack(fill="x", padx=16, pady=(12, 10))
 
-        # 2. Duck Breed Selection
-        ctk.CTkLabel(content, text="Duck Breed:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=16, pady=(4, 2))
-        breed_opts = ["KAYUMANGGI (Itik Pinas)", "PEKIN (Cherry Valley)", "MUSCOVY (Pato)", "KHAKI_CAMPBELL (Layer)"]
-        breed_dropdown = ctk.CTkOptionMenu(
-            content, values=breed_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
+        # Dynamic Container Frames
+        builder_frame = ctk.CTkFrame(content, fg_color="transparent")
+        server_frame = ctk.CTkFrame(content, fg_color="transparent")
+        custom_frame = ctk.CTkFrame(content, fg_color="transparent")
+
+        # 1. FORMAT BUILDER CONTROLS
+        # Current Year-Month default
+        now = datetime.now()
+        cur_year_month = now.strftime("%Y-%m")
+        months_opts = [
+            cur_year_month,
+            now.replace(month=(now.month % 12) + 1 if now.month < 12 else 1).strftime("%Y-%m"),
+            now.replace(month=max(1, now.month - 1)).strftime("%Y-%m"),
+        ]
+
+        ym_row = ctk.CTkFrame(builder_frame, fg_color="transparent")
+        ym_row.pack(fill="x", pady=(0, 8))
+
+        # Year-Month
+        ym_col = ctk.CTkFrame(ym_row, fg_color="transparent")
+        ym_col.pack(side="left", fill="x", expand=True, padx=(0, 4))
+        ctk.CTkLabel(ym_col, text="Year-Month:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
+        ym_dropdown = ctk.CTkOptionMenu(
+            ym_col, values=months_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
+            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=32
+        )
+        ym_dropdown.set(cur_year_month)
+        ym_dropdown.pack(fill="x")
+
+        # Cohort Number
+        cohort_col = ctk.CTkFrame(ym_row, fg_color="transparent")
+        cohort_col.pack(side="right", fill="x", expand=True, padx=(4, 0))
+        ctk.CTkLabel(cohort_col, text="Cohort Run #:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
+        cohort_opts = [f"{i:02d}" for i in range(1, 13)]
+        cohort_dropdown = ctk.CTkOptionMenu(
+            cohort_col, values=cohort_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
+            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=32
+        )
+        cohort_dropdown.set("01")
+        cohort_dropdown.pack(fill="x")
+
+        # Breed Dropdown
+        ctk.CTkLabel(builder_frame, text="Duck Breed Code:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(2, 2))
+        breed_map = {
+            "KAY (Kayumanggi / Itik Pinas)": ("KAY", "KAYUMANGGI"),
+            "ITM (Itim / Native Black)": ("ITM", "ITIM"),
+            "KHK (Khaki Campbell Layer)": ("KHK", "KHAKI_CAMPBELL"),
+            "PEK (Pekin Cherry Valley)": ("PEK", "PEKIN"),
+            "MUS (Muscovy Pato)": ("MUS", "MUSCOVY"),
+        }
+        breed_builder_dropdown = ctk.CTkOptionMenu(
+            builder_frame, values=list(breed_map.keys()), fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
+            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=32
+        )
+        breed_builder_dropdown.set("KAY (Kayumanggi / Itik Pinas)")
+        breed_builder_dropdown.pack(fill="x", pady=(0, 8))
+
+        # Live Code Preview Box
+        preview_frame = ctk.CTkFrame(builder_frame, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
+        preview_frame.pack(fill="x", pady=(0, 8), ipady=4)
+        ctk.CTkLabel(preview_frame, text="GENERATED BATCH CODE:", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=10, pady=(2, 0))
+        preview_label = ctk.CTkLabel(preview_frame, text="BATCH-2026-08-KAY-01", font=(FUTheme.FONT_FAMILY, 14, "bold"), text_color=FUTheme.PRIMARY_MAROON)
+        preview_label.pack(anchor="w", padx=10, pady=(0, 2))
+
+        def update_preview(*args):
+            ym = ym_dropdown.get()
+            b_key = breed_builder_dropdown.get()
+            b_code = breed_map.get(b_key, ("KAY", "KAYUMANGGI"))[0]
+            c_num = cohort_dropdown.get()
+            preview_label.configure(text=f"BATCH-{ym}-{b_code}-{c_num}")
+
+        ym_dropdown.configure(command=update_preview)
+        breed_builder_dropdown.configure(command=update_preview)
+        cohort_dropdown.configure(command=update_preview)
+        update_preview()
+
+        # 2. SERVER ACTIVE BATCHES CONTROLS
+        ctk.CTkLabel(server_frame, text="Active Incubator Batches (Synced from Server):", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
+        server_dropdown = ctk.CTkOptionMenu(
+            server_frame, values=["Loading active batches from server..."], fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
             button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=36
         )
-        for b in breed_opts:
-            if self.current_breed in b:
-                breed_dropdown.set(b)
-                break
-        breed_dropdown.pack(fill="x", padx=16, pady=(0, 10))
+        server_dropdown.pack(fill="x", pady=(0, 10))
 
-        # 3. Candling Stage
-        ctk.CTkLabel(content, text="Candling Stage:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=16, pady=(4, 2))
-        stage_opts = ["DAY_7 (Initial Blood Ring Check)", "DAY_10 (Primary Penoy Salvage)", "DAY_14 (Mid Embryo Vitality)", "DAY_18 (Pre-Hatcher Transfer)"]
+        server_batches_cache = []
+
+        def fetch_server_batches():
+            import urllib.request
+            import json
+            try:
+                url = "http://localhost:8000/api/v1/batches"
+                req = urllib.request.Request(url, headers={"User-Agent": "OvaLensEdge/2.0"})
+                with urllib.request.urlopen(req, timeout=1.5) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode('utf-8'))
+                        if isinstance(data, list) and len(data) > 0:
+                            server_batches_cache.clear()
+                            server_batches_cache.extend(data)
+                            opts = [f"{b.get('batch_code', b.get('batch_id'))}  ({b.get('breed')}, {b.get('initial_egg_count', 500)} eggs)" for b in data]
+                            server_dropdown.configure(values=opts)
+                            server_dropdown.set(opts[0])
+                            return
+            except Exception:
+                pass
+            server_dropdown.configure(values=["(Offline — Use Format Builder tab)"])
+            server_dropdown.set("(Offline — Use Format Builder tab)")
+
+        threading.Thread(target=fetch_server_batches, daemon=True).start()
+
+        # 3. CUSTOM CODE CONTROLS
+        ctk.CTkLabel(custom_frame, text="Custom / Experimental Batch Code:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
+        custom_entry = ctk.CTkEntry(custom_frame, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=36)
+        custom_entry.insert(0, self.current_batch_id)
+        custom_entry.pack(fill="x", pady=(0, 10))
+
+        # Mode visibility controller
+        def on_mode_change(selected_mode):
+            builder_frame.pack_forget()
+            server_frame.pack_forget()
+            custom_frame.pack_forget()
+            if "Builder" in selected_mode:
+                builder_frame.pack(fill="x", padx=16, pady=(0, 6))
+            elif "Server" in selected_mode:
+                server_frame.pack(fill="x", padx=16, pady=(0, 6))
+            else:
+                custom_frame.pack(fill="x", padx=16, pady=(0, 6))
+
+        mode_segmented.configure(command=on_mode_change)
+        builder_frame.pack(fill="x", padx=16, pady=(0, 6))
+
+        # COMMON PARAMETERS: Candling Stage
+        ctk.CTkLabel(content, text="Candling Stage:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=16, pady=(4, 2))
+        stage_opts = [
+            "DAY_10 (Primary Penoy Salvage @ ₱14.00)",
+            "DAY_18 (Lockdown Hatcher Transfer)",
+            "DAY_25 (Pipping Watch)",
+            "DAY_7 (Initial Blood Ring Check)"
+        ]
         stage_dropdown = ctk.CTkOptionMenu(
             content, values=stage_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=36
+            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON, height=34
         )
         for s in stage_opts:
             if self.current_stage in s:
                 stage_dropdown.set(s)
                 break
-        stage_dropdown.pack(fill="x", padx=16, pady=(0, 10))
+        stage_dropdown.pack(fill="x", padx=16, pady=(0, 8))
 
-        # 4. Target Egg Quantity & Operator Row
+        # Target Quantity & Operator
         qty_row = ctk.CTkFrame(content, fg_color="transparent")
-        qty_row.pack(fill="x", padx=16, pady=(4, 12))
+        qty_row.pack(fill="x", padx=16, pady=(0, 10))
 
         col1 = ctk.CTkFrame(qty_row, fg_color="transparent")
-        col1.pack(side="left", fill="x", expand=True, padx=(0, 6))
-        ctk.CTkLabel(col1, text="Total Eggs in Batch:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        qty_entry = ctk.CTkEntry(col1, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=36)
+        col1.pack(side="left", fill="x", expand=True, padx=(0, 4))
+        ctk.CTkLabel(col1, text="Total Eggs in Batch:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
+        qty_entry = ctk.CTkEntry(col1, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=34)
         qty_entry.insert(0, str(self.target_egg_count))
         qty_entry.pack(fill="x")
 
         col2 = ctk.CTkFrame(qty_row, fg_color="transparent")
-        col2.pack(side="right", fill="x", expand=True, padx=(6, 0))
-        ctk.CTkLabel(col2, text="Operator Name:", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        op_entry = ctk.CTkEntry(col2, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=36)
+        col2.pack(side="right", fill="x", expand=True, padx=(4, 0))
+        ctk.CTkLabel(col2, text="Operator Name:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
+        op_entry = ctk.CTkEntry(col2, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=34)
         op_entry.insert(0, self.operator_name)
         op_entry.pack(fill="x")
 
         def apply_batch():
-            raw_batch = batch_entry.get().strip()
+            mode = mode_segmented.get()
+            if "Builder" in mode:
+                ym = ym_dropdown.get()
+                b_key = breed_builder_dropdown.get()
+                b_code, full_breed = breed_map.get(b_key, ("KAY", "KAYUMANGGI"))
+                c_num = cohort_dropdown.get()
+                final_batch_id = f"BATCH-{ym}-{b_code}-{c_num}"
+                final_breed = full_breed
+            elif "Server" in mode:
+                sel = server_dropdown.get()
+                raw_code = sel.split(" ")[0]
+                if raw_code.startswith("BATCH-"):
+                    final_batch_id = raw_code
+                    matched = next((b for b in server_batches_cache if b.get("batch_code") == raw_code or b.get("batch_id") == raw_code), None)
+                    final_breed = matched.get("breed", "KAYUMANGGI") if matched else "KAYUMANGGI"
+                else:
+                    final_batch_id = self.current_batch_id
+                    final_breed = self.current_breed
+            else:
+                final_batch_id = custom_entry.get().strip() or self.current_batch_id
+                final_breed = self.current_breed
+
             raw_qty = qty_entry.get().strip()
             raw_op = op_entry.get().strip()
-            raw_breed = breed_dropdown.get().split(" ")[0]
             raw_stage = stage_dropdown.get().split(" ")[0]
-
-            if not raw_batch:
-                return
 
             try:
                 parsed_qty = max(1, int(raw_qty))
             except ValueError:
                 parsed_qty = 500
 
-            self.current_batch_id = raw_batch
-            self.current_breed = raw_breed
+            self.current_batch_id = final_batch_id
+            self.current_breed = final_breed
             self.current_stage = raw_stage
             self.target_egg_count = parsed_qty
             self.operator_name = raw_op or "Operator"
