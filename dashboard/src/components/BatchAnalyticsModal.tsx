@@ -28,6 +28,8 @@ import {
 } from 'recharts';
 import { apiClient } from '../api/client';
 import { BatchAnalyticsResponse } from '../types';
+import { useModalAnimation } from '@/hooks/useModalAnimation';
+import { cn } from '@/lib/utils';
 
 interface BatchAnalyticsModalProps {
   batchId: string | null;
@@ -44,6 +46,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
 }) => {
   const [data, setData] = useState<BatchAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { shouldRender, isClosing } = useModalAnimation(isOpen && Boolean(batchId), 220);
 
   useEffect(() => {
     if (isOpen && batchId) {
@@ -55,7 +58,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
     }
   }, [isOpen, batchId]);
 
-  if (!isOpen || !batchId) return null;
+  if (!shouldRender || !batchId) return null;
 
   const pieData = data
     ? [
@@ -66,8 +69,22 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
     : [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-modal-backdrop">
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-modal-content">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className={cn(
+          "fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity",
+          isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
+        )}
+        onClick={onClose}
+      />
+
+      <div
+        className={cn(
+          "bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto z-10",
+          isClosing ? "animate-modal-content-exit" : "animate-modal-content"
+        )}
+      >
         {/* Modal Header */}
         <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-xs z-10">
           <div className="flex items-center gap-3">

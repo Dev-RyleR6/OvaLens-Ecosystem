@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { EggScan, FertilityClass } from '../types';
 import { Badge } from './Badge';
+import { useModalAnimation } from '@/hooks/useModalAnimation';
+import { cn } from '@/lib/utils';
 
 interface HumanInTheLoopOverrideModalProps {
   isOpen: boolean;
@@ -46,6 +48,7 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
   const [reason, setReason] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { shouldRender, isClosing } = useModalAnimation(isOpen && Boolean(scan) && Boolean(targetClass), 220);
 
   useEffect(() => {
     if (targetClass && REASON_PRESETS[targetClass]?.length > 0) {
@@ -56,7 +59,7 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
     setError(null);
   }, [targetClass, isOpen]);
 
-  if (!isOpen || !scan || !targetClass) return null;
+  if (!shouldRender || !scan || !targetClass) return null;
 
   const currentClass = scan.final_class || 'FERTILE';
 
@@ -84,8 +87,22 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-modal-backdrop">
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-modal-content">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className={cn(
+          "fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity",
+          isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
+        )}
+        onClick={onClose}
+      />
+
+      <div
+        className={cn(
+          "bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden z-10",
+          isClosing ? "animate-modal-content-exit" : "animate-modal-content"
+        )}
+      >
         {/* Header */}
         <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white">
           <div className="flex items-center gap-3">

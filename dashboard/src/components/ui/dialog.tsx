@@ -1,6 +1,7 @@
 import * as React from "react"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useModalAnimation } from "@/hooks/useModalAnimation"
 
 interface DialogProps {
   isOpen: boolean
@@ -21,6 +22,8 @@ export const Dialog: React.FC<DialogProps> = ({
   className,
   maxWidth = "max-w-lg",
 }) => {
+  const { shouldRender, isClosing } = useModalAnimation(isOpen, 220)
+
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose()
@@ -35,20 +38,24 @@ export const Dialog: React.FC<DialogProps> = ({
     }
   }, [isOpen, onClose])
 
-  if (!isOpen) return null
+  if (!shouldRender) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-modal-backdrop"
+        className={cn(
+          "fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity",
+          isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
+        )}
         onClick={onClose}
       />
 
       {/* Dialog content */}
       <div
         className={cn(
-          "relative w-full rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl transition-all z-10 animate-modal-content",
+          "relative w-full rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl transition-all z-10",
+          isClosing ? "animate-modal-content-exit" : "animate-modal-content",
           maxWidth,
           className
         )}

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { X, Award, CheckCircle2, AlertCircle } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { BatchSummary } from '../types';
+import { useModalAnimation } from '@/hooks/useModalAnimation';
+import { cn } from '@/lib/utils';
 
 interface FinalizeHatchModalProps {
   batch: BatchSummary | null;
@@ -20,8 +22,9 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const { shouldRender, isClosing } = useModalAnimation(isOpen && Boolean(batch), 220);
 
-  if (!isOpen || !batch) return null;
+  if (!shouldRender || !batch) return null;
 
   const initialCount = batch.initial_egg_count || 500;
   const unhatchedCount = Math.max(0, initialCount - Number(hatchedCount || 0));
@@ -57,8 +60,22 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-modal-backdrop">
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-modal-content">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className={cn(
+          "fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity",
+          isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
+        )}
+        onClick={onClose}
+      />
+
+      <div
+        className={cn(
+          "bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden z-10",
+          isClosing ? "animate-modal-content-exit" : "animate-modal-content"
+        )}
+      >
         {/* Modal Header */}
         <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white">
           <div className="flex items-center gap-3">

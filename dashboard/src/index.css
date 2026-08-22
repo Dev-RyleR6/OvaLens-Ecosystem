@@ -176,6 +176,11 @@
   to { opacity: 1; }
 }
 
+@keyframes modalBackdropExit {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 @keyframes modalContentEnter {
   from {
     opacity: 0;
@@ -187,21 +192,49 @@
   }
 }
 
+@keyframes modalContentExit {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+}
+
 @keyframes drawerSlideInRight {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes drawerSlideOutRight {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
 }
 
 .animate-modal-backdrop {
-  animation: modalBackdropEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: modalBackdropEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-backdrop-exit {
+  animation: modalBackdropExit 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-modal-content {
-  animation: modalContentEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: modalContentEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-content-exit {
+  animation: modalContentExit 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-drawer-right {
-  animation: drawerSlideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: drawerSlideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-drawer-right-exit {
+  animation: drawerSlideOutRight 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-fade-in {

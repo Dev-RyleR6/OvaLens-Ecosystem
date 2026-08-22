@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { LogOut, Loader2, X, CheckCircle2, Shield, User as UserIcon } from 'lucide-react';
 import { User } from '../types';
+import { useModalAnimation } from '@/hooks/useModalAnimation';
+import { cn } from '@/lib/utils';
 
 interface LogoutModalProps {
   isOpen: boolean;
@@ -16,6 +18,7 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
   user,
 }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { shouldRender, isClosing } = useModalAnimation(isOpen, 220);
 
   // Close on Escape key
   useEffect(() => {
@@ -28,7 +31,7 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, isLoggingOut, onClose]);
 
-  if (!isOpen) return null;
+  if (!shouldRender) return null;
 
   const handleConfirm = async () => {
     setIsLoggingOut(true);
@@ -51,14 +54,22 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Soft Blurred Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-modal-backdrop"
+        className={cn(
+          "fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity",
+          isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
+        )}
         onClick={() => {
           if (!isLoggingOut) onClose();
         }}
       />
 
       {/* Main Dialog Card */}
-      <div className="relative w-full max-w-md bg-white rounded-2xl p-6 sm:p-7 shadow-2xl border border-slate-200/90 z-10 animate-modal-content font-sans text-slate-900">
+      <div
+        className={cn(
+          "relative w-full max-w-md bg-white rounded-2xl p-6 sm:p-7 shadow-2xl border border-slate-200/90 z-10 font-sans text-slate-900",
+          isClosing ? "animate-modal-content-exit" : "animate-modal-content"
+        )}
+      >
         
         {/* Top Close Button */}
         <button
