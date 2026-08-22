@@ -250,6 +250,15 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         self.cycle_status_label.pack(side="left")
 
+        # Quick Standby / Cancel Button on HUD Bar
+        self.hud_cancel_btn = ctk.CTkButton(
+            self.cycle_hud, text="✕ Standby [ESC]", font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            fg_color="transparent", hover_color=FUTheme.ABNORMAL_RED_BG,
+            text_color=FUTheme.TEXT_MUTED, border_width=1, border_color=FUTheme.BORDER,
+            command=self.stop_or_cancel_session, height=26, width=110, corner_radius=6
+        )
+        self.hud_cancel_btn.pack(side="right", padx=(0, 8), pady=5)
+
         # Inner container with disabled propagation to lock video dimensions
         self.video_container = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.DARKROOM_VIEWPORT, corner_radius=8)
         self.video_container.pack(fill="both", expand=True, padx=10, pady=(0, 10))
@@ -371,31 +380,30 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         log_title.pack(side="left")
 
+        # Compact Live Scans List Box
         self.log_textbox = ctk.CTkTextbox(
-            log_frame, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            font=("Consolas", 11), activate_scrollbars=True, corner_radius=8
+            log_frame, fg_color=FUTheme.PANEL_LIGHT_ALT, font=("Consolas", 10),
+            text_color=FUTheme.TEXT_SECONDARY, corner_radius=8,
+            border_width=1, border_color=FUTheme.BORDER
         )
-        self.log_textbox.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.log_textbox.pack(fill="both", expand=True, padx=12, pady=(0, 12))
         self.log_textbox.configure(state="disabled")
 
     def _render_standby_hud(self):
-        """Render high-contrast, interactive Standby Card inside viewport."""
-        for widget in self.standby_frame.winfo_children():
-            widget.destroy()
+        """Build centered Standby Card in video viewport when camera is idle."""
+        for child in self.standby_frame.winfo_children():
+            child.destroy()
 
         card = ctk.CTkFrame(
-            self.standby_frame, fg_color="#1E293B", corner_radius=12,
-            border_width=1, border_color="#334155"
+            self.standby_frame, fg_color=FUTheme.PANEL_LIGHT, corner_radius=16,
+            border_width=1, border_color=FUTheme.BORDER
         )
-        card.pack(padx=20, pady=20)
+        card.pack(padx=24, pady=24)
 
-        # Standby Icon & Badge
-        icon_badge = ctk.CTkLabel(
-            card, text=" 📷 ", font=(FUTheme.FONT_FAMILY, 28),
-            fg_color="#0F172A", text_color=FUTheme.FERTILE_GREEN_TEXT,
-            corner_radius=10, padx=10, pady=6
+        icon = ctk.CTkLabel(
+            card, text="🥚", font=(FUTheme.FONT_FAMILY, 40)
         )
-        icon_badge.pack(pady=(16, 8))
+        icon.pack(pady=(20, 2))
 
         title = ctk.CTkLabel(
             card, text="CAMERA & AI VISION ON STANDBY",
@@ -448,9 +456,9 @@ class OvaLensOperatorApp(ctk.CTk):
             self.footer_frame, text="▶ START AUTO SORTING", font=(FUTheme.FONT_FAMILY, 13, "bold"),
             fg_color=FUTheme.PRIMARY_MAROON, hover_color=FUTheme.HOVER_MAROON,
             text_color=FUTheme.TEXT_WHITE, command=self.toggle_auto_session,
-            width=210, height=42, corner_radius=8
+            width=190, height=42, corner_radius=8
         )
-        self.session_btn.pack(side="left", padx=(18, 8), pady=13)
+        self.session_btn.pack(side="left", padx=(14, 6), pady=13)
 
         # Single Trigger Scan Button (Manual Override)
         self.scan_btn = ctk.CTkButton(
@@ -458,9 +466,19 @@ class OvaLensOperatorApp(ctk.CTk):
             fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
             border_width=1, border_color=FUTheme.BORDER_DARK,
             text_color=FUTheme.TEXT_PRIMARY, command=self.trigger_candling_scan,
-            width=180, height=42, corner_radius=8
+            width=160, height=42, corner_radius=8
         )
-        self.scan_btn.pack(side="left", padx=8, pady=13)
+        self.scan_btn.pack(side="left", padx=6, pady=13)
+
+        # Dedicated Terminate / Cancel / End Session Button
+        self.cancel_btn = ctk.CTkButton(
+            self.footer_frame, text="⏹ Cancel Session [ESC]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
+            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.ABNORMAL_RED_BG,
+            border_width=1, border_color=FUTheme.BORDER_DARK,
+            text_color=FUTheme.TEXT_PRIMARY, command=self.stop_or_cancel_session,
+            width=165, height=42, corner_radius=8
+        )
+        self.cancel_btn.pack(side="left", padx=6, pady=13)
 
         # Manual Eject Button with High-Contrast Luminous Text
         self.eject_btn = ctk.CTkButton(
@@ -468,9 +486,9 @@ class OvaLensOperatorApp(ctk.CTk):
             fg_color=FUTheme.ABNORMAL_RED_BG, hover_color=FUTheme.ABNORMAL_RED_HOVER,
             border_width=1, border_color=FUTheme.ABNORMAL_RED_BORDER,
             text_color=FUTheme.ABNORMAL_RED_TEXT, command=self.trigger_manual_eject,
-            width=150, height=42, corner_radius=8
+            width=145, height=42, corner_radius=8
         )
-        self.eject_btn.pack(side="left", padx=8, pady=13)
+        self.eject_btn.pack(side="left", padx=6, pady=13)
 
         # Batch Setup Quick Button
         self.batch_setup_btn = ctk.CTkButton(
@@ -478,31 +496,36 @@ class OvaLensOperatorApp(ctk.CTk):
             fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
             border_width=1, border_color=FUTheme.BORDER_DARK,
             text_color=FUTheme.TEXT_PRIMARY, command=self.open_batch_setup_dialog,
-            width=140, height=42, corner_radius=8
+            width=130, height=42, corner_radius=8
         )
-        self.batch_setup_btn.pack(side="right", padx=(8, 18), pady=13)
+        self.batch_setup_btn.pack(side="right", padx=(6, 14), pady=13)
 
         # Conveyor Settings Button
         self.settings_btn = ctk.CTkButton(
-            self.footer_frame, text="⚙ Conveyor Config", font=(FUTheme.FONT_FAMILY, 12),
+            self.footer_frame, text="⚙ Config", font=(FUTheme.FONT_FAMILY, 12),
             fg_color=FUTheme.PANEL_LIGHT_ALT, border_width=1, border_color=FUTheme.BORDER,
             text_color=FUTheme.TEXT_SECONDARY, hover_color=FUTheme.PANEL_ACCENT,
-            command=self.open_calibration_dialog, width=140, height=42, corner_radius=8
+            command=self.open_calibration_dialog, width=100, height=42, corner_radius=8
         )
-        self.settings_btn.pack(side="right", padx=8, pady=13)
+        self.settings_btn.pack(side="right", padx=6, pady=13)
 
     def stop_or_cancel_session(self):
         """Universal Stop / Cancel action: halts auto cycle or closes manual camera feed back to Standby."""
         if self.is_auto_cycle_running:
             self._stop_auto_cycle()
-            self._log("[ACTION] Automated conveyor sorting stopped by operator.")
-        elif self.camera.is_running:
-            self.camera.stop()
+            self._log("[ACTION] Automated conveyor sorting halted by operator.")
+        elif self.camera.is_running or self.is_session_active:
+            self.is_session_active = False
+            self._session_start_time = None
+            if self.camera.is_running:
+                self.camera.stop()
             self.video_label.configure(image=None)
             self._render_standby_hud()
             self.standby_frame.place(relx=0.5, rely=0.5, anchor="center")
             self._update_cycle_hud("●", FUTheme.TEXT_MUTED, "CONVEYOR STANDBY — CAMERA CLOSED")
-            self._log("[ACTION] Camera feed closed. Viewport returned to Standby.")
+            self._log("[ACTION] Session ended. Camera closed and returned to Standby.")
+        else:
+            self._log("[INFO] System already in Standby.")
 
     def toggle_auto_session(self):
         """Toggle automated full conveyor sorting cycle with on-demand camera start."""
