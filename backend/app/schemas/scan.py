@@ -48,7 +48,9 @@ class ScanListItem(BaseModel):
     confidence: float
     inference_ms: int
     routing_action: RoutingAction
-    thumbnail_url: Optional[str]
+    image_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    detections: List[Dict[str, Any]] = Field(default_factory=list)
     scanned_at: datetime
 
 

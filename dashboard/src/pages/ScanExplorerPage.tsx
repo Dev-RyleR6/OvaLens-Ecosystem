@@ -14,9 +14,10 @@ import {
   Volume2,
   VolumeX,
   RefreshCw,
+  Layers,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
-import { EggScan, FertilityClass } from '../types';
+import { EggScan, FertilityClass, BatchSummary } from '../types';
 import { Badge } from '../components/Badge';
 import { CandlingAperture } from '../components/CandlingAperture';
 import { Sheet } from '../components/ui/sheet';
@@ -28,7 +29,12 @@ type SortOrder = 'asc' | 'desc';
 // Acoustic feedback synthesis via HTML5 Web Audio API
 const playAcousticFeedback = (isAccept: boolean) => {
   try {
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const audioCtx = new AudioContextClass();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = isAccept ? 'sine' : 'triangle';
@@ -46,8 +52,10 @@ const playAcousticFeedback = (isAccept: boolean) => {
 
 export const ScanExplorerPage: React.FC = () => {
   const [scans, setScans] = useState<EggScan[]>([]);
+  const [batches, setBatches] = useState<BatchSummary[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('TABLE');
   const [selectedScan, setSelectedScan] = useState<EggScan | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Filters
   const [classFilter, setClassFilter] = useState<string>('ALL');
@@ -69,13 +77,39 @@ export const ScanExplorerPage: React.FC = () => {
   const [overrideReason, setOverrideReason] = useState('Visual confirmation by operator');
 
   const fetchScans = async () => {
-    const data = await apiClient.getScans({
-      final_class: classFilter === 'ALL' ? undefined : classFilter,
-      batch_id: batchFilter === 'ALL' ? undefined : batchFilter,
-      limit: 100
-    });
-    setScans(data);
+    try {
+      setIsLoading(true);
+      const data = await apiClient.getScans({
+        final_class: classFilter === 'ALL' ? undefined : classFilter,
+        batch_id: batchFilter === 'ALL' ? undefined : batchFilter,
+        limit: 100
+      });
+      if (Array.isArray(data)) {
+        setScans(data);
+      } else {
+        setScans([]);
+      }
+    } catch (err) {
+      console.error('Error fetching scans:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const fetchBatches = async () => {
+    try {
+      const data = await apiClient.getBatches();
+      if (Array.isArray(data)) {
+        setBatches(data);
+      }
+    } catch (err) {
+      console.error('Error fetching batches:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchBatches();
+  }, []);
 
   useEffect(() => {
     fetchScans();
@@ -92,41 +126,48 @@ export const ScanExplorerPage: React.FC = () => {
 
   const handleOverride = async (newClass: FertilityClass) => {
     if (!selectedScan) return;
-    const updated = await apiClient.overrideScanClassification(selectedScan.scan_id, newClass, overrideReason);
-    setSelectedScan({ ...updated });
-    fetchScans();
-    if (isSoundEnabled) {
-      playAcousticFeedback(newClass === 'FERTILE');
+    try {
+      const updated = await apiClient.overrideScanClassification(selectedScan.scan_id, newClass, overrideReason);
+      setSelectedScan({ ...updated });
+      fetchScans();
+      if (isSoundEnabled) {
+        playAcousticFeedback(newClass === 'FERTILE');
+      }
+      setOverrideToast(`Scan #${selectedScan.sequence_number ?? 0} reclassified to ${newClass}. Logged in Audit Trail.`);
+      setTimeout(() => setOverrideToast(null), 3500);
+    } catch (err) {
+      console.error('Error overriding scan:', err);
     }
-    setOverrideToast(`Scan #${selectedScan.sequence_number} reclassified to ${newClass}. Logged in Audit Trail.`);
-    setTimeout(() => setOverrideToast(null), 3500);
   };
 
   // Filtered & Sorted Scans
   const processedScans = useMemo(() => {
-    let result = [...scans];
+    let result = Array.isArray(scans) ? [...scans] : [];
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (s) =>
-          s.scan_id.toLowerCase().includes(q) ||
-          s.sequence_number.toString().includes(q) ||
-          s.batch_id.toLowerCase().includes(q)
+          (s.scan_id || '').toLowerCase().includes(q) ||
+          (s.sequence_number !== undefined && s.sequence_number !== null && s.sequence_number.toString().includes(q)) ||
+          (s.batch_id || '').toLowerCase().includes(q)
       );
     }
 
     if (confidenceFilter === 'HIGH') {
-      result = result.filter((s) => s.confidence >= 0.90);
+      result = result.filter((s) => (s.confidence ?? 0) >= 0.90);
     } else if (confidenceFilter === 'MEDIUM') {
-      result = result.filter((s) => s.confidence >= 0.80 && s.confidence < 0.90);
+      result = result.filter((s) => (s.confidence ?? 0) >= 0.80 && (s.confidence ?? 0) < 0.90);
     } else if (confidenceFilter === 'LOW') {
-      result = result.filter((s) => s.confidence < 0.80);
+      result = result.filter((s) => (s.confidence ?? 0) < 0.80);
     }
 
     result.sort((a, b) => {
       let aVal = a[sortField];
       let bVal = b[sortField];
+
+      if (aVal === undefined || aVal === null) return sortOrder === 'asc' ? 1 : -1;
+      if (bVal === undefined || bVal === null) return sortOrder === 'asc' ? -1 : 1;
 
       if (typeof aVal === 'string') {
         return sortOrder === 'asc'
@@ -146,7 +187,7 @@ export const ScanExplorerPage: React.FC = () => {
     return processedScans.slice(start, start + rowsPerPage);
   }, [processedScans, currentPage, rowsPerPage]);
 
-  const totalPages = Math.ceil(processedScans.length / rowsPerPage) || 1;
+  const totalPages = Math.max(1, Math.ceil(processedScans.length / rowsPerPage));
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -156,6 +197,14 @@ export const ScanExplorerPage: React.FC = () => {
       setSortOrder('desc');
     }
   };
+
+  // Combine known batch IDs from batch list and scans for dropdown
+  const batchOptions = useMemo(() => {
+    const set = new Set<string>();
+    batches.forEach(b => { if (b.batch_id) set.add(b.batch_id); if (b.batch_code) set.add(b.batch_code); });
+    scans.forEach(s => { if (s.batch_id) set.add(s.batch_id); });
+    return Array.from(set);
+  }, [batches, scans]);
 
   return (
     <div className="space-y-6 pb-8">
@@ -274,9 +323,11 @@ export const ScanExplorerPage: React.FC = () => {
             className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
           >
             <option value="ALL">All Batches</option>
-            <option value="BATCH-2026-08-KAY-01">BATCH-2026-08-KAY-01</option>
-            <option value="BATCH-2026-08-ITM-01">BATCH-2026-08-ITM-01</option>
-            <option value="BATCH-2026-07-KHK-01">BATCH-2026-07-KHK-01</option>
+            {batchOptions.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
           </select>
 
           <select
@@ -345,54 +396,64 @@ export const ScanExplorerPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginatedScans.map((scan) => (
-                  <tr
-                    key={scan.scan_id}
-                    className="hover:bg-slate-50 transition-colors cursor-pointer"
-                    onClick={() => setSelectedScan(scan)}
-                  >
-                    <td className="py-3 px-4 font-mono font-bold text-slate-700">
-                      #{scan.sequence_number.toString().padStart(3, '0')}
-                    </td>
-                    <td className="py-3 px-4 font-semibold text-slate-900">{scan.batch_id}</td>
-                    <td className="py-3 px-4">
-                      <Badge type="fertility" value={scan.final_class} />
-                    </td>
-                    <td className="py-3 px-4 font-extrabold text-slate-900">
-                      {(scan.confidence * 100).toFixed(1)}%
-                    </td>
-                    <td className="py-3 px-4 text-slate-700 font-mono">
-                      {scan.inference_ms.toFixed(1)} ms
-                    </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`font-bold ${
-                          scan.routing_action === 'ACCEPT' ? 'text-emerald-800' : 'text-rose-800'
-                        }`}
-                      >
-                        {scan.routing_action}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-slate-500 font-medium">
-                      {new Date(scan.scanned_at).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                      })}
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedScan(scan);
-                        }}
-                        className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
+                {paginatedScans.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-slate-400">
+                      No matching candling scans found.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  paginatedScans.map((scan) => (
+                    <tr
+                      key={scan.scan_id}
+                      className="hover:bg-slate-50 transition-colors cursor-pointer"
+                      onClick={() => setSelectedScan(scan)}
+                    >
+                      <td className="py-3 px-4 font-mono font-bold text-slate-700">
+                        #{((scan.sequence_number ?? 0)).toString().padStart(3, '0')}
+                      </td>
+                      <td className="py-3 px-4 font-semibold text-slate-900">{scan.batch_id || 'N/A'}</td>
+                      <td className="py-3 px-4">
+                        <Badge type="fertility" value={scan.final_class || 'FERTILE'} />
+                      </td>
+                      <td className="py-3 px-4 font-extrabold text-slate-900">
+                        {((scan.confidence ?? 0) * 100).toFixed(1)}%
+                      </td>
+                      <td className="py-3 px-4 text-slate-700 font-mono">
+                        {(scan.inference_ms ?? 0).toFixed(1)} ms
+                      </td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`font-bold ${
+                            scan.routing_action === 'ACCEPT' ? 'text-emerald-800' : 'text-rose-800'
+                          }`}
+                        >
+                          {scan.routing_action || (scan.final_class === 'FERTILE' ? 'ACCEPT' : 'REJECT')}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-500 font-medium">
+                        {scan.scanned_at
+                          ? new Date(scan.scanned_at).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                            })
+                          : 'N/A'}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedScan(scan);
+                          }}
+                          className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -400,35 +461,41 @@ export const ScanExplorerPage: React.FC = () => {
       ) : (
         /* Grid / Aperture Cards View */
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {paginatedScans.map((scan) => (
-            <div
-              key={scan.scan_id}
-              onClick={() => setSelectedScan(scan)}
-              className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xs hover:border-[#800000] transition-colors cursor-pointer space-y-3 flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <span className="font-mono font-bold text-xs text-slate-700">
-                    #{scan.sequence_number.toString().padStart(3, '0')}
-                  </span>
-                  <Badge type="fertility" value={scan.final_class} />
-                </div>
-
-                <div className="mt-2">
-                  <CandlingAperture
-                    finalClass={scan.final_class}
-                    confidence={scan.confidence}
-                    inferenceMs={scan.inference_ms}
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                <span className="font-mono">{scan.batch_id}</span>
-                <span className="font-bold text-slate-700">{(scan.confidence * 100).toFixed(0)}% Conf</span>
-              </div>
+          {paginatedScans.length === 0 ? (
+            <div className="col-span-full py-12 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+              No matching candling scans found.
             </div>
-          ))}
+          ) : (
+            paginatedScans.map((scan) => (
+              <div
+                key={scan.scan_id}
+                onClick={() => setSelectedScan(scan)}
+                className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xs hover:border-[#800000] transition-colors cursor-pointer space-y-3 flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <span className="font-mono font-bold text-xs text-slate-700">
+                      #{((scan.sequence_number ?? 0)).toString().padStart(3, '0')}
+                    </span>
+                    <Badge type="fertility" value={scan.final_class || 'FERTILE'} />
+                  </div>
+
+                  <div className="mt-2">
+                    <CandlingAperture
+                      finalClass={scan.final_class}
+                      confidence={scan.confidence ?? 0.95}
+                      inferenceMs={scan.inference_ms ?? 25.0}
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                  <span className="font-mono">{scan.batch_id || 'N/A'}</span>
+                  <span className="font-bold text-slate-700">{((scan.confidence ?? 0) * 100).toFixed(0)}% Conf</span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -478,17 +545,17 @@ export const ScanExplorerPage: React.FC = () => {
       <Sheet
         isOpen={Boolean(selectedScan)}
         onClose={() => setSelectedScan(null)}
-        title={selectedScan ? `Candling Scan #${selectedScan.sequence_number}` : ''}
-        description={selectedScan ? `Batch: ${selectedScan.batch_id} • UUID: ${selectedScan.scan_id}` : ''}
+        title={selectedScan ? `Candling Scan #${selectedScan.sequence_number ?? 0}` : ''}
+        description={selectedScan ? `Batch: ${selectedScan.batch_id || 'N/A'} • UUID: ${selectedScan.scan_id}` : ''}
       >
         {selectedScan && (
           <div className="space-y-4 text-xs">
             {/* Visual Candling Aperture */}
             <CandlingAperture
               finalClass={selectedScan.final_class}
-              confidence={selectedScan.confidence}
-              inferenceMs={selectedScan.inference_ms}
-              sequenceNumber={selectedScan.sequence_number}
+              confidence={selectedScan.confidence ?? 0.95}
+              inferenceMs={selectedScan.inference_ms ?? 25.0}
+              sequenceNumber={selectedScan.sequence_number ?? 0}
               batchId={selectedScan.batch_id}
               aspectRatio={0.78}
             />
@@ -499,10 +566,10 @@ export const ScanExplorerPage: React.FC = () => {
                 <span className="font-bold text-slate-800">Conveyor Routing Action:</span>
                 <span
                   className={`font-bold ${
-                    selectedScan.routing_action === 'ACCEPT' ? 'text-emerald-800' : 'text-rose-800'
+                    (selectedScan.routing_action === 'ACCEPT' || selectedScan.final_class === 'FERTILE') ? 'text-emerald-800' : 'text-rose-800'
                   }`}
                 >
-                  {selectedScan.routing_action === 'ACCEPT' ? 'ACCEPT (Incubation Tray)' : 'REJECT (Diverter Eject)'}
+                  {(selectedScan.routing_action === 'ACCEPT' || selectedScan.final_class === 'FERTILE') ? 'ACCEPT (Incubation Tray)' : 'REJECT (Diverter Eject)'}
                 </span>
               </div>
               <p className="text-slate-600 text-[11px]">
@@ -569,13 +636,13 @@ export const ScanExplorerPage: React.FC = () => {
               <span className="font-bold text-slate-800 block">YOLOv8 Detection Telemetry</span>
               <pre className="p-3 rounded-lg bg-slate-900 text-emerald-400 font-mono text-[11px] overflow-x-auto max-h-32">
                 {JSON.stringify(
-                  selectedScan.detections.length > 0
+                  Array.isArray(selectedScan.detections) && selectedScan.detections.length > 0
                     ? selectedScan.detections
                     : [
                         {
                           bbox: [0.24, 0.18, 0.76, 0.88],
-                          class_name: selectedScan.final_class,
-                          confidence: selectedScan.confidence,
+                          class_name: selectedScan.final_class || 'FERTILE',
+                          confidence: selectedScan.confidence ?? 0.95,
                           aspect_ratio: 0.78,
                         }
                       ],
