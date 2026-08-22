@@ -36,13 +36,13 @@ export const Modal: React.FC<ModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* High-Contrast Dark Backdrop Blur */}
       <div
-        className="fixed inset-0 bg-black/85 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-modal-backdrop"
         onClick={onClose}
       />
 
       {/* Modal Dialog */}
       <div
-        className={`relative w-full ${maxWidth} bg-obsidian-900 border border-obsidian-700/90 rounded-lg shadow-2xl overflow-hidden z-10 animate-fade-in`}
+        className={`relative w-full ${maxWidth} bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden z-10 animate-modal-content`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-obsidian-850 border-b border-obsidian-700/80">

@@ -41,14 +41,14 @@ export const Dialog: React.FC<DialogProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in-0"
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-modal-backdrop"
         onClick={onClose}
       />
 
       {/* Dialog content */}
       <div
         className={cn(
-          "relative w-full rounded-lg border bg-background p-6 text-foreground shadow-lg transition-all z-10 animate-in fade-in-0 zoom-in-95",
+          "relative w-full rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl transition-all z-10 animate-modal-content",
           maxWidth,
           className
         )}

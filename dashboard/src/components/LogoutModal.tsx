@@ -51,14 +51,14 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Soft Blurred Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/35 backdrop-blur-[3px] transition-opacity animate-in fade-in-50 duration-200"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-modal-backdrop"
         onClick={() => {
           if (!isLoggingOut) onClose();
         }}
       />
 
       {/* Main Dialog Card */}
-      <div className="relative w-full max-w-md bg-white rounded-2xl p-6 sm:p-7 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.18)] border border-slate-200/90 z-10 animate-in fade-in-50 zoom-in-[0.98] duration-200 font-sans text-slate-900">
+      <div className="relative w-full max-w-md bg-white rounded-2xl p-6 sm:p-7 shadow-2xl border border-slate-200/90 z-10 animate-modal-content font-sans text-slate-900">
         
         {/* Top Close Button */}
         <button
