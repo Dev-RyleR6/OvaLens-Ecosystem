@@ -23,16 +23,22 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
   onClose,
   batch,
 }) => {
-  if (!batch) return null;
+  const lastBatchRef = React.useRef(batch);
+  if (batch) {
+    lastBatchRef.current = batch;
+  }
+  const displayBatch = batch || lastBatchRef.current;
 
   const handlePrint = () => {
     window.print();
   };
 
-  const fertileCount = batch.fertile_count || 451;
-  const penoyCount = batch.infertile_count || 37;
-  const abnormalCount = batch.abnormal_count || 12;
-  const totalScanned = batch.total_scanned || 500;
+  if (!displayBatch) return null;
+
+  const fertileCount = displayBatch.fertile_count || 451;
+  const penoyCount = displayBatch.infertile_count || 37;
+  const abnormalCount = displayBatch.abnormal_count || 12;
+  const totalScanned = displayBatch.total_scanned || 500;
   const penoySalvageValue = (penoyCount * 14.0).toFixed(2);
 
   return (
@@ -67,15 +73,15 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-50 p-3.5 rounded-lg border border-slate-200">
             <div>
               <span className="text-[10px] text-slate-400 font-bold uppercase block">Batch Code</span>
-              <strong className="text-slate-900 font-mono">{batch.batch_code}</strong>
+              <strong className="text-slate-900 font-mono">{displayBatch.batch_code}</strong>
             </div>
             <div>
               <span className="text-[10px] text-slate-400 font-bold uppercase block">Duck Breed</span>
-              <strong className="text-[#800000]">{batch.breed}</strong>
+              <strong className="text-[#800000]">{displayBatch.breed}</strong>
             </div>
             <div>
               <span className="text-[10px] text-slate-400 font-bold uppercase block">Candling Milestone</span>
-              <strong className="text-slate-900">{batch.current_stage} (Day 10)</strong>
+              <strong className="text-slate-900">{displayBatch.current_stage} (Day 10)</strong>
             </div>
             <div>
               <span className="text-[10px] text-slate-400 font-bold uppercase block">Certified Date</span>

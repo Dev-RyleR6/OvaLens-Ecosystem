@@ -55,7 +55,6 @@ export const ScanExplorerPage: React.FC = () => {
   const [scans, setScans] = useState<EggScan[]>([]);
   const [batches, setBatches] = useState<BatchSummary[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('TABLE');
-  const [selectedScan, setSelectedScan] = useState<EggScan | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
   // Filters
@@ -71,6 +70,8 @@ export const ScanExplorerPage: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   // Live Auto-Refresh & Audio Toggles
+  const [selectedScan, setSelectedScan] = useState<EggScan | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isLiveAutoRefresh, setIsLiveAutoRefresh] = useState(false);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
 
@@ -417,7 +418,10 @@ export const ScanExplorerPage: React.FC = () => {
                     <tr
                       key={scan.scan_id}
                       className="table-row-hover cursor-pointer group"
-                      onClick={() => setSelectedScan(scan)}
+                      onClick={() => {
+                        setSelectedScan(scan);
+                        setIsSheetOpen(true);
+                      }}
                     >
                       <td className="py-3 px-4 font-mono font-bold text-slate-700 group-hover:text-[#800000] transition-colors">
                         #{((scan.sequence_number ?? 0)).toString().padStart(3, '0')}
@@ -455,6 +459,7 @@ export const ScanExplorerPage: React.FC = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedScan(scan);
+                            setIsSheetOpen(true);
                           }}
                           className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
                         >
@@ -479,8 +484,11 @@ export const ScanExplorerPage: React.FC = () => {
             paginatedScans.map((scan) => (
               <div
                 key={scan.scan_id}
-                onClick={() => setSelectedScan(scan)}
-                className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xs hover:border-[#800000] transition-colors cursor-pointer space-y-3 flex flex-col justify-between"
+                onClick={() => {
+                  setSelectedScan(scan);
+                  setIsSheetOpen(true);
+                }}
+                className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xs hover:border-[#800000] hover-lift transition-all cursor-pointer space-y-3 flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -509,8 +517,8 @@ export const ScanExplorerPage: React.FC = () => {
         </div>
       )}
 
-      {/* Pagination Controls */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 pt-2">
+      {/* Pagination Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600 bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs">
         <div className="flex items-center gap-2">
           <span>Showing {paginatedScans.length} of {processedScans.length} verified scans</span>
           <span>•</span>
@@ -553,8 +561,8 @@ export const ScanExplorerPage: React.FC = () => {
 
       {/* Scan Details & Human-in-the-Loop Override Drawer (Sheet) */}
       <Sheet
-        isOpen={Boolean(selectedScan)}
-        onClose={() => setSelectedScan(null)}
+        isOpen={isSheetOpen}
+        onClose={() => setIsSheetOpen(false)}
         title={selectedScan ? `Candling Scan #${selectedScan.sequence_number ?? 0}` : ''}
         description={selectedScan ? `Batch: ${selectedScan.batch_id || 'N/A'} • UUID: ${selectedScan.scan_id}` : ''}
       >

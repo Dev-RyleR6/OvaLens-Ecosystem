@@ -64,6 +64,7 @@ export const RecordsPage: React.FC = () => {
   // Selection for Bulk Actions
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<BatchSummary | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   const [certificateBatch, setCertificateBatch] = useState<BatchSummary | null>(null);
 
@@ -466,7 +467,10 @@ export const RecordsPage: React.FC = () => {
                           className={`hover:bg-slate-50 transition-colors cursor-pointer ${
                             isSelected ? 'bg-maroon-50/30' : ''
                           }`}
-                          onClick={() => setSelectedBatch(b)}
+                          onClick={() => {
+                            setSelectedBatch(b);
+                            setIsDrawerOpen(true);
+                          }}
                         >
                           <td className="py-3 px-4 text-center" onClick={(e) => toggleSelectBatch(b.batch_id, e)}>
                             {isSelected ? (
@@ -533,8 +537,11 @@ export const RecordsPage: React.FC = () => {
               {paginatedBatches.map((b) => (
                 <div
                   key={b.batch_id}
-                  onClick={() => setSelectedBatch(b)}
-                  className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs hover:border-[#800000] transition-colors cursor-pointer space-y-4 flex flex-col justify-between"
+                  onClick={() => {
+                    setSelectedBatch(b);
+                    setIsDrawerOpen(true);
+                  }}
+                  className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs hover:border-[#800000] hover-lift transition-all cursor-pointer space-y-4 flex flex-col justify-between"
                 >
                   <div>
                     <div className="flex items-start justify-between pb-3 border-b border-slate-100">
@@ -726,8 +733,8 @@ export const RecordsPage: React.FC = () => {
 
       {/* Batch Inspection Sheet Drawer */}
       <Sheet
-        isOpen={Boolean(selectedBatch)}
-        onClose={() => setSelectedBatch(null)}
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
         title={selectedBatch ? `Batch Record: ${selectedBatch.batch_code}` : ''}
         description="Historical incubation and candling performance record"
       >

@@ -216,7 +216,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.net_status_badge.pack(side="left", padx=4)
 
     def _center_window(self, dialog, width: int, height: int):
-        """Center modal dialog relative to root window."""
+        """Center modal dialog relative to root window and trigger smooth fade-in."""
         self.update_idletasks()
         rx = self.winfo_x()
         ry = self.winfo_y()
@@ -225,6 +225,44 @@ class OvaLensOperatorApp(ctk.CTk):
         x = rx + max(0, (rw - width) // 2)
         y = ry + max(0, (rh - height) // 2)
         dialog.geometry(f"{width}x{height}+{x}+{y}")
+        self._animate_modal_open(dialog)
+
+    def _animate_modal_open(self, dialog, duration_ms: int = 150):
+        """Smooth alpha fade-in for CustomTkinter dialogs."""
+        try:
+            dialog.attributes("-alpha", 0.0)
+            steps = 6
+            step_time = max(15, duration_ms // steps)
+            for i in range(1, steps + 1):
+                alpha = i / steps
+                dialog.after(i * step_time, lambda a=alpha: dialog.winfo_exists() and dialog.attributes("-alpha", a))
+        except Exception:
+            pass
+
+    def _animate_modal_close(self, dialog, on_close=None, duration_ms: int = 150):
+        """Smooth alpha fade-out before destroying dialog."""
+        try:
+            steps = 6
+            step_time = max(15, duration_ms // steps)
+            for i in range(steps):
+                alpha = 1.0 - (i / steps)
+                dialog.after(i * step_time, lambda a=alpha: dialog.winfo_exists() and dialog.attributes("-alpha", a))
+
+            def finalize():
+                if on_close:
+                    try:
+                        on_close()
+                    except Exception:
+                        pass
+                if dialog.winfo_exists():
+                    dialog.destroy()
+
+            dialog.after(duration_ms, finalize)
+        except Exception:
+            if on_close:
+                on_close()
+            if dialog.winfo_exists():
+                dialog.destroy()
 
     def _build_main_layout(self):
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
