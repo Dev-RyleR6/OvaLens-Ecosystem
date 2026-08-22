@@ -104,6 +104,8 @@ class OvaLensOperatorApp(ctk.CTk):
         self.bind("<F11>", self.toggle_fullscreen)
         self.bind("c", self.toggle_crosshairs)
         self.bind("C", self.toggle_crosshairs)
+        self.bind("s", lambda event: self.open_scan_history_modal())
+        self.bind("S", lambda event: self.open_scan_history_modal())
         self.bind("<Escape>", lambda event: self.open_end_session_modal() if (self.is_session_active or self.camera.is_running) else None)
 
         # Start Standby Display & Status Loop
@@ -379,6 +381,15 @@ class OvaLensOperatorApp(ctk.CTk):
             text_color=FUTheme.TEXT_PRIMARY
         )
         log_title.pack(side="left")
+
+        self.history_btn = ctk.CTkButton(
+            log_header, text="🔍 Explorer [S]", font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
+            border_width=1, border_color=FUTheme.BORDER,
+            text_color=FUTheme.TEXT_SECONDARY, command=self.open_scan_history_modal,
+            height=24, width=110, corner_radius=6
+        )
+        self.history_btn.pack(side="right")
 
         # Compact Live Scans List Box
         self.log_textbox = ctk.CTkTextbox(
@@ -659,24 +670,54 @@ class OvaLensOperatorApp(ctk.CTk):
         ).pack(side="right")
 
     def stop_or_cancel_session(self):
-        """Universal Stop / Cancel action: halts auto cycle or closes manual camera feed back to Standby."""
-        if self.is_auto_cycle_running:
-            self._stop_auto_cycle()
-            self._log("[ACTION] Automated conveyor sorting halted by operator.")
-        elif self.camera.is_running or self.is_session_active:
-            self.is_session_active = False
-            self._session_start_time = None
-            if self.camera.is_running:
-                self.camera.stop()
-            self.video_label.configure(image=None)
-            self._render_standby_hud()
-            self.standby_frame.place(relx=0.5, rely=0.5, anchor="center")
-            self._update_cycle_hud("●", FUTheme.TEXT_MUTED, "CONVEYOR STANDBY — CAMERA CLOSED")
-            self._set_session_active_state(False)
-            self._log("[ACTION] Session ended. Camera closed and returned to Standby.")
-        else:
-            self._set_session_active_state(False)
-            self._log("[INFO] System already in Standby.")
+        """
+        Universal, Conflict-Free End Session Protocol:
+        1. Signals auto-cycle loop cancellation event.
+        2. Commands ESP32 hardware conveyor motor to stop immediately.
+        3. Cleanly joins background cycle worker thread with timeout to avoid race conditions.
+        4. Finalizes the local SQLite session (records ended_at & commits passive WAL checkpoint).
+        5. Flushes pending synchronization payloads.
+        6. Safely stops the OpenCV frame grabber hardware handle.
+        7. Clears viewport and displays Standby HUD card.
+        8. Restores UI controls and hides active session buttons.
+        """
+        # 1. Cancel running cycle thread & halt hardware motor
+        if self.is_auto_cycle_running or self._stop_cycle_event.is_set():
+            self._stop_cycle_event.set()
+            self.iot.set_conveyor(False)
+            if hasattr(self, "_auto_cycle_thread") and self._auto_cycle_thread and self._auto_cycle_thread.is_alive():
+                try:
+                    self._auto_cycle_thread.join(timeout=0.6)
+                except Exception:
+                    pass
+            self.is_auto_cycle_running = False
+
+        # 2. Finalize Session in Database
+        if self.current_session_id:
+            try:
+                self.db.complete_session(self.current_session_id)
+            except Exception as e:
+                self._log(f"[DB] Session completion warning: {e}")
+
+        # 3. Stop Camera Grabber
+        if self.camera.is_running:
+            self.camera.stop()
+
+        # 4. Reset internal session flags
+        self.is_session_active = False
+        self._session_start_time = None
+
+        # 5. Restore Viewport & HUD
+        self.video_label.configure(image=None)
+        self._render_standby_hud()
+        self.standby_frame.place(relx=0.5, rely=0.5, anchor="center")
+        self._update_cycle_hud("●", FUTheme.TEXT_MUTED, "CONVEYOR STANDBY — SESSION IDLE")
+        self._set_session_active_state(False)
+        self._log("[ACTION] End session protocol completed. System returned to Standby.")
+
+    def _stop_auto_cycle(self):
+        """Helper to cleanly stop automated cycle loop."""
+        self.stop_or_cancel_session()
 
     def toggle_auto_session(self):
         """Toggle automated full conveyor sorting cycle with on-demand camera start."""
@@ -732,25 +773,6 @@ class OvaLensOperatorApp(ctk.CTk):
         else:
             # Stop Session & Release Camera
             self.stop_or_cancel_session()
-
-    def _stop_auto_cycle(self):
-        self.is_session_active = False
-        self.is_auto_cycle_running = False
-        self._stop_cycle_event.set()
-        self.iot.set_conveyor(False)
-        self._session_start_time = None
-
-        # Stop Camera Stream on Session End
-        if self.camera.is_running:
-            self.camera.stop()
-
-        self._set_session_active_state(False)
-        self._update_cycle_hud("●", FUTheme.TEXT_MUTED, "CONVEYOR STANDBY — SESSION IDLE")
-        
-        # Clear video canvas and display standby HUD
-        self.video_label.configure(image=None)
-        self._render_standby_hud()
-        self.standby_frame.place(relx=0.5, rely=0.5, anchor="center")
 
         self._log(f"[OK] Auto sorting ended. Completed {self.total_count}/{self.target_egg_count} eggs.")
 
@@ -1505,7 +1527,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         s4_body = ctk.CTkLabel(
             s4,
-            text="• [SPACEBAR]: Trigger Single Test Scan (Manual Candling)\n• [ESC] key: End Session (Run Summary & Direct CSV Export)\n• [R] key: Emergency Manual Servo Eject\n• [F11] key: Toggle Kiosk / Fullscreen Mode\n• [C] key: Toggle Optical Alignment Crosshairs\n• [B] key: Open Batch Setup Modal\n• [F1] / [H]: Open this Operator Quick Guide",
+            text="• [SPACEBAR]: Trigger Single Test Scan (Manual Candling)\n• [ESC] key: End Session (Run Summary & Direct CSV Export)\n• [S] key: Scan Explorer & Candling History\n• [R] key: Emergency Manual Servo Eject\n• [F11] key: Toggle Kiosk / Fullscreen Mode\n• [C] key: Toggle Optical Alignment Crosshairs\n• [B] key: Open Batch Setup Modal\n• [F1] / [H]: Open this Operator Quick Guide",
             font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s4_body.pack(anchor="w", padx=14, pady=(2, 10))
@@ -1692,4 +1714,193 @@ class OvaLensOperatorApp(ctk.CTk):
             hover_color=FUTheme.PANEL_ACCENT, text_color=FUTheme.TEXT_SECONDARY,
             font=(FUTheme.FONT_FAMILY, 11), command=dialog.destroy,
             height=38, corner_radius=8, width=110
+        ).pack(side="right")
+
+    def open_scan_history_modal(self, event=None):
+        """Interactive Scan History & Explorer modal with real-time class filters and CSV export."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(f"Scan Explorer & History — Batch {self.current_batch_id}")
+        dialog.geometry("740x660")
+        dialog.configure(fg_color=FUTheme.BG_LIGHT)
+        dialog.transient(self)
+        dialog.grab_set()
+        self._center_window(dialog, 740, 660)
+
+        card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
+        card.pack(fill="both", expand=True, padx=16, pady=16)
+
+        # Header Row
+        hdr = ctk.CTkFrame(card, fg_color="transparent")
+        hdr.pack(fill="x", padx=16, pady=(16, 8))
+
+        ctk.CTkLabel(
+            hdr, text="🔍 Scan Explorer & Candling History",
+            font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.TEXT_PRIMARY
+        ).pack(side="left")
+
+        # Active Batch & Stage Badge
+        ctk.CTkLabel(
+            hdr, text=f"Batch: {self.current_batch_id}  •  {self.current_stage}",
+            font=(FUTheme.FONT_FAMILY, 11, "bold"), fg_color=FUTheme.PANEL_LIGHT_ALT,
+            text_color=FUTheme.TEXT_SECONDARY, corner_radius=6, padx=10, pady=4
+        ).pack(side="right")
+
+        # Filter Tabs Row
+        filter_row = ctk.CTkFrame(card, fg_color="transparent")
+        filter_row.pack(fill="x", padx=16, pady=(0, 10))
+
+        current_filter = ["ALL"]
+
+        # Counts
+        total_scans = self.db.get_scans_by_batch(self.current_batch_id, limit=5000, class_filter="ALL")
+        n_total = len(total_scans)
+        n_fertile = sum(1 for s in total_scans if s["final_class"] == "FERTILE")
+        n_infertile = sum(1 for s in total_scans if s["final_class"] == "INFERTILE")
+        n_abnormal = sum(1 for s in total_scans if s["final_class"] == "ABNORMAL")
+
+        tab_btns = {}
+
+        # Scrollable table container
+        table_container = ctk.CTkScrollableFrame(card, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8)
+        table_container.pack(fill="both", expand=True, padx=16, pady=(0, 10))
+
+        # Status toast for CSV exports
+        toast_label = ctk.CTkLabel(card, text="", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.FERTILE_GREEN_TEXT)
+        toast_label.pack(pady=(0, 4))
+
+        def render_table():
+            for child in table_container.winfo_children():
+                child.destroy()
+
+            flt = current_filter[0]
+            scans = self.db.get_scans_by_batch(self.current_batch_id, limit=200, class_filter=flt)
+
+            if not scans:
+                empty = ctk.CTkLabel(
+                    table_container, text=f"No scans found for filter '{flt}' in Batch {self.current_batch_id}.",
+                    font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED
+                )
+                empty.pack(pady=40)
+                return
+
+            for s in scans:
+                cls_name = s["final_class"]
+                conf_pct = f"{s['confidence']*100:.1f}%"
+                seq_num = s["sequence_number"]
+                action = s["routing_action"]
+                lat = f"{s['inference_ms']}ms"
+                time_str = s["scanned_at"].split("T")[1][:8] if "T" in s["scanned_at"] else s["scanned_at"]
+
+                if cls_name == "FERTILE":
+                    badge_fg = FUTheme.FERTILE_GREEN_CARD
+                    badge_border = FUTheme.FERTILE_GREEN_BORDER
+                    badge_text = FUTheme.FERTILE_GREEN_TEXT
+                    pill = "🟢 FERTILE"
+                elif cls_name == "INFERTILE":
+                    badge_fg = FUTheme.INFERTILE_AMBER_CARD
+                    badge_border = FUTheme.INFERTILE_AMBER_BORDER
+                    badge_text = FUTheme.INFERTILE_AMBER_TEXT
+                    pill = "🟡 INFERTILE"
+                else:
+                    badge_fg = FUTheme.ABNORMAL_RED_CARD
+                    badge_border = FUTheme.ABNORMAL_RED_BORDER
+                    badge_text = FUTheme.ABNORMAL_RED_TEXT
+                    pill = "🔴 ABNORMAL"
+
+                row_card = ctk.CTkFrame(table_container, fg_color=FUTheme.PANEL_LIGHT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
+                row_card.pack(fill="x", pady=3, padx=4)
+
+                # Col 1: Sequence #
+                ctk.CTkLabel(
+                    row_card, text=f"#{seq_num:03d}", font=(FUTheme.FONT_FAMILY, 11, "bold"),
+                    text_color=FUTheme.TEXT_PRIMARY, width=50
+                ).pack(side="left", padx=(10, 4), pady=8)
+
+                # Col 2: Classification Badge Pill
+                cls_lbl = ctk.CTkLabel(
+                    row_card, text=pill, font=(FUTheme.FONT_FAMILY, 10, "bold"),
+                    fg_color=badge_fg, text_color=badge_text, corner_radius=5, padx=8, pady=2
+                )
+                cls_lbl.pack(side="left", padx=6, pady=8)
+
+                # Col 3: Confidence & Action
+                ctk.CTkLabel(
+                    row_card, text=f"Conf: {conf_pct}  •  Action: {action}",
+                    font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_SECONDARY
+                ).pack(side="left", padx=10, pady=8)
+
+                # Col 4 (Right): Time & Latency
+                meta_txt = f"{time_str}  ({lat})"
+                ctk.CTkLabel(
+                    row_card, text=meta_txt, font=("Consolas", 10), text_color=FUTheme.TEXT_MUTED
+                ).pack(side="right", padx=(4, 12), pady=8)
+
+        def set_filter(flt: str):
+            current_filter[0] = flt
+            for k, btn in tab_btns.items():
+                if k == flt:
+                    btn.configure(fg_color=FUTheme.PRIMARY_MAROON, text_color=FUTheme.TEXT_WHITE)
+                else:
+                    btn.configure(fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY)
+            render_table()
+
+        # Build Filter Tabs
+        tabs_spec = [
+            ("ALL", f"All Scans ({n_total})"),
+            ("FERTILE", f"🟢 Fertile ({n_fertile})"),
+            ("INFERTILE", f"🟡 Infertile ({n_infertile})"),
+            ("ABNORMAL", f"🔴 Abnormal ({n_abnormal})"),
+        ]
+
+        for key, label in tabs_spec:
+            btn = ctk.CTkButton(
+                filter_row, text=label, font=(FUTheme.FONT_FAMILY, 10, "bold"),
+                fg_color=FUTheme.PRIMARY_MAROON if key == "ALL" else FUTheme.PANEL_LIGHT_ALT,
+                text_color=FUTheme.TEXT_WHITE if key == "ALL" else FUTheme.TEXT_PRIMARY,
+                hover_color=FUTheme.HOVER_MAROON, height=28, corner_radius=6,
+                command=lambda k=key: set_filter(k)
+            )
+            btn.pack(side="left", padx=(0, 6))
+            tab_btns[key] = btn
+
+        render_table()
+
+        # Bottom Actions / Export Toolbar
+        b_bar = ctk.CTkFrame(card, fg_color="transparent")
+        b_bar.pack(fill="x", padx=16, pady=(0, 12))
+
+        def export_current():
+            try:
+                flt = current_filter[0]
+                path = self.db.export_batch_csv(self.current_batch_id, class_filter=flt)
+                toast_label.configure(text=f"✓ Exported {flt} scans to: {os.path.basename(path)}", text_color=FUTheme.FERTILE_GREEN_TEXT)
+                self._log(f"[EXPORT] CSV saved: {path}")
+            except Exception as e:
+                toast_label.configure(text=f"Export error: {e}", text_color=FUTheme.ABNORMAL_RED_TEXT)
+
+        def export_all():
+            try:
+                path = self.db.export_batch_csv(self.current_batch_id, class_filter="ALL")
+                toast_label.configure(text=f"✓ Exported ALL batch scans to: {os.path.basename(path)}", text_color=FUTheme.FERTILE_GREEN_TEXT)
+                self._log(f"[EXPORT] Complete batch CSV saved: {path}")
+            except Exception as e:
+                toast_label.configure(text=f"Export error: {e}", text_color=FUTheme.ABNORMAL_RED_TEXT)
+
+        ctk.CTkButton(
+            b_bar, text="📄 Export Current Filter (CSV)", fg_color=FUTheme.PRIMARY_MAROON,
+            hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE,
+            font=(FUTheme.FONT_FAMILY, 11, "bold"), command=export_current, height=36, corner_radius=8
+        ).pack(side="left", fill="x", expand=True, padx=(0, 6))
+
+        ctk.CTkButton(
+            b_bar, text="💾 Export Full Batch (CSV)", fg_color=FUTheme.PANEL_LIGHT_ALT,
+            hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER_DARK,
+            text_color=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 11, "bold"),
+            command=export_all, height=36, corner_radius=8
+        ).pack(side="left", fill="x", expand=True, padx=(0, 6))
+
+        ctk.CTkButton(
+            b_bar, text="Close", fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
+            text_color=FUTheme.TEXT_SECONDARY, font=(FUTheme.FONT_FAMILY, 11),
+            command=dialog.destroy, height=36, corner_radius=8, width=80
         ).pack(side="right")

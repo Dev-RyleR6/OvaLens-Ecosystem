@@ -185,3 +185,54 @@ def test_csv_session_export(tmp_path):
         assert "FERTILE" in lines[1]
         assert "INFERTILE" in lines[2]
 
+
+def test_session_completion_and_batch_querying(tmp_path):
+    """Verify session completion protocol, filtered batch scan queries, and batch CSV export."""
+    test_db_path = str(tmp_path / "test_history.db")
+    export_dir = str(tmp_path / "exports_history")
+    db = LocalDatabaseManager(db_path=test_db_path)
+
+    sess_id = str(uuid.uuid4())
+    db.create_session(
+        session_id=sess_id,
+        batch_id="BATCH-TEST-EXPLORER",
+        device_id="STATION-1",
+        stage="DAY_10",
+        operator_name="Inspector"
+    )
+
+    # Record 4 scans (2 Fertile, 1 Infertile, 1 Abnormal)
+    db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 1, "FERTILE", 0.98, 15, "ACCEPT", [])
+    db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 2, "FERTILE", 0.95, 17, "ACCEPT", [])
+    db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 3, "INFERTILE", 0.89, 16, "REJECT", [])
+    db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 4, "ABNORMAL", 0.92, 19, "REJECT", [])
+
+    # Test Session Completion Protocol
+    completed_stats = db.complete_session(sess_id)
+    assert completed_stats["ended_at"] is not None
+    assert completed_stats["total_scanned"] == 4
+    assert completed_stats["fertile_count"] == 2
+    assert completed_stats["infertile_count"] == 1
+    assert completed_stats["abnormal_count"] == 1
+
+    # Test Querying Batch Scans with filtering
+    all_scans = db.get_scans_by_batch("BATCH-TEST-EXPLORER", class_filter="ALL")
+    assert len(all_scans) == 4
+
+    fertile_scans = db.get_scans_by_batch("BATCH-TEST-EXPLORER", class_filter="FERTILE")
+    assert len(fertile_scans) == 2
+
+    infertile_scans = db.get_scans_by_batch("BATCH-TEST-EXPLORER", class_filter="INFERTILE")
+    assert len(infertile_scans) == 1
+
+    abnormal_scans = db.get_scans_by_batch("BATCH-TEST-EXPLORER", class_filter="ABNORMAL")
+    assert len(abnormal_scans) == 1
+
+    # Test Filtered Batch CSV Export
+    csv_fertile = db.export_batch_csv("BATCH-TEST-EXPLORER", class_filter="FERTILE", output_dir=export_dir)
+    assert os.path.exists(csv_fertile)
+    with open(csv_fertile, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+        assert len(lines) == 3  # Header + 2 fertile scans
+
+

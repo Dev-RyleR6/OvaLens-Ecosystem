@@ -182,6 +182,76 @@ class LocalDatabaseManager:
             """, (limit,))
             return [dict(row) for row in cursor.fetchall()]
 
+    def complete_session(self, session_id: str, ended_at: Optional[str] = None) -> Dict[str, Any]:
+        """Finalize session metadata, commit counts, and execute SQLite WAL checkpoint."""
+        if not ended_at:
+            ended_at = datetime.now(timezone.utc).isoformat()
+        with self._get_connection() as conn:
+            conn.execute("""
+                UPDATE local_sessions
+                SET ended_at = ?
+                WHERE session_id = ? AND (ended_at IS NULL OR ended_at = '');
+            """, (ended_at, session_id))
+            conn.commit()
+            # Run a passive WAL checkpoint to flush pending transactions to disk safely
+            try:
+                conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
+            except Exception:
+                pass
+        return self.get_session_stats(session_id)
+
+    def get_scans_by_batch(self, batch_id: str, limit: int = 300, class_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Fetch scans for a batch with optional class filtering (FERTILE, INFERTILE, ABNORMAL)."""
+        with self._get_connection() as conn:
+            if class_filter and class_filter != "ALL":
+                cursor = conn.execute("""
+                    SELECT sequence_number, scan_id, batch_id, session_id, final_class, confidence, inference_ms, routing_action, scanned_at, is_synced
+                    FROM local_scans
+                    WHERE batch_id = ? AND final_class = ?
+                    ORDER BY sequence_number DESC
+                    LIMIT ?;
+                """, (batch_id, class_filter, limit))
+            else:
+                cursor = conn.execute("""
+                    SELECT sequence_number, scan_id, batch_id, session_id, final_class, confidence, inference_ms, routing_action, scanned_at, is_synced
+                    FROM local_scans
+                    WHERE batch_id = ?
+                    ORDER BY sequence_number DESC
+                    LIMIT ?;
+                """, (batch_id, limit))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def export_batch_csv(self, batch_id: str, class_filter: Optional[str] = None, output_dir: Optional[str] = None) -> str:
+        """Export batch scans to CSV, optionally filtered by class."""
+        import csv
+        if output_dir is None:
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            output_dir = os.path.join(base_dir, "exports")
+        os.makedirs(output_dir, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filter_tag = f"_{class_filter.lower()}" if class_filter and class_filter != "ALL" else ""
+        filename = f"OvaLens_{batch_id}{filter_tag}_{timestamp}.csv"
+        filepath = os.path.join(output_dir, filename)
+
+        scans = self.get_scans_by_batch(batch_id, limit=5000, class_filter=class_filter)
+        with open(filepath, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["#", "Scan ID", "Batch Code", "Classification", "Confidence", "Action", "Latency (ms)", "Timestamp (UTC)", "Server Synced"])
+            for r in scans:
+                writer.writerow([
+                    r["sequence_number"],
+                    r["scan_id"],
+                    r["batch_id"],
+                    r["final_class"],
+                    f"{r['confidence']*100:.2f}%",
+                    r["routing_action"],
+                    r["inference_ms"],
+                    r["scanned_at"],
+                    "YES" if r["is_synced"] else "NO"
+                ])
+        return filepath
+
     def export_session_csv(self, session_id: str, output_dir: Optional[str] = None) -> str:
         """Generate a complete, timestamped CSV export report of an egg sorting run."""
         import csv
