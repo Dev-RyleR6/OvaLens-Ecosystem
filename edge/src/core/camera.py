@@ -27,11 +27,22 @@ class CameraGrabber:
         self._fps_count = 0
         self._current_fps = 0.0
         self._last_fps_time = time.time()
+        self._static_bg: Optional[np.ndarray] = None
+
+    def _init_static_bg(self):
+        """Pre-render darkroom candling aperture background once to minimize CPU cycles."""
+        bg = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        cv2.circle(bg, (self.width // 2, self.height // 2), 260, (15, 35, 80), -1)
+        cv2.circle(bg, (self.width // 2, self.height // 2), 180, (20, 60, 160), -1)
+        self._static_bg = bg
 
     def start(self):
         """Initialize camera hardware and start continuous frame grabber thread."""
         if self._is_running:
             return
+
+        if self._static_bg is None:
+            self._init_static_bg()
 
         self._open_camera()
         self._is_running = True
@@ -57,7 +68,9 @@ class CameraGrabber:
             self._is_mock_mode = True
 
     def _capture_loop(self):
+        frame_interval = 1.0 / max(1, self.fps)
         while self._is_running:
+            t_start = time.time()
             if not self._is_mock_mode and self.cap and self.cap.isOpened():
                 ret, frame = self.cap.read()
                 if ret and frame is not None:
@@ -65,14 +78,16 @@ class CameraGrabber:
                         self._latest_frame = frame
                     self._update_fps()
                 else:
-                    time.sleep(0.01)
+                    time.sleep(0.005)
             else:
                 # Generate synthetic candling frame with a moving egg silhouette
                 frame = self._generate_mock_candling_frame()
                 with self._lock:
                     self._latest_frame = frame
                 self._update_fps()
-                time.sleep(1.0 / self.fps)
+                elapsed = time.time() - t_start
+                sleep_time = max(0.001, frame_interval - elapsed)
+                time.sleep(sleep_time)
 
     def _update_fps(self):
         self._fps_count += 1
@@ -83,12 +98,11 @@ class CameraGrabber:
             self._last_fps_time = now
 
     def _generate_mock_candling_frame(self) -> np.ndarray:
-        """Create a synthetic high-contrast duck egg candling image."""
-        img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-
-        # Candling ambient background glow
-        cv2.circle(img, (self.width // 2, self.height // 2), 260, (15, 35, 80), -1)
-        cv2.circle(img, (self.width // 2, self.height // 2), 180, (20, 60, 160), -1)
+        """Create a synthetic high-contrast duck egg candling image using cached background."""
+        if self._static_bg is not None:
+            img = self._static_bg.copy()
+        else:
+            img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
 
         # Draw egg silhouette in center
         t = time.time()
@@ -108,13 +122,13 @@ class CameraGrabber:
 
         return img
 
-    def get_latest_frame(self) -> Optional[np.ndarray]:
+    def get_latest_frame(self, copy: bool = False) -> Optional[np.ndarray]:
         """Return the most recent video frame atomically."""
         if not self._is_running:
             return None
         with self._lock:
             if self._latest_frame is not None:
-                return self._latest_frame.copy()
+                return self._latest_frame.copy() if copy else self._latest_frame
             return None
 
     @property

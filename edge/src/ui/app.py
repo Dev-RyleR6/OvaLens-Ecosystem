@@ -13,6 +13,7 @@ from typing import Optional, Dict, Any, List, Tuple
 
 import cv2
 import numpy as np
+import tkinter as tk
 from PIL import Image, ImageTk
 import customtkinter as ctk
 
@@ -272,9 +273,10 @@ class OvaLensOperatorApp(ctk.CTk):
                 self._cached_container_h = event.height
         self.video_container.bind("<Configure>", _on_video_resize)
 
-        # Video HUD Canvas
-        self.video_label = ctk.CTkLabel(self.video_container, text="", fg_color=FUTheme.DARKROOM_VIEWPORT)
+        # Video HUD Canvas (Native Tkinter Label for 60 FPS zero-overhead rendering)
+        self.video_label = tk.Label(self.video_container, bg=FUTheme.DARKROOM_VIEWPORT, bd=0, highlightthickness=0)
         self.video_label.place(relx=0.5, rely=0.5, anchor="center")
+        self._current_photo = None
 
         # Standby Overlay Container (rendered when camera is off)
         self.standby_frame = ctk.CTkFrame(self.video_container, fg_color="transparent")
@@ -781,13 +783,13 @@ class OvaLensOperatorApp(ctk.CTk):
         Industrial Automated Conveyor State Machine:
         1. Motor Advances Conveyor
         2. Egg enters dark candling chamber (Conveyor Pauses for blur-free optical capture)
-        3. AI Vision inference executes
+        3. AI Vision inference executes in worker thread (Zero UI lag)
         4. Servo diverter actuates if rejected; lets egg pass to incubator lane if fertile
         5. Automatically repeats until target batch count is satisfied
         """
         while self.is_auto_cycle_running and not self._stop_cycle_event.is_set():
             if self.total_count >= self.target_egg_count:
-                self.after(0, lambda: self._on_batch_target_complete())
+                self.after(0, self._on_batch_target_complete)
                 break
 
             # PHASE 1: Motor Advance (Transport egg to candling aperture)
@@ -806,12 +808,19 @@ class OvaLensOperatorApp(ctk.CTk):
             if self._stop_cycle_event.is_set():
                 break
 
-            # PHASE 3: AI Candling Scan & Actuation
+            # PHASE 3: AI Candling Scan & Actuation in Background Thread
             self.after(0, lambda: self._update_cycle_hud("🔵", FUTheme.PRIMARY_MAROON, f"AI INFERENCE — SCANNING EGG #{self.total_count + 1}...", bg_color=FUTheme.PRIMARY_MAROON_BG))
-            self.after(0, self.trigger_candling_scan)
+            
+            frame = self.camera.get_latest_frame(copy=True)
+            if frame is not None:
+                # Run neural net prediction asynchronously in this background thread
+                result = self.engine.predict(frame)
+                self.after(0, lambda res=result: self._process_scan_result(res))
+            else:
+                self.after(0, self.trigger_candling_scan)
 
             # Settle time between cycles
-            time.sleep(0.4)
+            time.sleep(0.35)
 
     def _on_batch_target_complete(self):
         self._stop_auto_cycle()
@@ -826,18 +835,8 @@ class OvaLensOperatorApp(ctk.CTk):
         self.cycle_status_dot.configure(text=dot_icon, text_color=dot_color)
         self.cycle_status_label.configure(text=status_text, text_color=dot_color if dot_color != FUTheme.TEXT_MUTED else FUTheme.TEXT_PRIMARY)
 
-    def trigger_candling_scan(self):
-        """Perform instant snapshot inference and trigger conveyor actuator if rejected."""
-        if not self.camera.is_running:
-            self.camera.start()
-            self.standby_frame.place_forget()
-            self._set_session_active_state(True)
-            time.sleep(0.1)
-
-        frame = self.camera.get_latest_frame()
-        if frame is None:
-            return
-
+    def _process_scan_result(self, result: Dict[str, Any]):
+        """Commit scan result to database, schedule physical actuator, and update telemetry on UI."""
         if not self.is_session_active:
             self.current_session_id = self.current_session_id or str(uuid.uuid4())
             self.is_session_active = True
@@ -853,13 +852,11 @@ class OvaLensOperatorApp(ctk.CTk):
         self.scan_sequence += 1
         scan_id = str(uuid.uuid4())
 
-        # Run AI Model Inference (YOLOv8 + ONNX Runtime)
-        result = self.engine.predict(frame)
         final_cls = result["final_class"]
         conf = result["confidence"]
         action = result["routing_action"]
         lat_ms = result["inference_ms"]
-        detections = result["detections"]
+        detections = result.get("detections", [])
 
         self._latest_detections = detections
 
@@ -893,6 +890,21 @@ class OvaLensOperatorApp(ctk.CTk):
         self._update_counters_ui()
         self._update_result_banner(final_cls, conf, action, lat_ms)
         self._log(f"#{self.scan_sequence:03d} | {final_cls:<9} | {conf*100:5.1f}% | {action:<6} | {lat_ms}ms")
+
+    def trigger_candling_scan(self):
+        """Perform instant snapshot inference on-demand (Manual Test Scan)."""
+        if not self.camera.is_running:
+            self.camera.start()
+            self.standby_frame.place_forget()
+            self._set_session_active_state(True)
+            time.sleep(0.05)
+
+        frame = self.camera.get_latest_frame(copy=True)
+        if frame is None:
+            return
+
+        result = self.engine.predict(frame)
+        self._process_scan_result(result)
 
     def trigger_manual_eject(self):
         """Fire servo kicker immediately with visual confirmation on UI."""
@@ -965,27 +977,26 @@ class OvaLensOperatorApp(ctk.CTk):
 
     def _update_video_frame(self):
         """
-        Live video render loop at ~30 FPS with dynamic AI bounding box & classification overlays.
-        Only grabs and renders active camera frames when a session is in progress.
+        High-Performance Video Render Loop (~33 FPS).
+        Uses atomic frame buffer and native Tkinter PhotoImage for zero-overhead GUI rendering.
         """
         if self.camera.is_running:
-            frame = self.camera.get_latest_frame()
+            frame = self.camera.get_latest_frame(copy=False)
             if frame is not None:
-                h, w = frame.shape[:2]
+                # Copy only if drawing active annotations to avoid mutating grabber buffer
+                if self.show_crosshairs or self._latest_detections:
+                    disp_frame = frame.copy()
+                else:
+                    disp_frame = frame
 
-                # Run live detection if not recently computed (every ~100ms) and not in auto cycle
-                now = time.time()
-                if not self.is_auto_cycle_running and now - self._last_live_infer_time > 0.12:
-                    infer_res = self.engine.predict(frame)
-                    self._latest_detections = infer_res.get("detections", [])
-                    self._last_live_infer_time = now
+                h, w = disp_frame.shape[:2]
 
                 # 1. Draw Optical Candling Alignment Guide / Crosshairs (if enabled)
                 if self.show_crosshairs:
-                    cv2.circle(frame, (w // 2, h // 2), 6, (0, 255, 0), -1)
-                    cv2.line(frame, (w // 2 - 25, h // 2), (w // 2 + 25, h // 2), (0, 255, 0), 1)
-                    cv2.line(frame, (w // 2, h // 2 - 25), (w // 2, h // 2 + 25), (0, 255, 0), 1)
-                    cv2.ellipse(frame, (w // 2, h // 2), (180, 240), 0, 0, 360, (0, 200, 255), 1)
+                    cv2.circle(disp_frame, (w // 2, h // 2), 6, (0, 255, 0), -1)
+                    cv2.line(disp_frame, (w // 2 - 25, h // 2), (w // 2 + 25, h // 2), (0, 255, 0), 1)
+                    cv2.line(disp_frame, (w // 2, h // 2 - 25), (w // 2, h // 2 + 25), (0, 255, 0), 1)
+                    cv2.ellipse(disp_frame, (w // 2, h // 2), (180, 240), 0, 0, 360, (0, 200, 255), 1)
 
                 # 2. Draw Live AI Bounding Boxes & Classification Labels
                 for det in self._latest_detections:
@@ -1010,14 +1021,14 @@ class OvaLensOperatorApp(ctk.CTk):
                             box_bgr = (38, 38, 220)     # Reject Red
                             label_str = f"ABNORMAL: {conf*100:.1f}%"
 
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), box_bgr, 2)
+                        cv2.rectangle(disp_frame, (x1, y1), (x2, y2), box_bgr, 2)
                         (tw, th), _ = cv2.getTextSize(label_str, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
-                        cv2.rectangle(frame, (x1, y1 - th - 8), (x1 + tw + 10, y1), box_bgr, -1)
-                        cv2.putText(frame, label_str, (x1 + 5, y1 - 4),
+                        cv2.rectangle(disp_frame, (x1, y1 - th - 8), (x1 + tw + 10, y1), box_bgr, -1)
+                        cv2.putText(disp_frame, label_str, (x1 + 5, y1 - 4),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA)
 
-                # 3. Fast Letterbox Scaling with Cached Geometry Dimensions
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # 3. High-Speed Aspect Ratio Scaling
+                rgb_frame = cv2.cvtColor(disp_frame, cv2.COLOR_BGR2RGB)
 
                 container_w = max(100, self._cached_container_w)
                 container_h = max(100, self._cached_container_h)
@@ -1037,10 +1048,11 @@ class OvaLensOperatorApp(ctk.CTk):
 
                 resized = cv2.resize(rgb_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
                 pil_img = Image.fromarray(resized)
-                ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(target_w, target_h))
-                self.video_label.configure(image=ctk_img)
+                photo = ImageTk.PhotoImage(image=pil_img)
+                self.video_label.configure(image=photo)
+                self._current_photo = photo
 
-        self.after(33, self._update_video_frame)
+        self.after(30, self._update_video_frame)
 
     def _update_status_loop(self):
         # Update FPS
@@ -1081,11 +1093,17 @@ class OvaLensOperatorApp(ctk.CTk):
         self.after(1000, self._update_status_loop)
 
     def _log(self, message: str):
-        """Append log line and maintain bounded history."""
-        self.log_textbox.configure(state="normal")
-        self.log_textbox.insert("end", f"{message}\n")
-        self.log_textbox.see("end")
-        self.log_textbox.configure(state="disabled")
+        """Append log line and maintain bounded history for smooth scrolling."""
+        try:
+            self.log_textbox.configure(state="normal")
+            self.log_textbox.insert("end", f"{message}\n")
+            line_count = int(self.log_textbox.index("end-1c").split(".")[0])
+            if line_count > 200:
+                self.log_textbox.delete("1.0", f"{line_count - 200}.0")
+            self.log_textbox.see("end")
+            self.log_textbox.configure(state="disabled")
+        except Exception:
+            pass
 
     def confirm_exit_dialog(self):
         """High-contrast modal confirmation prompt before stopping operations or shutting down."""
