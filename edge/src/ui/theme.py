@@ -47,4 +47,4 @@ class FUTheme:
     TEXT_ACCENT = "#FDE047"           # Gold / Amber highlight
 
     # Standard Typography
-    FONT_FAMILY = "Segoe UI"
+    FONT_FAMILY = "Plus Jakarta Sans"

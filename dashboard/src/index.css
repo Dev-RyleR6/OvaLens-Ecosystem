@@ -16,7 +16,8 @@
   }
 
   body {
-    @apply bg-[#F8FAFC] text-[#0F172A] font-sans antialiased selection:bg-[#800000] selection:text-white;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    @apply bg-[#F8FAFC] text-[#0F172A] antialiased selection:bg-[#800000] selection:text-white;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
