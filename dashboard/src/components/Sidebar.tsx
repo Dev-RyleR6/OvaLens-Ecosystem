@@ -14,6 +14,7 @@ import {
   HardDrive,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -21,6 +22,9 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
+  const { user } = useAuth();
+  const userRole = user?.role || 'ADMIN';
+
   const operationsNav = [
     { to: '/', label: 'Overview', icon: LayoutDashboard },
     { to: '/batches', label: 'Incubation Batches', icon: Layers },
@@ -30,12 +34,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
   ];
 
   const adminNav = [
-    { to: '/records', label: 'Historical Records', icon: Archive },
-    { to: '/models', label: 'Vision Model (ONNX)', icon: Microscope },
-    { to: '/users', label: 'User & Access', icon: Users },
-    { to: '/logs', label: 'Audit Trail Logs', icon: FileText },
-    { to: '/settings', label: 'Hatchery Settings', icon: Settings },
-  ];
+    { to: '/records', label: 'Historical Records', icon: Archive, minRole: ['ADMIN', 'MANAGER', 'OPERATOR'] },
+    { to: '/models', label: 'Vision Model (ONNX)', icon: Microscope, minRole: ['ADMIN', 'MANAGER', 'OPERATOR'] },
+    { to: '/users', label: 'User & Access', icon: Users, minRole: ['ADMIN'] },
+    { to: '/logs', label: 'Audit Trail Logs', icon: FileText, minRole: ['ADMIN', 'MANAGER'] },
+    { to: '/settings', label: 'Hatchery Settings', icon: Settings, minRole: ['ADMIN', 'MANAGER'] },
+  ].filter(item => item.minRole.includes(userRole));
 
   return (
     <>
