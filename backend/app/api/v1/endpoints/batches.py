@@ -70,9 +70,22 @@ def update_batch(
 def advance_batch_stage(
     batch_id: str,
     payload: AdvanceStagePayload,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(require_manager_or_admin)
 ):
-    return BatchService.advance_stage(db, batch_id, payload.stage)
+    batch = BatchService.advance_stage(db, batch_id, payload.stage)
+    
+    # Audit log
+    audit = AuditLogModel(
+        user_id=current_user.user_id,
+        action="STAGE_ADVANCED",
+        entity_type="BATCH",
+        entity_id=batch_id,
+        details={"new_stage": payload.stage, "advanced_by": current_user.email}
+    )
+    db.add(audit)
+    db.commit()
+    return batch
 
 
 @router.post("/{batch_id}/finalize-hatch", response_model=BatchResponse, summary="Finalize Day 28 hatch trial and record duckling count")

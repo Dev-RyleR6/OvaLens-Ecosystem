@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.models.audit import AuditLogModel
 from app.models.user import UserModel
 from app.schemas.audit import AuditLogResponse
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_manager_or_admin
 
 router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 
@@ -26,7 +26,7 @@ def list_audit_logs(
     entity_type: Optional[str] = None,
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
+    current_user: UserModel = Depends(require_manager_or_admin)
 ):
     query = db.query(AuditLogModel)
     if action:

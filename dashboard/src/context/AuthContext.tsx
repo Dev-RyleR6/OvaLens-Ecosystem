@@ -29,8 +29,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         setUser(null);
       }
+
+      // Authoritative server token & role verification to prevent localStorage tampering
+      apiClient.getMe()
+        .then((freshUser) => {
+          setUser(freshUser);
+          localStorage.setItem('ovalens_user', JSON.stringify(freshUser));
+        })
+        .catch(() => {
+          // If token expired or was invalidated by server, clean up
+          logout();
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
   const login = async (credentials: LoginCredentials) => {
