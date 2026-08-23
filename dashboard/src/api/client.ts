@@ -55,6 +55,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Auto-handle 401 Unauthorized / Token Expiration
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('ovalens_auth_token');
+      localStorage.removeItem('ovalens_user');
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const apiClient = {
   // Authentication & Security
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
