@@ -42,6 +42,90 @@ backend/
 
 ---
 
+## 🌐 REST API Endpoints Reference & Security Matrix
+
+All endpoints are versioned under `/api/v1`. Interactive Swagger documentation is available at `http://localhost:8000/docs`.
+
+### 1. Authentication & Session Management (`/api/v1/auth`)
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/auth/login` | Public (Rate-Limited) | User login returning JWT Bearer token. Protected by sliding-window IP rate limiting (10 attempts/min). |
+| `GET` | `/api/v1/auth/me` | `Bearer JWT` | Returns active user profile, email, and role from authoritative database. |
+| `POST` | `/api/v1/auth/register` | `Admin Only` | Creates an operator, manager, or administrator account with bcrypt hashed password. |
+
+### 2. User Administration (`/api/v1/users`)
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/users` | `Admin Only` | Lists all hatchery users, roles, active statuses, and creation timestamps. |
+| `POST` | `/api/v1/users` | `Admin Only` | Registers new user account with duplicate email validation and audit logging. |
+| `PATCH` | `/api/v1/users/{id}/status` | `Admin Only` | Toggles user status (`ACTIVE` vs `SUSPENDED`) with self-deactivation protection. |
+
+### 3. Incubation Batches & Lifecycle (`/api/v1/batches`)
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/batches` | Public Read | Lists all cohorts with computed fertility rate, cull rate, and hatchability. |
+| `GET` | `/api/v1/batches/active` | Public Read | Returns only active (`INCUBATING`) batches for Edge selection. |
+| `POST` | `/api/v1/batches` | `Manager / Admin` | Creates a new incubation cohort with auto-generated code and target hatch dates. |
+| `GET` | `/api/v1/batches/{id}` | Public Read | Retrieves single batch record and metadata. |
+| `GET` | `/api/v1/batches/{id}/analytics`| Public Read | Returns deep batch analytics: Day 10 fertility %, Penoy salvage ₱, and power savings ₱. |
+| `PUT` | `/api/v1/batches/{id}` | `Manager / Admin` | Updates batch parameters and logs changes to audit trail. |
+| `POST` | `/api/v1/batches/{id}/advance-stage` | `Manager / Admin` | Advances milestone (`SETTING` $\to$ `DAY_10` $\to$ `DAY_18` $\to$ `DAY_25` $\to$ `HATCHED`). |
+| `POST` | `/api/v1/batches/{id}/finalize-hatch` | `Manager / Admin` | Finalizes Day 28 harvest metrics with actual hatched vs unhatched counts. |
+| `DELETE` | `/api/v1/batches/{id}` | `Manager / Admin` | Archives/removes batch cohort and records audit event. |
+| `POST` | `/api/v1/batches/check-milestones` | Public Read | Evaluates incubation days and alerts if candling/transfer is due. |
+
+### 4. Edge Candling Scans & Ingestion (`/api/v1/scans`)
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/scans/sync` | `X-API-Key` | Idempotent bulk scan ingestion (`ON CONFLICT DO NOTHING`). |
+| `POST` | `/api/v1/scans/upload-image` | `X-API-Key` | Uploads high-res 1080p candling photos with bounding box annotations. |
+| `GET` | `/api/v1/scans` | Public Read | Lists and filters scans by `batch_id`, `session_id`, or `final_class`. |
+| `GET` | `/api/v1/scans/{id}` | Public Read | Returns scan details, HSV candling metrics, and inference latency. |
+| `PATCH` | `/api/v1/scans/{id}/override` | `Bearer JWT` | Human-in-the-Loop classification override with reason logging and session rollup recalculation. |
+
+### 5. Candling Sessions (`/api/v1/sessions`)
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/sessions` | Public Read | Lists candling shifts by batch, stage, or date. |
+| `POST` | `/api/v1/sessions` | `X-API-Key` | Starts a candling shift on an edge sorter machine. |
+| `GET` | `/api/v1/sessions/{id}` | Public Read | Retrieves session summary, total scanned, and class distribution. |
+| `PUT` | `/api/v1/sessions/{id}/end` | `X-API-Key` | Concludes active candling shift and stamps completion time. |
+
+### 6. Edge Hardware Sorter Stations (`/api/v1/devices`)
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/devices` | `Bearer JWT` | Lists all registered conveyor sorting machines and status (`ONLINE`, `OFFLINE`). |
+| `POST` | `/api/v1/devices/register` | `X-API-Key` | Registers or updates station hardware platform, model version, and conveyor speed. |
+| `POST` | `/api/v1/devices/{id}/heartbeat`| `X-API-Key` | Edge station heartbeat ping with IP address and telemetry. |
+
+### 7. Hatchery Analytics & Economics (`/api/v1/analytics`)
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/analytics/overview` | Public Read | Top-level KPIs: total scanned, fertility rate, cull rate, and hatchability. |
+| `GET` | `/api/v1/analytics/economic-yield`| Public Read | Penoy salvage revenue (₱), thermal power savings (kWh/₱), and total economic ROI. |
+| `GET` | `/api/v1/analytics/breed-comparison`| Public Read | Biological and commercial yield comparison across duck breeds. |
+| `GET` | `/api/v1/analytics/mortality-trends`| Public Read | Early (Day 10), mid (Day 18), and late (Day 25) embryonic mortality breakdown. |
+| `GET` | `/api/v1/analytics/mortality-progression`| Public Read | Developmental mortality curve and viability retention benchmarks. |
+
+### 8. Audit Trail & Compliance (`/api/v1/audit-logs`)
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/audit-logs` | `Manager / Admin` | Queries immutable security, operational, and classification override logs with severity levels. |
+
+### 9. Facility Settings & Calibration (`/api/v1/settings`)
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/settings` | Public Read | Retrieves facility profile, confidence thresholds, and economic prices. |
+| `PUT` | `/api/v1/settings` | `Manager / Admin` | Updates facility parameters with strict numeric bounds and audit logging. |
+
+### 10. Audit Reports & Exports (`/api/v1/reports`)
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/reports/batch/{id}/csv` | Public Read | Streams raw candling dataset CSV export with bounding boxes. |
+| `GET` | `/api/v1/reports/batch/{id}/pdf` | Public Read | Generates official Foundation University PDF Candling Inspection Certificate. |
+
+---
+
 ## ⚙️ Setup & Execution
 
 ### 1. Install Dependencies
