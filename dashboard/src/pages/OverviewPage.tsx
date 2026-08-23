@@ -23,12 +23,13 @@ import { TrayMatrix } from '../components/TrayMatrix';
 import { BatchProgressTimeline } from '../components/BatchProgressTimeline';
 import { apiClient } from '../api/client';
 import { AnalyticsOverview, BatchSummary, EggScan, EconomicYield } from '../types';
+import { mockOverview, mockEconomicYield, mockBatches, mockScans } from '../api/mockData';
 
 export const OverviewPage: React.FC = () => {
-  const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
-  const [, setEconomic] = useState<EconomicYield | null>(null);
-  const [batches, setBatches] = useState<BatchSummary[]>([]);
-  const [, setRecentScans] = useState<EggScan[]>([]);
+  const [overview, setOverview] = useState<AnalyticsOverview>(mockOverview);
+  const [, setEconomic] = useState<EconomicYield>(mockEconomicYield);
+  const [batches, setBatches] = useState<BatchSummary[]>(mockBatches);
+  const [, setRecentScans] = useState<EggScan[]>(mockScans);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('ALL');
 
   useEffect(() => {
@@ -42,10 +43,10 @@ export const OverviewPage: React.FC = () => {
           apiClient.getScans({ limit: 6 })
         ]);
         if (isMounted) {
-          setOverview(overviewData);
-          setEconomic(economicData);
-          setBatches(batchesData);
-          setRecentScans(scansData);
+          if (overviewData) setOverview(overviewData);
+          if (economicData) setEconomic(economicData);
+          if (batchesData && batchesData.length > 0) setBatches(batchesData);
+          if (scansData && scansData.length > 0) setRecentScans(scansData);
         }
       } catch (err) {
         console.error("Dashboard fetch error:", err);

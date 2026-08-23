@@ -27,13 +27,14 @@ import { CandlingCertificateModal } from '../components/CandlingCertificateModal
 import { BatchAnalyticsModal } from '../components/BatchAnalyticsModal';
 import { FinalizeHatchModal } from '../components/FinalizeHatchModal';
 import { Activity, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { mockBatches } from '../api/mockData';
 
 type ViewMode = 'TABLE' | 'GRID';
 type SortField = 'batch_code' | 'set_date' | 'initial_egg_count' | 'fertility_rate';
 type SortOrder = 'asc' | 'desc';
 
 export const BatchesPage: React.FC = () => {
-  const [batches, setBatches] = useState<BatchSummary[]>([]);
+  const [batches, setBatches] = useState<BatchSummary[]>(mockBatches);
   const [viewMode, setViewMode] = useState<ViewMode>('TABLE');
   const [searchQuery, setSearchQuery] = useState('');
   const [breedFilter, setBreedFilter] = useState<string>('ALL');
