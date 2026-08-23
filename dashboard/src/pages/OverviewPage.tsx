@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Activity,
   Layers,
@@ -8,6 +8,9 @@ import {
   Zap,
   Info,
   X,
+  Filter,
+  RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
@@ -34,7 +37,7 @@ export const OverviewPage: React.FC = () => {
   const [economic, setEconomic] = useState<EconomicYield | null>(null);
   const [batches, setBatches] = useState<BatchSummary[]>([]);
   const [recentScans, setRecentScans] = useState<EggScan[]>([]);
-  const [selectedBatch, setSelectedBatch] = useState<BatchSummary | null>(null);
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('ALL');
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
     return localStorage.getItem('ovalens_onboarding_dismissed') !== 'true';
   });
@@ -54,9 +57,6 @@ export const OverviewPage: React.FC = () => {
           setEconomic(economicData);
           setBatches(batchesData);
           setRecentScans(scansData);
-          if (batchesData.length > 0) {
-            setSelectedBatch(batchesData[0]);
-          }
         }
       } catch (err) {
         console.error("Dashboard fetch error:", err);
@@ -68,10 +68,45 @@ export const OverviewPage: React.FC = () => {
     };
   }, []);
 
-  const totalScanned = overview?.total_eggs_scanned ?? 2050;
-  const fertileCount = overview?.total_fertile ?? 1812;
-  const penoyCount = overview?.total_infertile ?? 168;
-  const abnormalCount = overview?.total_abnormal ?? 70;
+  // Currently focused batch (either explicitly chosen or first batch if ALL)
+  const currentBatch = useMemo(() => {
+    if (selectedBatchId !== 'ALL') {
+      return batches.find(b => b.batch_id === selectedBatchId) || null;
+    }
+    return batches.length > 0 ? batches[0] : null;
+  }, [selectedBatchId, batches]);
+
+  // Dynamically calculate KPIs based on batch filter selection
+  const isFiltered = selectedBatchId !== 'ALL' && currentBatch !== null;
+
+  const totalScanned = useMemo(() => {
+    if (isFiltered && currentBatch) {
+      const sum = (currentBatch.fertile_count || 0) + (currentBatch.infertile_count || 0) + (currentBatch.abnormal_count || 0);
+      return sum > 0 ? sum : (currentBatch.initial_egg_count || 500);
+    }
+    return overview?.total_eggs_scanned ?? 2050;
+  }, [isFiltered, currentBatch, overview]);
+
+  const fertileCount = useMemo(() => {
+    if (isFiltered && currentBatch) {
+      return currentBatch.fertile_count || 0;
+    }
+    return overview?.total_fertile ?? 1812;
+  }, [isFiltered, currentBatch, overview]);
+
+  const penoyCount = useMemo(() => {
+    if (isFiltered && currentBatch) {
+      return currentBatch.infertile_count || 0;
+    }
+    return overview?.total_infertile ?? 168;
+  }, [isFiltered, currentBatch, overview]);
+
+  const abnormalCount = useMemo(() => {
+    if (isFiltered && currentBatch) {
+      return currentBatch.abnormal_count || 0;
+    }
+    return overview?.total_abnormal ?? 70;
+  }, [isFiltered, currentBatch, overview]);
 
   const fertilePct = Number(((fertileCount / (totalScanned || 1)) * 100).toFixed(1));
   const penoyPct = Number(((penoyCount / (totalScanned || 1)) * 100).toFixed(1));
@@ -102,10 +137,10 @@ export const OverviewPage: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Institutional Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+      {/* Institutional Page Header with Interactive Batch Filter */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
               Hatchery Operations Command
             </h1>
@@ -113,18 +148,55 @@ export const OverviewPage: React.FC = () => {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
               Live Sorter Feed
             </span>
+            {isFiltered && currentBatch && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-maroon-50 text-[#800000] border border-maroon-200">
+                <Sparkles className="w-3 h-3" />
+                Filtered: {currentBatch.batch_code}
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
             Real-time duck egg candling classification, 28-day cohort tracking, and Day 10 commercial Penoy food salvage.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        {/* Filter Toolbar: Batch Filter Dropdown & Quick Actions */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Batch Selector Dropdown */}
+          <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 shadow-2xs">
+            <Filter className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+            <label htmlFor="batch-filter" className="text-[11px] font-bold text-slate-600 uppercase tracking-wider hidden sm:inline">
+              Cohort:
+            </label>
+            <select
+              id="batch-filter"
+              value={selectedBatchId}
+              onChange={(e) => setSelectedBatchId(e.target.value)}
+              className="text-xs font-semibold text-slate-800 bg-transparent border-0 focus:outline-none focus:ring-0 cursor-pointer pr-2"
+            >
+              <option value="ALL">🌐 All Batches (Hatchery Overall)</option>
+              {batches.map((b) => (
+                <option key={b.batch_id} value={b.batch_id}>
+                  📦 {b.batch_code} ({b.breed} • {b.current_stage})
+                </option>
+              ))}
+            </select>
+            {isFiltered && (
+              <button
+                onClick={() => setSelectedBatchId('ALL')}
+                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors text-[10px] font-bold cursor-pointer"
+                title="Reset to All Batches"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
           <Link
             to="/batches"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-semibold shadow-xs transition-colors btn-press cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-semibold shadow-xs transition-colors btn-press cursor-pointer flex-shrink-0"
           >
-            <span>Manage All Batches</span>
+            <span>Manage Batches</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -183,19 +255,19 @@ export const OverviewPage: React.FC = () => {
       {/* Operational KPI Ribbon */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Eggs Candled"
+          title={isFiltered ? "Batch Eggs Candled" : "Total Eggs Candled"}
           value={totalScanned.toLocaleString()}
           unit="eggs"
-          subtitle="ONNX YOLOv8 FP16 Verified"
+          subtitle={isFiltered && currentBatch ? `Cohort: ${currentBatch.batch_code}` : "ONNX YOLOv8 FP16 Verified"}
           icon={Activity}
           highlightColor="maroon"
         />
         <StatCard
-          title="Overall Fertility Rate"
-          value={`${overview?.overall_fertility_rate ?? '88.4'}%`}
+          title={isFiltered ? "Cohort Fertility Rate" : "Overall Fertility Rate"}
+          value={`${isFiltered && currentBatch ? currentBatch.fertility_rate : (overview?.overall_fertility_rate ?? '88.4')}%`}
           subtitle={`${fertileCount.toLocaleString()} viable spider embryos`}
           icon={CheckCircle2}
-          trend={{ value: '+2.1%', isPositive: true, label: 'vs previous cohort' }}
+          trend={!isFiltered ? { value: '+2.1%', isPositive: true, label: 'vs previous cohort' } : undefined}
           highlightColor="green"
         />
         <StatCard
@@ -206,26 +278,28 @@ export const OverviewPage: React.FC = () => {
           highlightColor="amber"
         />
         <StatCard
-          title="Active Incubating Batches"
-          value={overview ? overview.active_batches_count : '3'}
-          unit="batches"
-          subtitle="In 28-day incubation cycle"
+          title={isFiltered ? "Incubator Location" : "Active Incubating Batches"}
+          value={isFiltered && currentBatch ? currentBatch.incubator_id : (overview ? overview.active_batches_count : '3')}
+          unit={isFiltered ? "" : "batches"}
+          subtitle={isFiltered && currentBatch ? `Stage: ${currentBatch.current_stage}` : "In 28-day incubation cycle"}
           icon={Layers}
           highlightColor="blue"
         />
       </div>
 
       {/* Active Incubation Batch Stage Tracker with Quick Batch Switcher */}
-      {selectedBatch && (
+      {currentBatch && (
         <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs hover:border-slate-300 transition-all animate-slide-up">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#800000]">Active Batch:</span>
-                <h3 className="text-base font-bold text-[#0F172A]">{selectedBatch.batch_code}</h3>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#800000]">
+                  {isFiltered ? "Inspecting Cohort:" : "Active Batch:"}
+                </span>
+                <h3 className="text-base font-bold text-[#0F172A]">{currentBatch.batch_code}</h3>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Breed: <strong>{selectedBatch.breed}</strong> • Incubator: <strong>{selectedBatch.incubator_id}</strong> • Initial Set: <strong>{selectedBatch.initial_egg_count} eggs</strong>
+                Breed: <strong>{currentBatch.breed}</strong> • Incubator: <strong>{currentBatch.incubator_id}</strong> • Initial Set: <strong>{currentBatch.initial_egg_count} eggs</strong>
               </p>
             </div>
 
@@ -233,12 +307,22 @@ export const OverviewPage: React.FC = () => {
             <div className="flex items-center gap-2 flex-wrap">
               {batches.length > 1 && (
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                  <button
+                    onClick={() => setSelectedBatchId('ALL')}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all btn-press cursor-pointer ${
+                      selectedBatchId === 'ALL'
+                        ? 'bg-[#800000] text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                    }`}
+                  >
+                    All Batches
+                  </button>
                   {batches.slice(0, 4).map((b) => (
                     <button
                       key={b.batch_id}
-                      onClick={() => setSelectedBatch(b)}
+                      onClick={() => setSelectedBatchId(b.batch_id)}
                       className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all btn-press cursor-pointer ${
-                        selectedBatch.batch_id === b.batch_id
+                        selectedBatchId === b.batch_id
                           ? 'bg-[#800000] text-white shadow-2xs'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                       }`}
@@ -248,15 +332,15 @@ export const OverviewPage: React.FC = () => {
                   ))}
                 </div>
               )}
-              <Badge type="status" value={selectedBatch.status} />
-              <Badge type="stage" value={selectedBatch.current_stage} />
+              <Badge type="status" value={currentBatch.status} />
+              <Badge type="stage" value={currentBatch.current_stage} />
             </div>
           </div>
 
           <div className="pt-2">
             <BatchProgressTimeline
-              currentStage={selectedBatch.current_stage}
-              setDate={selectedBatch.set_date}
+              currentStage={currentBatch.current_stage}
+              setDate={currentBatch.set_date}
             />
           </div>
         </div>
@@ -426,7 +510,7 @@ export const OverviewPage: React.FC = () => {
 
       {/* Embedded 42-Egg Tray Matrix Component */}
       <TrayMatrix
-        batchCode={selectedBatch?.batch_code || "BATCH-2026-08-KAY-01"}
+        batchCode={currentBatch?.batch_code || "BATCH-2026-08-KAY-01"}
         trayNumber={1}
       />
     </div>
