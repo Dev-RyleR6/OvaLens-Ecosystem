@@ -110,8 +110,8 @@ export const DevicesPage: React.FC = () => {
       )}
 
       {/* Edge Devices Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-slide-up stagger-1">
-        {devices.map((device, index) => {
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {devices.map((device) => {
           const cal = calibration[device.device_id] || {
             speed: device.conveyor_speed_cm_s || 12.5,
             dist: device.conveyor_dist_cm || 25.0,
@@ -123,7 +123,7 @@ export const DevicesPage: React.FC = () => {
           return (
             <div
               key={device.device_id}
-              className={`bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs space-y-4 hover-lift transition-all animate-slide-up stagger-${index + 1}`}
+              className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs space-y-4 hover-lift transition-all"
             >
               {/* Device Header with Live Radar Beacon */}
               <div className="flex items-start justify-between pb-3 border-b border-slate-100">
