@@ -277,17 +277,17 @@ export const AuditLogsPage: React.FC = () => {
                   </td>
                   <td className="py-3 px-4">
                     {log.severity === 'SECURITY' ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-800 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-200">
+                      <span className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-rose-800 bg-rose-50 w-24 py-1 rounded-md border border-rose-200">
                         <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                         Security
                       </span>
                     ) : log.severity === 'WARNING' ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200">
+                      <span className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-amber-900 bg-amber-50 w-24 py-1 rounded-md border border-amber-200">
                         <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                         Warning
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                      <span className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-100 w-24 py-1 rounded-md border border-slate-200">
                         <Info className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                         Info
                       </span>
