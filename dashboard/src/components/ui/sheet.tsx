@@ -1,4 +1,5 @@
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useModalAnimation } from "@/hooks/useModalAnimation"
@@ -38,9 +39,9 @@ export const Sheet: React.FC<SheetProps> = ({
     }
   }, [isOpen, onClose])
 
-  if (!shouldRender) return null
+  if (!shouldRender || typeof document === "undefined") return null
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop */}
       <div
@@ -51,10 +52,10 @@ export const Sheet: React.FC<SheetProps> = ({
         onClick={onClose}
       />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10 pointer-events-none">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10 pointer-events-none z-50">
         <div
           className={cn(
-            "relative w-screen max-w-[100vw] sm:max-w-md md:max-w-lg border-l border-slate-200 bg-white shadow-2xl flex flex-col pointer-events-auto z-10 h-[100dvh] max-h-[100dvh] overflow-hidden",
+            "relative w-screen max-w-[100vw] sm:max-w-md md:max-w-lg border-l border-slate-200 bg-white shadow-2xl flex flex-col pointer-events-auto z-50 h-screen max-h-screen h-[100dvh] max-h-[100dvh] overflow-hidden",
             isClosing ? "animate-drawer-right-exit" : "animate-drawer-right",
             className
           )}
@@ -88,6 +89,7 @@ export const Sheet: React.FC<SheetProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

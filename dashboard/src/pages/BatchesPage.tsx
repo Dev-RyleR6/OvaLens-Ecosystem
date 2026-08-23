@@ -48,6 +48,7 @@ export const BatchesPage: React.FC = () => {
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<BatchSummary | null>(null);
   const [batchSessions, setBatchSessions] = useState<CandlingSession[]>([]);
   const [isAdvancing, setIsAdvancing] = useState(false);
@@ -80,6 +81,7 @@ export const BatchesPage: React.FC = () => {
 
   const handleSelectBatch = async (b: BatchSummary) => {
     setSelectedBatch(b);
+    setIsDrawerOpen(true);
     const sessions = await apiClient.getSessions(b.batch_id);
     setBatchSessions(sessions);
   };
@@ -713,8 +715,8 @@ export const BatchesPage: React.FC = () => {
 
       {/* Batch Details Drawer (Sheet) */}
       <Sheet
-        isOpen={Boolean(selectedBatch)}
-        onClose={() => setSelectedBatch(null)}
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
         title={selectedBatch ? `Batch: ${selectedBatch.batch_code}` : ''}
         description="Incubation progress, operator candling shifts, and yield metrics"
       >
