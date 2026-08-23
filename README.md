@@ -188,68 +188,65 @@ The FastAPI backend exposes versioned, high-throughput REST endpoints under `/ap
    - **`OPERATOR`**: Candling shift operations, live scan review, and human-in-the-loop classification overrides.
 3. **Sliding-Window IP Rate Limiting**: `POST /api/v1/auth/login` limits failed login attempts to 10/min per IP to prevent brute-force attacks.
 
-### Modular REST API Endpoints
+### 📑 Complete REST API Endpoints Specification
 
-```
-/api/v1/
-├── auth/
-│   ├── POST /login                        # Authenticate user & issue JWT token (Rate-limited)
-│   ├── GET  /me                           # Authoritative user profile verification (Bearer JWT)
-│   └── POST /register                     # Register new user account (Admin only)
-│
-├── users/
-│   ├── GET   /                            # List all operators & managers (Admin only)
-│   ├── POST  /                            # Create user with bcrypt password hash (Admin only)
-│   └── PATCH /{id}/status                 # Toggle user status with self-deactivation guard (Admin only)
-│
-├── batches/
-│   ├── GET    /                           # List all batches with computed fertility & hatchability
-│   ├── GET    /active                     # List active batches for Edge station selection
-│   ├── POST   /                           # Create new incubation batch cohort (Manager/Admin)
-│   ├── GET    /{id}                       # Get single batch record details
-│   ├── GET    /{id}/analytics             # Deep batch analytics (Day 10 fertility, Penoy salvage ₱)
-│   ├── PUT    /{id}                       # Update batch status & hatch counts (Manager/Admin)
-│   ├── POST   /{id}/advance-stage         # Advance milestone (Day 10, Day 18, Day 25, Hatched) (Manager/Admin)
-│   ├── POST   /{id}/finalize-hatch        # Finalize Day 28 harvest trial (Manager/Admin)
-│   ├── DELETE /{id}                       # Archive/delete incubation batch (Manager/Admin)
-│   └── POST   /check-milestones           # Automated milestone checker & alerts
-│
-├── scans/
-│   ├── POST  /sync                        # Idempotent bulk scan ingestion from Edge (X-API-Key)
-│   ├── POST  /upload-image                # Upload 1080p candling frame photo (X-API-Key)
-│   ├── GET   /                            # List & filter candling scans by batch or class
-│   ├── GET   /{id}                        # Get full scan record with JSONB bounding boxes
-│   └── PATCH /{id}/override               # Human-in-the-Loop classification override (Bearer JWT)
-│
-├── sessions/
-│   ├── GET /                              # List candling sessions by batch/stage
-│   ├── POST /                             # Start active candling shift from Edge (X-API-Key)
-│   ├── GET /{id}                          # Get session summary & class totals
-│   └── PUT /{id}/end                      # Conclude candling shift & record end timestamp (X-API-Key)
-│
-├── devices/
-│   ├── GET  /                             # List registered sorting conveyor stations (Bearer JWT)
-│   ├── POST /register                     # Register or calibrate edge station (X-API-Key)
-│   └── POST /{id}/heartbeat               # Edge machine telemetry ping (X-API-Key)
-│
-├── analytics/
-│   ├── GET /overview                      # Overall facility KPIs (fertility, cull, hatch rates)
-│   ├── GET /economic-yield                # Day-10 Penoy salvage revenue & power savings ROI
-│   ├── GET /breed-comparison              # Commercial performance across duck breeds
-│   ├── GET /mortality-trends              # Early vs mid vs late embryonic mortality breakdown
-│   └── GET /mortality-progression         # 28-day developmental viability retention curve
-│
-├── audit-logs/
-│   └── GET /                              # Immutable PostgreSQL audit trail logs (Manager/Admin)
-│
-├── settings/
-│   ├── GET /                              # Get facility configuration & pricing parameters
-│   └── PUT /                              # Update economic prices & AI thresholds (Manager/Admin)
-│
-└── reports/
-    ├── GET /batch/{id}/csv                # Stream raw candling dataset CSV export
-    └── GET /batch/{id}/pdf                # Generate official Foundation University PDF Certificate
-```
+#### 🔐 1. Authentication & User Administration (`/api/v1/auth`, `/api/v1/users`)
+| Method | Endpoint | Authorization | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/auth/login` | Public *(Rate-Limited)* | Authenticates credentials and returns JWT Bearer token (10 attempts/min sliding window). |
+| `GET` | `/api/v1/auth/me` | `Bearer JWT` | Returns authenticated user profile, assigned role, and permissions. |
+| `POST` | `/api/v1/auth/register` | `Admin Only` | Creates an operator, manager, or administrator account with bcrypt hashed password. |
+| `GET` | `/api/v1/users` | `Admin Only` | Lists all registered hatchery personnel, roles, and active statuses. |
+| `POST` | `/api/v1/users` | `Admin Only` | Admin creates user with duplicate email checks and security audit logging. |
+| `PATCH` | `/api/v1/users/{id}/status` | `Admin Only` | Toggles operator access (`ACTIVE` $\leftrightarrow$ `SUSPENDED`) with self-lockout defense. |
+
+#### 🥚 2. Incubation Cohorts & Lifecycle Management (`/api/v1/batches`)
+| Method | Endpoint | Authorization | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/batches` | Public Read | Lists all incubation batches with computed fertility rate, cull rate, and hatchability. |
+| `GET` | `/api/v1/batches/active` | Public Read | Returns active (`INCUBATING`) batches for candling station operator selection. |
+| `POST` | `/api/v1/batches` | `Manager / Admin` | Creates a new incubation cohort with auto-generated code and milestone schedule. |
+| `GET` | `/api/v1/batches/{id}` | Public Read | Retrieves detailed batch metadata, egg count history, and assigned incubator. |
+| `GET` | `/api/v1/batches/{id}/analytics` | Public Read | Deep analytics: Day 10 fertility %, Penoy salvage ₱, and thermal power savings ₱. |
+| `PUT` | `/api/v1/batches/{id}` | `Manager / Admin` | Updates batch parameters and logs changes to the audit trail. |
+| `POST` | `/api/v1/batches/{id}/advance-stage` | `Manager / Admin` | Advances incubation milestone (`SETTING` $\to$ `DAY_10` $\to$ `DAY_18` $\to$ `DAY_25` $\to$ `HATCHED`). |
+| `POST` | `/api/v1/batches/{id}/finalize-hatch` | `Manager / Admin` | Finalizes Day 28 harvest trial with actual hatched vs unhatched counts. |
+| `DELETE` | `/api/v1/batches/{id}` | `Manager / Admin` | Archives or removes batch record with audit log tracking. |
+| `POST` | `/api/v1/batches/check-milestones` | Public Read | Automated milestone checker flagging due candling and hatcher transfer schedules. |
+
+#### 🔬 3. Edge Candling Scans & Sessions (`/api/v1/scans`, `/api/v1/sessions`)
+| Method | Endpoint | Authorization | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/scans/sync` | `X-API-Key` | Idempotent bulk scan ingestion from edge station (`ON CONFLICT DO NOTHING`). |
+| `POST` | `/api/v1/scans/upload-image` | `X-API-Key` | Uploads high-res 1080p candling photos with bounding box overlays. |
+| `GET` | `/api/v1/scans` | Public Read | Search, filter, and paginate candling scans by batch, session, or class. |
+| `GET` | `/api/v1/scans/{id}` | Public Read | Full scan record with JSONB bounding boxes, HSV luminance, and inference latency. |
+| `PATCH` | `/api/v1/scans/{id}/override` | `Bearer JWT` | Human-in-the-Loop classification override with reason logging and session rollup updates. |
+| `GET` | `/api/v1/sessions` | Public Read | Lists candling shifts by batch, milestone stage, or date. |
+| `POST` | `/api/v1/sessions` | `X-API-Key` | Starts a new candling session on an edge sorter machine. |
+| `GET` | `/api/v1/sessions/{id}` | Public Read | Retrieves session totals, fertile/infertile/abnormal distribution, and avg latency. |
+| `PUT` | `/api/v1/sessions/{id}/end` | `X-API-Key` | Concludes active candling shift and stamps completion timestamp. |
+
+#### ⚙️ 4. Edge Sorter Hardware & Telemetry (`/api/v1/devices`)
+| Method | Endpoint | Authorization | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/devices` | `Bearer JWT` | Lists all registered conveyor sorting machines and real-time connectivity status. |
+| `POST` | `/api/v1/devices/register` | `X-API-Key` | Registers or updates station hardware platform, model version, and conveyor speed. |
+| `POST` | `/api/v1/devices/{id}/heartbeat` | `X-API-Key` | Edge station heartbeat telemetry ping with local IP and health status. |
+
+#### 📊 5. Hatchery Analytics, Audit Trail & Exports (`/api/v1/analytics`, `/api/v1/audit-logs`, `/api/v1/reports`, `/api/v1/settings`)
+| Method | Endpoint | Authorization | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/analytics/overview` | Public Read | Facility-wide KPIs: total eggs scanned, fertility rate, cull rate, and hatchability. |
+| `GET` | `/api/v1/analytics/economic-yield` | Public Read | Day-10 Penoy salvage revenue (₱), thermal energy saved (kWh/₱), and total financial ROI. |
+| `GET` | `/api/v1/analytics/breed-comparison` | Public Read | Biological fertility and commercial yield benchmarks across duck breeds. |
+| `GET` | `/api/v1/analytics/mortality-trends` | Public Read | Early (Day 10), mid (Day 18), and late (Day 25) embryonic mortality breakdown. |
+| `GET` | `/api/v1/analytics/mortality-progression` | Public Read | 28-day developmental mortality curve and viability retention benchmarks. |
+| `GET` | `/api/v1/audit-logs` | `Manager / Admin` | Immutable PostgreSQL audit records with dynamic severity categorization. |
+| `GET` | `/api/v1/settings` | Public Read | Retrieves facility profile, confidence thresholds, and economic unit prices. |
+| `PUT` | `/api/v1/settings` | `Manager / Admin` | Updates pricing rates and vision thresholds with strict validation and audit logging. |
+| `GET` | `/api/v1/reports/batch/{id}/csv` | Public Read | Streams raw batch candling scan dataset as downloadable CSV. |
+| `GET` | `/api/v1/reports/batch/{id}/pdf` | Public Read | Generates official Foundation University PDF Candling Inspection Certificate. |
 
 ---
 
