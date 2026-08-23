@@ -11,6 +11,15 @@ from app.api.deps import get_current_user
 router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 
 
+def _derive_severity(action: str) -> str:
+    act = action.upper()
+    if any(k in act for k in ["FAILED", "ERROR", "SECURITY", "UNAUTHORIZED", "DENIED"]):
+        return "SECURITY"
+    if any(k in act for k in ["OVERRIDE", "CALIBRATION", "DEACTIVATED", "UPDATE", "WARNING"]):
+        return "WARNING"
+    return "INFO"
+
+
 @router.get("", response_model=List[AuditLogResponse], summary="List system audit logs")
 def list_audit_logs(
     action: Optional[str] = None,
@@ -25,4 +34,27 @@ def list_audit_logs(
     if entity_type:
         query = query.filter(AuditLogModel.entity_type == entity_type)
 
-    return query.order_by(AuditLogModel.created_at.desc()).limit(limit).all()
+    raw_logs = query.order_by(AuditLogModel.created_at.desc()).limit(limit).all()
+
+    result = []
+    for log in raw_logs:
+        operator_name = (
+            log.user.full_name if log.user else
+            log.details.get("operator") or log.details.get("email") or "System Automated"
+        )
+        severity = log.details.get("severity") or _derive_severity(log.action)
+        result.append(
+            AuditLogResponse(
+                log_id=log.log_id,
+                user_id=log.user_id,
+                operator_name=operator_name,
+                action=log.action,
+                entity_type=log.entity_type,
+                entity_id=log.entity_id,
+                details=log.details or {},
+                ip_address=log.ip_address,
+                severity=severity,
+                created_at=log.created_at
+            )
+        )
+    return result
