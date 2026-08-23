@@ -141,3 +141,34 @@ def test_human_in_the_loop_override_audit_logging():
     assert "reason" in matching_log["details"]
 
 
+def test_rbac_and_admin_security_protections():
+    # 1. Login as admin
+    admin_login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@ovalens.fu.edu.ph", "password": "Admin@123"}
+    )
+    assert admin_login.status_code == 200
+    admin_data = admin_login.json()
+    admin_token = admin_data["access_token"]
+    admin_id = admin_data["user"]["user_id"]
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    # 2. Verify admin can list users
+    users_resp = client.get("/api/v1/users", headers=admin_headers)
+    assert users_resp.status_code == 200
+    assert len(users_resp.json()) >= 1
+
+    # 3. Verify self-deactivation guard on admin account
+    self_toggle = client.patch(f"/api/v1/users/{admin_id}/status", headers=admin_headers)
+    assert self_toggle.status_code == 400
+    assert "Cannot suspend your own" in self_toggle.json()["detail"]
+
+    # 4. Verify unauthenticated override is rejected
+    unauth_override = client.patch(
+        "/api/v1/scans/00000000-0000-0000-0000-000000000000/override",
+        json={"final_class": "INFERTILE", "reason": "Testing unauth"}
+    )
+    assert unauth_override.status_code == 401
+
+
+

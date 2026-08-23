@@ -11,7 +11,7 @@ from app.models.scan import EggScanModel, FertilityClass
 from app.models.user import UserModel
 from app.schemas.scan import ScanSyncPayload, ScanSyncResponse, ScanListItem, ScanDetailResponse, ScanOverridePayload
 from app.services.scan_service import ScanService
-from app.api.deps import verify_api_key, get_optional_current_user
+from app.api.deps import verify_api_key, get_current_user
 
 router = APIRouter(prefix="/scans", tags=["Egg Scans & Ingestion"])
 
@@ -84,15 +84,14 @@ def override_scan(
     payload: ScanOverridePayload,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: Optional[UserModel] = Depends(get_optional_current_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
-    user_id = current_user.user_id if current_user else None
-    client_ip = request.client.host if request.client else None
+    client_ip = request.client.host if request.client else "127.0.0.1"
     return ScanService.override_scan(
         db=db,
         scan_id=scan_id,
         final_class=payload.final_class,
         reason=payload.reason,
-        user_id=user_id,
+        user_id=current_user.user_id,
         ip_address=client_ip,
     )

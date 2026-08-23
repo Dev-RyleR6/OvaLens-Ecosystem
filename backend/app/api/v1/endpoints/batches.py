@@ -63,7 +63,19 @@ def update_batch(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(require_manager_or_admin)
 ):
-    return BatchService.update_batch(db, batch_id, payload)
+    batch = BatchService.update_batch(db, batch_id, payload)
+    
+    # Audit log
+    audit = AuditLogModel(
+        user_id=current_user.user_id,
+        action="BATCH_UPDATED",
+        entity_type="BATCH",
+        entity_id=batch_id,
+        details={"updated_fields": list(payload.model_dump(exclude_unset=True).keys()), "updated_by": current_user.email}
+    )
+    db.add(audit)
+    db.commit()
+    return batch
 
 
 @router.post("/{batch_id}/advance-stage", response_model=BatchResponse, summary="Advance batch incubation milestone stage")
