@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Award, CheckCircle2, AlertCircle } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { BatchSummary } from '../types';
@@ -63,7 +64,7 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
@@ -188,6 +189,7 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

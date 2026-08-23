@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   TrendingUp,
@@ -72,7 +73,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
       ]
     : [];
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
@@ -329,6 +330,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
           ) : null}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

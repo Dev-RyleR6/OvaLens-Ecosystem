@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   ShieldCheck,
@@ -96,7 +97,7 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
@@ -113,117 +114,111 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
           isClosing ? "animate-modal-content-exit" : "animate-modal-content"
         )}
       >
-        {/* Header */}
+        {/* Modal Header */}
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-white flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-black">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-black">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900">
-                Confirm Human-in-the-Loop Override
+                Human-in-the-Loop Override
               </h2>
               <p className="text-[11px] text-slate-500">
-                Scan #{(displayScan.sequence_number ?? 0).toString().padStart(3, '0')} • Batch: {displayScan.batch_id}
+                Correct AI Vision Classification • Egg #{displayScan.sequence_number || 'N/A'}
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        {/* Modal Body */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto custom-scrollbar flex-1">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-semibold text-red-700 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Classification Transition Comparison */}
-          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs">
-            <div className="space-y-1">
-              <span className="text-[10px] text-slate-500 font-semibold block uppercase">
-                Original AI Output
-              </span>
+          {/* Class Shift Visualizer */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-center justify-between">
+            <div className="text-center space-y-1">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">AI Classified</span>
               <Badge type="fertility" value={currentClass} />
             </div>
 
-            <div className="flex flex-col items-center justify-center text-slate-400">
-              <ArrowRight className="w-4 h-4" />
-              <span className="text-[9px] font-bold mt-0.5">RECLASSIFY</span>
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Override</span>
+              <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-2xs">
+                <ArrowRight className="w-4 h-4 text-[#800000]" />
+              </div>
             </div>
 
-            <div className="space-y-1 text-right">
-              <span className="text-[10px] text-slate-500 font-semibold block uppercase">
-                Operator Target
-              </span>
+            <div className="text-center space-y-1">
+              <span className="text-[10px] text-[#800000] font-bold uppercase block">Operator Corrected</span>
               <Badge type="fertility" value={displayTargetClass} />
             </div>
           </div>
 
-          {/* Preset Reason Selector */}
+          {/* Preset Justifications */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <span>Audit Justification Preset</span>
-              <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+            <label className="text-xs font-bold text-slate-700 block">
+              Quick Justification Presets
             </label>
             <div className="space-y-1.5">
-              {REASON_PRESETS[displayTargetClass]?.map((preset, index) => {
-                const isSelected = reason === preset;
-                return (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => handleSelectPreset(preset)}
-                    className={`w-full text-left p-2 rounded-lg border text-xs transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-amber-50/70 border-amber-400 font-semibold text-amber-950 ring-1 ring-amber-400'
-                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
-                    }`}
-                  >
-                    {preset}
-                  </button>
-                );
-              })}
+              {REASON_PRESETS[displayTargetClass]?.map((preset, idx) => (
+                <button
+                  type="button"
+                  key={idx}
+                  onClick={() => handleSelectPreset(preset)}
+                  className={`w-full text-left p-2.5 rounded-lg border text-xs font-medium transition-all cursor-pointer flex items-start gap-2 ${
+                    reason === preset
+                      ? 'bg-maroon-50/60 border-[#800000] text-[#800000] shadow-2xs font-semibold'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <CheckCircle2 className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${reason === preset ? 'text-[#800000]' : 'text-slate-300'}`} />
+                  <span className="leading-snug">{preset}</span>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Custom Reason Textarea */}
+          {/* Custom Audit Justification */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700">
-              Custom Operator Remarks
+            <label className="text-xs font-bold text-slate-700 block">
+              Audit Justification Notes (Mandatory for Quality Audit)
             </label>
             <textarea
               rows={2}
-              required
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Provide a reason for the classification override..."
-              className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-1 focus:ring-[#800000]"
+              placeholder="Provide specific optical observation details..."
+              className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 shadow-xs resize-none"
+              required
             />
           </div>
 
-          {/* Audit Notice */}
-          <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-lg text-[11px] text-amber-900 flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-            <span>
-              This action updates batch yield statistics and logs an immutable audit trail entry with your operator credentials and IP address.
-            </span>
-          </div>
+          {/* Economic Notice */}
+          {displayTargetClass === 'INFERTILE' && (
+            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-center justify-between">
+              <span>Day 10 Commercial Penoy Salvage Recovery:</span>
+              <strong className="text-amber-800 font-mono font-bold">+₱14.00/egg</strong>
+            </div>
+          )}
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
               className="px-3.5 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold cursor-pointer"
             >
               Cancel
@@ -238,6 +233,7 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { LogOut, Loader2, X, CheckCircle2, Shield, User as UserIcon } from 'lucide-react';
 import { User } from '../types';
 import { useModalAnimation } from '@/hooks/useModalAnimation';
@@ -50,7 +51,7 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
     return name.slice(0, 2).toUpperCase();
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Soft Blurred Backdrop */}
       <div
@@ -159,7 +160,8 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
