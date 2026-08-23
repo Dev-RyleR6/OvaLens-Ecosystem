@@ -83,38 +83,85 @@ class ReportService:
                 textColor=colors.HexColor("#5C0000")
             )
 
+            # Query settings for unit prices
+            from app.models.settings import HatcherySettingsModel
+            from app.models.scan import FertilityClass
+            from sqlalchemy import func
+            
+            settings_record = db.query(HatcherySettingsModel).first()
+            penoy_price = float(settings_record.penoy_unit_price_php) if settings_record else 14.0
+            duckling_price = float(settings_record.duckling_unit_price_php) if settings_record else 40.0
+            kwh_rate = float(settings_record.electricity_kwh_rate_php) if settings_record else 12.5
+
+            # Calculate total scanned across all sessions
+            total_scanned = sum(s.total_scanned for s in sessions)
+            total_fertile = sum(s.fertile_count for s in sessions)
+            total_infertile = sum(s.infertile_count for s in sessions)
+            total_abnormal = sum(s.abnormal_count for s in sessions)
+            fertility_rate = round((total_fertile / total_scanned * 100), 2) if total_scanned > 0 else 0.0
+            hatchability_rate = round((batch.hatched_count / batch.initial_egg_count * 100), 2) if batch.initial_egg_count > 0 and batch.hatched_count else 0.0
+
+            penoy_salvage_php = round(total_infertile * penoy_price, 2)
+            kwh_saved = round(total_infertile * 18 * 0.015, 2)
+            power_saved_php = round(kwh_saved * kwh_rate, 2)
+
             elements = []
             elements.append(Paragraph("FOUNDATION UNIVERSITY — OVALENS HATCHERY SYSTEM", title_style))
-            elements.append(Paragraph(f"Official Candling Audit & Batch Report — {batch.batch_code}", sub_style))
-            elements.append(Spacer(1, 16))
+            elements.append(Paragraph(f"Official Candling Inspection & Batch Audit Certificate — {batch.batch_code}", sub_style))
+            elements.append(Spacer(1, 14))
 
+            # Batch Metadata Table
             meta_data = [
                 ["Batch ID:", batch.batch_id, "Duck Breed:", batch.breed.value],
                 ["Incubator:", batch.incubator_id, "Current Stage:", batch.current_stage.value],
-                ["Initial Set Count:", str(batch.initial_egg_count), "Batch Status:", batch.status.value],
-                ["Set Date:", batch.set_date.strftime("%Y-%m-%d %H:%M"), "Hatch Date:", batch.target_hatch_date.strftime("%Y-%m-%d %H:%M")],
-                ["Hatched Count:", str(batch.hatched_count), "Unhatched Count:", str(batch.unhatched_count)]
+                ["Initial Set Eggs:", f"{batch.initial_egg_count:,}", "Batch Status:", batch.status.value],
+                ["Incubation Set Date:", batch.set_date.strftime("%Y-%m-%d %H:%M"), "Target Hatch Date:", batch.target_hatch_date.strftime("%Y-%m-%d %H:%M")],
+                ["Hatched Ducklings:", f"{batch.hatched_count:,}", "Unhatched Dead:", f"{batch.unhatched_count:,}"]
             ]
 
-            t_meta = Table(meta_data, colWidths=[110, 160, 110, 160])
+            t_meta = Table(meta_data, colWidths=[115, 155, 115, 155])
             t_meta.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
                 ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0F172A")),
                 ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+                ("TOPPADDING", (0, 0), (-1, -1), 3.5),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
                 ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
                 ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
             ]))
             elements.append(t_meta)
-            elements.append(Spacer(1, 18))
+            elements.append(Spacer(1, 14))
 
-            elements.append(Paragraph("<b>Candling Milestone Sessions Summary</b>", styles["Heading3"]))
-            elements.append(Spacer(1, 6))
+            # Performance & Economics Summary Box
+            elements.append(Paragraph("<b>Biological & Economic Yield Realization</b>", styles["Heading3"]))
+            elements.append(Spacer(1, 4))
+            econ_data = [
+                ["Candled Fertility Rate:", f"{fertility_rate}%", "Final Hatchability:", f"{hatchability_rate}%"],
+                ["Penoy Eggs Salvaged (Day 10):", f"{total_infertile:,} eggs", "Penoy Cash Recovery:", f"₱{penoy_salvage_php:,.2f}"],
+                ["Thermal Power Saved:", f"{kwh_saved:.1f} kWh", "Electricity Savings:", f"₱{power_saved_php:,.2f}"],
+            ]
+            t_econ = Table(econ_data, colWidths=[140, 130, 140, 130])
+            t_econ.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F0FDF4")),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#065F46")),
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+                ("TOPPADDING", (0, 0), (-1, -1), 3.5),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#A7F3D0")),
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+            ]))
+            elements.append(t_econ)
+            elements.append(Spacer(1, 14))
 
-            sess_data = [["Stage", "Operator", "Total Scanned", "Fertile", "Infertile", "Abnormal", "Avg Latency (ms)"]]
+            # Sessions Table
+            elements.append(Paragraph("<b>Candling Milestone Runs (Edge Optical Station)</b>", styles["Heading3"]))
+            elements.append(Spacer(1, 4))
+
+            sess_data = [["Stage", "Operator", "Total Scanned", "Fertile", "Infertile (Penoy)", "Abnormal", "Avg Latency"]]
             for s in sessions:
                 sess_data.append([
                     s.stage.value,
@@ -123,24 +170,42 @@ class ReportService:
                     str(s.fertile_count),
                     str(s.infertile_count),
                     str(s.abnormal_count),
-                    f"{float(s.avg_inference_ms):.1f}"
+                    f"{float(s.avg_inference_ms):.1f} ms"
                 ])
 
-            t_sess = Table(sess_data, colWidths=[70, 110, 80, 70, 70, 70, 70])
+            t_sess = Table(sess_data, colWidths=[65, 115, 75, 65, 85, 65, 70])
             t_sess.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#800000")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("ALIGN", (2, 0), (-1, -1), "CENTER"),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 3.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
             ]))
             elements.append(t_sess)
-            elements.append(Spacer(1, 24))
+            elements.append(Spacer(1, 28))
 
-            elements.append(Paragraph(f"Generated on: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} | OvaLens v2.0 Enterprise Engine", styles["Italic"]))
+            # Official Sign-Off Block
+            sign_data = [
+                ["___________________________________", "___________________________________"],
+                ["Candling Shift Lead / Operator", "Hatchery Operations Manager"],
+                ["Foundation University Hatchery", "Foundation University Hatchery"],
+            ]
+            t_sign = Table(sign_data, colWidths=[270, 270])
+            t_sign.setStyle(TableStyle([
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#334155")),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ]))
+            elements.append(t_sign)
+            elements.append(Spacer(1, 16))
+
+            elements.append(Paragraph(f"Official Audit Document • Generated on: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} • OvaLens Ecosystem v2.0", styles["Italic"]))
 
             doc.build(elements)
             buffer.seek(0)
@@ -148,7 +213,7 @@ class ReportService:
         else:
             # Fallback simple text-based summary
             text_report = f"""FOUNDATION UNIVERSITY — OVALENS HATCHERY SYSTEM
-Official Candling Audit & Batch Report — {batch.batch_code}
+Official Candling Inspection & Batch Audit Certificate — {batch.batch_code}
 Generated on: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 Batch Details:
