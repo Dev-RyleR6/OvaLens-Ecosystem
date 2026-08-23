@@ -47,7 +47,7 @@ const ProtectedLayout: React.FC = () => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return (

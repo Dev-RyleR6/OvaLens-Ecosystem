@@ -109,8 +109,9 @@ export const LoginPage: React.FC = () => {
       setIsExiting(true);
       await new Promise((res) => setTimeout(res, 250));
 
-      const from = (location.state as any)?.from?.pathname || '/';
-      navigate(from, { replace: true });
+      const targetPath = (location.state as any)?.from?.pathname;
+      const safeDestination = (targetPath && !['/users', '/logs', '/settings'].includes(targetPath)) ? targetPath : '/';
+      navigate(safeDestination, { replace: true });
     } catch (err: any) {
       const attempts = failedAttempts + 1;
       setFailedAttempts(attempts);
