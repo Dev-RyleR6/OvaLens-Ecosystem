@@ -23,7 +23,7 @@ import { apiClient } from '../api/client';
 import { EconomicYield, MortalityTrends, BreedMetricItem, BatchSummary, BatchAnalyticsResponse, BatchForecastResponse } from '../types';
 import { DataUnavailableState } from '../components/ui/DataUnavailableState';
 import { BatchForecastCard } from '../components/BatchForecastCard';
-import { Filter, RotateCcw, Layers, Info, Bird, Activity } from 'lucide-react';
+import { Filter, RotateCcw, Layers, Info, Bird, Activity, ChevronDown, SlidersHorizontal } from 'lucide-react';
 
 export const AnalyticsPage: React.FC = () => {
   const [economic, setEconomic] = useState<EconomicYield | null>(null);
@@ -222,8 +222,8 @@ export const AnalyticsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Page Header with Multi-Filter Toolbar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
           <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
             Hatchery Economics & Salvage Analytics
@@ -233,43 +233,73 @@ export const AnalyticsPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Filter Controls Group */}
-        <div className="flex flex-wrap items-center gap-2">
+        {isAnyFilterActive && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-[#800000] bg-red-50 border border-red-200 px-2.5 py-1 rounded-md">
+              Filtered View Active
+            </span>
+            <button
+              onClick={handleResetAllFilters}
+              className="h-8 px-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-md text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Reset all filters to facility totals"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Analytics Scope & Multi-Filter Toolbar */}
+      <div className="bg-white border border-[#E2E8F0] rounded-xl p-3.5 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100 text-xs">
+          <div className="flex items-center gap-2 font-bold text-slate-800">
+            <SlidersHorizontal className="w-4 h-4 text-[#800000]" />
+            <span>Economic Scope & Cohort Filters</span>
+          </div>
+          <span className="text-[11px] text-slate-400">
+            Select specific breed or batch to recalibrate financial yield & salvage recovery
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
           {/* 1. Duck Breed Filter */}
-          <div className="relative flex items-center">
+          <div className="relative">
             <select
               value={breedFilter}
               onChange={(e) => handleBreedFilterChange(e.target.value)}
-              className="h-9 px-3 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
+              className="w-full h-9 pl-3 pr-8 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 shadow-2xs cursor-pointer appearance-none"
             >
               <option value="ALL">All Duck Breeds</option>
               <option value="KAYUMANGGI">Kayumanggi (Pateros)</option>
               <option value="ITIM">Native Itim</option>
               <option value="KHAKI">Khaki Campbell</option>
             </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
           {/* 2. Incubation Status Filter */}
-          <div className="relative flex items-center">
+          <div className="relative">
             <select
               value={statusFilter}
               onChange={(e) => handleStatusFilterChange(e.target.value)}
-              className="h-9 px-3 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
+              className="w-full h-9 pl-3 pr-8 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 shadow-2xs cursor-pointer appearance-none"
             >
               <option value="ALL">All Statuses</option>
               <option value="ACTIVE">Active Only (Incubating)</option>
               <option value="COMPLETED">Completed Only (Hatched)</option>
             </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
           {/* 3. Batch Selector */}
-          <div className="relative flex items-center">
-            <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+          <div className="relative">
+            <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <select
               value={selectedBatchId}
               onChange={(e) => handleBatchChange(e.target.value)}
               disabled={isLoadingBatch}
-              className="h-9 pl-9 pr-8 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer disabled:opacity-60"
+              className="w-full h-9 pl-8 pr-8 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 shadow-2xs cursor-pointer disabled:opacity-60 appearance-none"
             >
               <option value="ALL">
                 {filteredBatches.length === batches.length
@@ -282,19 +312,8 @@ export const AnalyticsPage: React.FC = () => {
                 </option>
               ))}
             </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
-
-          {/* Reset All Filters Button */}
-          {isAnyFilterActive && (
-            <button
-              onClick={handleResetAllFilters}
-              className="h-9 px-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Reset all filters"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset</span>
-            </button>
-          )}
         </div>
       </div>
 

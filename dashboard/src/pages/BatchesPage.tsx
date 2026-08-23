@@ -16,6 +16,7 @@ import {
   ArrowUpDown,
   CheckSquare,
   Square,
+  ChevronDown,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { BatchSummary, DuckBreed, BatchStage, CandlingSession } from '../types';
@@ -339,48 +340,57 @@ export const BatchesPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-          <select
-            value={breedFilter}
-            onChange={(e) => {
-              setBreedFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
-          >
-            <option value="ALL">All Duck Breeds</option>
-            <option value="KAYUMANGGI">Kayumanggi</option>
-            <option value="ITIM">Itim (Native)</option>
-            <option value="KHAKI">Khaki Campbell</option>
-          </select>
+          <div className="relative">
+            <select
+              value={breedFilter}
+              onChange={(e) => {
+                setBreedFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full h-9 pl-3 pr-8 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 shadow-2xs cursor-pointer appearance-none"
+            >
+              <option value="ALL">All Duck Breeds</option>
+              <option value="KAYUMANGGI">Kayumanggi</option>
+              <option value="ITIM">Itim (Native)</option>
+              <option value="KHAKI">Khaki Campbell</option>
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
 
-          <select
-            value={stageFilter}
-            onChange={(e) => {
-              setStageFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
-          >
-            <option value="ALL">All Incubation Stages</option>
-            <option value="SETTING">Setting (Day 0-9)</option>
-            <option value="DAY_10">Day 10 (1st Candling)</option>
-            <option value="DAY_18">Day 18 (2nd Candling)</option>
-            <option value="DAY_25">Day 25 (Pipping)</option>
-            <option value="COMPLETED">Completed</option>
-          </select>
+          <div className="relative">
+            <select
+              value={stageFilter}
+              onChange={(e) => {
+                setStageFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full h-9 pl-3 pr-8 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 shadow-2xs cursor-pointer appearance-none"
+            >
+              <option value="ALL">All Incubation Stages</option>
+              <option value="SETTING">Setting (Day 0-9)</option>
+              <option value="DAY_10">Day 10 (1st Candling)</option>
+              <option value="DAY_18">Day 18 (2nd Candling)</option>
+              <option value="DAY_25">Day 25 (Pipping)</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="INCUBATING">Incubating</option>
-            <option value="COMPLETED">Completed</option>
-          </select>
+          <div className="relative">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full h-9 pl-3 pr-8 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 shadow-2xs cursor-pointer appearance-none"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="INCUBATING">Incubating</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
       </div>
 
