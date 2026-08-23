@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Database, LogOut, ShieldCheck, Server } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Database, LogOut, ShieldCheck, Server, Settings, User, ChevronDown, Sliders } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { LogoutModal } from './LogoutModal';
 import { apiClient } from '../api/client';
@@ -10,9 +11,12 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isApiOnline, setIsApiOnline] = useState(true);
   const [currentTime, setCurrentTime] = useState<string>('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updateTime = () => {
@@ -34,11 +38,36 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     return () => clearInterval(interval);
   }, []);
 
+  // Close dropdown on click outside or escape key
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   const getInitials = (name?: string) => {
     if (!name) return 'OP';
     const parts = name.trim().split(' ');
     if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
     return name.slice(0, 2).toUpperCase();
+  };
+
+  const handleNavigateSettings = () => {
+    setIsDropdownOpen(false);
+    navigate('/settings');
   };
 
   return (
@@ -78,7 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
           </div>
         </div>
 
-        {/* Right Controls: Clock, Connection Indicators & User Profile */}
+        {/* Right Controls: Clock, Connection Indicators & User Profile Dropdown */}
         <div className="flex items-center gap-3">
           {/* Real-time Clock */}
           {currentTime && (
@@ -104,33 +133,97 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
             <span className="font-bold text-slate-900">Synced</span>
           </div>
 
-          {/* User Operator Profile */}
-          <div className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l border-slate-200">
-            <div className="w-8 h-8 rounded-full bg-slate-100 text-[#800000] border border-slate-200 flex items-center justify-center text-xs font-bold shadow-2xs">
-              {getInitials(user?.full_name)}
-            </div>
-            <div className="hidden md:block text-left">
-              <div className="flex items-center gap-1.5">
-                <p className="text-xs font-bold text-[#0F172A] leading-tight">
-                  {user?.full_name || 'Ryle Gabotero'}
-                </p>
-                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-[#800000] border border-slate-200">
-                  {user?.role || 'ADMIN'}
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-500 font-medium">
-                {user?.email || 'admin@foundationu.com'}
-              </p>
-            </div>
-
-            {/* Logout Button */}
+          {/* Merged User Profile Dropdown Menu */}
+          <div className="relative pl-2 sm:pl-3 border-l border-slate-200" ref={dropdownRef}>
             <button
-              onClick={() => setShowLogoutModal(true)}
-              className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors btn-press cursor-pointer ml-1"
-              title="Sign Out"
+              onClick={() => setIsDropdownOpen(prev => !prev)}
+              className={`flex items-center gap-2.5 p-1.5 rounded-xl transition-all cursor-pointer border ${
+                isDropdownOpen
+                  ? 'bg-slate-100/80 border-slate-300 shadow-xs'
+                  : 'hover:bg-slate-50 border-transparent hover:border-slate-200'
+              }`}
+              aria-expanded={isDropdownOpen}
+              aria-haspopup="true"
             >
-              <LogOut className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-full bg-slate-100 text-[#800000] border border-slate-200 flex items-center justify-center text-xs font-bold shadow-2xs">
+                {getInitials(user?.full_name)}
+              </div>
+              <div className="hidden md:block text-left">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-bold text-[#0F172A] leading-tight">
+                    {user?.full_name || 'Ryle Gabotero'}
+                  </p>
+                  <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-red-50 text-[#800000] border border-red-200">
+                    {user?.role || 'ADMIN'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-500 font-medium">
+                  {user?.email || 'admin@foundationu.com'}
+                </p>
+              </div>
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-slate-700' : ''}`} />
             </button>
+
+            {/* Dropdown Popover Menu */}
+            {isDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                {/* User Identity Header */}
+                <div className="px-3 py-2.5 bg-slate-50/80 rounded-lg border border-slate-100 mb-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-bold text-slate-900 truncate">
+                      {user?.full_name || 'Ryle Gabotero'}
+                    </p>
+                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-50 text-[#800000] border border-red-200">
+                      {user?.role || 'ADMIN'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-mono truncate">
+                    {user?.email || 'admin@foundationu.com'}
+                  </p>
+                </div>
+
+                {/* Menu Action Items */}
+                <div className="space-y-0.5 text-xs font-medium text-slate-700">
+                  <button
+                    onClick={handleNavigateSettings}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-[#800000] transition-colors text-left cursor-pointer"
+                  >
+                    <User className="w-4 h-4 text-slate-500" />
+                    <span>My Profile & Password</span>
+                  </button>
+
+                  <button
+                    onClick={handleNavigateSettings}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-[#800000] transition-colors text-left cursor-pointer"
+                  >
+                    <Settings className="w-4 h-4 text-slate-500" />
+                    <span>Facility & System Settings</span>
+                  </button>
+
+                  <button
+                    onClick={handleNavigateSettings}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-[#800000] transition-colors text-left cursor-pointer"
+                  >
+                    <Database className="w-4 h-4 text-slate-500" />
+                    <span>Database Backups</span>
+                  </button>
+                </div>
+
+                <div className="h-px bg-slate-100 my-1" />
+
+                {/* Sign Out Trigger */}
+                <button
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    setShowLogoutModal(true);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-rose-700 hover:bg-rose-50 hover:text-rose-800 transition-colors text-left text-xs font-semibold cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4 text-rose-600" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
