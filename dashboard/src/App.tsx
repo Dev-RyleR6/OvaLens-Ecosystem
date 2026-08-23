@@ -62,8 +62,8 @@ const ProtectedLayout: React.FC = () => {
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} />
         <main ref={mainRef} className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 w-full custom-scrollbar">
-          <div key={location.pathname} className="max-w-7xl mx-auto animate-page-enter">
-            <Routes location={location}>
+          <div className="max-w-7xl mx-auto">
+            <Routes>
               <Route path="/" element={<OverviewPage />} />
               <Route path="/batches" element={<BatchesPage />} />
               <Route path="/scans" element={<ScanExplorerPage />} />
