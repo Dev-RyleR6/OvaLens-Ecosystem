@@ -45,23 +45,31 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
   onClose,
   onConfirm,
 }) => {
+  const lastScanRef = React.useRef(scan);
+  const lastTargetClassRef = React.useRef(targetClass);
+  if (scan) lastScanRef.current = scan;
+  if (targetClass) lastTargetClassRef.current = targetClass;
+
+  const displayScan = scan || lastScanRef.current;
+  const displayTargetClass = targetClass || lastTargetClassRef.current;
+
   const [reason, setReason] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { shouldRender, isClosing } = useModalAnimation(isOpen && Boolean(scan) && Boolean(targetClass), 220);
+  const { shouldRender, isClosing } = useModalAnimation(isOpen, 220);
 
   useEffect(() => {
-    if (targetClass && REASON_PRESETS[targetClass]?.length > 0) {
-      setReason(REASON_PRESETS[targetClass][0]);
+    if (displayTargetClass && REASON_PRESETS[displayTargetClass]?.length > 0) {
+      setReason(REASON_PRESETS[displayTargetClass][0]);
     } else {
       setReason('Visual re-inspection by operator');
     }
     setError(null);
-  }, [targetClass, isOpen]);
+  }, [displayTargetClass, isOpen]);
 
-  if (!shouldRender || !scan || !targetClass) return null;
+  if (!shouldRender || !displayScan || !displayTargetClass) return null;
 
-  const currentClass = scan.final_class || 'FERTILE';
+  const currentClass = displayScan.final_class || 'FERTILE';
 
   const handleSelectPreset = (preset: string) => {
     setReason(preset);
@@ -74,10 +82,12 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
       return;
     }
 
+    if (!displayTargetClass) return;
+
     setIsSubmitting(true);
     setError(null);
     try {
-      await onConfirm(targetClass, reason.trim());
+      await onConfirm(displayTargetClass, reason.trim());
       onClose();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to save classification override.');
@@ -114,7 +124,7 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
                 Confirm Human-in-the-Loop Override
               </h2>
               <p className="text-[11px] text-slate-500">
-                Scan #{(scan.sequence_number ?? 0).toString().padStart(3, '0')} • Batch: {scan.batch_id}
+                Scan #{(displayScan.sequence_number ?? 0).toString().padStart(3, '0')} • Batch: {displayScan.batch_id}
               </p>
             </div>
           </div>
@@ -154,7 +164,7 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
               <span className="text-[10px] text-slate-500 font-semibold block uppercase">
                 Operator Target
               </span>
-              <Badge type="fertility" value={targetClass} />
+              <Badge type="fertility" value={displayTargetClass} />
             </div>
           </div>
 
@@ -165,7 +175,7 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
               <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
             </label>
             <div className="space-y-1.5">
-              {REASON_PRESETS[targetClass]?.map((preset, index) => {
+              {REASON_PRESETS[displayTargetClass]?.map((preset, index) => {
                 const isSelected = reason === preset;
                 return (
                   <button

@@ -44,21 +44,25 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const lastBatchIdRef = React.useRef(batchId);
+  if (batchId) lastBatchIdRef.current = batchId;
+  const displayBatchId = batchId || lastBatchIdRef.current;
+
   const [data, setData] = useState<BatchAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { shouldRender, isClosing } = useModalAnimation(isOpen && Boolean(batchId), 220);
+  const { shouldRender, isClosing } = useModalAnimation(isOpen, 220);
 
   useEffect(() => {
-    if (isOpen && batchId) {
+    if (isOpen && displayBatchId) {
       setIsLoading(true);
       apiClient
-        .getBatchAnalytics(batchId)
+        .getBatchAnalytics(displayBatchId)
         .then((res) => setData(res))
         .finally(() => setIsLoading(false));
     }
-  }, [isOpen, batchId]);
+  }, [isOpen, displayBatchId]);
 
-  if (!shouldRender || !batchId) return null;
+  if (!shouldRender || !displayBatchId) return null;
 
   const pieData = data
     ? [
@@ -94,7 +98,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
             <div>
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
-                  {data?.batch_code || batchId} Analytics
+                  {data?.batch_code || displayBatchId} Analytics
                 </h2>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#800000]/10 text-[#800000] border border-[#800000]/20">
                   {data?.breed || 'KAYUMANGGI'}

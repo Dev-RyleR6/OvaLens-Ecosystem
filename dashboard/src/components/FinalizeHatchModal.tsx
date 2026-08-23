@@ -18,15 +18,19 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const lastBatchRef = React.useRef(batch);
+  if (batch) lastBatchRef.current = batch;
+  const displayBatch = batch || lastBatchRef.current;
+
   const [hatchedCount, setHatchedCount] = useState<number>(0);
   const [notes, setNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const { shouldRender, isClosing } = useModalAnimation(isOpen && Boolean(batch), 220);
+  const { shouldRender, isClosing } = useModalAnimation(isOpen, 220);
 
-  if (!shouldRender || !batch) return null;
+  if (!shouldRender || !displayBatch) return null;
 
-  const initialCount = batch.initial_egg_count || 500;
+  const initialCount = displayBatch.initial_egg_count || 500;
   const unhatchedCount = Math.max(0, initialCount - Number(hatchedCount || 0));
   const hatchRate = initialCount > 0 ? ((Number(hatchedCount || 0) / initialCount) * 100).toFixed(1) : '0.0';
 
@@ -45,7 +49,7 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
     setError(null);
 
     try {
-      await apiClient.finalizeBatchHatch(batch.batch_id, {
+      await apiClient.finalizeBatchHatch(displayBatch.batch_id, {
         hatched_count: Number(hatchedCount),
         unhatched_count: unhatchedCount,
         notes: notes || undefined,
@@ -87,7 +91,7 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
                 Finalize Day 28 Hatch Trial
               </h2>
               <p className="text-[11px] text-slate-500">
-                Batch: {batch.batch_code} ({batch.breed})
+                Batch: {displayBatch.batch_code} ({displayBatch.breed})
               </p>
             </div>
           </div>
@@ -116,7 +120,7 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
             </div>
             <div className="flex justify-between text-slate-600">
               <span>Day 10 Fertile Active:</span>
-              <span className="font-bold text-emerald-700">{batch.fertile_count || batch.initial_egg_count} eggs</span>
+              <span className="font-bold text-emerald-700">{displayBatch.fertile_count || displayBatch.initial_egg_count} eggs</span>
             </div>
             <div className="flex justify-between text-slate-600 border-t border-slate-200 pt-1.5">
               <span>Calculated Hatchability:</span>
