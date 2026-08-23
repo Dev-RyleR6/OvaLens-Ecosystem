@@ -83,12 +83,14 @@ class ReportService:
                 textColor=colors.HexColor("#5C0000")
             )
 
-            # Query settings for unit prices
+            # Query settings for facility & institution branding
             from app.models.settings import HatcherySettingsModel
             from app.models.scan import FertilityClass
             from sqlalchemy import func
             
             settings_record = db.query(HatcherySettingsModel).first()
+            institution_name = settings_record.institution if (settings_record and settings_record.institution) else "Foundation University"
+            facility_name = settings_record.facility_name if (settings_record and settings_record.facility_name) else "OvaLens Duck Hatchery & Research Facility"
             penoy_price = float(settings_record.penoy_unit_price_php) if settings_record else 14.0
             duckling_price = float(settings_record.duckling_unit_price_php) if settings_record else 40.0
             kwh_rate = float(settings_record.electricity_kwh_rate_php) if settings_record else 12.5
@@ -106,21 +108,21 @@ class ReportService:
             power_saved_php = round(kwh_saved * kwh_rate, 2)
 
             elements = []
-            elements.append(Paragraph("FOUNDATION UNIVERSITY — OVALENS HATCHERY SYSTEM", title_style))
-            elements.append(Paragraph(f"Official Candling Inspection & Batch Audit Certificate — {batch.batch_code}", sub_style))
+            elements.append(Paragraph(f"{institution_name.upper()} — {facility_name.upper()}", title_style))
+            elements.append(Paragraph(f"Official Candling Inspection & Research Audit Certificate — {batch.batch_code}", sub_style))
             elements.append(Spacer(1, 14))
 
             # Retrieve actual personnel from DB
-            manager_name = batch.creator.full_name if (batch.creator and batch.creator.full_name) else "Engr. Ryle Gabotero (Manager)"
-            primary_operator = sessions[0].operator_name if sessions else "Maria Clara (Lead Operator)"
+            manager_name = batch.creator.full_name if (batch.creator and batch.creator.full_name) else "Engr. Ryle Gabotero"
+            primary_operator = sessions[0].operator_name if sessions else "Lead Proponent"
 
             # Batch Metadata Table
             meta_data = [
                 ["Batch ID:", batch.batch_id, "Duck Breed:", batch.breed.value],
-                ["Incubator:", batch.incubator_id, "Current Stage:", batch.current_stage.value],
+                ["Incubator Unit:", batch.incubator_id, "Current Stage:", batch.current_stage.value],
                 ["Initial Set Eggs:", f"{batch.initial_egg_count:,}", "Batch Status:", batch.status.value],
                 ["Incubation Set Date:", batch.set_date.strftime("%Y-%m-%d %H:%M"), "Target Hatch Date:", batch.target_hatch_date.strftime("%Y-%m-%d %H:%M")],
-                ["Hatched Ducklings:", f"{batch.hatched_count:,}", "Batch Manager:", manager_name]
+                ["Hatched Ducklings:", f"{batch.hatched_count:,}", "Project Proponent:", manager_name]
             ]
 
             t_meta = Table(meta_data, colWidths=[115, 155, 115, 155])
@@ -165,7 +167,7 @@ class ReportService:
             elements.append(Paragraph("<b>Candling Milestone Runs (Edge Optical Station)</b>", styles["Heading3"]))
             elements.append(Spacer(1, 4))
 
-            sess_data = [["Stage", "Operator", "Total Scanned", "Fertile", "Infertile (Penoy)", "Abnormal", "Avg Latency"]]
+            sess_data = [["Stage", "Operator / Researcher", "Total Scanned", "Fertile", "Infertile (Penoy)", "Abnormal", "Avg Latency"]]
             for s in sessions:
                 sess_data.append([
                     s.stage.value,
@@ -177,7 +179,7 @@ class ReportService:
                     f"{float(s.avg_inference_ms):.1f} ms"
                 ])
 
-            t_sess = Table(sess_data, colWidths=[65, 115, 75, 65, 85, 65, 70])
+            t_sess = Table(sess_data, colWidths=[65, 120, 70, 65, 85, 65, 70])
             t_sess.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#800000")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -191,11 +193,11 @@ class ReportService:
             elements.append(t_sess)
             elements.append(Spacer(1, 28))
 
-            # Official Sign-Off Block with Real Database Personnel
+            # Official Sign-Off Block with Academic & Industrial Dynamic Roles
             sign_data = [
                 [f"<u>   {primary_operator}   </u>", f"<u>   {manager_name}   </u>"],
-                ["Candling Shift Operator / Lead", "Hatchery Operations Manager"],
-                ["Foundation University Duck Hatchery", "Foundation University Duck Hatchery"],
+                ["Lead Researcher & Project Proponent", "Hatchery Operations Supervisor"],
+                [institution_name, institution_name],
             ]
             t_sign = Table(sign_data, colWidths=[270, 270])
             t_sign.setStyle(TableStyle([
