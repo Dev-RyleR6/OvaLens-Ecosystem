@@ -19,6 +19,14 @@ const ProtectedLayout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
+  const mainRef = React.useRef<HTMLElement>(null);
+
+  // Smooth scroll to top when changing views
+  React.useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [location.pathname]);
 
   if (isLoading) {
     return (
@@ -40,9 +48,9 @@ const ProtectedLayout: React.FC = () => {
       <Navbar onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)} />
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 w-full">
-          <div className="max-w-7xl mx-auto animate-fade-in">
-            <Routes>
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 w-full custom-scrollbar">
+          <div key={location.pathname} className="max-w-7xl mx-auto animate-page-enter">
+            <Routes location={location}>
               <Route path="/" element={<OverviewPage />} />
               <Route path="/batches" element={<BatchesPage />} />
               <Route path="/scans" element={<ScanExplorerPage />} />
