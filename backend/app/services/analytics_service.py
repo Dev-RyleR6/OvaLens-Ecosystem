@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case
 
 from app.models.batch import BatchModel, DuckBreed, BatchStatus
 from app.models.session import CandlingSessionModel, CandlingStage
@@ -63,9 +63,9 @@ class AnalyticsService:
             # Scan stats for breed
             scan_stats = db.query(
                 func.count(EggScanModel.scan_id).label("total_scans"),
-                func.coalesce(func.sum(func.case((EggScanModel.final_class == FertilityClass.FERTILE, 1), else_=0)), 0).label("fertile"),
-                func.coalesce(func.sum(func.case((EggScanModel.final_class == FertilityClass.INFERTILE, 1), else_=0)), 0).label("infertile"),
-                func.coalesce(func.sum(func.case((EggScanModel.final_class == FertilityClass.ABNORMAL, 1), else_=0)), 0).label("abnormal")
+                func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.FERTILE, 1), else_=0)), 0).label("fertile"),
+                func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.INFERTILE, 1), else_=0)), 0).label("infertile"),
+                func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.ABNORMAL, 1), else_=0)), 0).label("abnormal")
             ).join(BatchModel, EggScanModel.batch_id == BatchModel.batch_id).filter(BatchModel.breed == breed).first()
 
             total_scans = scan_stats.total_scans or 0
