@@ -17,6 +17,7 @@ The system automates the inspection of duck eggs on a motorized conveyor belt, u
 ## 📚 Key Project Documentation
 
 * 📖 **[Setup & Operations Manual](SETUP_AND_OPERATIONS.md)**: Full guide on prerequisites, installation, operating procedures, and troubleshooting.
+* 🚀 **[Complete Feature & Technical Specification](FEATURES.md)**: Exhaustive documentation of all Backend REST API services, mathematical models, and React Dashboard modules.
 * 🛡️ **[Code Review & Security Audit](CODE_REVIEW.md)**: Formal code review audit covering security, non-blocking edge concurrency, and test coverage.
 * 🤖 **[Master AI & Developer Guidelines](AGENTS.md)**: Architecture tenets, negative constraints, Conventional Commits standard, and verification runbooks.
 * 📜 **[Apache License 2.0](LICENSE)**: Institutional open-source license.
