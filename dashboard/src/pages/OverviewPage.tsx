@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   ChevronDown,
   ArrowRight,
-  Zap,
   RotateCcw,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
@@ -103,9 +103,9 @@ export const OverviewPage: React.FC = () => {
 
   // Pie chart data
   const pieData = [
-    { name: 'Fertile Embryos', value: fertileCount, color: '#357a38' },
-    { name: 'Penoy (Salvaged)', value: penoyCount, color: '#d97706' },
-    { name: 'Dead / Abnormal', value: abnormalCount, color: '#dc2626' },
+    { name: 'Fertile Embryos (Accept)', value: fertileCount, color: '#357a38' },
+    { name: 'Penoy Salvaged @ ₱14', value: penoyCount, color: '#d97706' },
+    { name: 'Dead / Abnormal (Discard)', value: abnormalCount, color: '#dc2626' },
   ];
 
   // Hourly Sorting Velocity telemetry
@@ -124,27 +124,30 @@ export const OverviewPage: React.FC = () => {
       {/* Executive Command Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
               Hatchery Command Center
             </h1>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-              Conveyor Sorter Active
+              Live Sorter Feed
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Real-time vision candling, 28-day cohort incubation status, and Day 10 Penoy recovery.
+            Real-time optical candling classification, 28-day cohort tracking, and Day 10 Penoy food salvage.
           </p>
         </div>
 
         {/* Filter Toolbar */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          <div className="relative inline-flex items-center">
+          <div className="relative inline-flex items-center bg-white border border-slate-300 rounded-lg shadow-2xs">
+            <span className="pl-3 text-slate-400">
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+            </span>
             <select
               value={selectedBatchId}
               onChange={(e) => setSelectedBatchId(e.target.value)}
-              className="appearance-none bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-lg pl-3 pr-8 py-2 shadow-2xs hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-[#800000]/20 focus:border-[#800000] cursor-pointer"
+              className="appearance-none bg-transparent border-0 text-slate-800 text-xs font-semibold pl-2 pr-8 py-2 focus:outline-none focus:ring-0 cursor-pointer"
             >
               <option value="ALL">All Batches (Hatchery Overall)</option>
               {batches.map((b) => (
@@ -180,78 +183,90 @@ export const OverviewPage: React.FC = () => {
       {/* Industrial KPI Telemetry Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Candled */}
-        <div className="p-4 sm:p-5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
+        <div className="p-4 sm:p-5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>{isFiltered ? 'Cohort Eggs Candled' : 'Total Eggs Candled'}</span>
-            <span className="text-[10px] font-mono uppercase bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
-              YOLOv8 FP16
+            <span>{isFiltered ? 'Cohort Candled Scans' : 'Total Candled Scans'}</span>
+            <span className="text-[10px] font-mono uppercase bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold">
+              ONNX FP16
             </span>
           </div>
-          <div className="flex items-baseline gap-2 pt-1">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tracking-tight">
               {totalScanned.toLocaleString()}
             </span>
-            <span className="text-xs text-slate-500 font-semibold">eggs</span>
+            <span className="text-xs text-slate-500 font-medium">eggs</span>
           </div>
-          <p className="text-[11px] text-slate-500 truncate pt-1">
-            {isFiltered && currentBatch ? `Cohort: ${currentBatch.batch_code}` : 'Cumulative candled across all shifts'}
+          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div className="bg-[#800000] h-full rounded-full" style={{ width: '100%' }} />
+          </div>
+          <p className="text-[11px] text-slate-500 truncate">
+            {isFiltered && currentBatch ? `Batch: ${currentBatch.batch_code}` : 'Cumulative across all hatchery sorting runs'}
           </p>
         </div>
 
-        {/* Fertility Yield */}
-        <div className="p-4 sm:p-5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
+        {/* Fertility Rate */}
+        <div className="p-4 sm:p-5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>{isFiltered ? 'Cohort Fertility Rate' : 'Hatchery Fertility Rate'}</span>
+            <span>{isFiltered ? 'Cohort Fertility' : 'Hatchery Fertility Rate'}</span>
             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
               {fertilePct}%
             </span>
           </div>
-          <div className="flex items-baseline gap-2 pt-1">
-            <span className="text-2xl sm:text-3xl font-black text-emerald-800 tracking-tight">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black text-emerald-800 font-mono tracking-tight">
               {isFiltered && currentBatch ? currentBatch.fertility_rate : (overview?.overall_fertility_rate ?? '88.4')}%
             </span>
           </div>
-          <p className="text-[11px] text-slate-500 truncate pt-1">
+          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div className="bg-emerald-600 h-full rounded-full" style={{ width: `${Math.min(100, fertilePct)}%` }} />
+          </div>
+          <p className="text-[11px] text-slate-500 truncate">
             <strong className="text-emerald-700 font-semibold">{fertileCount.toLocaleString()}</strong> viable spider embryos
           </p>
         </div>
 
-        {/* Commercial Penoy Recovery */}
-        <div className="p-4 sm:p-5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
+        {/* Day 10 Penoy Salvage */}
+        <div className="p-4 sm:p-5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
             <span>Day-10 Penoy Salvage</span>
-            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
               ₱14.00/egg
             </span>
           </div>
-          <div className="flex items-baseline gap-2 pt-1">
-            <span className="text-2xl sm:text-3xl font-black text-amber-800 tracking-tight">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black text-amber-800 font-mono tracking-tight">
               ₱{((penoyCount) * 14.0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </span>
           </div>
-          <p className="text-[11px] text-slate-500 truncate pt-1">
-            <strong className="text-amber-800 font-semibold">{penoyCount.toLocaleString()}</strong> unfertilized eggs salvaged
+          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div className="bg-amber-500 h-full rounded-full" style={{ width: `${Math.min(100, penoyPct)}%` }} />
+          </div>
+          <p className="text-[11px] text-slate-500 truncate">
+            <strong className="text-amber-800 font-semibold">{penoyCount.toLocaleString()}</strong> unfertilized eggs recovered
           </p>
         </div>
 
-        {/* Cohort Location & Incubation Cycle */}
-        <div className="p-4 sm:p-5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
+        {/* Active Cohorts / Location */}
+        <div className="p-4 sm:p-5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
             <span>{isFiltered ? 'Incubator Unit' : 'Active Cohorts'}</span>
             <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
               {isFiltered && currentBatch ? currentBatch.current_stage : '28-Day Cycle'}
             </span>
           </div>
-          <div className="flex items-baseline gap-2 pt-1">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tracking-tight">
               {isFiltered && currentBatch ? currentBatch.incubator_id : (overview ? overview.active_batches_count : '3')}
             </span>
-            <span className="text-xs text-slate-500 font-semibold">
+            <span className="text-xs text-slate-500 font-medium">
               {isFiltered ? '' : 'batches'}
             </span>
           </div>
-          <p className="text-[11px] text-slate-500 truncate pt-1">
-            {isFiltered && currentBatch ? `Breed: ${currentBatch.breed}` : `${batches.length} total registered batches`}
+          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div className="bg-slate-700 h-full rounded-full" style={{ width: '75%' }} />
+          </div>
+          <p className="text-[11px] text-slate-500 truncate">
+            {isFiltered && currentBatch ? `Breed: ${currentBatch.breed}` : `${batches.length} cohorts in hatchery schedule`}
           </p>
         </div>
       </div>
@@ -262,8 +277,8 @@ export const OverviewPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-bold text-slate-500 uppercase">
-                  {isFiltered ? 'Inspecting Batch:' : 'Active Incubation Batch:'}
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  {isFiltered ? 'Inspecting Cohort:' : 'Active Cohort:'}
                 </span>
                 <h3 className="text-base font-bold text-slate-900 font-mono">{currentBatch.batch_code}</h3>
               </div>
@@ -293,7 +308,7 @@ export const OverviewPage: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">Embryo Classification Yield</h3>
-                <p className="text-xs text-slate-500">Day 10 Biological 3-Class Distribution</p>
+                <p className="text-xs text-slate-500">Day 10 Optical Candling 3-Class Breakdown</p>
               </div>
               <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                 {fertilePct}% Fertile
@@ -329,7 +344,7 @@ export const OverviewPage: React.FC = () => {
               </ResponsiveContainer>
               <div className="absolute text-center pointer-events-none">
                 <span className="text-[10px] text-slate-400 font-bold uppercase block">Total</span>
-                <span className="text-base font-black text-slate-900 leading-tight block">{totalScanned}</span>
+                <span className="text-base font-black text-slate-900 font-mono leading-tight block">{totalScanned}</span>
                 <span className="text-[10px] text-slate-500">eggs</span>
               </div>
             </div>
@@ -338,32 +353,32 @@ export const OverviewPage: React.FC = () => {
               <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50/70 border border-emerald-200">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
-                  <span className="font-bold text-emerald-950">Fertile Embryos (Accept)</span>
+                  <span className="font-semibold text-emerald-950">Fertile Embryos (Accept)</span>
                 </div>
-                <span className="font-extrabold text-emerald-900">{fertileCount} ({fertilePct}%)</span>
+                <span className="font-mono font-bold text-emerald-900">{fertileCount} ({fertilePct}%)</span>
               </div>
 
               <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50/70 border border-amber-200">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-600" />
-                  <span className="font-bold text-amber-950">Penoy Salvaged @ ₱14</span>
+                  <span className="font-semibold text-amber-950">Penoy Salvaged @ ₱14</span>
                 </div>
-                <span className="font-extrabold text-amber-900">{penoyCount} ({penoyPct}%)</span>
+                <span className="font-mono font-bold text-amber-900">{penoyCount} ({penoyPct}%)</span>
               </div>
 
               <div className="flex items-center justify-between p-2 rounded-lg bg-red-50/70 border border-red-200">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-600" />
-                  <span className="font-bold text-red-950">Dead / Abnormal (Discard)</span>
+                  <span className="font-semibold text-red-950">Dead / Abnormal (Discard)</span>
                 </div>
-                <span className="font-extrabold text-red-900">{abnormalCount} ({abnormalPct}%)</span>
+                <span className="font-mono font-bold text-red-900">{abnormalCount} ({abnormalPct}%)</span>
               </div>
             </div>
           </div>
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
             <span>Recovered Penoy Value:</span>
-            <strong className="text-amber-800 text-sm">₱{((penoyCount) * 14.0).toFixed(2)}</strong>
+            <strong className="text-amber-800 text-sm font-mono font-bold">₱{((penoyCount) * 14.0).toFixed(2)}</strong>
           </div>
         </div>
 
@@ -372,13 +387,10 @@ export const OverviewPage: React.FC = () => {
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-slate-700" />
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Conveyor Velocity & Sorter Throughput
-                  </h3>
-                </div>
-                <p className="text-xs text-slate-500">Live sorting velocity (120 eggs/min) and AI inference latency</p>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Conveyor Velocity & Sorter Throughput
+                </h3>
+                <p className="text-xs text-slate-500">Continuous 120 eggs/min candling pace and ONNX runtime response</p>
               </div>
               <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                 Station-01-RP5
@@ -390,7 +402,7 @@ export const OverviewPage: React.FC = () => {
                 <AreaChart data={throughputTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="speedGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#800000" stopOpacity={0.2}/>
+                      <stop offset="5%" stopColor="#800000" stopOpacity={0.15}/>
                       <stop offset="95%" stopColor="#800000" stopOpacity={0.0}/>
                     </linearGradient>
                   </defs>
@@ -403,7 +415,7 @@ export const OverviewPage: React.FC = () => {
                       borderRadius: '0.5rem',
                       fontSize: '11px',
                     }}
-                    formatter={(val: any) => [`${val} eggs/min`, 'Candling Velocity']}
+                    formatter={(val: any) => [`${val} eggs/min`, 'Candling Pace']}
                   />
                   <Area type="monotone" dataKey="speed" stroke="#800000" strokeWidth={2} fillOpacity={1} fill="url(#speedGradient)" />
                 </AreaChart>
@@ -412,15 +424,15 @@ export const OverviewPage: React.FC = () => {
 
             <div className="grid grid-cols-3 gap-2 mt-2 text-center text-xs">
               <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-500 block font-medium">Sorting Velocity</span>
+                <span className="text-[10px] text-slate-500 block font-medium">Sorting Pace</span>
                 <strong className="text-slate-900 text-sm font-mono">120 eggs/min</strong>
               </div>
               <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-500 block font-medium">Avg Inference</span>
+                <span className="text-[10px] text-slate-500 block font-medium">Mean Latency</span>
                 <strong className="text-slate-900 text-sm font-mono">24.6 ms</strong>
               </div>
               <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-500 block font-medium">Servo Eject Pulse</span>
+                <span className="text-[10px] text-slate-500 block font-medium">Eject Actuation</span>
                 <strong className="text-slate-900 text-sm font-mono">250 ms</strong>
               </div>
             </div>
