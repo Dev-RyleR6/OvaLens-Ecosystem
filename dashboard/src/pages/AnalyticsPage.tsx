@@ -20,13 +20,18 @@ import {
 
 import { StatCard } from '../components/StatCard';
 import { apiClient } from '../api/client';
-import { EconomicYield, MortalityTrends, BreedMetricItem } from '../types';
+import { EconomicYield, MortalityTrends, BreedMetricItem, BatchSummary, BatchAnalyticsResponse } from '../types';
 import { DataUnavailableState } from '../components/ui/DataUnavailableState';
+import { Filter, RotateCcw, Layers, Info } from 'lucide-react';
 
 export const AnalyticsPage: React.FC = () => {
   const [economic, setEconomic] = useState<EconomicYield | null>(null);
   const [mortality, setMortality] = useState<MortalityTrends | null>(null);
   const [breedMetrics, setBreedMetrics] = useState<BreedMetricItem[]>([]);
+  const [batches, setBatches] = useState<BatchSummary[]>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('ALL');
+  const [batchAnalytics, setBatchAnalytics] = useState<BatchAnalyticsResponse | null>(null);
+  const [isLoadingBatch, setIsLoadingBatch] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
 
@@ -39,14 +44,16 @@ export const AnalyticsPage: React.FC = () => {
     setIsLoading(true);
     setIsError(false);
     try {
-      const [eData, mData, bData] = await Promise.all([
+      const [eData, mData, bData, batchList] = await Promise.all([
         apiClient.getEconomicYield(),
         apiClient.getMortalityTrends(),
         apiClient.getBreedComparison(),
+        apiClient.getBatches(),
       ]);
       setEconomic(eData);
       setMortality(mData);
       setBreedMetrics(Array.isArray(bData) ? bData : []);
+      setBatches(Array.isArray(batchList) ? batchList : []);
       if (eData?.penoy_culled_day_10) {
         setCustomEggs(eData.penoy_culled_day_10);
       }
@@ -61,6 +68,32 @@ export const AnalyticsPage: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleBatchChange = async (batchId: string) => {
+    setSelectedBatchId(batchId);
+    if (batchId === 'ALL') {
+      setBatchAnalytics(null);
+      if (economic?.penoy_culled_day_10) {
+        setCustomEggs(economic.penoy_culled_day_10);
+      }
+      return;
+    }
+
+    setIsLoadingBatch(true);
+    try {
+      const data = await apiClient.getBatchAnalytics(batchId);
+      setBatchAnalytics(data);
+      if (data && typeof data.infertile_penoy_day_10 === 'number') {
+        setCustomEggs(data.infertile_penoy_day_10);
+      }
+    } catch (err) {
+      console.error('Failed to load batch analytics:', err);
+    } finally {
+      setIsLoadingBatch(false);
+    }
+  };
+
+  const selectedBatchInfo = batches.find((b) => b.batch_id === selectedBatchId);
 
   // 28-day duck egg developmental viability curve
   const cohortSurvivalData = [
@@ -103,11 +136,13 @@ export const AnalyticsPage: React.FC = () => {
   const dynamicPowerSavings = dynamicKwhSaved * safeElectricityRate;
   const dynamicTotalBenefit = dynamicPenoySales + dynamicPowerSavings;
 
-  const penoyCount = economic?.penoy_culled_day_10 ?? 168;
-  const salvageRev = economic?.salvage_revenue_php ?? economic?.estimated_penoy_salvage_value_php ?? 2352.00;
-  const kwhSaved = economic?.incubator_energy_saved_kwh ?? 45.4;
-  const powerSaved = economic?.energy_savings_php ?? economic?.electricity_saved_estimated_php ?? 544.32;
-  const totalBenefit = economic?.total_economic_benefit_php ?? 24176.32;
+  const isBatchFiltered = selectedBatchId !== 'ALL' && batchAnalytics !== null;
+
+  const penoyCount = isBatchFiltered ? batchAnalytics.infertile_penoy_day_10 : (economic?.penoy_culled_day_10 ?? 168);
+  const salvageRev = isBatchFiltered ? batchAnalytics.penoy_salvage_value_php : (economic?.salvage_revenue_php ?? economic?.estimated_penoy_salvage_value_php ?? 2352.00);
+  const kwhSaved = isBatchFiltered ? (batchAnalytics.infertile_penoy_day_10 * 18 * 0.015) : (economic?.incubator_energy_saved_kwh ?? 45.4);
+  const powerSaved = isBatchFiltered ? batchAnalytics.electricity_saved_php : (economic?.energy_savings_php ?? economic?.electricity_saved_estimated_php ?? 544.32);
+  const totalBenefit = isBatchFiltered ? (salvageRev + powerSaved) : (economic?.total_economic_benefit_php ?? 24176.32);
 
   if (isError && !economic && !mortality) {
     return (
@@ -134,7 +169,7 @@ export const AnalyticsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Page Header */}
+      {/* Page Header with Batch Filter Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
           <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
@@ -145,10 +180,73 @@ export const AnalyticsPage: React.FC = () => {
           </p>
         </div>
 
-        <span className="text-xs font-semibold text-[#800000] bg-maroon-50 border border-maroon-200 px-3 py-1 rounded-full">
-          Foundation University Research Division
-        </span>
+        {/* Batch Filter Dropdown */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex items-center">
+            <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+            <select
+              value={selectedBatchId}
+              onChange={(e) => handleBatchChange(e.target.value)}
+              disabled={isLoadingBatch}
+              className="h-9 pl-9 pr-8 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer disabled:opacity-60"
+            >
+              <option value="ALL">All Batches (Facility Total)</option>
+              {batches.map((b) => (
+                <option key={b.batch_id} value={b.batch_id}>
+                  {b.batch_code} • {b.breed} ({b.current_stage || 'Incubating'})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedBatchId !== 'ALL' && (
+            <button
+              onClick={() => handleBatchChange('ALL')}
+              className="h-9 px-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Reset to All Batches"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Contextual Active Batch Banner (if filtered) */}
+      {isBatchFiltered && selectedBatchInfo && (
+        <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center flex-shrink-0">
+              <Layers className="w-4 h-4 text-amber-900" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-amber-950 text-sm">{selectedBatchInfo.batch_code}</span>
+                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                  {selectedBatchInfo.breed}
+                </span>
+                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-white text-slate-700 border border-slate-200">
+                  {selectedBatchInfo.current_stage}
+                </span>
+              </div>
+              <p className="text-amber-800 text-[11px] mt-0.5">
+                Incubator: <strong>{selectedBatchInfo.incubator_id}</strong> • Day {batchAnalytics?.elapsed_days || 0} of 28 • Set Date: {selectedBatchInfo.set_date}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 text-amber-900 font-medium self-end sm:self-auto">
+            <div className="text-right">
+              <span className="text-[10px] text-amber-700 uppercase tracking-wider block font-bold">Fertility Rate</span>
+              <span className="text-sm font-extrabold text-emerald-800">{batchAnalytics?.day_10_fertility_rate ?? 0}%</span>
+            </div>
+            <div className="text-right border-l border-amber-200 pl-4">
+              <span className="text-[10px] text-amber-700 uppercase tracking-wider block font-bold">Total Eggs</span>
+              <span className="text-sm font-extrabold text-slate-900">{selectedBatchInfo.initial_egg_count}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 4 Clean Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -156,14 +254,14 @@ export const AnalyticsPage: React.FC = () => {
           title="Penoy Eggs Salvaged"
           value={`${penoyCount}`}
           unit="eggs"
-          subtitle="Culled on Day 10 candling"
+          subtitle={isBatchFiltered ? "Culled from this batch on Day 10" : "Culled across all facility batches"}
           icon={Coins}
           highlightColor="amber"
         />
         <StatCard
           title="Penoy Salvage Revenue"
           value={`₱${salvageRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          subtitle={`@ ₱${economic?.penoy_unit_price_php ?? 14.0}/egg market rate`}
+          subtitle={`@ ₱${economic?.penoy_unit_price_php ?? 14.0}/egg market price`}
           icon={TrendingUp}
           highlightColor="amber"
         />
@@ -171,14 +269,14 @@ export const AnalyticsPage: React.FC = () => {
           title="Incubator Energy Saved"
           value={`${kwhSaved.toFixed(1)}`}
           unit="kWh"
-          subtitle={`₱${powerSaved.toFixed(2)} thermal power avoided`}
+          subtitle={`₱${powerSaved.toFixed(2)} thermal electricity avoided`}
           icon={Zap}
           highlightColor="blue"
         />
         <StatCard
           title="Total Economic Benefit"
           value={`₱${totalBenefit.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          subtitle="Direct sales + avoided power"
+          subtitle={isBatchFiltered ? "Direct Penoy sales + power saved" : "Facility-wide direct sales + power saved"}
           icon={Award}
           highlightColor="green"
         />
