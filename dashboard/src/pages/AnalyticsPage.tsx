@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Coins,
   TrendingUp,
@@ -22,13 +22,15 @@ import { StatCard } from '../components/StatCard';
 import { apiClient } from '../api/client';
 import { EconomicYield, MortalityTrends, BreedMetricItem, BatchSummary, BatchAnalyticsResponse } from '../types';
 import { DataUnavailableState } from '../components/ui/DataUnavailableState';
-import { Filter, RotateCcw, Layers, Info } from 'lucide-react';
+import { Filter, RotateCcw, Layers, Info, Bird, Activity } from 'lucide-react';
 
 export const AnalyticsPage: React.FC = () => {
   const [economic, setEconomic] = useState<EconomicYield | null>(null);
   const [mortality, setMortality] = useState<MortalityTrends | null>(null);
   const [breedMetrics, setBreedMetrics] = useState<BreedMetricItem[]>([]);
   const [batches, setBatches] = useState<BatchSummary[]>([]);
+  const [breedFilter, setBreedFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedBatchId, setSelectedBatchId] = useState<string>('ALL');
   const [batchAnalytics, setBatchAnalytics] = useState<BatchAnalyticsResponse | null>(null);
   const [isLoadingBatch, setIsLoadingBatch] = useState<boolean>(false);
@@ -93,6 +95,50 @@ export const AnalyticsPage: React.FC = () => {
     }
   };
 
+  const filteredBatches = useMemo(() => {
+    return batches.filter((b) => {
+      const matchesBreed = breedFilter === 'ALL' || b.breed === breedFilter;
+      const matchesStatus =
+        statusFilter === 'ALL' ||
+        (statusFilter === 'ACTIVE' && b.status === 'INCUBATING') ||
+        (statusFilter === 'COMPLETED' && b.status === 'COMPLETED');
+      return matchesBreed && matchesStatus;
+    });
+  }, [batches, breedFilter, statusFilter]);
+
+  const handleBreedFilterChange = (breed: string) => {
+    setBreedFilter(breed);
+    if (selectedBatchId !== 'ALL') {
+      const batch = batches.find((b) => b.batch_id === selectedBatchId);
+      if (batch && breed !== 'ALL' && batch.breed !== breed) {
+        handleBatchChange('ALL');
+      }
+    }
+  };
+
+  const handleStatusFilterChange = (status: string) => {
+    setStatusFilter(status);
+    if (selectedBatchId !== 'ALL') {
+      const batch = batches.find((b) => b.batch_id === selectedBatchId);
+      if (batch) {
+        const isMatch =
+          status === 'ALL' ||
+          (status === 'ACTIVE' && batch.status === 'INCUBATING') ||
+          (status === 'COMPLETED' && batch.status === 'COMPLETED');
+        if (!isMatch) {
+          handleBatchChange('ALL');
+        }
+      }
+    }
+  };
+
+  const handleResetAllFilters = () => {
+    setBreedFilter('ALL');
+    setStatusFilter('ALL');
+    handleBatchChange('ALL');
+  };
+
+  const isAnyFilterActive = breedFilter !== 'ALL' || statusFilter !== 'ALL' || selectedBatchId !== 'ALL';
   const selectedBatchInfo = batches.find((b) => b.batch_id === selectedBatchId);
 
   // 28-day duck egg developmental viability curve
@@ -169,8 +215,8 @@ export const AnalyticsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Page Header with Batch Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+      {/* Page Header with Multi-Filter Toolbar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
           <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
             Hatchery Economics & Salvage Analytics
@@ -180,8 +226,36 @@ export const AnalyticsPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Batch Filter Dropdown */}
-        <div className="flex items-center gap-2">
+        {/* Filter Controls Group */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 1. Duck Breed Filter */}
+          <div className="relative flex items-center">
+            <select
+              value={breedFilter}
+              onChange={(e) => handleBreedFilterChange(e.target.value)}
+              className="h-9 px-3 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
+            >
+              <option value="ALL">All Duck Breeds</option>
+              <option value="KAYUMANGGI">Kayumanggi (Pateros)</option>
+              <option value="ITIM">Native Itim</option>
+              <option value="KHAKI">Khaki Campbell</option>
+            </select>
+          </div>
+
+          {/* 2. Incubation Status Filter */}
+          <div className="relative flex items-center">
+            <select
+              value={statusFilter}
+              onChange={(e) => handleStatusFilterChange(e.target.value)}
+              className="h-9 px-3 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="ACTIVE">Active Only (Incubating)</option>
+              <option value="COMPLETED">Completed Only (Hatched)</option>
+            </select>
+          </div>
+
+          {/* 3. Batch Selector */}
           <div className="relative flex items-center">
             <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
             <select
@@ -190,8 +264,12 @@ export const AnalyticsPage: React.FC = () => {
               disabled={isLoadingBatch}
               className="h-9 pl-9 pr-8 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer disabled:opacity-60"
             >
-              <option value="ALL">All Batches (Facility Total)</option>
-              {batches.map((b) => (
+              <option value="ALL">
+                {filteredBatches.length === batches.length
+                  ? 'All Batches (Facility Total)'
+                  : `All Filtered Batches (${filteredBatches.length} available)`}
+              </option>
+              {filteredBatches.map((b) => (
                 <option key={b.batch_id} value={b.batch_id}>
                   {b.batch_code} • {b.breed} ({b.current_stage || 'Incubating'})
                 </option>
@@ -199,11 +277,12 @@ export const AnalyticsPage: React.FC = () => {
             </select>
           </div>
 
-          {selectedBatchId !== 'ALL' && (
+          {/* Reset All Filters Button */}
+          {isAnyFilterActive && (
             <button
-              onClick={() => handleBatchChange('ALL')}
+              onClick={handleResetAllFilters}
               className="h-9 px-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Reset to All Batches"
+              title="Reset all filters"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Reset</span>
@@ -463,19 +542,36 @@ export const AnalyticsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {breedMetrics.map((b) => (
-                <tr key={b.breed} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-4 font-bold text-[#0F172A]">{b.breed}</td>
-                  <td className="py-3 px-4 text-slate-700 font-medium">{b.total_eggs ?? 0} eggs</td>
-                  <td className="py-3 px-4 text-emerald-700 font-bold">{b.fertile_count ?? 0}</td>
-                  <td className="py-3 px-4 font-bold text-emerald-800">{b.fertility_rate ?? 0}%</td>
-                  <td className="py-3 px-4 text-amber-800 font-semibold">
-                    {b.infertile_count ?? 0} ({b.total_eggs > 0 ? (((b.infertile_count ?? 0) / b.total_eggs) * 100).toFixed(1) : '0.0'}%)
-                  </td>
-                  <td className="py-3 px-4 text-slate-800 font-bold">{b.hatched_count ?? 0}</td>
-                  <td className="py-3 px-4 text-right font-extrabold text-slate-900">{b.hatchability_rate ?? 0}%</td>
-                </tr>
-              ))}
+              {breedMetrics.map((b) => {
+                const isSelected = breedFilter !== 'ALL' && b.breed === breedFilter;
+                return (
+                  <tr
+                    key={b.breed}
+                    className={`transition-colors ${
+                      isSelected ? 'bg-amber-50/80 font-semibold' : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <td className="py-3 px-4 font-bold text-[#0F172A]">
+                      <div className="flex items-center gap-1.5">
+                        <span>{b.breed}</span>
+                        {isSelected && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-900">
+                            Filtered
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-slate-700 font-medium">{b.total_eggs ?? 0} eggs</td>
+                    <td className="py-3 px-4 text-emerald-700 font-bold">{b.fertile_count ?? 0}</td>
+                    <td className="py-3 px-4 font-bold text-emerald-800">{b.fertility_rate ?? 0}%</td>
+                    <td className="py-3 px-4 text-amber-800 font-semibold">
+                      {b.infertile_count ?? 0} ({b.total_eggs > 0 ? (((b.infertile_count ?? 0) / b.total_eggs) * 100).toFixed(1) : '0.0'}%)
+                    </td>
+                    <td className="py-3 px-4 text-slate-800 font-bold">{b.hatched_count ?? 0}</td>
+                    <td className="py-3 px-4 text-right font-extrabold text-slate-900">{b.hatchability_rate ?? 0}%</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
