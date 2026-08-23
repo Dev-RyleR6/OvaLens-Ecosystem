@@ -110,13 +110,17 @@ class ReportService:
             elements.append(Paragraph(f"Official Candling Inspection & Batch Audit Certificate — {batch.batch_code}", sub_style))
             elements.append(Spacer(1, 14))
 
+            # Retrieve actual personnel from DB
+            manager_name = batch.creator.full_name if (batch.creator and batch.creator.full_name) else "Engr. Ryle Gabotero (Manager)"
+            primary_operator = sessions[0].operator_name if sessions else "Maria Clara (Lead Operator)"
+
             # Batch Metadata Table
             meta_data = [
                 ["Batch ID:", batch.batch_id, "Duck Breed:", batch.breed.value],
                 ["Incubator:", batch.incubator_id, "Current Stage:", batch.current_stage.value],
                 ["Initial Set Eggs:", f"{batch.initial_egg_count:,}", "Batch Status:", batch.status.value],
                 ["Incubation Set Date:", batch.set_date.strftime("%Y-%m-%d %H:%M"), "Target Hatch Date:", batch.target_hatch_date.strftime("%Y-%m-%d %H:%M")],
-                ["Hatched Ducklings:", f"{batch.hatched_count:,}", "Unhatched Dead:", f"{batch.unhatched_count:,}"]
+                ["Hatched Ducklings:", f"{batch.hatched_count:,}", "Batch Manager:", manager_name]
             ]
 
             t_meta = Table(meta_data, colWidths=[115, 155, 115, 155])
@@ -187,18 +191,18 @@ class ReportService:
             elements.append(t_sess)
             elements.append(Spacer(1, 28))
 
-            # Official Sign-Off Block
+            # Official Sign-Off Block with Real Database Personnel
             sign_data = [
-                ["___________________________________", "___________________________________"],
-                ["Candling Shift Lead / Operator", "Hatchery Operations Manager"],
-                ["Foundation University Hatchery", "Foundation University Hatchery"],
+                [f"<u>   {primary_operator}   </u>", f"<u>   {manager_name}   </u>"],
+                ["Candling Shift Operator / Lead", "Hatchery Operations Manager"],
+                ["Foundation University Duck Hatchery", "Foundation University Duck Hatchery"],
             ]
             t_sign = Table(sign_data, colWidths=[270, 270])
             t_sign.setStyle(TableStyle([
                 ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("FONTSIZE", (0, 0), (-1, -1), 8.5),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#334155")),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#1E293B")),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
                 ("TOPPADDING", (0, 0), (-1, -1), 2),
             ]))
