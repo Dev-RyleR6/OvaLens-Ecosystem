@@ -65,9 +65,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     return name.slice(0, 2).toUpperCase();
   };
 
-  const handleNavigateSettings = () => {
+  const handleNavigate = (path: string) => {
     setIsDropdownOpen(false);
-    navigate('/settings');
+    navigate(path);
   };
 
   return (
@@ -185,7 +185,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                 {/* Menu Action Items */}
                 <div className="space-y-0.5 text-xs font-medium text-slate-700">
                   <button
-                    onClick={handleNavigateSettings}
+                    onClick={() => handleNavigate('/settings?tab=account')}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-[#800000] transition-colors text-left cursor-pointer"
                   >
                     <User className="w-4 h-4 text-slate-500" />
@@ -193,7 +193,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                   </button>
 
                   <button
-                    onClick={handleNavigateSettings}
+                    onClick={() => handleNavigate('/settings?tab=facility')}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-[#800000] transition-colors text-left cursor-pointer"
                   >
                     <Settings className="w-4 h-4 text-slate-500" />
@@ -201,11 +201,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                   </button>
 
                   <button
-                    onClick={handleNavigateSettings}
+                    onClick={() => handleNavigate('/settings?tab=backups')}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-[#800000] transition-colors text-left cursor-pointer"
                   >
                     <Database className="w-4 h-4 text-slate-500" />
                     <span>Database Backups</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleNavigate('/settings?tab=preferences')}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-[#800000] transition-colors text-left cursor-pointer"
+                  >
+                    <Sliders className="w-4 h-4 text-slate-500" />
+                    <span>UI & Alert Preferences</span>
                   </button>
                 </div>
 

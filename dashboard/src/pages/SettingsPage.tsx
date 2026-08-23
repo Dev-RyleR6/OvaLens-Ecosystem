@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Building,
   Coins,
@@ -31,7 +32,26 @@ interface BackupArchive {
 
 export const SettingsPage: React.FC = () => {
   const { user, updateUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('facility');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') as SettingsTab | null;
+
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
+    if (tabParam && ['facility', 'account', 'backups', 'preferences'].includes(tabParam)) {
+      return tabParam;
+    }
+    return 'facility';
+  });
+
+  useEffect(() => {
+    if (tabParam && ['facility', 'account', 'backups', 'preferences'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (tab: SettingsTab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
 
   // --- Facility Settings State ---
   const [facilityName, setFacilityName] = useState('Foundation University Automated Hatchery');
@@ -329,7 +349,7 @@ export const SettingsPage: React.FC = () => {
       {/* Tabs Navigation */}
       <div className="flex border-b border-slate-200 gap-1 sm:gap-2">
         <button
-          onClick={() => setActiveTab('facility')}
+          onClick={() => handleTabChange('facility')}
           className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 ${
             activeTab === 'facility'
               ? 'border-[#800000] text-[#800000] bg-red-50/50'
@@ -341,7 +361,7 @@ export const SettingsPage: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('account')}
+          onClick={() => handleTabChange('account')}
           className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 ${
             activeTab === 'account'
               ? 'border-[#800000] text-[#800000] bg-red-50/50'
@@ -353,7 +373,7 @@ export const SettingsPage: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('backups')}
+          onClick={() => handleTabChange('backups')}
           className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 ${
             activeTab === 'backups'
               ? 'border-[#800000] text-[#800000] bg-red-50/50'
@@ -365,7 +385,7 @@ export const SettingsPage: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('preferences')}
+          onClick={() => handleTabChange('preferences')}
           className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 ${
             activeTab === 'preferences'
               ? 'border-[#800000] text-[#800000] bg-red-50/50'
