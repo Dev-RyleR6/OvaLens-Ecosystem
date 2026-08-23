@@ -242,8 +242,8 @@
     width: 0%;
     opacity: 1;
   }
-  60% {
-    width: 75%;
+  50% {
+    width: 70%;
     opacity: 1;
   }
   100% {
@@ -253,22 +253,27 @@
 }
 
 .animate-top-loader {
-  animation: topLoader 0.28s cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+  animation: topLoader 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes pageCrossFade {
+@keyframes pageSmoothEnter {
   0% {
-    opacity: 0.75;
-    transform: scale(0.998);
+    opacity: 0;
+    transform: translateY(6px);
   }
   100% {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(0px);
   }
 }
 
+.animate-page-smooth {
+  animation: pageSmoothEnter 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
+}
+
 .animate-page-enter {
-  animation: pageCrossFade 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: pageSmoothEnter 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-fade-in {

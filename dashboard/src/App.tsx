@@ -30,7 +30,7 @@ const ProtectedLayout: React.FC = () => {
     }
     const timer = setTimeout(() => {
       setIsNavigating(false);
-    }, 280);
+    }, 400);
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
@@ -62,8 +62,8 @@ const ProtectedLayout: React.FC = () => {
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} />
         <main ref={mainRef} className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 w-full custom-scrollbar">
-          <div className="max-w-7xl mx-auto">
-            <Routes>
+          <div key={location.pathname} className="max-w-7xl mx-auto animate-page-smooth">
+            <Routes location={location}>
               <Route path="/" element={<OverviewPage />} />
               <Route path="/batches" element={<BatchesPage />} />
               <Route path="/scans" element={<ScanExplorerPage />} />
