@@ -14,6 +14,7 @@ import { ModelsPage } from './pages/ModelsPage';
 import { UsersPage } from './pages/UsersPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { RoleProtectedRoute } from './components/RoleProtectedRoute';
 
 const ProtectedLayout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -71,9 +72,32 @@ const ProtectedLayout: React.FC = () => {
               <Route path="/devices" element={<DevicesPage />} />
               <Route path="/records" element={<RecordsPage />} />
               <Route path="/models" element={<ModelsPage />} />
-              <Route path="/users" element={<UsersPage />} />
-              <Route path="/logs" element={<AuditLogsPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+              
+              {/* RBAC Protected Administration Routes */}
+              <Route
+                path="/users"
+                element={
+                  <RoleProtectedRoute allowedRoles={['ADMIN']} moduleName="User & Access Control">
+                    <UsersPage />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/logs"
+                element={
+                  <RoleProtectedRoute allowedRoles={['ADMIN', 'MANAGER']} moduleName="Audit Trail Logs">
+                    <AuditLogsPage />
+                  </RoleProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <RoleProtectedRoute allowedRoles={['ADMIN', 'MANAGER']} moduleName="Facility Configuration">
+                    <SettingsPage />
+                  </RoleProtectedRoute>
+                }
+              />
             </Routes>
           </div>
         </main>
