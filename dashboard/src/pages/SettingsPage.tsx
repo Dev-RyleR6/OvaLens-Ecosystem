@@ -11,6 +11,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
+import { DataUnavailableState } from '../components/ui/DataUnavailableState';
 
 export const SettingsPage: React.FC = () => {
   const [facilityName, setFacilityName] = useState('Foundation University Automated Hatchery');
@@ -23,11 +24,15 @@ export const SettingsPage: React.FC = () => {
   const [conveyorSpeed, setConveyorSpeed] = useState(10.0);
   const [conveyorDistance, setConveyorDistance] = useState(25.0);
 
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isError, setIsError] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  useEffect(() => {
-    const fetchSettings = async () => {
+  const fetchSettings = async () => {
+    setIsLoading(true);
+    setIsError(false);
+    try {
       const data = await apiClient.getSettings();
       if (data) {
         if (data.facility_name) setFacilityName(data.facility_name);
@@ -43,7 +48,15 @@ export const SettingsPage: React.FC = () => {
         if (data.conveyor_speed_cm_s !== undefined) setConveyorSpeed(data.conveyor_speed_cm_s);
         if (data.conveyor_distance_cm !== undefined) setConveyorDistance(data.conveyor_distance_cm);
       }
-    };
+    } catch (err) {
+      console.error('Failed to load settings:', err);
+      setIsError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchSettings();
   }, []);
 
@@ -69,16 +82,39 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  if (isError && !facilityName) {
+    return (
+      <div className="space-y-6 max-w-4xl pb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+          <div>
+            <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
+              Hatchery Facility Settings
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              System-wide economic valuation constants, optical confidence thresholds, and hardware timing parameters.
+            </p>
+          </div>
+        </div>
+        <DataUnavailableState
+          title="Facility Settings Offline"
+          description="Unable to load persistent settings from the PostgreSQL database. Ensure the backend REST service is reachable."
+          onRetry={fetchSettings}
+          isRetrying={isLoading}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 pb-8">
-      {/* Header */}
+    <div className="space-y-6 max-w-4xl pb-8">
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
           <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
-            Hatchery Facility & AI Configuration
+            Hatchery Facility Settings
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Foundation University institutional settings, candling vision thresholds, and market prices.
+            System-wide economic valuation constants, optical confidence thresholds, and hardware timing parameters.
           </p>
         </div>
 

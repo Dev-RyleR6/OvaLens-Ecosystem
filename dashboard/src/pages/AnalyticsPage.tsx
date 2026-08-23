@@ -21,39 +21,45 @@ import {
 import { StatCard } from '../components/StatCard';
 import { apiClient } from '../api/client';
 import { EconomicYield, MortalityTrends, BreedMetricItem } from '../types';
+import { DataUnavailableState } from '../components/ui/DataUnavailableState';
 
 export const AnalyticsPage: React.FC = () => {
   const [economic, setEconomic] = useState<EconomicYield | null>(null);
   const [mortality, setMortality] = useState<MortalityTrends | null>(null);
   const [breedMetrics, setBreedMetrics] = useState<BreedMetricItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isError, setIsError] = useState<boolean>(false);
 
   // Dynamic Financial Simulator sliders
   const [customEggs, setCustomEggs] = useState(168);
   const [customPrice, setCustomPrice] = useState(14.00);
   const [electricityRate, setElectricityRate] = useState(12.50); // PHP per kWh
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchData = async () => {
-      try {
-        const [eData, mData, bData] = await Promise.all([
-          apiClient.getEconomicYield(),
-          apiClient.getMortalityTrends(),
-          apiClient.getBreedComparison(),
-        ]);
-        if (isMounted) {
-          setEconomic(eData);
-          setMortality(mData);
-          setBreedMetrics(Array.isArray(bData) ? bData : []);
-        }
-      } catch (err) {
-        console.error("Error fetching analytics data:", err);
+  const fetchData = async () => {
+    setIsLoading(true);
+    setIsError(false);
+    try {
+      const [eData, mData, bData] = await Promise.all([
+        apiClient.getEconomicYield(),
+        apiClient.getMortalityTrends(),
+        apiClient.getBreedComparison(),
+      ]);
+      setEconomic(eData);
+      setMortality(mData);
+      setBreedMetrics(Array.isArray(bData) ? bData : []);
+      if (eData?.penoy_culled_day_10) {
+        setCustomEggs(eData.penoy_culled_day_10);
       }
-    };
+    } catch (err) {
+      console.error("Error fetching analytics data:", err);
+      setIsError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   // 28-day duck egg developmental viability curve
@@ -102,6 +108,29 @@ export const AnalyticsPage: React.FC = () => {
   const kwhSaved = economic?.incubator_energy_saved_kwh ?? 45.4;
   const powerSaved = economic?.energy_savings_php ?? economic?.electricity_saved_estimated_php ?? 544.32;
   const totalBenefit = economic?.total_economic_benefit_php ?? 24176.32;
+
+  if (isError && !economic && !mortality) {
+    return (
+      <div className="space-y-6 pb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+          <div>
+            <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
+              Hatchery Economics & Salvage Analytics
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Commercial recovery from Day 10 Penoy culling, incubator thermal energy savings, and duck breed yield benchmarks.
+            </p>
+          </div>
+        </div>
+        <DataUnavailableState
+          title="Analytics Service Offline"
+          description="Unable to compute fertility metrics and economic salvage yield from PostgreSQL. Check that the backend server is active."
+          onRetry={fetchData}
+          isRetrying={isLoading}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-8">

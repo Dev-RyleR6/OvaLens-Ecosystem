@@ -23,39 +23,41 @@ import { TrayMatrix } from '../components/TrayMatrix';
 import { BatchProgressTimeline } from '../components/BatchProgressTimeline';
 import { apiClient } from '../api/client';
 import { AnalyticsOverview, BatchSummary, EggScan, EconomicYield } from '../types';
-import { mockOverview, mockEconomicYield, mockBatches, mockScans } from '../api/mockData';
+import { DataUnavailableState } from '../components/ui/DataUnavailableState';
 
 export const OverviewPage: React.FC = () => {
-  const [overview, setOverview] = useState<AnalyticsOverview>(mockOverview);
-  const [, setEconomic] = useState<EconomicYield>(mockEconomicYield);
-  const [batches, setBatches] = useState<BatchSummary[]>(mockBatches);
-  const [, setRecentScans] = useState<EggScan[]>(mockScans);
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
+  const [, setEconomic] = useState<EconomicYield | null>(null);
+  const [batches, setBatches] = useState<BatchSummary[]>([]);
+  const [, setRecentScans] = useState<EggScan[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('ALL');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isError, setIsError] = useState<boolean>(false);
+
+  const fetchDashboardData = async () => {
+    setIsLoading(true);
+    setIsError(false);
+    try {
+      const [overviewData, economicData, batchesData, scansData] = await Promise.all([
+        apiClient.getOverview(),
+        apiClient.getEconomicYield(),
+        apiClient.getBatches(),
+        apiClient.getScans({ limit: 6 })
+      ]);
+      if (overviewData) setOverview(overviewData);
+      if (economicData) setEconomic(economicData);
+      if (batchesData) setBatches(batchesData);
+      if (scansData) setRecentScans(scansData);
+    } catch (err) {
+      console.error("Dashboard fetch error:", err);
+      setIsError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchDashboardData = async () => {
-      try {
-        const [overviewData, economicData, batchesData, scansData] = await Promise.all([
-          apiClient.getOverview(),
-          apiClient.getEconomicYield(),
-          apiClient.getBatches(),
-          apiClient.getScans({ limit: 6 })
-        ]);
-        if (isMounted) {
-          if (overviewData) setOverview(overviewData);
-          if (economicData) setEconomic(economicData);
-          if (batchesData && batchesData.length > 0) setBatches(batchesData);
-          if (scansData && scansData.length > 0) setRecentScans(scansData);
-        }
-      } catch (err) {
-        console.error("Dashboard fetch error:", err);
-      }
-    };
     fetchDashboardData();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   // Focused batch object
@@ -119,6 +121,29 @@ export const OverviewPage: React.FC = () => {
     { time: '14:00', speed: 121, latency: 24.6 },
     { time: '15:00', speed: 120, latency: 24.4 },
   ];
+
+  if (isError && !overview && batches.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+              Hatchery Command Center
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Automated Duck Egg Candling & Fertility Telemetry
+            </p>
+          </div>
+        </div>
+        <DataUnavailableState
+          title="Telemetry Backend Offline"
+          description="Unable to reach the FastAPI REST backend at /api/v1. Check that the backend server (uvicorn) and PostgreSQL 16 database are active."
+          onRetry={fetchDashboardData}
+          isRetrying={isLoading}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-8">

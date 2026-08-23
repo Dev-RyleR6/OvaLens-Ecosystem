@@ -26,15 +26,18 @@ import { Sheet } from '../components/ui/sheet';
 import { CandlingCertificateModal } from '../components/CandlingCertificateModal';
 import { BatchAnalyticsModal } from '../components/BatchAnalyticsModal';
 import { FinalizeHatchModal } from '../components/FinalizeHatchModal';
+import { DataUnavailableState } from '../components/ui/DataUnavailableState';
+import { EmptyState } from '../components/ui/EmptyState';
 import { Activity, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
-import { mockBatches } from '../api/mockData';
 
 type ViewMode = 'TABLE' | 'GRID';
 type SortField = 'batch_code' | 'set_date' | 'initial_egg_count' | 'fertility_rate';
 type SortOrder = 'asc' | 'desc';
 
 export const BatchesPage: React.FC = () => {
-  const [batches, setBatches] = useState<BatchSummary[]>(mockBatches);
+  const [batches, setBatches] = useState<BatchSummary[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isError, setIsError] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<ViewMode>('TABLE');
   const [searchQuery, setSearchQuery] = useState('');
   const [breedFilter, setBreedFilter] = useState<string>('ALL');
@@ -72,8 +75,17 @@ export const BatchesPage: React.FC = () => {
   const [notes, setNotes] = useState('');
 
   const fetchBatches = async () => {
-    const data = await apiClient.getBatches();
-    setBatches(data);
+    setIsLoading(true);
+    setIsError(false);
+    try {
+      const data = await apiClient.getBatches();
+      setBatches(data || []);
+    } catch (err) {
+      console.error('Failed to fetch batches:', err);
+      setIsError(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -373,7 +385,21 @@ export const BatchesPage: React.FC = () => {
       </div>
 
       {/* View Mode: Table vs Grid */}
-      {viewMode === 'TABLE' ? (
+      {isError && batches.length === 0 ? (
+        <DataUnavailableState
+          title="Batches Service Unavailable"
+          description="Unable to load incubation cohorts from the PostgreSQL database. Ensure the backend REST service is reachable."
+          onRetry={fetchBatches}
+          isRetrying={isLoading}
+        />
+      ) : !isLoading && batches.length === 0 ? (
+        <EmptyState
+          title="No Incubation Batches Found"
+          description="There are currently no active or historical egg batches in the database. Initialize your first incubation batch to begin candling tracking."
+          actionLabel="Initialize First Batch"
+          onAction={() => setIsCreateOpen(true)}
+        />
+      ) : viewMode === 'TABLE' ? (
         <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">

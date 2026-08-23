@@ -22,6 +22,8 @@ import { Badge } from '../components/Badge';
 import { CandlingAperture } from '../components/CandlingAperture';
 import { Sheet } from '../components/ui/sheet';
 import { HumanInTheLoopOverrideModal } from '../components/HumanInTheLoopOverrideModal';
+import { DataUnavailableState } from '../components/ui/DataUnavailableState';
+import { EmptyState } from '../components/ui/EmptyState';
 
 type ViewMode = 'TABLE' | 'GRID';
 type SortField = 'sequence_number' | 'confidence' | 'inference_ms' | 'scanned_at';
@@ -56,6 +58,7 @@ export const ScanExplorerPage: React.FC = () => {
   const [batches, setBatches] = useState<BatchSummary[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('TABLE');
   const [isLoading, setIsLoading] = useState(false);
+  const [isError, setIsError] = useState(false);
   
   // Filters
   const [classFilter, setClassFilter] = useState<string>('ALL');
@@ -83,6 +86,7 @@ export const ScanExplorerPage: React.FC = () => {
   const fetchScans = async () => {
     try {
       setIsLoading(true);
+      setIsError(false);
       const data = await apiClient.getScans({
         final_class: classFilter === 'ALL' ? undefined : classFilter,
         batch_id: batchFilter === 'ALL' ? undefined : batchFilter,
@@ -95,6 +99,7 @@ export const ScanExplorerPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Error fetching scans:', err);
+      setIsError(true);
     } finally {
       setIsLoading(false);
     }
@@ -358,7 +363,19 @@ export const ScanExplorerPage: React.FC = () => {
       </div>
 
       {/* Main View Container (Table vs. Cards Grid) */}
-      {viewMode === 'TABLE' ? (
+      {isError && scans.length === 0 ? (
+        <DataUnavailableState
+          title="Scan Telemetry Offline"
+          description="Unable to load real-time candling scans from the PostgreSQL database. Ensure the backend REST service is reachable."
+          onRetry={fetchScans}
+          isRetrying={isLoading}
+        />
+      ) : !isLoading && processedScans.length === 0 ? (
+        <EmptyState
+          title="No Egg Scans Found"
+          description="No individual egg candling records match your filter criteria or have been synced from edge sorter stations."
+        />
+      ) : viewMode === 'TABLE' ? (
         <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden animate-slide-up stagger-1">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">

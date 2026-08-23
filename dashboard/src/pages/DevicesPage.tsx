@@ -19,10 +19,13 @@ import {
 import { apiClient } from '../api/client';
 import { Device } from '../types';
 import { Badge } from '../components/Badge';
+import { DataUnavailableState } from '../components/ui/DataUnavailableState';
+import { EmptyState } from '../components/ui/EmptyState';
 
 export const DevicesPage: React.FC = () => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isError, setIsError] = useState(false);
   const [savingDeviceId, setSavingDeviceId] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [diagnosticResult, setDiagnosticResult] = useState<Record<string, string>>({});
@@ -32,19 +35,26 @@ export const DevicesPage: React.FC = () => {
 
   const fetchDevices = async () => {
     setIsRefreshing(true);
-    const data = await apiClient.getDevices();
-    setDevices(data);
+    setIsError(false);
+    try {
+      const data = await apiClient.getDevices();
+      setDevices(data || []);
 
-    const calMap: Record<string, { speed: number; dist: number; pulse: number }> = {};
-    data.forEach(d => {
-      calMap[d.device_id] = {
-        speed: d.conveyor_speed_cm_s || 12.5,
-        dist: d.conveyor_dist_cm || 25.0,
-        pulse: d.servo_pulse_ms || 250,
-      };
-    });
-    setCalibration(calMap);
-    setTimeout(() => setIsRefreshing(false), 300);
+      const calMap: Record<string, { speed: number; dist: number; pulse: number }> = {};
+      (data || []).forEach(d => {
+        calMap[d.device_id] = {
+          speed: d.conveyor_speed_cm_s || 12.5,
+          dist: d.conveyor_dist_cm || 25.0,
+          pulse: d.servo_pulse_ms || 250,
+        };
+      });
+      setCalibration(calMap);
+    } catch (err) {
+      console.error('Error fetching devices:', err);
+      setIsError(true);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   useEffect(() => {
@@ -110,7 +120,20 @@ export const DevicesPage: React.FC = () => {
       )}
 
       {/* Edge Devices Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {isError && devices.length === 0 ? (
+        <DataUnavailableState
+          title="Edge Stations Offline"
+          description="Unable to connect to edge sorting hardware records in PostgreSQL. Ensure the backend REST service is reachable."
+          onRetry={fetchDevices}
+          isRetrying={isRefreshing}
+        />
+      ) : !isRefreshing && devices.length === 0 ? (
+        <EmptyState
+          title="No Sorter Stations Registered"
+          description="No edge sorting machines (ESP32 / Raspberry Pi) have registered with the central backend yet."
+        />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {devices.map((device) => {
           const cal = calibration[device.device_id] || {
             speed: device.conveyor_speed_cm_s || 12.5,
@@ -316,7 +339,8 @@ export const DevicesPage: React.FC = () => {
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

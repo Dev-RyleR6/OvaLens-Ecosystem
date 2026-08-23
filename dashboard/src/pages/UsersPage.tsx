@@ -16,6 +16,8 @@ import {
 import { apiClient } from '../api/client';
 import { User, UserRole } from '../types';
 import { Dialog } from '../components/ui/dialog';
+import { DataUnavailableState } from '../components/ui/DataUnavailableState';
+import { EmptyState } from '../components/ui/EmptyState';
 
 type ViewMode = 'TABLE' | 'GRID';
 type SortField = 'full_name' | 'role' | 'created_at';
@@ -23,6 +25,8 @@ type SortOrder = 'asc' | 'desc';
 
 export const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isError, setIsError] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<ViewMode>('TABLE');
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
@@ -44,8 +48,17 @@ export const UsersPage: React.FC = () => {
   const [role, setRole] = useState<UserRole>('OPERATOR');
 
   const fetchUsers = async () => {
-    const data = await apiClient.getUsers();
-    setUsers(data);
+    setIsLoading(true);
+    setIsError(false);
+    try {
+      const data = await apiClient.getUsers();
+      setUsers(data || []);
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+      setIsError(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -231,7 +244,21 @@ export const UsersPage: React.FC = () => {
       </div>
 
       {/* View Mode: Table vs Grid */}
-      {viewMode === 'TABLE' ? (
+      {isError && users.length === 0 ? (
+        <DataUnavailableState
+          title="User Service Offline"
+          description="Unable to load user accounts from PostgreSQL. Ensure the backend REST service is reachable."
+          onRetry={fetchUsers}
+          isRetrying={isLoading}
+        />
+      ) : !isLoading && processedUsers.length === 0 ? (
+        <EmptyState
+          title="No Users Found"
+          description="No user accounts match your filter criteria."
+          actionLabel="Add Operator Account"
+          onAction={() => setIsRegisterOpen(true)}
+        />
+      ) : viewMode === 'TABLE' ? (
         <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">

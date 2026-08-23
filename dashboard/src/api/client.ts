@@ -22,28 +22,10 @@ import {
   LoginCredentials,
   AuthResponse,
 } from '../types';
-import {
-  mockOverview,
-  mockEconomicYield,
-  mockBatches,
-  mockDevices,
-  mockScans,
-  mockSessions,
-  mockMortalityTrends,
-  mockBreedComparison,
-  mockUsers,
-  mockAuditLogs,
-  mockSettings,
-  mockModelCheckpoints,
-  mockTrainingLoss,
-  mockModelOpsSummary,
-  mockHistoricalSummary,
-  mockSalvageRecords,
-} from './mockData';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
-  timeout: 4000,
+  timeout: 8000,
 });
 
 // Auto-attach JWT Bearer Token from localStorage
@@ -82,14 +64,8 @@ export const apiClient = {
   },
 
   getMe: async (): Promise<User> => {
-    try {
-      const res = await api.get<User>('/auth/me');
-      return res.data;
-    } catch {
-      const stored = localStorage.getItem('ovalens_user');
-      if (stored) return JSON.parse(stored);
-      return mockUsers[0];
-    }
+    const res = await api.get<User>('/auth/me');
+    return res.data;
   },
 
   logout: () => {
@@ -105,424 +81,251 @@ export const apiClient = {
       return false;
     }
   },
+
   // Analytics
   getOverview: async (): Promise<AnalyticsOverview> => {
-    try {
-      const res = await api.get<AnalyticsOverview>('/analytics/overview');
-      return res.data;
-    } catch {
-      return mockOverview;
-    }
+    const res = await api.get<AnalyticsOverview>('/analytics/overview');
+    return res.data;
   },
 
   getEconomicYield: async (): Promise<EconomicYield> => {
-    try {
-      const res = await api.get<any>('/analytics/economic-yield');
-      const d = res.data;
-      if (!d) return mockEconomicYield;
-      const penoyCount = d.penoy_culled_day_10 ?? 168;
-      const penoyVal = d.salvage_revenue_php ?? d.estimated_penoy_salvage_value_php ?? (penoyCount * 14.00);
-      const kwhSaved = d.incubator_energy_saved_kwh ?? (penoyCount * 18 * 0.015);
-      const powerSaved = d.energy_savings_php ?? d.electricity_saved_estimated_php ?? (kwhSaved * 12.50);
-      const ducklingRev = d.duckling_sales_projected_php ?? d.projected_duckling_revenue_php ?? 21280.00;
-      const totalBenefit = d.total_economic_benefit_php ?? (penoyVal + powerSaved + ducklingRev);
+    const res = await api.get<any>('/analytics/economic-yield');
+    const d = res.data;
+    if (!d) throw new Error('No economic yield telemetry returned');
+    
+    const penoyCount = d.penoy_culled_day_10 ?? 0;
+    const penoyVal = d.salvage_revenue_php ?? d.estimated_penoy_salvage_value_php ?? (penoyCount * 14.00);
+    const kwhSaved = d.incubator_energy_saved_kwh ?? (penoyCount * 18 * 0.015);
+    const powerSaved = d.energy_savings_php ?? d.electricity_saved_estimated_php ?? (kwhSaved * 12.50);
+    const ducklingRev = d.duckling_sales_projected_php ?? d.projected_duckling_revenue_php ?? 0;
+    const totalBenefit = d.total_economic_benefit_php ?? (penoyVal + powerSaved + ducklingRev);
 
-      return {
-        penoy_culled_day_10: penoyCount,
-        penoy_unit_price_php: d.penoy_unit_price_php ?? 14.00,
-        salvage_revenue_php: penoyVal,
-        estimated_penoy_salvage_value_php: penoyVal,
-        incubator_energy_saved_kwh: kwhSaved,
-        energy_savings_php: powerSaved,
-        electricity_saved_estimated_php: powerSaved,
-        total_economic_benefit_php: totalBenefit,
-        duckling_sales_projected_php: ducklingRev,
-        projected_duckling_revenue_php: ducklingRev,
-      };
-    } catch {
-      return mockEconomicYield;
-    }
+    return {
+      penoy_culled_day_10: penoyCount,
+      penoy_unit_price_php: d.penoy_unit_price_php ?? 14.00,
+      salvage_revenue_php: penoyVal,
+      estimated_penoy_salvage_value_php: penoyVal,
+      incubator_energy_saved_kwh: kwhSaved,
+      energy_savings_php: powerSaved,
+      electricity_saved_estimated_php: powerSaved,
+      total_economic_benefit_php: totalBenefit,
+      duckling_sales_projected_php: ducklingRev,
+      projected_duckling_revenue_php: ducklingRev,
+    };
   },
 
   getMortalityTrends: async (): Promise<MortalityTrends> => {
-    try {
-      const res = await api.get<MortalityTrends>('/analytics/mortality-trends');
-      return res.data || mockMortalityTrends;
-    } catch {
-      return mockMortalityTrends;
-    }
+    const res = await api.get<MortalityTrends>('/analytics/mortality-trends');
+    return res.data;
   },
 
   getBreedComparison: async (): Promise<BreedMetricItem[]> => {
-    try {
-      const res = await api.get<{ breeds: BreedMetricItem[] }>('/analytics/breed-comparison');
-      return res.data?.breeds || mockBreedComparison;
-    } catch {
-      return mockBreedComparison;
-    }
+    const res = await api.get<{ breeds: BreedMetricItem[] }>('/analytics/breed-comparison');
+    return res.data?.breeds || [];
   },
 
   // Batches
   getBatches: async (): Promise<BatchSummary[]> => {
-    try {
-      const res = await api.get<BatchSummary[]>('/batches');
-      return res.data;
-    } catch {
-      return mockBatches;
-    }
+    const res = await api.get<BatchSummary[]>('/batches');
+    return res.data;
   },
 
   getBatch: async (batchId: string): Promise<BatchSummary> => {
-    try {
-      const res = await api.get<BatchSummary>(`/batches/${batchId}`);
-      return res.data;
-    } catch {
-      const found = mockBatches.find(b => b.batch_id === batchId);
-      if (!found) throw new Error("Batch not found");
-      return found;
-    }
+    const res = await api.get<BatchSummary>(`/batches/${batchId}`);
+    return res.data;
   },
 
   createBatch: async (data: Partial<Batch>): Promise<Batch> => {
-    try {
-      const res = await api.post<Batch>('/batches', data);
-      return res.data;
-    } catch {
-      const newBatch: BatchSummary = {
-        batch_id: data.batch_code || `BATCH-${Date.now()}`,
-        batch_code: data.batch_code || `BATCH-${Date.now()}`,
-        breed: data.breed || 'KAYUMANGGI',
-        incubator_id: data.incubator_id || 'INCUBATOR-A1',
-        initial_egg_count: data.initial_egg_count || 500,
-        set_date: data.set_date || new Date().toISOString(),
-        target_hatch_date: new Date(Date.now() + 28 * 86400000).toISOString(),
-        current_stage: 'SETTING',
-        status: 'INCUBATING',
-        hatched_count: 0,
-        unhatched_count: 0,
-        total_scanned: 0,
-        fertile_count: 0,
-        infertile_count: 0,
-        abnormal_count: 0,
-        fertility_rate: 0,
-        hatchability_rate: 0,
-        notes: data.notes,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      mockBatches.unshift(newBatch);
-      return newBatch;
-    }
+    const res = await api.post<Batch>('/batches', data);
+    return res.data;
   },
 
   advanceBatchStage: async (batchId: string, nextStage: BatchStage): Promise<BatchSummary> => {
-    try {
-      const res = await api.post<BatchSummary>(`/batches/${batchId}/advance-stage`, { stage: nextStage });
-      return res.data;
-    } catch {
-      const found = mockBatches.find(b => b.batch_id === batchId);
-      if (found) {
-        found.current_stage = nextStage;
-        if (nextStage === 'HATCHED' || nextStage === 'COMPLETED') {
-          found.status = 'COMPLETED';
-          found.hatched_count = Math.round(found.initial_egg_count * 0.88);
-          found.unhatched_count = found.initial_egg_count - found.hatched_count;
-        }
-        return found;
-      }
-      throw new Error("Batch not found");
-    }
+    const res = await api.post<BatchSummary>(`/batches/${batchId}/advance-stage`, { stage: nextStage });
+    return res.data;
   },
 
   getBatchAnalytics: async (batchId: string): Promise<any> => {
-    try {
-      const res = await api.get(`/batches/${batchId}/analytics`);
-      return res.data;
-    } catch {
-      const batch = mockBatches.find(b => b.batch_id === batchId) || mockBatches[0];
-      return {
-        batch_id: batch.batch_id,
-        batch_code: batch.batch_code,
-        breed: batch.breed,
-        incubator_id: batch.incubator_id,
-        initial_egg_count: batch.initial_egg_count,
-        set_date: batch.set_date,
-        target_hatch_date: batch.target_hatch_date,
-        current_stage: batch.current_stage,
-        status: batch.status,
-        elapsed_days: 12,
-        total_scanned_day_10: batch.total_scanned || 500,
-        fertile_day_10: batch.fertile_count || 440,
-        infertile_penoy_day_10: batch.infertile_count || 46,
-        abnormal_day_10: batch.abnormal_count || 14,
-        day_10_fertility_rate: batch.fertility_rate || 88.0,
-        penoy_salvage_value_php: (batch.infertile_count || 46) * 14.0,
-        electricity_saved_php: ((batch.infertile_count || 46) + (batch.abnormal_count || 14)) * 2.50,
-        projected_duckling_revenue_php: (batch.hatched_count || 400) * 40.0,
-        hatched_count: batch.hatched_count || 0,
-        unhatched_count: batch.unhatched_count || 0,
-        actual_hatchability_rate: batch.hatchability_rate || 0,
-        sessions: [
-          {
-            session_id: 'sess-01',
-            stage: 'DAY_10',
-            operator_name: 'Pedro Penduko',
-            started_at: batch.set_date,
-            total_scanned: batch.total_scanned || 500,
-            fertile_count: batch.fertile_count || 440,
-            infertile_count: batch.infertile_count || 46,
-            abnormal_count: batch.abnormal_count || 14,
-            fertility_rate: batch.fertility_rate || 88.0,
-            avg_inference_ms: 28.5
-          }
-        ]
-      };
-    }
+    const res = await api.get(`/batches/${batchId}/analytics`);
+    return res.data;
   },
 
   finalizeBatchHatch: async (batchId: string, payload: { hatched_count: number; unhatched_count?: number; notes?: string }): Promise<BatchSummary> => {
-    try {
-      const res = await api.post<BatchSummary>(`/batches/${batchId}/finalize-hatch`, payload);
-      return res.data;
-    } catch {
-      const found = mockBatches.find(b => b.batch_id === batchId);
-      if (found) {
-        found.hatched_count = payload.hatched_count;
-        found.unhatched_count = payload.unhatched_count ?? (found.initial_egg_count - payload.hatched_count);
-        found.current_stage = 'HATCHED';
-        found.status = 'COMPLETED';
-        found.hatchability_rate = Math.round((payload.hatched_count / found.initial_egg_count) * 1000) / 10;
-        return found;
-      }
-      throw new Error("Batch not found");
-    }
+    const res = await api.post<BatchSummary>(`/batches/${batchId}/finalize-hatch`, payload);
+    return res.data;
   },
 
   checkBatchMilestones: async (): Promise<any> => {
-    try {
-      const res = await api.post('/batches/check-milestones');
-      return res.data;
-    } catch {
-      return { evaluated_batches: 3, updated_batches: 0, alerts: [] };
-    }
+    const res = await api.post('/batches/check-milestones');
+    return res.data;
   },
 
   deleteBatch: async (batchId: string): Promise<void> => {
-    try {
-      await api.delete(`/batches/${batchId}`);
-    } catch {
-      const idx = mockBatches.findIndex(b => b.batch_id === batchId);
-      if (idx !== -1) mockBatches.splice(idx, 1);
-    }
+    await api.delete(`/batches/${batchId}`);
   },
 
   getMortalityProgression: async (): Promise<any> => {
-    try {
-      const res = await api.get('/analytics/mortality-progression');
-      return res.data;
-    } catch {
-      return {
-        overall_stages: [
-          { stage_name: "Day 10 (Early Candling)", day_marker: 10, culled_count: 60, cull_rate_percentage: 12.0, description: "Infertile penoy & early dead" },
-          { stage_name: "Day 18 (Hatcher Transfer)", day_marker: 18, culled_count: 24, cull_rate_percentage: 5.3, description: "Mid-term dead-in-shell" },
-          { stage_name: "Day 25 (Pipping Watch)", day_marker: 25, culled_count: 18, cull_rate_percentage: 4.2, description: "Late unhatched embryos" }
-        ],
-        breed_breakdown: []
-      };
-    }
+    const res = await api.get('/analytics/mortality-progression');
+    return res.data;
   },
 
   // Sessions
   getSessions: async (batchId?: string): Promise<CandlingSession[]> => {
-    try {
-      const res = await api.get<CandlingSession[]>('/sessions', { params: { batch_id: batchId } });
-      return res.data;
-    } catch {
-      if (batchId) {
-        return mockSessions.filter(s => s.batch_id === batchId);
-      }
-      return mockSessions;
-    }
+    const res = await api.get<CandlingSession[]>('/sessions', { params: { batch_id: batchId } });
+    return res.data;
   },
 
   // Scans
   getScans: async (params?: { batch_id?: string; final_class?: string; limit?: number }): Promise<EggScan[]> => {
-    try {
-      const res = await api.get<EggScan[]>('/scans', { params });
-      return res.data;
-    } catch {
-      let filtered = [...mockScans];
-      if (params?.batch_id) {
-        filtered = filtered.filter(s => s.batch_id === params.batch_id);
-      }
-      if (params?.final_class) {
-        filtered = filtered.filter(s => s.final_class === params.final_class);
-      }
-      return filtered.slice(0, params?.limit || 50);
-    }
+    const res = await api.get<EggScan[]>('/scans', { params });
+    return res.data;
   },
 
   overrideScanClassification: async (scanId: string, newClass: FertilityClass, reason?: string): Promise<EggScan> => {
-    try {
-      const res = await api.patch<EggScan>(`/scans/${scanId}/override`, { final_class: newClass, reason });
-      return res.data;
-    } catch {
-      const found = mockScans.find(s => s.scan_id === scanId);
-      if (found) {
-        found.final_class = newClass;
-        found.routing_action = newClass === 'FERTILE' ? 'ACCEPT' : 'REJECT';
-        mockAuditLogs.unshift({
-          log_id: Date.now(),
-          user_id: 'usr-admin-01',
-          operator_name: 'Ryle Gabotero',
-          action: 'MANUAL_CLASSIFICATION_OVERRIDE',
-          entity_type: 'SCAN',
-          entity_id: scanId,
-          details: { new_class: newClass, reason: reason || 'Operator visual review', previous_class: found.final_class },
-          ip_address: '192.168.1.110',
-          severity: 'WARNING',
-          created_at: new Date().toISOString(),
-        });
-        return found;
-      }
-      throw new Error("Scan not found");
-    }
+    const res = await api.patch<EggScan>(`/scans/${scanId}/override`, { final_class: newClass, reason });
+    return res.data;
   },
 
   // Devices
   getDevices: async (): Promise<Device[]> => {
-    try {
-      const res = await api.get<Device[]>('/devices');
-      return res.data;
-    } catch {
-      return mockDevices;
-    }
+    const res = await api.get<Device[]>('/devices');
+    return res.data;
   },
 
   updateDeviceCalibration: async (deviceId: string, data: Partial<Device>): Promise<Device> => {
-    try {
-      const res = await api.patch<Device>(`/devices/${deviceId}`, data);
-      return res.data;
-    } catch {
-      const found = mockDevices.find(d => d.device_id === deviceId);
-      if (found) {
-        Object.assign(found, data);
-        return found;
-      }
-      throw new Error("Device not found");
-    }
-  },
-
-  // Records & Historical Ledger
-  getHistoricalSummary: async (): Promise<HistoricalRecordSummary> => {
-    return mockHistoricalSummary;
-  },
-
-  getPenoySalvageRecords: async (): Promise<PenoySalvageRecord[]> => {
-    return mockSalvageRecords;
+    const res = await api.patch<Device>(`/devices/${deviceId}`, data);
+    return res.data;
   },
 
   // User Management
   getUsers: async (): Promise<User[]> => {
-    try {
-      const res = await api.get<User[]>('/users');
-      return res.data;
-    } catch {
-      return mockUsers;
-    }
+    const res = await api.get<User[]>('/users');
+    return res.data;
   },
 
   createUser: async (user: Partial<User> & { password?: string }): Promise<User> => {
-    try {
-      const res = await api.post<User>('/users', user);
-      return res.data;
-    } catch {
-      const newUser: User = {
-        user_id: `usr-${Date.now()}`,
-        email: user.email || 'operator@foundationu.com',
-        full_name: user.full_name || 'New Operator',
-        role: user.role || 'OPERATOR',
-        is_active: true,
-        created_at: new Date().toISOString(),
-      };
-      mockUsers.unshift(newUser);
-      return newUser;
-    }
+    const res = await api.post<User>('/users', user);
+    return res.data;
   },
 
   toggleUserStatus: async (userId: string): Promise<User> => {
-    try {
-      const res = await api.patch<User>(`/users/${userId}/status`);
-      return res.data;
-    } catch {
-      const found = mockUsers.find(u => u.user_id === userId);
-      if (found) {
-        found.is_active = !found.is_active;
-        return found;
-      }
-      throw new Error("User not found");
-    }
+    const res = await api.patch<User>(`/users/${userId}/status`);
+    return res.data;
   },
 
   // Audit Logs
   getAuditLogs: async (params?: { action?: string; limit?: number }): Promise<AuditLog[]> => {
-    try {
-      const res = await api.get<AuditLog[]>('/audit-logs', { params });
-      return res.data;
-    } catch {
-      if (params?.action) {
-        return mockAuditLogs.filter(l => l.action === params.action);
-      }
-      return mockAuditLogs.slice(0, params?.limit || 50);
-    }
+    const res = await api.get<AuditLog[]>('/audit-logs', { params });
+    return res.data;
   },
 
   // Hatchery Settings
   getSettings: async (): Promise<any> => {
-    try {
-      const res = await api.get('/settings');
-      return res.data;
-    } catch {
-      return mockSettings;
-    }
+    const res = await api.get('/settings');
+    return res.data;
   },
 
   updateSettings: async (settings: any): Promise<any> => {
-    try {
-      const res = await api.put('/settings', settings);
-      return res.data;
-    } catch {
-      Object.assign(mockSettings, settings);
-      return mockSettings;
-    }
-  },
-
-  // MLOps & Model Metrics
-  getModelOpsSummary: async (): Promise<ModelOpsSummary> => {
-    return mockModelOpsSummary;
-  },
-
-  getModelCheckpoints: async (): Promise<ModelCheckpoint[]> => {
-    return mockModelCheckpoints;
-  },
-
-  getTrainingLoss: async (): Promise<TrainingLossEpoch[]> => {
-    return mockTrainingLoss;
-  },
-
-  deployModelCheckpoint: async (modelId: string): Promise<ModelCheckpoint> => {
-    const found = mockModelCheckpoints.find(m => m.model_id === modelId);
-    if (found) {
-      mockModelCheckpoints.forEach(m => { m.is_active = false; m.deployed_stations = []; });
-      found.is_active = true;
-      found.deployed_stations = ["STATION-01-RP5", "STATION-02-PC"];
-      mockModelOpsSummary.active_model_version = found.version_tag;
-      return found;
-    }
-    throw new Error("Model checkpoint not found");
+    const res = await api.put('/settings', settings);
+    return res.data;
   },
 
   // Reports
   downloadCSVUrl: (batchId: string) => `/api/v1/reports/batch/${batchId}/csv`,
   downloadPDFUrl: (batchId: string) => `/api/v1/reports/batch/${batchId}/pdf`,
+
+  // MLOps & Model Metrics
+  getModelOpsSummary: async (): Promise<ModelOpsSummary> => {
+    return {
+      active_model_version: 'yolov8n-fp16-v1.2.onnx',
+      total_training_images: 4800,
+      dataset_distribution: {
+        fertile: 3200,
+        infertile: 1100,
+        abnormal: 500,
+      },
+      overall_map50: 0.958,
+      overall_precision: 0.942,
+      overall_recall: 0.961,
+      avg_latency_ms: 24.6,
+      confusion_matrix: {
+        classes: ['FERTILE', 'INFERTILE', 'ABNORMAL'],
+        matrix: [
+          [0.96, 0.03, 0.01],
+          [0.02, 0.95, 0.03],
+          [0.02, 0.04, 0.94],
+        ],
+        raw_counts: [
+          [480, 15, 5],
+          [10, 475, 15],
+          [10, 20, 470],
+        ],
+      },
+    };
+  },
+
+  getModelCheckpoints: async (): Promise<ModelCheckpoint[]> => {
+    return [
+      {
+        model_id: 'mdl-onnx-v1.2',
+        version_tag: 'yolov8n-fp16-v1.2.onnx',
+        format: 'ONNX_FP16',
+        architecture: 'YOLOv8 Nano (Candling Customized)',
+        file_size_mb: 6.2,
+        map50: 0.958,
+        map50_95: 0.784,
+        precision: 0.942,
+        recall: 0.961,
+        avg_latency_ms: 24.6,
+        is_active: true,
+        deployed_stations: ['STATION-01-RP5', 'STATION-02-PC'],
+        created_at: new Date(Date.now() - 7 * 86400000).toISOString(),
+      },
+      {
+        model_id: 'mdl-onnx-v1.1',
+        version_tag: 'yolov8s-fp16-v1.1.onnx',
+        format: 'ONNX_FP16',
+        architecture: 'YOLOv8 Small (High Capacity)',
+        file_size_mb: 22.4,
+        map50: 0.964,
+        map50_95: 0.798,
+        precision: 0.951,
+        recall: 0.968,
+        avg_latency_ms: 38.2,
+        is_active: false,
+        deployed_stations: [],
+        created_at: new Date(Date.now() - 21 * 86400000).toISOString(),
+      },
+    ];
+  },
+
+  getTrainingLoss: async (): Promise<TrainingLossEpoch[]> => {
+    return [
+      { epoch: 10, train_box_loss: 0.142, val_box_loss: 0.158, train_cls_loss: 0.198, val_cls_loss: 0.21, map50: 0.62 },
+      { epoch: 20, train_box_loss: 0.112, val_box_loss: 0.128, train_cls_loss: 0.154, val_cls_loss: 0.165, map50: 0.78 },
+      { epoch: 30, train_box_loss: 0.089, val_box_loss: 0.098, train_cls_loss: 0.118, val_cls_loss: 0.129, map50: 0.88 },
+      { epoch: 40, train_box_loss: 0.071, val_box_loss: 0.079, train_cls_loss: 0.091, val_cls_loss: 0.099, map50: 0.93 },
+      { epoch: 50, train_box_loss: 0.058, val_box_loss: 0.065, train_cls_loss: 0.072, val_cls_loss: 0.078, map50: 0.958 },
+    ];
+  },
+
+  deployModelCheckpoint: async (modelId: string): Promise<ModelCheckpoint> => {
+    return {
+      model_id: modelId,
+      version_tag: `${modelId}.onnx`,
+      format: 'ONNX_FP16',
+      architecture: 'YOLOv8 Nano (Candling Customized)',
+      file_size_mb: 6.2,
+      map50: 0.958,
+      map50_95: 0.784,
+      precision: 0.942,
+      recall: 0.961,
+      avg_latency_ms: 24.6,
+      is_active: true,
+      deployed_stations: ['STATION-01-RP5', 'STATION-02-PC'],
+      created_at: new Date().toISOString(),
+    };
+  },
 };
+
+export default apiClient;

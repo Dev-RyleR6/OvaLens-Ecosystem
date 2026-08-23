@@ -13,12 +13,16 @@ import {
 import { apiClient } from '../api/client';
 import { AuditLog } from '../types';
 import { Sheet } from '../components/ui/sheet';
+import { DataUnavailableState } from '../components/ui/DataUnavailableState';
+import { EmptyState } from '../components/ui/EmptyState';
 
 type SortField = 'log_id' | 'action' | 'created_at';
 type SortOrder = 'asc' | 'desc';
 
 export const AuditLogsPage: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isError, setIsError] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [actionFilter, setActionFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
@@ -32,8 +36,17 @@ export const AuditLogsPage: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const fetchLogs = async () => {
-    const data = await apiClient.getAuditLogs({ limit: 100 });
-    setLogs(data);
+    setIsLoading(true);
+    setIsError(false);
+    try {
+      const data = await apiClient.getAuditLogs({ limit: 100 });
+      setLogs(data || []);
+    } catch (err) {
+      console.error('Failed to fetch audit logs:', err);
+      setIsError(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -192,9 +205,22 @@ export const AuditLogsPage: React.FC = () => {
       </div>
 
       {/* Logs Table */}
-      <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+      {isError && logs.length === 0 ? (
+        <DataUnavailableState
+          title="Audit Trail Service Offline"
+          description="Unable to connect to the PostgreSQL audit log engine. Ensure the backend REST service is active."
+          onRetry={fetchLogs}
+          isRetrying={isLoading}
+        />
+      ) : !isLoading && processedLogs.length === 0 ? (
+        <EmptyState
+          title="No Audit Records Found"
+          description="No security or operational audit records match your filter criteria."
+        />
+      ) : (
+        <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <th
@@ -279,6 +305,7 @@ export const AuditLogsPage: React.FC = () => {
           </table>
         </div>
       </div>
+      )}
 
       {/* Pagination Controls */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 pt-2">

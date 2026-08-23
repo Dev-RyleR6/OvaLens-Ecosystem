@@ -70,16 +70,16 @@ export const RecordsPage: React.FC = () => {
 
   useEffect(() => {
     const fetchRecords = async () => {
-      const [sum, bData, salData, sessData] = await Promise.all([
-        apiClient.getHistoricalSummary(),
-        apiClient.getBatches(),
-        apiClient.getPenoySalvageRecords(),
-        apiClient.getSessions(),
-      ]);
-      setSummary(sum);
-      setBatches(bData);
-      setSalvageRecords(salData);
-      setSessions(sessData);
+      try {
+        const [bData, sessData] = await Promise.all([
+          apiClient.getBatches(),
+          apiClient.getSessions(),
+        ]);
+        setBatches(bData || []);
+        setSessions(sessData || []);
+      } catch (err) {
+        console.error("Error fetching records:", err);
+      }
     };
     fetchRecords();
   }, []);
