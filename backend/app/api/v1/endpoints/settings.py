@@ -56,3 +56,29 @@ def update_settings(
     db.refresh(settings)
     
     return settings
+
+
+@router.post("/backups/create", summary="Trigger automated database snapshot")
+def create_backup(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(require_manager_or_admin)
+):
+    from app.services.backup_service import BackupService
+    result = BackupService.create_database_snapshot(db, triggered_by=current_user.email)
+    
+    audit = AuditLogModel(
+        user_id=current_user.user_id,
+        action="DATABASE_BACKUP_CREATED",
+        entity_type="BACKUP",
+        entity_id=result["filename"],
+        details={"filename": result["filename"], "file_size_kb": result["file_size_kb"], "triggered_by": current_user.email}
+    )
+    db.add(audit)
+    db.commit()
+    return result
+
+
+@router.get("/backups", summary="List database snapshot archives")
+def list_backups(current_user: UserModel = Depends(require_manager_or_admin)):
+    from app.services.backup_service import BackupService
+    return BackupService.list_backups()

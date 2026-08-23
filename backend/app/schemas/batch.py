@@ -128,3 +128,35 @@ class MilestoneCheckResponse(BaseModel):
     updated_batches: int
     alerts: List[dict]
 
+
+class BatchForecastResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    batch_id: str
+    batch_code: str
+    breed: DuckBreed
+    initial_egg_count: int
+    elapsed_days: int
+    current_stage: BatchStage
+    status: BatchStatus
+
+    # Biological Indicators
+    detected_fertility_rate: float
+    breed_baseline_fertility: float
+    expected_embryo_viability_rate: float
+
+    # Day 28 Predictions
+    predicted_hatched_count: int
+    predicted_hatchability_rate: float
+    predicted_unhatched_count: int
+
+    # Financial Forecast
+    penoy_realized_revenue_php: float
+    projected_duckling_revenue_php: float
+    projected_total_revenue_php: float
+
+    # Anomaly Diagnostics
+    anomaly_status: str  # OPTIMAL | WARNING | CRITICAL
+    confidence_level: str  # HIGH | MEDIUM | LOW
+    advisory_notes: List[str]
+

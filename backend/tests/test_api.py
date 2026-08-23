@@ -171,4 +171,39 @@ def test_rbac_and_admin_security_protections():
     assert unauth_override.status_code == 401
 
 
+def test_hatch_yield_forecast_and_backup_service():
+    # 1. Login as admin
+    admin_login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@ovalens.fu.edu.ph", "password": "Admin@123"}
+    )
+    admin_token = admin_login.json()["access_token"]
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    # 2. Test Day 28 Biological Forecast Endpoint
+    forecast_resp = client.get("/api/v1/batches/BATCH-2026-08-KAY-01/forecast")
+    assert forecast_resp.status_code == 200
+    forecast_data = forecast_resp.json()
+    assert forecast_data["batch_id"] == "BATCH-2026-08-KAY-01"
+    assert "predicted_hatched_count" in forecast_data
+    assert "predicted_hatchability_rate" in forecast_data
+    assert "projected_total_revenue_php" in forecast_data
+    assert forecast_data["anomaly_status"] in ("OPTIMAL", "WARNING", "CRITICAL")
+    assert len(forecast_data["advisory_notes"]) >= 1
+
+    # 3. Test Database Backup Creation
+    backup_create = client.post("/api/v1/settings/backups/create", headers=admin_headers)
+    assert backup_create.status_code == 200
+    backup_res = backup_create.json()
+    assert backup_res["status"] == "success"
+    assert backup_res["filename"].endswith(".json.gz")
+    assert backup_res["file_size_kb"] > 0
+
+    # 4. Test List Backups
+    backups_list = client.get("/api/v1/settings/backups", headers=admin_headers)
+    assert backups_list.status_code == 200
+    assert len(backups_list.json()) >= 1
+
+
+
 

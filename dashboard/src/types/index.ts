@@ -136,6 +136,28 @@ export interface MilestoneCheckResponse {
   }>;
 }
 
+export interface BatchForecastResponse {
+  batch_id: string;
+  batch_code: string;
+  breed: DuckBreed;
+  initial_egg_count: number;
+  elapsed_days: number;
+  current_stage: BatchStage;
+  status: BatchStatus;
+  detected_fertility_rate: number;
+  breed_baseline_fertility: number;
+  expected_embryo_viability_rate: number;
+  predicted_hatched_count: number;
+  predicted_hatchability_rate: number;
+  predicted_unhatched_count: number;
+  penoy_realized_revenue_php: number;
+  projected_duckling_revenue_php: number;
+  projected_total_revenue_php: number;
+  anomaly_status: 'OPTIMAL' | 'WARNING' | 'CRITICAL';
+  confidence_level: 'HIGH' | 'MEDIUM' | 'LOW';
+  advisory_notes: string[];
+}
+
 export interface CandlingSession {
   session_id: string;
   batch_id: string;

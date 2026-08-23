@@ -143,6 +143,52 @@ class CameraGrabber:
     def is_mock_mode(self) -> bool:
         return self._is_mock_mode
 
+    def calibrate_optical_tunnel(self) -> dict:
+        """
+        Pre-shift optical diagnostic routine.
+        Analyzes candling aperture illumination, ambient baseline, and contrast.
+        """
+        frame = self.get_latest_frame(copy=True)
+        if frame is None:
+            return {
+                "status": "UNAVAILABLE",
+                "message": "No active video stream from camera aperture.",
+                "mean_luminance": 0.0,
+                "contrast_ratio": 0.0,
+            }
+
+        # Convert to HSV and evaluate V channel (Luminance)
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        v_channel = hsv[:, :, 2]
+        
+        # Center aperture ROI (central 40% of frame)
+        h, w = v_channel.shape
+        cx1, cx2 = int(w * 0.3), int(w * 0.7)
+        cy1, cy2 = int(h * 0.3), int(h * 0.7)
+        center_roi = v_channel[cy1:cy2, cx1:cx2]
+        
+        center_mean = float(np.mean(center_roi))
+        ambient_mean = float(np.mean(v_channel))
+        contrast_ratio = round(center_mean / max(1.0, ambient_mean), 2)
+
+        if center_mean < 45.0:
+            status = "LOW_ILLUMINATION"
+            message = "Candling LED intensity is low. Verify 10W high-power candler power supply."
+        elif center_mean > 240.0:
+            status = "OVEREXPOSED"
+            message = "Aperture saturation detected. Lower exposure or increase optical diffuser distance."
+        else:
+            status = "OPTIMAL"
+            message = f"Optical candling tunnel calibrated ({center_mean:.1f} lux center luminance, {contrast_ratio}x contrast ratio)."
+
+        return {
+            "status": status,
+            "message": message,
+            "mean_luminance": round(center_mean, 1),
+            "ambient_luminance": round(ambient_mean, 1),
+            "contrast_ratio": contrast_ratio,
+        }
+
     def stop(self):
         """Safely release camera resources and stop thread."""
         self._is_running = False

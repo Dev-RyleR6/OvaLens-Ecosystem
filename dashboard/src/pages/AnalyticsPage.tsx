@@ -20,8 +20,9 @@ import {
 
 import { StatCard } from '../components/StatCard';
 import { apiClient } from '../api/client';
-import { EconomicYield, MortalityTrends, BreedMetricItem, BatchSummary, BatchAnalyticsResponse } from '../types';
+import { EconomicYield, MortalityTrends, BreedMetricItem, BatchSummary, BatchAnalyticsResponse, BatchForecastResponse } from '../types';
 import { DataUnavailableState } from '../components/ui/DataUnavailableState';
+import { BatchForecastCard } from '../components/BatchForecastCard';
 import { Filter, RotateCcw, Layers, Info, Bird, Activity } from 'lucide-react';
 
 export const AnalyticsPage: React.FC = () => {
@@ -33,6 +34,7 @@ export const AnalyticsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedBatchId, setSelectedBatchId] = useState<string>('ALL');
   const [batchAnalytics, setBatchAnalytics] = useState<BatchAnalyticsResponse | null>(null);
+  const [batchForecast, setBatchForecast] = useState<BatchForecastResponse | null>(null);
   const [isLoadingBatch, setIsLoadingBatch] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
@@ -75,6 +77,7 @@ export const AnalyticsPage: React.FC = () => {
     setSelectedBatchId(batchId);
     if (batchId === 'ALL') {
       setBatchAnalytics(null);
+      setBatchForecast(null);
       if (economic?.penoy_culled_day_10) {
         setCustomEggs(economic.penoy_culled_day_10);
       }
@@ -83,13 +86,17 @@ export const AnalyticsPage: React.FC = () => {
 
     setIsLoadingBatch(true);
     try {
-      const data = await apiClient.getBatchAnalytics(batchId);
+      const [data, forecast] = await Promise.all([
+        apiClient.getBatchAnalytics(batchId),
+        apiClient.getBatchForecast(batchId)
+      ]);
       setBatchAnalytics(data);
+      setBatchForecast(forecast);
       if (data && typeof data.infertile_penoy_day_10 === 'number') {
         setCustomEggs(data.infertile_penoy_day_10);
       }
     } catch (err) {
-      console.error('Failed to load batch analytics:', err);
+      console.error('Failed to load batch analytics/forecast:', err);
     } finally {
       setIsLoadingBatch(false);
     }
@@ -325,6 +332,11 @@ export const AnalyticsPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Day 28 Biological Forecast Card (when batch is filtered) */}
+      {isBatchFiltered && (
+        <BatchForecastCard forecast={batchForecast} isLoading={isLoadingBatch} />
       )}
 
       {/* 4 Clean Metric Cards */}

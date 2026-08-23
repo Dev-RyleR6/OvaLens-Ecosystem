@@ -7,9 +7,10 @@ from app.models.user import UserModel
 from app.models.audit import AuditLogModel
 from app.schemas.batch import (
     BatchCreate, BatchUpdate, BatchResponse, BatchSummaryResponse, AdvanceStagePayload,
-    BatchAnalyticsResponse, FinalizeHatchPayload, MilestoneCheckResponse
+    BatchAnalyticsResponse, FinalizeHatchPayload, MilestoneCheckResponse, BatchForecastResponse
 )
 from app.services.batch_service import BatchService
+from app.services.forecast_service import ForecastService
 from app.api.deps import get_current_user, require_manager_or_admin
 
 router = APIRouter(prefix="/batches", tags=["Incubation Batches"])
@@ -54,6 +55,11 @@ def get_batch(batch_id: str, db: Session = Depends(get_db)):
 @router.get("/{batch_id}/analytics", response_model=BatchAnalyticsResponse, summary="Get deep batch analytics and embryo mortality breakdown")
 def get_batch_analytics(batch_id: str, db: Session = Depends(get_db)):
     return BatchService.get_batch_deep_analytics(db, batch_id)
+
+
+@router.get("/{batch_id}/forecast", response_model=BatchForecastResponse, summary="Predict Day 28 hatch yield, revenue forecast, and biological anomalies")
+def get_batch_forecast(batch_id: str, db: Session = Depends(get_db)):
+    return ForecastService.get_batch_forecast(db, batch_id)
 
 
 @router.put("/{batch_id}", response_model=BatchResponse, summary="Update batch status or hatch counts")

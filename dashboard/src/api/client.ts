@@ -21,6 +21,7 @@ import {
   HistoricalRecordSummary,
   LoginCredentials,
   AuthResponse,
+  BatchForecastResponse,
 } from '../types';
 
 const api = axios.create({
@@ -147,6 +148,11 @@ export const apiClient = {
 
   getBatchAnalytics: async (batchId: string): Promise<any> => {
     const res = await api.get(`/batches/${batchId}/analytics`);
+    return res.data;
+  },
+
+  getBatchForecast: async (batchId: string): Promise<BatchForecastResponse> => {
+    const res = await api.get<BatchForecastResponse>(`/batches/${batchId}/forecast`);
     return res.data;
   },
 
