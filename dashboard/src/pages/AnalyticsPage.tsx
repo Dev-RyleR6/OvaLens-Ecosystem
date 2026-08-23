@@ -452,7 +452,7 @@ export const AnalyticsPage: React.FC = () => {
                   </h3>
                   <p className="text-xs text-slate-500">Early arrest vs Mid-term vs Late pipping failure</p>
                 </div>
-                <span className="text-xs font-semibold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
+                <span className="text-xs font-semibold text-rose-800 bg-rose-50 px-2.5 py-0.5 rounded-md border border-rose-200">
                   {mortality?.total_culled_eggs ?? 238} Culled Eggs Total
                 </span>
               </div>

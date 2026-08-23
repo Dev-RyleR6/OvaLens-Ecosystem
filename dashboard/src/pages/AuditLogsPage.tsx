@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   Info,
   Shield,
+  ShieldAlert,
   ArrowUpDown,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
@@ -125,7 +126,7 @@ export const AuditLogsPage: React.FC = () => {
           </p>
         </div>
 
-        <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+        <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-3 py-1 rounded-md border border-slate-200">
           PostgreSQL WAL Traceability Active
         </span>
       </div>
@@ -266,23 +267,28 @@ export const AuditLogsPage: React.FC = () => {
                 >
                   <td className="py-3 px-4 font-mono font-bold text-slate-500">#{log.log_id}</td>
                   <td className="py-3 px-4">
-                    <span className="font-bold text-[#0F172A] font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                    <span className="font-semibold text-[#0F172A] font-mono text-xs bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
                       {log.action}
                     </span>
                   </td>
-                  <td className="py-3 px-4 font-semibold text-slate-700 font-mono text-[11px]">{log.entity_id}</td>
+                  <td className="py-3 px-4 font-semibold text-slate-700 font-mono text-xs">{log.entity_id}</td>
                   <td className="py-3 px-4 text-slate-800 font-medium">
                     {log.operator_name || 'Automated Sorter'}
                   </td>
                   <td className="py-3 px-4">
-                    {log.severity === 'WARNING' ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                        <AlertTriangle className="w-3 h-3" />
+                    {log.severity === 'SECURITY' ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-800 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-200">
+                        <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                        Security
+                      </span>
+                    ) : log.severity === 'WARNING' ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                         Warning
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                        <Info className="w-3 h-3 text-slate-500" />
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                        <Info className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                         Info
                       </span>
                     )}

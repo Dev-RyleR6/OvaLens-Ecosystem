@@ -326,27 +326,27 @@ export const UsersPage: React.FC = () => {
                     <td className="py-3 px-4 text-slate-600 font-mono">{u.email}</td>
                     <td className="py-3 px-4">
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold ${
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${
                           u.role === 'ADMIN'
-                            ? 'bg-maroon-50 text-[#800000] border border-maroon-200'
+                            ? 'bg-red-50 text-[#800000] border-red-200'
                             : u.role === 'MANAGER'
-                            ? 'bg-blue-50 text-blue-800 border border-blue-200'
-                            : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            ? 'bg-blue-50 text-blue-800 border-blue-200'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
                         }`}
                       >
-                        <Shield className="w-3 h-3" />
+                        <Shield className="w-3.5 h-3.5 shrink-0" />
                         {u.role}
                       </span>
                     </td>
                     <td className="py-3 px-4">
                       {u.is_active ? (
-                        <span className="inline-flex items-center gap-1.5 text-emerald-700 font-semibold text-xs">
-                          <span className="w-2 h-2 rounded-full bg-emerald-600" />
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0" />
                           Active
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 text-slate-400 font-medium text-xs">
-                          <span className="w-2 h-2 rounded-full bg-slate-300" />
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
                           Suspended
                         </span>
                       )}
@@ -392,23 +392,29 @@ export const UsersPage: React.FC = () => {
                     </div>
                   </div>
                   {u.is_active ? (
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="Active" />
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0" />
+                      Active
+                    </span>
                   ) : (
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-300" title="Suspended" />
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                      Suspended
+                    </span>
                   )}
                 </div>
 
                 <div className="pt-3 flex items-center justify-between text-xs">
                   <span
-                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold ${
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${
                       u.role === 'ADMIN'
-                        ? 'bg-maroon-50 text-[#800000] border border-maroon-200'
+                        ? 'bg-red-50 text-[#800000] border-red-200'
                         : u.role === 'MANAGER'
-                        ? 'bg-blue-50 text-blue-800 border border-blue-200'
-                        : 'bg-slate-100 text-slate-700 border border-slate-200'
+                        ? 'bg-blue-50 text-blue-800 border-blue-200'
+                        : 'bg-slate-100 text-slate-700 border-slate-200'
                     }`}
                   >
-                    <Shield className="w-3 h-3" />
+                    <Shield className="w-3.5 h-3.5 shrink-0" />
                     {u.role}
                   </span>
                   <span className="text-slate-400 text-[11px]">

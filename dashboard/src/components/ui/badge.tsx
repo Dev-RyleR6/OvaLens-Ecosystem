@@ -11,15 +11,15 @@ function Badge({ className, variant = "default", ...props }: BadgeProps) {
     secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
     destructive: "border-transparent bg-destructive/15 text-destructive border border-destructive/20",
     outline: "text-foreground border border-border",
-    success: "border-transparent bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800",
-    warning: "border-transparent bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800",
-    maroon: "border-transparent bg-maroon-50 text-maroon-800 dark:bg-maroon-900/30 dark:text-maroon-200 border border-maroon-200 dark:border-maroon-800",
+    success: "border-transparent bg-emerald-50 text-emerald-800 border border-emerald-200",
+    warning: "border-transparent bg-amber-50 text-amber-900 border border-amber-200",
+    maroon: "border-transparent bg-maroon-50 text-[#800000] border border-maroon-200",
   }
 
   return (
     <div
       className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+        "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
         variants[variant],
         className
       )}

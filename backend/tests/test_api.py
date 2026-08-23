@@ -212,49 +212,72 @@ def test_hatch_yield_forecast_and_backup_service():
 
 
 def test_user_profile_and_password_change_flow():
-    # 1. Login as operator
-    op_login = client.post(
+    # 1. Login as admin and create dedicated test user
+    admin_login = client.post(
         "/api/v1/auth/login",
-        json={"email": "operator@ovalens.fu.edu.ph", "password": "Operator@123"}
+        json={"email": "admin@ovalens.fu.edu.ph", "password": "Admin@123"}
     )
-    assert op_login.status_code == 200
-    op_token = op_login.json()["access_token"]
-    op_headers = {"Authorization": f"Bearer {op_token}"}
+    admin_token = admin_login.json()["access_token"]
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
-    # 2. Update profile name
+    import time
+    test_email = f"tester_{int(time.time())}@ovalens.fu.edu.ph"
+    create_res = client.post(
+        "/api/v1/users",
+        headers=admin_headers,
+        json={
+            "email": test_email,
+            "password": "InitialPassword@123",
+            "full_name": "Test Operator Proponent",
+            "role": "OPERATOR"
+        }
+    )
+    assert create_res.status_code == 200
+
+    # 2. Login as the newly created user
+    user_login = client.post(
+        "/api/v1/auth/login",
+        json={"email": test_email, "password": "InitialPassword@123"}
+    )
+    assert user_login.status_code == 200
+    user_token = user_login.json()["access_token"]
+    user_headers = {"Authorization": f"Bearer {user_token}"}
+
+    # 3. Update profile name
     update_prof = client.patch(
         "/api/v1/users/me/profile",
-        json={"full_name": "Maria Clara (Senior Candling Lead)"},
-        headers={**op_headers}
+        json={"full_name": "Maria Clara (Updated Lead)"},
+        headers=user_headers
     )
     assert update_prof.status_code == 200
-    assert update_prof.json()["full_name"] == "Maria Clara (Senior Candling Lead)"
+    assert update_prof.json()["full_name"] == "Maria Clara (Updated Lead)"
 
-    # 3. Fail password change on wrong current password
+    # 4. Fail password change on wrong current password
     bad_pw = client.patch(
         "/api/v1/users/me/password",
         json={"current_password": "WrongPassword999", "new_password": "NewSecretPassword@456"},
-        headers={**op_headers}
+        headers=user_headers
     )
     assert bad_pw.status_code == 400
     assert "Current password verification failed" in bad_pw.json()["detail"]
 
-    # 4. Success password change
+    # 5. Success password change
     good_pw = client.patch(
         "/api/v1/users/me/password",
-        json={"current_password": "Operator@123", "new_password": "NewOperatorPass@789"},
-        headers={**op_headers}
+        json={"current_password": "InitialPassword@123", "new_password": "NewOperatorPass@789"},
+        headers=user_headers
     )
     assert good_pw.status_code == 200
     assert good_pw.json()["status"] == "success"
 
-    # 5. Verify login with new password
+    # 6. Verify login with new password
     new_login = client.post(
         "/api/v1/auth/login",
-        json={"email": "operator@ovalens.fu.edu.ph", "password": "NewOperatorPass@789"}
+        json={"email": test_email, "password": "NewOperatorPass@789"}
     )
     assert new_login.status_code == 200
     assert "access_token" in new_login.json()
+
 
 
 
