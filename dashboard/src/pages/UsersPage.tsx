@@ -326,7 +326,7 @@ export const UsersPage: React.FC = () => {
                     <td className="py-3 px-4 text-slate-600 font-mono">{u.email}</td>
                     <td className="py-3 px-4">
                       <span
-                        className={`inline-flex items-center justify-center gap-1.5 w-28 py-1 rounded-md text-xs font-semibold border ${
+                        className={`inline-flex items-center gap-2 w-28 px-2.5 py-1 rounded-md text-xs font-semibold border ${
                           u.role === 'ADMIN'
                             ? 'bg-red-50 text-[#800000] border-red-200'
                             : u.role === 'MANAGER'
@@ -335,19 +335,19 @@ export const UsersPage: React.FC = () => {
                         }`}
                       >
                         <Shield className="w-3.5 h-3.5 shrink-0" />
-                        {u.role}
+                        <span>{u.role}</span>
                       </span>
                     </td>
                     <td className="py-3 px-4">
                       {u.is_active ? (
-                        <span className="inline-flex items-center justify-center gap-1.5 w-24 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        <span className="inline-flex items-center gap-2 w-24 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0" />
-                          Active
+                          <span>Active</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center justify-center gap-1.5 w-24 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                        <span className="inline-flex items-center gap-2 w-24 px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
                           <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                          Suspended
+                          <span>Suspended</span>
                         </span>
                       )}
                     </td>
@@ -406,7 +406,7 @@ export const UsersPage: React.FC = () => {
 
                 <div className="pt-3 flex items-center justify-between text-xs">
                   <span
-                    className={`inline-flex items-center justify-center gap-1.5 w-28 py-1 rounded-md text-xs font-semibold border ${
+                    className={`inline-flex items-center gap-2 w-28 px-2.5 py-1 rounded-md text-xs font-semibold border ${
                       u.role === 'ADMIN'
                         ? 'bg-red-50 text-[#800000] border-red-200'
                         : u.role === 'MANAGER'
@@ -415,7 +415,7 @@ export const UsersPage: React.FC = () => {
                     }`}
                   >
                     <Shield className="w-3.5 h-3.5 shrink-0" />
-                    {u.role}
+                    <span>{u.role}</span>
                   </span>
                   <span className="text-slate-400 text-[11px]">
                     Joined: {new Date(u.created_at).toLocaleDateString()}
