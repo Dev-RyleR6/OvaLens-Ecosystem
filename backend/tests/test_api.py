@@ -203,6 +203,59 @@ def test_hatch_yield_forecast_and_backup_service():
     backups_list = client.get("/api/v1/settings/backups", headers=admin_headers)
     assert backups_list.status_code == 200
     assert len(backups_list.json()) >= 1
+    backup_file = backups_list.json()[0]["filename"]
+
+    # 5. Test Download Backup Endpoint
+    download_resp = client.get(f"/api/v1/settings/backups/{backup_file}/download", headers=admin_headers)
+    assert download_resp.status_code == 200
+    assert download_resp.headers["content-type"] == "application/gzip"
+
+
+def test_user_profile_and_password_change_flow():
+    # 1. Login as operator
+    op_login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "operator@ovalens.fu.edu.ph", "password": "Operator@123"}
+    )
+    assert op_login.status_code == 200
+    op_token = op_login.json()["access_token"]
+    op_headers = {"Authorization": f"Bearer {op_token}"}
+
+    # 2. Update profile name
+    update_prof = client.patch(
+        "/api/v1/users/me/profile",
+        json={"full_name": "Maria Clara (Senior Candling Lead)"},
+        headers={**op_headers}
+    )
+    assert update_prof.status_code == 200
+    assert update_prof.json()["full_name"] == "Maria Clara (Senior Candling Lead)"
+
+    # 3. Fail password change on wrong current password
+    bad_pw = client.patch(
+        "/api/v1/users/me/password",
+        json={"current_password": "WrongPassword999", "new_password": "NewSecretPassword@456"},
+        headers={**op_headers}
+    )
+    assert bad_pw.status_code == 400
+    assert "Current password verification failed" in bad_pw.json()["detail"]
+
+    # 4. Success password change
+    good_pw = client.patch(
+        "/api/v1/users/me/password",
+        json={"current_password": "Operator@123", "new_password": "NewOperatorPass@789"},
+        headers={**op_headers}
+    )
+    assert good_pw.status_code == 200
+    assert good_pw.json()["status"] == "success"
+
+    # 5. Verify login with new password
+    new_login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "operator@ovalens.fu.edu.ph", "password": "NewOperatorPass@789"}
+    )
+    assert new_login.status_code == 200
+    assert "access_token" in new_login.json()
+
 
 
 

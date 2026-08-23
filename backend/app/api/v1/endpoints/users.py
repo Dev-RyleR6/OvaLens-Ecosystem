@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict, Any
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
@@ -6,11 +6,74 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.user import UserModel, UserRole
 from app.models.audit import AuditLogModel
-from app.schemas.auth import UserResponse, UserCreate
-from app.core.security import get_password_hash
+from app.schemas.auth import UserResponse, UserCreate, PasswordChangeRequest, ProfileUpdateRequest
+from app.core.security import get_password_hash, verify_password
 from app.api.deps import get_current_user, require_admin
 
 router = APIRouter(prefix="/users", tags=["Users"])
+
+
+@router.patch("/me/profile", response_model=UserResponse, summary="Update logged-in user profile")
+def update_my_profile(
+    payload: ProfileUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    current_user.full_name = payload.full_name.strip()
+    db.commit()
+    db.refresh(current_user)
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    try:
+        audit = AuditLogModel(
+            user_id=current_user.user_id,
+            action="USER_PROFILE_UPDATED",
+            entity_type="AUTH",
+            entity_id=str(current_user.user_id),
+            details={"full_name": current_user.full_name, "severity": "INFO"},
+            ip_address=client_ip
+        )
+        db.add(audit)
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    return current_user
+
+
+@router.patch("/me/password", response_model=Dict[str, Any], summary="Change logged-in user password")
+def change_my_password(
+    payload: PasswordChangeRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password verification failed. Please enter your correct current password."
+        )
+
+    current_user.hashed_password = get_password_hash(payload.new_password)
+    db.commit()
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    try:
+        audit = AuditLogModel(
+            user_id=current_user.user_id,
+            action="USER_PASSWORD_CHANGED",
+            entity_type="AUTH",
+            entity_id=str(current_user.user_id),
+            details={"email": current_user.email, "severity": "SECURITY"},
+            ip_address=client_ip
+        )
+        db.add(audit)
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    return {"status": "success", "message": "Password changed successfully."}
 
 
 @router.get("", response_model=List[UserResponse], summary="List all hatchery operators & managers")

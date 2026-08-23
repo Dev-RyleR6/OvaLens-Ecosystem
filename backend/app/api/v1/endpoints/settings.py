@@ -82,3 +82,28 @@ def create_backup(
 def list_backups(current_user: UserModel = Depends(require_manager_or_admin)):
     from app.services.backup_service import BackupService
     return BackupService.list_backups()
+
+
+@router.get("/backups/{filename}/download", summary="Download database snapshot archive")
+def download_backup(
+    filename: str,
+    current_user: UserModel = Depends(require_manager_or_admin)
+):
+    import os
+    from fastapi import HTTPException
+    from fastapi.responses import FileResponse
+
+    # Sanitize filename
+    clean_name = os.path.basename(filename)
+    backup_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../backups"))
+    filepath = os.path.join(backup_dir, clean_name)
+
+    if not os.path.exists(filepath) or not clean_name.endswith(".json.gz"):
+        raise HTTPException(status_code=404, detail=f"Backup archive '{clean_name}' not found.")
+
+    return FileResponse(
+        path=filepath,
+        filename=clean_name,
+        media_type="application/gzip"
+    )
+

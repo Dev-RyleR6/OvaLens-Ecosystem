@@ -225,7 +225,21 @@ export const apiClient = {
     return res.data;
   },
 
-  // Hatchery Settings
+  // User Profile & Account Management
+  updateMyProfile: async (fullName: string): Promise<User> => {
+    const res = await api.patch<User>('/users/me/profile', { full_name: fullName });
+    return res.data;
+  },
+
+  changeMyPassword: async (currentPassword: string, newPassword: string): Promise<{ status: string; message: string }> => {
+    const res = await api.patch<{ status: string; message: string }>('/users/me/password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    return res.data;
+  },
+
+  // Hatchery Settings & Backups
   getSettings: async (): Promise<any> => {
     const res = await api.get('/settings');
     return res.data;
@@ -235,6 +249,18 @@ export const apiClient = {
     const res = await api.put('/settings', settings);
     return res.data;
   },
+
+  getBackups: async (): Promise<any> => {
+    const res = await api.get('/settings/backups');
+    return res.data;
+  },
+
+  createBackup: async (): Promise<any> => {
+    const res = await api.post('/settings/backups/create');
+    return res.data;
+  },
+
+  downloadBackupUrl: (filename: string) => `/api/v1/settings/backups/${filename}/download`,
 
   // Reports
   downloadCSVUrl: (batchId: string) => `/api/v1/reports/batch/${batchId}/csv`,
