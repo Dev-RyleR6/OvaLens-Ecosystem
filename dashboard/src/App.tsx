@@ -19,13 +19,19 @@ const ProtectedLayout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
+  const [isNavigating, setIsNavigating] = React.useState(false);
   const mainRef = React.useRef<HTMLElement>(null);
 
-  // Smooth scroll to top when changing views
+  // Smooth top loading indicator & scroll to top when changing views
   React.useEffect(() => {
+    setIsNavigating(true);
     if (mainRef.current) {
       mainRef.current.scrollTo({ top: 0, behavior: 'instant' });
     }
+    const timer = setTimeout(() => {
+      setIsNavigating(false);
+    }, 280);
+    return () => clearTimeout(timer);
   }, [location.pathname]);
 
   if (isLoading) {
@@ -44,7 +50,14 @@ const ProtectedLayout: React.FC = () => {
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#F8FAFC] text-[#0F172A] flex flex-col font-sans">
+    <div className="h-screen w-screen overflow-hidden bg-[#F8FAFC] text-[#0F172A] flex flex-col font-sans relative">
+      {/* Top Route Navigation Loading Bar */}
+      {isNavigating && (
+        <div className="fixed top-0 left-0 right-0 h-0.5 z-50 overflow-hidden pointer-events-none">
+          <div className="h-full bg-gradient-to-r from-[#800000] via-[#C00000] to-[#357a38] animate-top-loader" />
+        </div>
+      )}
+
       <Navbar onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)} />
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} />
