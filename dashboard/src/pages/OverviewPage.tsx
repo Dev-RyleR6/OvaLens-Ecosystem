@@ -327,6 +327,7 @@ export const OverviewPage: React.FC = () => {
                     outerRadius={68}
                     paddingAngle={3}
                     dataKey="value"
+                    isAnimationActive={false}
                   >
                     {pieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -418,7 +419,15 @@ export const OverviewPage: React.FC = () => {
                     }}
                     formatter={(val: any) => [`${val} eggs/min`, 'Candling Pace']}
                   />
-                  <Area type="monotone" dataKey="speed" stroke="#800000" strokeWidth={2} fillOpacity={1} fill="url(#speedGradient)" />
+                  <Area
+                    type="monotone"
+                    dataKey="speed"
+                    stroke="#800000"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#speedGradient)"
+                    isAnimationActive={false}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
