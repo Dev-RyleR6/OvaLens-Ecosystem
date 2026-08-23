@@ -18,6 +18,7 @@ import { User, UserRole } from '../types';
 import { Dialog } from '../components/ui/dialog';
 import { DataUnavailableState } from '../components/ui/DataUnavailableState';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 
 type ViewMode = 'TABLE' | 'GRID';
 type SortField = 'full_name' | 'role' | 'created_at';
@@ -39,6 +40,8 @@ export const UsersPage: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [userToToggle, setUserToToggle] = useState<User | null>(null);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Form State
@@ -82,11 +85,24 @@ export const UsersPage: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const handleToggleStatus = async (user: User) => {
-    await apiClient.toggleUserStatus(user.user_id);
-    fetchUsers();
-    setToastMessage(`Status updated for ${user.full_name}.`);
-    setTimeout(() => setToastMessage(null), 3000);
+  const handleConfirmToggleStatus = async () => {
+    if (!userToToggle) return;
+    setIsTogglingStatus(true);
+    try {
+      await apiClient.toggleUserStatus(userToToggle.user_id);
+      await fetchUsers();
+      setToastMessage(
+        `Account access for ${userToToggle.full_name} has been ${
+          userToToggle.is_active ? 'suspended' : 'reactivated'
+        }.`
+      );
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (err) {
+      console.error('Failed to toggle user status:', err);
+    } finally {
+      setIsTogglingStatus(false);
+      setUserToToggle(null);
+    }
   };
 
   // Filtered & Sorted Users
@@ -340,7 +356,7 @@ export const UsersPage: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <button
-                        onClick={() => handleToggleStatus(u)}
+                        onClick={() => setUserToToggle(u)}
                         className={`text-xs font-semibold px-2.5 py-1 rounded border transition-colors cursor-pointer ${
                           u.is_active
                             ? 'border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -403,7 +419,7 @@ export const UsersPage: React.FC = () => {
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end">
                 <button
-                  onClick={() => handleToggleStatus(u)}
+                  onClick={() => setUserToToggle(u)}
                   className={`text-xs font-semibold px-3 py-1 rounded border transition-colors cursor-pointer ${
                     u.is_active
                       ? 'border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -532,6 +548,23 @@ export const UsersPage: React.FC = () => {
           </div>
         </form>
       </Dialog>
+
+      {/* Confirmation Modal for Suspending / Reactivating User */}
+      <ConfirmationModal
+        isOpen={userToToggle !== null}
+        onClose={() => setUserToToggle(null)}
+        onConfirm={handleConfirmToggleStatus}
+        title={userToToggle?.is_active ? `Suspend User Access: ${userToToggle?.full_name}` : `Reactivate User Access: ${userToToggle?.full_name}`}
+        description={
+          userToToggle?.is_active
+            ? `Are you sure you want to suspend access for ${userToToggle?.full_name} (${userToToggle?.email})? They will immediately be prevented from logging into candling stations and the admin dashboard.`
+            : `Are you sure you want to reactivate access for ${userToToggle?.full_name} (${userToToggle?.email})? They will regain access to their assigned ${userToToggle?.role} role.`
+        }
+        confirmText={userToToggle?.is_active ? 'Suspend Account' : 'Reactivate Account'}
+        cancelText="Cancel"
+        variant={userToToggle?.is_active ? 'danger' : 'primary'}
+        isLoading={isTogglingStatus}
+      />
     </div>
   );
 };

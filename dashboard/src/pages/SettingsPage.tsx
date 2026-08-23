@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { DataUnavailableState } from '../components/ui/DataUnavailableState';
+import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 
 export const SettingsPage: React.FC = () => {
   const [facilityName, setFacilityName] = useState('Foundation University Automated Hatchery');
@@ -24,6 +25,10 @@ export const SettingsPage: React.FC = () => {
   const [conveyorSpeed, setConveyorSpeed] = useState(10.0);
   const [conveyorDistance, setConveyorDistance] = useState(25.0);
 
+  // Original snapshot to compute diffs
+  const [original, setOriginal] = useState<any>(null);
+
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -47,6 +52,18 @@ export const SettingsPage: React.FC = () => {
         if (data.kwh_saved_per_culled_egg !== undefined) setKwhSavedPerEgg(data.kwh_saved_per_culled_egg);
         if (data.conveyor_speed_cm_s !== undefined) setConveyorSpeed(data.conveyor_speed_cm_s);
         if (data.conveyor_distance_cm !== undefined) setConveyorDistance(data.conveyor_distance_cm);
+
+        setOriginal({
+          facility_name: data.facility_name || 'Foundation University Automated Hatchery',
+          institution: data.institution || 'Foundation University - Dumaguete City',
+          confidence_threshold: data.confidence_threshold ?? 0.85,
+          penoy_unit_price_php: data.penoy_unit_price_php ?? data.penoy_unit_price ?? 14.00,
+          duckling_unit_price_php: data.duckling_unit_price_php ?? data.duckling_unit_price ?? 40.00,
+          electricity_kwh_rate_php: data.electricity_kwh_rate_php ?? data.kwh_rate_php ?? 12.50,
+          kwh_saved_per_culled_egg: data.kwh_saved_per_culled_egg ?? 0.20,
+          conveyor_speed_cm_s: data.conveyor_speed_cm_s ?? 10.0,
+          conveyor_distance_cm: data.conveyor_distance_cm ?? 25.0,
+        });
       }
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -60,8 +77,36 @@ export const SettingsPage: React.FC = () => {
     fetchSettings();
   }, []);
 
-  const handleSave = async (e: React.FormEvent) => {
+  const calculateDiffs = () => {
+    if (!original) return [];
+    const diffs = [];
+    if (original.penoy_unit_price_php !== penoyPrice) {
+      diffs.push({ label: 'Penoy Selling Price', oldValue: `₱${Number(original.penoy_unit_price_php).toFixed(2)}`, newValue: `₱${Number(penoyPrice).toFixed(2)}` });
+    }
+    if (original.duckling_unit_price_php !== ducklingPrice) {
+      diffs.push({ label: 'Duckling Selling Price', oldValue: `₱${Number(original.duckling_unit_price_php).toFixed(2)}`, newValue: `₱${Number(ducklingPrice).toFixed(2)}` });
+    }
+    if (original.electricity_kwh_rate_php !== kwhRate) {
+      diffs.push({ label: 'Electricity Rate', oldValue: `₱${Number(original.electricity_kwh_rate_php).toFixed(2)}/kWh`, newValue: `₱${Number(kwhRate).toFixed(2)}/kWh` });
+    }
+    if (original.confidence_threshold !== confidenceThreshold) {
+      diffs.push({ label: 'AI Confidence Threshold', oldValue: `${Number(original.confidence_threshold * 100).toFixed(0)}%`, newValue: `${Number(confidenceThreshold * 100).toFixed(0)}%` });
+    }
+    if (original.facility_name !== facilityName) {
+      diffs.push({ label: 'Facility Name', oldValue: original.facility_name, newValue: facilityName });
+    }
+    if (original.conveyor_speed_cm_s !== conveyorSpeed) {
+      diffs.push({ label: 'Conveyor Belt Speed', oldValue: `${original.conveyor_speed_cm_s} cm/s`, newValue: `${conveyorSpeed} cm/s` });
+    }
+    return diffs;
+  };
+
+  const handleOpenPrompt = (e: React.FormEvent) => {
     e.preventDefault();
+    setIsConfirmOpen(true);
+  };
+
+  const handleExecuteSave = async () => {
     setIsSaving(true);
     try {
       await apiClient.updateSettings({
@@ -75,8 +120,22 @@ export const SettingsPage: React.FC = () => {
         conveyor_speed_cm_s: conveyorSpeed,
         conveyor_distance_cm: conveyorDistance,
       });
+      setOriginal({
+        facility_name: facilityName,
+        institution,
+        confidence_threshold: confidenceThreshold,
+        penoy_unit_price_php: penoyPrice,
+        duckling_unit_price_php: ducklingPrice,
+        electricity_kwh_rate_php: kwhRate,
+        kwh_saved_per_culled_egg: kwhSavedPerEgg,
+        conveyor_speed_cm_s: conveyorSpeed,
+        conveyor_distance_cm: conveyorDistance,
+      });
+      setIsConfirmOpen(false);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3500);
+    } catch (err) {
+      console.error('Failed to save settings:', err);
     } finally {
       setIsSaving(false);
     }
@@ -119,12 +178,12 @@ export const SettingsPage: React.FC = () => {
         </div>
 
         <button
-          onClick={handleSave}
+          onClick={handleOpenPrompt}
           disabled={isSaving}
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
         >
           <Save className="w-4 h-4" />
-          <span>{isSaving ? 'Saving Changes...' : 'Save Configuration'}</span>
+          <span>Save Configuration</span>
         </button>
       </div>
 
@@ -135,7 +194,7 @@ export const SettingsPage: React.FC = () => {
         </div>
       )}
 
-      <form onSubmit={handleSave} className="space-y-6">
+      <form onSubmit={handleOpenPrompt} className="space-y-6">
         {/* Section 1: Institutional & Facility Profile */}
         <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
@@ -287,6 +346,19 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
       </form>
+      {/* Confirmation Prompt Modal */}
+      <ConfirmationModal
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={handleExecuteSave}
+        title="Confirm Facility Configuration Update"
+        description="Are you sure you want to apply these administrative changes? Live financial valuations, candling thresholds, and system reports will immediately reflect the new parameters."
+        confirmText="Confirm & Save Settings"
+        cancelText="Review Changes"
+        variant={calculateDiffs().some(d => d.label.includes('Price') || d.label.includes('Threshold')) ? 'warning' : 'primary'}
+        isLoading={isSaving}
+        diffs={calculateDiffs()}
+      />
     </div>
   );
 };
