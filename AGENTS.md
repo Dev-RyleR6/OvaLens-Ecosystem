@@ -14,10 +14,15 @@ This document serves as the **Master Source of Truth & Architecture Guide** for 
 2. **Central Monorepo Topology**:
    - Keep all code inside the root monorepo: `edge/`, `backend/`, `dashboard/`, and `firmware/`.
    - Never initialize nested `.git` repositories inside subdirectories.
-3. **Biological Model Classes (Strict 3-Class Vision Model)**:
-   - `FERTILE`: Active embryo with spider blood veins (Action: `ACCEPT`).
-   - `INFERTILE`: Clear unfertilized yolk / "bugok" (Action: `REJECT`, Salvaged on Day 10 as Penoy @ ₱14).
-   - `ABNORMAL`: Dead embryo, blood ring, corrupted yolk (Action: `REJECT`, Discarded early).
+3. **Biological Model Classes & Genetic Scope (Strict 3-Class Vision Model)**:
+   - **Target Breeds**: *Itik Pinas* Pure Lines (`IP-Itim`, `IP-Khaki`) and Commercial Hybrid (`IP-Kayumanggi`).
+   - **Candling Checkpoints**: Day 10, Day 18, and Day 25 of incubation.
+   - **Dataset Split**: 70% Training, 15% Validation, 15% Testing.
+   - **Classes**:
+     - `FERTILE`: Active embryo with spider blood veins or viable shadow (Action: `ACCEPT` $\to$ Incubation Tray).
+     - `INFERTILE`: Clear unfertilized yolk (Action: `REJECT` $\to$ Salvaged on Day 10 as Penoy @ ₱14.00).
+     - `ABNORMAL`: Dead embryo, blood ring, corrupted yolk (Action: `REJECT` $\to$ Discard Tray).
+   - **Fallback State**: Low-confidence captures ($\tau < 0.75$) or synchronization errors MUST trigger `MANUAL_REVIEW`.
 4. **Offline-First Edge Resilience**:
    - The Edge application MUST record every scan to local SQLite (with WAL mode enabled) before syncing over the network.
    - Network dropouts must never block or delay the physical conveyor belt sorting speed.
@@ -166,7 +171,19 @@ git checkout -b feat/<scope>-<description>
 * **Types**: `feat` | `fix` | `refactor` | `perf` | `docs` | `test` | `chore`
 * **Scopes**: `backend` | `edge` | `dashboard` | `firmware` | `agents` | `ci`
 
-### C. GitHub CLI (`gh`) PR Automation:
+### C. Automated Verification & Git Commit Utility:
+To enforce automated code review, automated testing, and changelog updates on every feature, use:
+```bash
+python scripts/verify_and_commit.py -m "feat(backend): add economic penoy yield calculation"
+```
+This utility automatically:
+1. Runs the **Backend API pytest suite** (`tests/test_api.py`).
+2. Runs the **Edge CV pipeline pytest suite** (`tests/test_edge_pipeline.py`).
+3. Runs the **Dashboard build verification** (`npm.cmd run build`).
+4. Updates [`CHANGELOG.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/CHANGELOG.md) under the appropriate semantic section.
+5. Stages files and commits with standard Conventional Commit messages.
+
+### D. GitHub CLI (`gh`) PR Automation:
 ```bash
 # Push branch to remote
 git push -u origin feat/<branch-name>
@@ -180,6 +197,22 @@ gh pr checks
 # Merge once verified
 gh pr merge --squash --delete-branch
 ```
+
+---
+
+## 🤝 5.1 Engineering Partnership: Antigravity & Codex
+
+OvaLens development follows an orchestrated **two-tier agent architecture**:
+
+* **Antigravity (Orchestrator, Planner & Lead Architect)**:
+  - System architecture, interface contracts, schema designs, state machines.
+  - Phase breakdown, milestone tracking, and task backlog management in [`PROJECT_PLAN.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/PROJECT_PLAN.md).
+  - Formulating unambiguous implementation specifications for Codex.
+  - Code review, quality audits, test gatekeeping, and automated Git commits.
+* **Codex (Implementor & Feature Builder)**:
+  - Focused implementation of discrete features, services, and components according to Antigravity's specification contracts.
+  - Writing accompanying unit tests and adhering to strict architectural constraints.
+
 
 ---
 

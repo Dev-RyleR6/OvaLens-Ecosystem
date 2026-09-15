@@ -1,0 +1,91 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Methodology" id="ovalens_perfect_alignment">
+    <mxGraphModel dx="2828" dy="1554" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1700" background="light-dark(#ffffff, #121212)" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="DSRM" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F8F9FA;strokeColor=#000000;strokeWidth=1;" value="&lt;b style=&quot;font-size:14px;&quot;&gt;OVERARCHING FRAMEWORK: DESIGN SCIENCE RESEARCH METHODOLOGY (DSRM)&lt;/b&gt;&lt;br/&gt;Peffers et al. (2007)&lt;br/&gt;&lt;div style=&quot;margin-top:10px;&quot;&gt;1. Problem Identification | 2. Objectives Definition | 3. Design and Development&lt;br/&gt;4. Demonstration | 5. Evaluation | 6. Communication&lt;/div&gt;" vertex="1">
+          <mxGeometry height="90" width="620" x="115" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="START" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=50;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=2;" value="&lt;b&gt;START&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="100" x="375" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="P1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;align=left;verticalAlign=top;" value="&lt;div style=&quot;padding:10px;&quot;&gt;&lt;b style=&quot;font-size:14px;&quot;&gt;PHASE 1: PLANNING &amp; REQUIREMENTS&lt;/b&gt;&lt;br/&gt;&lt;i&gt;(DSRM: Problem Identification &amp; Objectives Definition)&lt;/i&gt;&lt;hr size=&quot;1&quot; color=&quot;#cccccc&quot; style=&quot;margin-top:8px; margin-bottom:8px;&quot; /&gt;&lt;ul style=&quot;margin-top:0px; margin-bottom:0px; padding-left:25px;&quot;&gt;&lt;li&gt;Define System Requirements&lt;/li&gt;&lt;li&gt;Design System Architecture&lt;/li&gt;&lt;li&gt;Identify System Components&lt;/li&gt;&lt;li&gt;Establish Evaluation Criteria&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="520" x="165" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="P2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;align=left;verticalAlign=top;" value="&lt;div style=&quot;padding:10px;&quot;&gt;&lt;b style=&quot;font-size:14px;&quot;&gt;PHASE 2: DATA COLLECTION &amp; PREPARATION&lt;/b&gt;&lt;hr size=&quot;1&quot; color=&quot;#cccccc&quot; style=&quot;margin-top:8px; margin-bottom:8px;&quot; /&gt;&lt;ul style=&quot;margin-top:0px; margin-bottom:5px; padding-left:25px;&quot;&gt;&lt;li&gt;Capture Duck Egg Images&lt;/li&gt;&lt;li&gt;Label and Annotate Images&lt;/li&gt;&lt;li&gt;Preprocess &amp; Organize Dataset (70/15/15 Split)&lt;/li&gt;&lt;/ul&gt;&lt;b style=&quot;padding-left:5px;&quot;&gt;Output:&lt;/b&gt; 3,000+ Annotated Images&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="520" x="165" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="AGILE_BOX" parent="1" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;fillColor=#FAFAFA;strokeColor=#333333;verticalAlign=top;spacingTop=10;strokeWidth=1;" value="&lt;b style=&quot;font-size:13px;&quot;&gt;AGILE DEVELOPMENT CYCLE (Beck et al., 2001)&lt;/b&gt;&lt;br/&gt;&lt;i&gt;Incremental Development, Iterative Testing, and Continuous Refinement&lt;/i&gt;" vertex="1">
+          <mxGeometry height="730" width="620" x="115" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="P3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;align=left;verticalAlign=top;" value="&lt;div style=&quot;padding:10px;&quot;&gt;&lt;b style=&quot;font-size:14px;&quot;&gt;PHASE 3: YOLOv8 MODEL DEVELOPMENT&lt;/b&gt;&lt;br/&gt;&lt;i&gt;(DSRM: Design &amp; Development)&lt;/i&gt;&lt;hr size=&quot;1&quot; color=&quot;#cccccc&quot; style=&quot;margin-top:8px; margin-bottom:8px;&quot; /&gt;&lt;ul style=&quot;margin-top:0px; margin-bottom:0px; padding-left:25px;&quot;&gt;&lt;li&gt;Configure YOLOv8&lt;/li&gt;&lt;li&gt;Train &amp; Validate Model&lt;/li&gt;&lt;li&gt;Tune Hyperparameters&lt;/li&gt;&lt;li&gt;Measure Initial Performance&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="520" x="165" y="640" as="geometry" />
+        </mxCell>
+        <mxCell id="P4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;align=left;verticalAlign=top;" value="&lt;div style=&quot;padding:10px;&quot;&gt;&lt;b style=&quot;font-size:14px;&quot;&gt;PHASE 4: HARDWARE &amp; SOFTWARE PROTOTYPING&lt;/b&gt;&lt;br/&gt;&lt;i&gt;(DSRM: Design &amp; Development)&lt;/i&gt;&lt;hr size=&quot;1&quot; color=&quot;#cccccc&quot; style=&quot;margin-top:8px; margin-bottom:8px;&quot; /&gt;&lt;ul style=&quot;margin-top:0px; margin-bottom:0px; padding-left:25px;&quot;&gt;&lt;li&gt;&lt;b&gt;Hardware:&lt;/b&gt; Conveyor, Cradles, Chamber, LED/Cam, Servo&lt;/li&gt;&lt;li&gt;&lt;b&gt;Software:&lt;/b&gt; Raspberry Pi App, Web Dashboard&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="520" x="165" y="810" as="geometry" />
+        </mxCell>
+        <mxCell id="P5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;align=left;verticalAlign=top;" value="&lt;div style=&quot;padding:10px;&quot;&gt;&lt;b style=&quot;font-size:14px;&quot;&gt;PHASE 5: SYSTEM INTEGRATION &amp; TESTING&lt;/b&gt;&lt;br/&gt;&lt;i&gt;(DSRM: Demonstration)&lt;/i&gt;&lt;hr size=&quot;1&quot; color=&quot;#cccccc&quot; style=&quot;margin-top:8px; margin-bottom:8px;&quot; /&gt;&lt;ul style=&quot;margin-top:0px; margin-bottom:0px; padding-left:25px;&quot;&gt;&lt;li&gt;Integrate Hardware and Software&lt;/li&gt;&lt;li&gt;Test Conveyor, Candling, Inference, Sorting&lt;/li&gt;&lt;li&gt;Measure System Communication &amp; Speed&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="520" x="165" y="980" as="geometry" />
+        </mxCell>
+        <mxCell id="P6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;align=left;verticalAlign=top;" value="&lt;div style=&quot;padding:10px;&quot;&gt;&lt;b style=&quot;font-size:14px;&quot;&gt;PHASE 6: EVALUATION &amp; REFINEMENT&lt;/b&gt;&lt;br/&gt;&lt;i&gt;(DSRM: Evaluation)&lt;/i&gt;&lt;hr size=&quot;1&quot; color=&quot;#cccccc&quot; style=&quot;margin-top:8px; margin-bottom:8px;&quot; /&gt;&lt;ul style=&quot;margin-top:0px; margin-bottom:0px; padding-left:25px;&quot;&gt;&lt;li&gt;Evaluate Metrics (Accuracy, Precision, Recall, F1, Time)&lt;/li&gt;&lt;li&gt;Assess Breed &amp; Candling-Stage Performance&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="520" x="165" y="1150" as="geometry" />
+        </mxCell>
+        <mxCell id="FINAL" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F8F9FA;strokeColor=#000000;strokeWidth=2;" value="&lt;b style=&quot;font-size:14px;&quot;&gt;FINAL OVALENS PROTOTYPE&lt;/b&gt;&lt;br/&gt;&lt;div style=&quot;margin-top:5px;&quot;&gt;Integrated Duck Egg Fertility Classification and Sorting System&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="520" x="165" y="1350" as="geometry" />
+        </mxCell>
+        <mxCell id="DEPLOY" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;" value="&lt;b style=&quot;font-size:14px;&quot;&gt;PHASE 7: DEPLOYMENT &amp; COMMUNICATION&lt;/b&gt;&lt;br/&gt;&lt;i&gt;(DSRM: Communication)&lt;/i&gt;" vertex="1">
+          <mxGeometry height="60" width="520" x="165" y="1460" as="geometry" />
+        </mxCell>
+        <mxCell id="END" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=50;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=2;" value="&lt;b&gt;END&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="100" x="375" y="1560" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="START" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;strokeWidth=2;" target="P1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="P1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;strokeWidth=2;" target="P2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="P2" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;strokeWidth=2;" target="P3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="P3" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;strokeWidth=2;" target="P4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="P4" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;strokeWidth=2;" target="P5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="P5" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;strokeWidth=2;" target="P6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="P6" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;strokeWidth=2;" target="FINAL">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="FINAL" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;strokeWidth=2;" target="DEPLOY">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="DEPLOY" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;strokeWidth=2;" target="END">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="agile_loop" edge="1" parent="1" source="P6" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;strokeWidth=2;dashed=1;labelBackgroundColor=#FAFAFA;verticalAlign=bottom;spacingBottom=10;" target="P3" value="&lt;b&gt;Iterative Refinement Loop&lt;/b&gt;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="75" y="1220" />
+              <mxPoint x="75" y="710" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ep-VudWOLMXJrsMPs_rj-1" edge="1" parent="1" source="DEPLOY" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;strokeWidth=2;dashed=1;labelBackgroundColor=#FAFAFA;verticalAlign=bottom;spacingBottom=10;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="P3" value="&lt;b&gt;Feedback&lt;/b&gt;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="820" y="1490.67" />
+              <mxPoint x="820" y="710.67" />
+            </Array>
+            <mxPoint x="850" y="1500" as="sourcePoint" />
+            <mxPoint x="870" y="900" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

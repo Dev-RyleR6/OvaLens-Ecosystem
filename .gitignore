@@ -64,3 +64,8 @@ Thumbs.db
 *.pt
 *.pth
 *.onnx.data
+
+# Backups & Test Artifacts
+backups/
+*.json.gz
+

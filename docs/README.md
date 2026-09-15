@@ -1,8 +1,9 @@
 # OvaLens Capstone Documentation & Manuscript Repository
 
-> **OvaLens**: Automated Industrial-Grade Duck Egg Candling, Fertility Classification, and Hatchery Analytics Ecosystem  
-> **Institution**: Foundation University (FU), Dumaguete City, Negros Oriental  
-> **Project Lead / Developer**: Ryle Gabotero  
+> **OvaLens: A YOLOv8-Based Deep Learning System for Automated Near-Real-Time Candling and Sorting of Itik Pinas Duck Eggs**  
+> **Institution**: College of Computer Studies, Foundation University (FU), Dumaguete City, Negros Oriental  
+> **Authors (Team DevIn)**: Ryle Anthony Gabotero M., Olsen Nathaniel Cafino, Neil Allen Faburada  
+> **Capstone Adviser**: Mr. Andrew Mores | **Dean**: Sheena Mae Sab Sabado  
 
 ---
 
@@ -19,10 +20,13 @@ docs/
 │   ├── 05_Chapter_5_Summary_Conclusions_Recommendations.md # Conclusions & Future Research
 │   └── 06_References_and_Appendices.md             # IEEE/APA References, User Manual, Schematics
 │
-└── diagrams/                                       # High-Resolution Architectural & Hardware Diagrams
-    ├── architecture/                               # Monorepo Topology, REST/WebSocket Sync Diagrams
-    ├── hardware_schematics/                        # ESP32 Pinout, Relay & Optical Sensor Wiring
-    ├── flowcharts/                                 # Edge CV Inference & Diverter Timing Flowcharts
-    ├── database_erds/                              # PostgreSQL 16 Relational Database ERD
-    └── README.md                                   # Master Diagram Catalog & Vector Assets
+├── diagrams/                                       # High-Resolution Architectural & Hardware Diagrams
+│   ├── architecture/                               # Monorepo Topology, REST/WebSocket Sync Diagrams
+│   ├── flowcharts/                                 # Edge CV Inference & Diverter Timing Flowcharts
+│   ├── hardware_schematics/                        # ESP32 Pinout, Relay & Optical Sensor Wiring
+│   ├── database_erds/                              # PostgreSQL 16 Relational Database ERD
+│   ├── use_cases/                                  # UML Use Case Diagrams & Role Scopes (.drawio)
+│   └── README.md                                   # Master Diagram Catalog & Vector Assets
+│
+└── imports/                                        # Staging Area for Raw Google Docs & Drive Diagrams
 ```

@@ -1,25 +1,75 @@
-# Chapter 2: Review of Related Literature and Studies
+# Chapter 2: Review of Related Literature
 
-## 2.1 Duck Incubation & Embryonic Development
-* Duck egg incubation period: 28 days.
-* Milestones:
-  - **Day 0**: Setting in setter cabinet.
-  - **Day 10 (1st Candling)**: Distinguishing fertile spider blood vascular networks from clear infertile penoy eggs.
-  - **Day 18 (2nd Candling & Transfer)**: Transfer from setter trays to hatcher baskets.
-  - **Day 25 (Pipping)**: Internal and external shell pipping.
-  - **Day 28 (Hatch)**: Duckling emergence.
+## 2.1 Review of Related Literature
 
-## 2.2 Computer Vision in Agricultural Egg Sorting
-* Evolution from traditional image processing (Sobel filters, thresholding) to Deep Convolutional Neural Networks (CNNs) and YOLO architectures.
-* Challenges with duck eggs vs chicken eggs: Duck eggshells have thicker, greasier cuticles and higher opacity, requiring high-intensity 10W–20W LED transillumination.
+### Manual Candling and Non-Destructive Egg Assessment
+Candling uses transmitted light to reveal internal egg conditions associated with fertility and embryonic development without breaking the shell. Recent duck-egg research continues to identify manual candling as labor-intensive, time-consuming, and dependent on operator judgment. Liu et al. (2023) and Li et al. (2023) framed automated hatching-information detection as a response to these limitations, while Philippine work by Maglasang et al. (2025) likewise noted that manual inspection in small- to medium-scale farms can be laborious and prone to error. Cai et al. (2025) and Mulyani et al. (2026) further showed that machine-vision assessment can support repeatable evaluation when images are collected under defined incubation and imaging conditions. These findings support OvaLens's use of controlled candling illumination, fixed camera geometry, explicit operational labels, and a manual-review path for uncertain detections.
 
-## 2.3 Edge AI & Quantization Techniques (FP32 vs FP16 ONNX)
-* Comparison between heavy PyTorch runtimes and lightweight ONNX Runtime with hardware acceleration (ARM NEON / TensorRT).
+### Itik Pinas Genetic Groups Relevant to the Study
+The three duck groups represented in OvaLens are related Itik Pinas genetic groups rather than unrelated breeds. Santiago et al. (2022) describe IP-Kayumanggi as a commercial hybrid produced from male IP-Khaki and female IP-Itim. DOST-PCAARRD (2022) similarly identifies IP-Itim and IP-Khaki as the Itik Pinas pure lines and IP-Kayumanggi as the commercial line promoted through the national duck research and development program. This relationship supports training one pooled model for the partner hatchery while still reporting subgroup performance to determine whether prediction quality differs among IP-Itim, IP-Khaki, and IP-Kayumanggi.
 
-## 2.4 Distributed Offline-First Architectures
-* SQLite Write-Ahead Logging (WAL) for local high-throughput transactional integrity during network disconnections.
+### Deep Learning and Computer Vision in Duck-Egg Assessment
+Recent studies demonstrate that convolutional and detection-based models can classify candled duck eggs into operationally meaningful categories. Maglasang et al. (2025) evaluated five transfer-learning CNN backbones on 9,600 candled duck-egg images and reported 97.40% testing accuracy for VGG16 in a fertilized, unfertilized, and rotten classification task. Cai et al. (2025) reported 96.03% overall accuracy for an improved ResNet34 model that classified meat duck eggs as unfertilized, live embryonated, or abnormal. Mulyani et al. (2026) showed that EfficientNet-B3 performance on Cihateup duck eggs changed across incubation ranges and improved materially after image enhancement. Together, these findings support the use of deep learning while reinforcing that performance must be validated on the exact population, stages, imaging setup, and class definitions used by OvaLens.
 
-## 2.5 Conceptual Framework (IPO Model)
-* **Input**: Duck egg transillumination frames, conveyor optical sensor triggers, operator batch configurations.
-* **Process**: ONNX FP16 inference, geometric heuristics, ESP32 kinematic actuation ($\Delta t = D/v$), SQLite WAL logging, REST sync.
-* **Output**: Pneumatic physical sorting (Accept/Reject), digital batch reports, incubator tray matrix, economic salvage analytics.
+### YOLO Architectures for Efficient Object Detection
+YOLO-family detectors combine localization and class prediction in a single inference pipeline, making them relevant to systems that must make decisions while objects are moving through a mechanical workflow. Duck-specific studies have already demonstrated lightweight YOLO variants for hatching assessment. Zhou et al. (2023) used a lightweight YOLOX-Tiny-based detector on duck-egg incubation trays; Liu et al. (2023) developed AFF-YOLOX for early hatching information; Li et al. (2023) developed MobileOne-YOLO from YOLOv7; and Deng et al. (2024) proposed YOLO-Lite for Day 25 dead-embryo detection. OvaLens uses the Ultralytics YOLOv8 software framework (Jocher et al., 2023), but its bounding box represents the entire egg rather than an internal embryo or defect. Detection is retained to verify that an egg is present and positioned within the expected image region before a class and confidence score are accepted.
+
+### Edge Deployment for Agricultural Vision Systems
+Edge deployment places image processing near the acquisition hardware and can reduce dependence on continuous network connectivity. Chamara et al. (2023) demonstrated an agricultural edge-imaging platform that integrated Raspberry Pi hardware with classification, segmentation, detection, and counting tasks and explicitly measured processing speed and power consumption. Although crop monitoring differs from duck-egg candling, the study supports the feasibility of compact edge hardware for agricultural computer vision. For OvaLens, model suitability will therefore be established through measured inference latency on the selected Raspberry Pi configuration rather than through desktop or GPU results alone.
+
+### Mechanical Handling, Transport, and Egg Safety
+Automated inspection also requires attention to physical handling. Torma and Gaal (2024) reported hatchability differences associated with vibration and packaging during hatching-egg transport. Their work concerns transported chicken hatching eggs and does not directly prove that any specific duck-egg conveyor will improve or reduce hatchability. It nevertheless supports treating vibration and abrupt movement as engineering risks. OvaLens therefore uses indexed cradle movement, controlled stopping at the candling station, positional synchronization, and a gentler release path for eggs classified as Fertile as precautionary design measures.
+
+---
+
+## 2.2 Review of Related Studies
+
+### Liu et al. (2023) — AFF-YOLOX: An Improved Lightweight YOLOX Network to Detect Early Hatching Information of Duck Eggs
+Liu et al. (2023) proposed AFF-YOLOX for detecting early hatching information from multiple duck eggs on standard incubation trays. The model incorporated attention-based feature fusion and network simplification to improve speed while maintaining detection quality. It achieved 97.55% mAP, reduced the model to approximately 0.49 million parameters, and reported 178 ms latency per image. The study is directly relevant to OvaLens because it demonstrates that lightweight YOLO-family detection can support time-sensitive duck-egg hatching assessment. OvaLens differs by using one controlled candling image per cradle, three operational classes, later hatchery checkpoints, and Raspberry Pi-based deployment with downstream physical sorting.
+
+### Li et al. (2023) — MobileOne-YOLO: Improving the YOLOv7 Network for the Detection of Unfertilized Duck Eggs and Early Duck Embryo Development
+Li et al. (2023) developed MobileOne-YOLO to identify unfertilized eggs, dead embryos, and healthy embryos from duck eggs inspected on Day 10. The model achieved 98.10% detection accuracy, 98.55% precision and recall, 97.79% mAP50, and 142.8 FPS on the reported test configuration. The study is particularly relevant because its three biological states closely resemble OvaLens's Fertile, Infertile, and Abnormal operational categories. However, OvaLens will evaluate a locally collected Itik Pinas dataset across Day 10, Day 18, and Day 25 and will explicitly associate each accepted prediction with a physical conveyor cradle for sorting.
+
+### Zhou et al. (2023) — Evaluation of Duck Egg Hatching Characteristics with a Lightweight Multi-Target Detection Method
+Zhou et al. (2023) proposed a lightweight multi-target detector based on YOLOX-Tiny for identifying hatching characteristics of duck eggs on incubation trays. The reported model achieved 99.74% mAP, operated at 57 FPS, and reduced the parameter count to approximately 1.93 million. The study provides a strong precedent for lightweight duck-egg object detection where multiple eggs must be located and assessed efficiently. OvaLens differs because it uses a single-egg controlled chamber, whole-egg detection as an image-validity check, and cradle-level result tracking through an indexed sorting mechanism.
+
+### Galos and Saminiano (2024) — Real-Time “Balut” Smart Incubator Egg Assessment Using Convolutional Neural Network
+Galos and Saminiano (2024) developed a Philippine smart-incubator system that used a camera and CNN to distinguish Balut and Penoy eggs. Their evaluation reported 99.5% precision, 99.9% recall, a 99.7% F1 score, and a 98.89% device-functionality rate during an 18-day incubation assessment. This study is important to OvaLens because it is a recent Philippine duck-egg automation project that connects computer vision with incubation hardware. OvaLens extends the problem from a two-status incubator assessment to three operational classes, three hatchery candling checkpoints, explicit object detection, conveyor tracking, and automated routing to separate collection trays.
+
+### Deng et al. (2024) — Nondestructive Testing of Duck Eggs During Incubation Using YOLO-Lite
+Deng et al. (2024) designed an image-acquisition setup for duck eggs removed from incubation trays on Day 25 and proposed a simplified YOLOv4-based detector called YOLO-Lite for identifying dead embryos. The model reported 98.33% average recognition accuracy, 94.12% recall, and approximately 15 ms single-frame recognition time. This study is highly relevant to OvaLens because Day 25 is one of the partner hatchery's actual candling checkpoints and because the work demonstrates lightweight late-stage duck-egg detection. OvaLens differs by evaluating three classes across multiple stages and integrating prediction acceptance with cradle synchronization and sorting decisions.
+
+### Maglasang et al. (2025) — Duck Egg Embryonic Development Classification Using Transfer Learning and CNN
+Maglasang et al. (2025) classified Philippine candled duck eggs as fertilized, unfertilized, or rotten using five transfer-learning CNN backbones. Their dataset contained 9,600 images, and VGG16 achieved 97.40% testing accuracy after the authors applied image preprocessing and augmentation. The work is a strong local benchmark because it uses Philippine duck-egg imagery and a three-category formulation that is operationally close to OvaLens. OvaLens differs by using object detection instead of image classification alone, evaluating the specific Itik Pinas genetic groups maintained by the partner hatchery, and measuring the performance of the complete tracking-and-sorting workflow.
+
+### Cai et al. (2025) — Detection of Hatching Information of Meat Duck Eggs Based on Deep Learning
+Cai et al. (2025) used an improved ResNet34 architecture with attention mechanisms to classify meat duck eggs as unfertilized, live embryonated, or abnormal. The optimized network achieved 96.03% overall classification accuracy and was designed for early-to-middle incubation assessment. Its three-status formulation is closely aligned with OvaLens's operational classes and supports treating abnormal development separately from simple infertility. OvaLens differs by using a YOLOv8 detector, evaluating the partner hatchery's Day 10, Day 18, and Day 25 sessions, and incorporating a manual-review state when confidence or cradle synchronization is insufficient.
+
+### Alpeisov et al. (2025) — Using an Optoelectronic Method for the Non-Destructive Sorting of Hatching Duck Eggs
+Alpeisov et al. (2025) developed a stationary optoelectronic system specifically adapted to Adigel duck eggs. The setup combined image processing with weight and distance sensing to classify eggs for incubation suitability. Automatic and manual measurements showed correlations above 0.95 with mean relative error below 2%, and the reported overall classification accuracy was 97.7%. Although the study evaluates pre-incubation morphometric suitability rather than candled fertility, it is relevant because it demonstrates recent duck-specific non-destructive sorting and emphasizes that duck morphology and reflectivity require dedicated calibration. OvaLens instead focuses on internal candling appearance during incubation and routes eggs according to Fertile, Infertile, or Abnormal status.
+
+### Mulyani et al. (2026) — Classification of Cihateup Duck Egg Fertility Using Convolutional Neural Network EfficientNet-B3
+Mulyani et al. (2026) evaluated EfficientNet-B3 on Cihateup duck-egg candling images collected during the first 24 hours and Days 8-15. With image enhancement, the model achieved 77% and 80% accuracy for the two incubation ranges, respectively, while performance without enhancement was substantially lower. The study is relevant because it demonstrates that incubation stage and image preparation can materially affect fertility-classification performance. OvaLens therefore treats stage as an explicit dataset attribute and will report performance separately for Day 10, Day 18, and Day 25 rather than relying only on one pooled accuracy value.
+
+### Flores (2026) — Lightweight Vision Models for Egg Fertility Detection
+Flores (2026) optimized a YOLOv11 model for fertility detection using locally collected images of native Philippine poultry eggs and reported improvements in mAP50-95, precision, recall, and inference speed after hyperparameter tuning. Although the species differs from OvaLens, the study is relevant as a recent Philippine example of lightweight YOLO-based fertility detection using locally generated poultry imagery. OvaLens extends this local computer-vision direction to Itik Pinas duck eggs and combines the detector with candling hardware, cradle tracking, manual-review handling, and automated sorting.
+
+---
+
+## 2.3 Synthesis
+
+The recent studies reviewed from 2023 to 2026 show a clear movement from manual duck-egg candling toward controlled imaging, CNN-based classification, lightweight YOLO-family detection, and automated or optoelectronic sorting. Liu et al. (2023), Li et al. (2023), Zhou et al. (2023), and Deng et al. (2024) demonstrate that lightweight object detection can identify duck-egg hatching conditions with high reported accuracy and practical inference speed. Philippine studies by Galos and Saminiano (2024) and Maglasang et al. (2025) provide locally relevant evidence that computer vision can support Balut/Penoy or embryonic-development assessment, while Flores (2026) demonstrates the continuing use of YOLO-based fertility detection on locally collected Philippine poultry imagery.  
+
+The literature also indicates that strong model metrics do not automatically establish performance under a different hatchery workflow. Cai et al. (2025) use a three-status formulation similar to OvaLens, Mulyani et al. (2026) shows that stage and image preparation affect results, and Alpeisov et al. (2025) emphasizes the need for duck-specific calibration in non-destructive sorting. The studies differ in duck population, incubation day, image-acquisition geometry, class definitions, model architecture, hardware, and system objective. Their metrics therefore provide technical benchmarks rather than directly transferable performance expectations.  
+
+OvaLens addresses a specific combination of gaps:
+1. A locally collected Itik Pinas dataset representing **IP-Itim**, **IP-Khaki**, and **IP-Kayumanggi**;
+2. Evaluation across the partner hatchery's **Day 10, Day 18, and Day 25** workflow;
+3. Three operational classes of **Fertile**, **Infertile**, and **Abnormal**;
+4. Whole-egg **YOLOv8** object detection for verification and localization;
+5. **Raspberry Pi** edge inference ($\le 200\text{ ms}$ latency target);
+6. **Indexed pocket-conveyor** with cradle-level result tracking and stepper/servo actuation;
+7. **Manual-review handling** for low-confidence detections or synchronization faults;
+8. Automatic downstream sorting into class-specific collection trays.
+
+The study will evaluate both model performance and the integrated electromechanical workflow so that system success is based not only on prediction accuracy but also on whether the prototype preserves egg-to-result association, routes eggs correctly, and operates with measurable processing time and throughput under controlled hatchery trials.
