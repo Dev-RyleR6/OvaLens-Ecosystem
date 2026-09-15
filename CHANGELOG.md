@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Docs**: add comprehensive capstone feature checklist excel workbook (2026-09-15)
 - **Capstone**: sync authentic manuscript, diagrams, dsrm project plan, and changelog (2026-09-15)
 - Created `PROJECT_PLAN.md` living task backlog mapped to Design Science Research Methodology (DSRM) and Agile iteration cycles.
 - Integrated automated verification and conventional commit workflow (`scripts/verify_and_commit.py`).

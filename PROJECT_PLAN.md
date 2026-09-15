@@ -147,3 +147,4 @@ For every feature or subsystem milestone, the team follows this strict 5-stage l
 ## 📈 Living Changelog & Release Milestones
 
 All feature implementations, fixes, and architectural updates are tracked in [`CHANGELOG.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/CHANGELOG.md).
+
