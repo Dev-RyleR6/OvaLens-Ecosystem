@@ -243,6 +243,42 @@ All AI agents (including Codex, subagents, and human contributors) operating wit
 
 ---
 
+## 🎼 5.3 Multi-Agent Orchestra & Inter-Agent Communication
+
+OvaLens supports a synchronized multi-agent orchestra where specialized domain agents collaborate:
+
+```mermaid
+flowchart TD
+    Orch["Antigravity (Lead Orchestrator)"]
+    
+    subgraph SQUAD["Domain Specialist Subagents"]
+        BE["backend_agent\n(FastAPI + PostgreSQL)"]
+        FE["frontend_agent\n(React 18 + TypeScript)"]
+        ED["edge_agent\n(CV + CustomTkinter + ONNX)"]
+        FW["firmware_agent\n(ESP32 + C++ Actuator)"]
+    end
+
+    Orch -->|"Delegates Task Specs"| SQUAD
+    BE <-->|"1. Schema & API Contracts"| FE
+    ED <-->|"2. Sync Payload Protocols"| BE
+    ED <-->|"3. UART Baud Commands"| FW
+    SQUAD -->|"Reports Diffs & Test Results"| Orch
+    Orch -->|"Automated Quality Gate & Git Commit"| Done["Verified Monorepo Release"]
+```
+
+### Domain Agents & Responsibilities:
+1. **`backend_agent`**: Owns `backend/`. Implements FastAPI routers, Pydantic v2 schemas, and PostgreSQL queries. Communicates API response contracts to `frontend_agent`.
+2. **`frontend_agent`**: Owns `dashboard/`. Implements React components, TailwindCSS UI, and TypeScript types mirroring backend Pydantic models.
+3. **`edge_agent`**: Owns `edge/`. Implements CustomTkinter 60 FPS UI, frame grabbers, ONNX FP16 inference, and SQLite WAL sync workers. Coordinates payload formats with `backend_agent`.
+4. **`firmware_agent`**: Owns `firmware/`. Implements ESP32 C++ timers, optical debouncing, and servo diverter angles. Coordinates UART packets with `edge_agent`.
+
+### Inter-Agent Communication Rules:
+* When a full-stack feature is implemented, `backend_agent` emits the Pydantic schema model to `frontend_agent`.
+* `frontend_agent` automatically synchronizes the TypeScript interfaces in `dashboard/src/types/` and the Axios hooks in `dashboard/src/api/`.
+* All agents execute `python scripts/verify_and_commit.py --task <TASK_ID> -m "..."` to run test suites, update [`CHANGELOG.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/CHANGELOG.md), check off the task in [`PROJECT_PLAN.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/PROJECT_PLAN.md), and commit cleanly.
+
+---
+
 ## 🧪 6. Testing & Verification Runbook
 
 Before submitting or opening a PR, run the following verification commands:
