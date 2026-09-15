@@ -6,7 +6,10 @@ dashboard page, firmware routine, and AI task.
 """
 
 import sys
-if hasattr(sys.stdout, "reconfigure"):
+from io import TextIOWrapper
+from typing import cast
+
+if isinstance(sys.stdout, TextIOWrapper):
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
@@ -15,6 +18,7 @@ if hasattr(sys.stdout, "reconfigure"):
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 
 def build_excel_checklist():
     wb = openpyxl.Workbook()
@@ -52,7 +56,7 @@ def build_excel_checklist():
     # -------------------------------------------------------------------------
     # TAB 1: EXECUTIVE SUMMARY & DASHBOARD
     # -------------------------------------------------------------------------
-    ws_dash = wb.active
+    ws_dash = cast(Worksheet, wb.active)
     ws_dash.title = "Executive Overview"
     ws_dash.views.sheetView[0].showGridLines = True
 
@@ -138,7 +142,7 @@ def build_excel_checklist():
     # -------------------------------------------------------------------------
     # TAB 2: MASTER FEATURE CHECKLIST (EXHAUSTIVE ENUMERATION)
     # -------------------------------------------------------------------------
-    ws_master = wb.create_sheet(title="Master Checklist")
+    ws_master = cast(Worksheet, wb.create_sheet(title="Master Checklist"))
     ws_master.views.sheetView[0].showGridLines = True
 
     headers = [
@@ -319,7 +323,7 @@ def build_excel_checklist():
     for ws in [ws_dash, ws_master]:
         for col in ws.columns:
             max_len = max(len(str(cell.value or '')) for cell in col)
-            col_letter = get_column_letter(col[0].column)
+            col_letter = get_column_letter(cast(int, col[0].column))
             ws.column_dimensions[col_letter].width = min(max(max_len + 3, 12), 52)
 
     ws_master.column_dimensions["A"].width = 18

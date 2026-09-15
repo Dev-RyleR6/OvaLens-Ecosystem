@@ -8,7 +8,9 @@ Usage:
 """
 
 import sys
-if hasattr(sys.stdout, "reconfigure"):
+from io import TextIOWrapper
+
+if isinstance(sys.stdout, TextIOWrapper):
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
