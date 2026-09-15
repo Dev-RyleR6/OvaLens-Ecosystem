@@ -9,142 +9,218 @@
 
 ---
 
-## 🏛️ Team Workflow & Division of Responsibilities
+## 🏛️ 1. Team Workflow & Division of Responsibilities
 
 ```mermaid
 flowchart LR
-    A["Antigravity\n(Orchestrator & Architect)"] -->|"1. Technical Spec & Task Contract"| B["Codex\n(Implementor)"]
-    B -->|"2. Feature Implementation & Tests"| C["Automated Verification\n(Pytest + Build + Audit)"]
-    C -->|"3. Verification Results"| A
-    A -->|"4. Code Review & Quality Gates"| D{"Passes Review?"}
+    A["Antigravity\n(Orchestrator & Architect)"] -->|"1. Technical Spec & Task ID"| B["Codex\n(Implementor)"]
+    B -->|"2. Implementation & Unit Tests"| C["Automated Quality Gate\n(scripts/verify_and_commit.py)"]
+    C -->|"3. Automated Test Results"| A
+    A -->|"4. Code Review & Quality Audit"| D{"Passes Audit?"}
     D -- "Fix Required" --> B
-    D -- "Approved" --> E["Automated Git Commit\n& CHANGELOG Update"]
+    D -- "Approved" --> E["Auto-Check [x] in PROJECT_PLAN.md\n& Excel Checklist & CHANGELOG.md"]
 ```
 
 | Responsibility | Antigravity (Orchestrator) | Codex (Implementor) |
 | :--- | :---: | :---: |
 | **System Architecture & Schematics** | Lead Owner | Reviewer / Consumer |
-| **Task Breakdown & Phase Tracking** | Lead Owner | - |
+| **Task Breakdown & Phase Tracking** | Lead Owner | Inherits Workflow |
 | **Technical Feature Implementation** | Reviewer & Verifier | Lead Owner |
 | **Automated Test Execution** | Gatekeeper | Test Writer |
 | **Security & Architecture Audit** | Lead Auditor | Fix Provider |
-| **Git Commits & CHANGELOG.md** | Automated Operator | - |
+| **Git Commits & CHANGELOG.md** | Automated Operator | Trigger via `--task` |
 
 ---
 
-## 🔄 The 5-Stage Iterative Development Cycle
+## 🔁 2. Global Agent Protocol for Automated Feature Completion
 
-For every feature or subsystem milestone, the team follows this strict 5-stage lifecycle:
+Whenever **Codex** or any agent implements a feature, endpoint, or module, they MUST execute the automated quality gate specifying the task ID:
 
-1. **Stage 1: Plan & Spec (Antigravity)**
-   * Select the next unblocked item from this `PROJECT_PLAN.md`.
-   * Define input/output contracts (Pydantic models, TypeScript interfaces, database migrations, hardware timings).
-   * Formulate the implementation prompt for Codex.
+```bash
+python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subject>"
+```
 
-2. **Stage 2: Implementation (Codex)**
-   * Implement the feature adhering strictly to [`AGENTS.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/AGENTS.md):
-     - Zero Firebase dependencies.
-     - Offline SQLite WAL before REST network sync.
-     - 3-class biological model (`FERTILE`, `INFERTILE`, `ABNORMAL`).
-     - Foundation University brand palette (`#800000`, `#357a38`, `#DC2626`).
-
-3. **Stage 3: Automated Verification (Automated Test Suite)**
-   * Run backend API suite: `pytest backend/tests/test_api.py -v`.
-   * Run edge CV pipeline suite: `pytest edge/tests/test_edge_pipeline.py -v`.
-   * Run dashboard typecheck and build: `npm run build` in `dashboard/`.
-
-4. **Stage 4: Code Review & Quality Audit (Antigravity)**
-   * Audit against `.agents/skills/code-reviewer/`:
-     - SQL injection & input validation (Pydantic v2).
-     - Idempotency (`ON CONFLICT DO NOTHING`).
-     - Non-blocking multi-threading (frame grabber, ONNX inference, serial worker).
-     - UI 60 FPS responsiveness and dark/light mode consistency.
-
-5. **Stage 5: Commit & Changelog Automation (Antigravity)**
-   * Execute automated commit script: `python scripts/verify_and_commit.py`.
-   * Generates Conventional Commit (`feat(...)`, `fix(...)`, `refactor(...)`).
-   * Updates [`CHANGELOG.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/CHANGELOG.md) and checks off item in `PROJECT_PLAN.md`.
+### What This Command Automatically Executes:
+1. **Runs Test Suite**: Runs Backend API pytest (13 tests) + Edge CV pipeline pytest (8 tests) + Dashboard build.
+2. **Updates Checklist**: Automatically finds `- [ ] **<TASK_ID>**` in this `PROJECT_PLAN.md` and marks it `- [x]`.
+3. **Updates Excel Workbook**: Updates [`docs/OvaLens_Capstone_Feature_Checklist.xlsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/docs/OvaLens_Capstone_Feature_Checklist.xlsx) marking the row status as `Done`.
+4. **Updates CHANGELOG**: Appends the feature under `[Unreleased]` in [`CHANGELOG.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/CHANGELOG.md).
+5. **Git Commit**: Stages all changes and creates a standardized Conventional Commit.
 
 ---
 
-## 📋 Comprehensive Capstone Phase Checklist (DSRM + Agile)
+## 📋 3. Exhaustive Subsystem Feature & Endpoint Checklist
 
 ### Phase 1: Planning & Requirements (DSRM: Problem ID & Objectives)
-- [x] **1.1 Research Proposal Alignment**: Establish title, problem statement, objectives, and scope in `docs/manuscript/`.
-- [x] **1.2 Authentic Manuscript Integration**: Parse and format `DevIn (2026).md` into Chapters 1, 2, and References.
-- [x] **1.3 Conceptual Framework (IPO)**: Import and catalog `IPO_Academic_Final.drawio` matrix.
-- [x] **1.4 Research Methodology**: Import and catalog `Methodology_Updated.drawio` (7-phase DSRM + Agile).
-- [x] **1.5 System Flowchart**: Import and catalog `Systemflow_chart_final.drawio` system activity diagram.
-- [x] **1.6 UML Use Cases**: Import and catalog `OvaLens_Use_Case_Diagram.drawio` (Worker, Supervisor, Admin).
-- [x] **1.7 Orchestrator-Implementor Architecture**: Define Antigravity + Codex collaboration standard.
-
-### Phase 2: Data Collection & Preparation (Dataset Management)
-- [ ] **2.1 Dataset Ingestion & Partitioning**: Implement automated script to split raw candling images into 70% Train, 15% Val, 15% Test.
-- [ ] **2.2 Multi-Stage Stratification**: Stratify dataset by genetic line (`IP-Itim`, `IP-Khaki`, `IP-Kayumanggi`) and stage (`Day 10`, `Day 18`, `Day 25`).
-- [ ] **2.3 Annotation Validator**: Script to verify whole-egg bounding box YOLO annotations (`[class_id, x_center, y_center, w, h]`).
-- [ ] **2.4 Image Augmentation Pipeline**: Geometric ($\pm 15^\circ$ rotation, flips) and HSV luminance adjustments.
-- [ ] **2.5 Dataset Statistics Generator**: Produce summary tables of class distribution for Chapter 3 & 4 manuscript tables.
-
-### Phase 3: YOLOv8 Model Development & Edge Optimization
-- [ ] **3.1 Ultralytics YOLOv8 Training Pipeline**: Script `edge/models/train_yolov8.py` with CIoU + BCE + DFL loss functions.
-- [ ] **3.2 Model Evaluation Benchmarks**: Compute Precision, Recall, F1-Score, $\text{mAP}_{50}$, and $\text{mAP}_{50-95}$.
-- [ ] **3.3 Genetic Subgroup Reporting**: Compute disaggregated metrics for IP-Itim, IP-Khaki, and IP-Kayumanggi.
-- [ ] **3.4 Incubation Stage Reporting**: Compute disaggregated metrics across Day 10, Day 18, and Day 25.
-- [ ] **3.5 ONNX FP16 Slim Quantization**: Script `edge/models/export_onnx.py` exporting to ONNX Runtime execution provider ($\le 200\text{ ms}$ latency target).
-- [ ] **3.6 Model Latency Profiler**: Benchmark inference latency on Raspberry Pi 5 / target hardware.
-
-### Phase 4: Hardware & Software Prototyping
-#### A. Firmware & Kinematics (`firmware/`)
-- [x] **4.1 ESP32 Sorter Firmware**: Implement optical sensor interrupt (GPIO 14) with 600ms lockout debounce.
-- [ ] **4.2 Stepper Pocket-Conveyor Driver**: Implement indexed step timing for cradle-by-cradle transport.
-- [ ] **4.3 Multi-Servo Sorting Actuation**: Actuate dedicated servo gates for Fertile, Infertile/Penoy, and Abnormal trays.
-- [ ] **4.4 Serial Command Protocol**: Non-blocking UART packet parser (115200 baud) with ACK/NACK responses.
-
-#### B. Edge CV & Desktop Controller (`edge/`)
-- [x] **4.5 Multi-Threaded Engine**: Implement 4-thread architecture (Frame Grabber, ONNX Inference, Serial Worker, SQLite Sync).
-- [x] **4.6 Local SQLite Store (WAL Mode)**: Atomic, immediate local scan recording before network transmission.
-- [ ] **4.7 Cradle-Tracking State Machine**: Maintain egg identity and cradle index from image capture to sorting gate.
-- [ ] **4.8 Fallback & Manual Review**: Detect invalid captures or low-confidence predictions ($\tau < 0.75$) and trigger operator review state.
-- [ ] **4.9 Operator Desktop UI (CustomTkinter)**: 60 FPS live video stream, cradle queue visualization, session stats, and manual override modal.
-
-#### C. Central Backend Engine (`backend/`)
-- [x] **4.10 FastAPI REST API Architecture**: Pydantic v2 schemas and SQLAlchemy 2.0 ORM.
-- [x] **4.11 PostgreSQL Database Models**: User, Device, Batch, Session, Scan tables.
-- [x] **4.12 Idempotent Scan Ingestion**: `POST /api/v1/scans/batch` with `ON CONFLICT (scan_id) DO NOTHING`.
-- [ ] **4.13 RBAC Authentication & Roles**: Implement JWT auth with Candling Worker, Hatchery Supervisor, and Admin permissions.
-- [ ] **4.14 Day 10 Penoy Economic Calculator**: Auto-calculate salvage revenue ($\text{Penoy Count} \times \text{₱14.00}$).
-- [ ] **4.15 Automated PDF/CSV Report Generation**: Export official batch summaries and audit logs.
-
-#### D. Web Admin Dashboard (`dashboard/`)
-- [x] **4.16 React 18 + Vite + TS Setup**: TailwindCSS styled with Foundation University brand tokens.
-- [x] **4.17 Incubation Tray Matrix**: Visual representation of egg positions ($A1 \to F7$).
-- [ ] **4.18 Real-Time Batch Overview**: Live stats on processed eggs, fertility rate, penoy salvage value, and discard rate.
-- [ ] **4.19 Genetic Line & Stage Filters**: Filter analytics by IP-Itim/Khaki/Kayumanggi and Day 10/18/25.
-- [ ] **4.20 Device & Sorter Health Monitor**: Live heartbeat and connection status for edge sorter stations.
-- [ ] **4.21 User Management & Audit Trail**: Admin interface for user accounts and operational event logs.
-
-### Phase 5: System Integration & Testing (Demonstration)
-- [ ] **5.1 End-to-End Pilot Simulation**: Test complete cycle: Cradle load $\to$ Index pause $\to$ Image capture $\to$ YOLOv8 predict $\to$ Servo divert $\to$ SQLite log $\to$ HTTP sync $\to$ Dashboard display.
-- [ ] **5.2 Cradle Synchronization Stress Test**: Verify egg-to-result tracking under speed variations and simulated jams.
-- [ ] **5.3 Offline Network Dropout Resilience**: Disconnect backend during active sorting; verify 100% sorting continuity and subsequent bulk replay sync.
-- [ ] **5.4 Operator Manual Review Testing**: Validate GUI alert and physical routing when uncertain eggs are flagged.
-
-### Phase 6: Evaluation & Refinement (Evaluation)
-- [ ] **6.1 Sorting Accuracy Benchmark**: Measure physical sorting accuracy across $\ge 100$ physical trial runs.
-- [ ] **6.2 Processing Time & Throughput**: Measure end-to-end cycle time per egg and overall throughput (eggs/minute).
-- [ ] **6.3 Successful-Cycle Rate**: Calculate percentage of error-free mechanical and electrical cycles.
-- [ ] **6.4 Manual-Review Frequency Rate**: Measure proportion of scans routed to manual review.
-- [ ] **6.5 Confusion Matrix & Metrics Consolidation**: Generate formal confusion matrix and classification metric tables for Chapter 4.
-
-### Phase 7: Deployment & Defense Communication (Communication)
-- [ ] **7.1 Manuscript Chapter 4 (Results & Discussion)**: Populate with quantitative trial data, confusion matrices, and charts.
-- [ ] **7.2 Manuscript Chapter 5 (Summary & Recommendations)**: Draft conclusions, engineering insights, and future research recommendations.
-- [ ] **7.3 1-Click Production Containerization**: Verify `docker-compose.yml` for PostgreSQL, FastAPI, and React dashboard.
-- [ ] **7.4 Oral Defense Slide Deck & Demo Script**: Prepare interactive presentation and live hardware demonstration runbook.
+- [x] **TASK-DOC-01**: Authentic Capstone Manuscript Integration (`docs/manuscript/` Chapters 1–6, Title Page, Approval Sheet, 15 APA 7 references)
+- [x] **TASK-DOC-02**: Import & Catalog Academic Diagrams (IPO Matrix, DSRM Methodology, System Flowchart, Use Cases in `.drawio` and `.html`)
+- [x] **TASK-DOC-03**: Two-Tier Agent Workflow & Automated Quality Gate (`scripts/verify_and_commit.py` + `PROJECT_PLAN.md` + `CHANGELOG.md`)
 
 ---
 
-## 📈 Living Changelog & Release Milestones
+### Phase 2: Data Collection & Preparation (Dataset Pipeline)
+- [ ] **TASK-AI-DS-01**: Dataset 70/15/15 Stratification Pipeline (Split 3,000+ candling images into 70% Train, 15% Val, 15% Test across IP-Itim, IP-Khaki, IP-Kayumanggi and Day 10, 18, 25)
+- [ ] **TASK-AI-DS-02**: Whole-Egg YOLO Bounding Box Validator (Verify darknet `[class_id, x, y, w, h]` enclosing the entire egg)
+- [ ] **TASK-AI-DS-03**: Candling Transillumination Augmentations (HSV luminance jitter `V +/-20%` and `+/-15 deg` rotation pipeline)
+- [ ] **TASK-AI-DS-04**: Dataset Distribution Summary Exporter (Generate automated Markdown and LaTeX tables for Chapter 3 & 4 manuscript)
 
-All feature implementations, fixes, and architectural updates are tracked in [`CHANGELOG.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/CHANGELOG.md).
+---
 
+### Phase 3: YOLOv8 Model Development & Edge Optimization
+- [ ] **TASK-AI-TRN-01**: Ultralytics YOLOv8 Training Pipeline (Implement training pipeline with CIoU + BCE + DFL loss functions)
+- [x] **TASK-AI-OPT-01**: ONNX FP16 Slim Export & Half-Precision Graph (`export_onnx.py` half-precision graph exporter)
+- [x] **TASK-AI-OPT-02**: Production Weights Verified (`edge/models/weights/best.onnx` ready for runtime execution)
+- [x] **TASK-AI-LAT-01**: Edge Inference Latency Benchmark (Enforce `<= 200 ms` SLA constraint on target hardware)
+- [ ] **TASK-AI-EVL-01**: Breed Subgroup Metric Evaluator (Compute Precision, Recall, F1, mAP for IP-Itim vs IP-Khaki vs IP-Kayumanggi)
+- [ ] **TASK-AI-EVL-02**: Stage Subgroup Metric Evaluator (Compute Precision, Recall, F1, mAP across Day 10, Day 18, Day 25)
+- [ ] **TASK-AI-EVL-03**: 3-Class Confusion Matrix & ROC Generator (Generate formal confusion matrix and curves for Chapter 4)
+
+---
+
+### Phase 4A: Firmware & Microcontroller (`firmware/`)
+- [x] **TASK-FW-INT-01**: Optical Sensor Hardware Interrupt (ESP32 GPIO 14 optical beam-break edge detection interrupt)
+- [x] **TASK-FW-INT-02**: 600ms Hardware Optical Debounce Lockout (Non-blocking timer lockout preventing false double-triggers)
+- [x] **TASK-FW-LED-01**: Candling Strobe LED Driver Relay (GPIO 19 strobe trigger synchronized with camera exposure)
+- [x] **TASK-FW-SER-01**: Non-Blocking Serial UART Command Parser (Buffer incoming 115200 baud UART bytes without `delay()` calls)
+- [ ] **TASK-FW-SER-02**: Serial ACK / NACK Status Protocol (Transmit acknowledgement packets upon command execution to edge driver)
+- [ ] **TASK-FW-STP-01**: Stepper Pocket-Conveyor Transport Routine (Indexed step timing to advance pocket conveyor one cradle at a time)
+- [x] **TASK-FW-SRV-01**: Servo Gate 1 - Fertile Release (Actuate servo diverter for Fertile eggs into cushioned incubation tray)
+- [ ] **TASK-FW-SRV-02**: Servo Gate 2 - Infertile / Penoy Salvage (Actuate servo diverter for Day 10 Penoy salvage sale @ ₱14.00)
+- [ ] **TASK-FW-SRV-03**: Servo Gate 3 - Abnormal Discard (Actuate servo diverter to cull dead/bursting embryos to waste bin)
+- [x] **TASK-FW-KIN-01**: Kinematic Actuation Delay Timer ($\Delta t = D / v = 25\text{ cm} / 12.5\text{ cm/s} = 2,000\text{ ms}$ delay before servo firing)
+
+---
+
+### Phase 4B: Edge CV & Desktop Controller (`edge/`)
+- [x] **TASK-EDGE-CAM-01**: Multi-Threaded Circular Frame Grabber (Thread 1: OpenCV DirectShow/V4L2 continuous circular buffer drain)
+- [x] **TASK-EDGE-CAM-02**: Camera Disconnect Recovery & Mock Mode (Auto-reconnect USB camera and generate mock frames for offline dev)
+- [x] **TASK-EDGE-AI-01**: ONNX Runtime FP16 Inference Engine (Thread 2: ONNX Runtime execution provider running quantized YOLOv8)
+- [x] **TASK-EDGE-AI-02**: Geometric Aspect-Ratio & Centering Gate (Enforce $0.65 \le \text{AR} \le 1.45$ to prevent classifying non-egg objects)
+- [x] **TASK-EDGE-AI-03**: Model Cache Warmup Routine (Execute 3 dummy passes on startup to eliminate first-frame latency spikes)
+- [x] **TASK-EDGE-HEU-01**: HSV Candling Luminance Analyzer (Analyze internal light transmission across yolk/albumin regions)
+- [x] **TASK-EDGE-HEU-02**: Vascular Vein & Blood Ring Heuristics (Auxiliary edge detector verifying spider blood veins vs necrotic ring)
+- [x] **TASK-EDGE-DB-01**: Local SQLite WAL Mode Store (Thread 4: Local scan persistence with `PRAGMA journal_mode = WAL;`)
+- [x] **TASK-EDGE-DB-02**: Unsynced Scan FIFO Queue Manager (Track unsynced scans and handle exponential backoff retry)
+- [x] **TASK-EDGE-SYN-01**: Background REST HTTP Sync Worker (Non-blocking background HTTP client transmitting batches of 50 scans)
+- [x] **TASK-EDGE-SYN-02**: Local CSV Session Exporter (Emergency offline CSV exporter saving session records to local USB drive)
+- [x] **TASK-EDGE-SER-01**: PySerial ESP32 UART Driver (Thread 3: Non-blocking serial worker communicating at 115200 baud)
+- [x] **TASK-EDGE-SER-02**: Serial Mock Driver for Hardware-Free Dev (Simulate ESP32 optical triggers and servo responses in unit tests)
+- [ ] **TASK-EDGE-TRK-01**: Cradle Tracking FIFO Queue (Maintain cradle queue mapping `cradle_id` from image station to sorting gate)
+- [ ] **TASK-EDGE-TRK-02**: Conveyor Index Resynchronization Handler (Pause conveyor and alert operator if physical cradle index drifts)
+- [ ] **TASK-EDGE-REV-01**: Manual Review Fallback State Machine (Trigger manual review flag when confidence $< 0.75$ or egg uncentered)
+- [x] **TASK-EDGE-UI-01**: CustomTkinter 60 FPS Operator Desktop UI (Main Thread: CustomTkinter operator GUI with Foundation University theme)
+- [x] **TASK-EDGE-UI-02**: Live Candling Video Viewport (Smooth video rendering canvas with overlay bounding box and class tag)
+- [x] **TASK-EDGE-UI-03**: Real-Time Session Statistics Counters (Live counters for Fertile, Infertile, Abnormal, and Manual Review count)
+- [ ] **TASK-EDGE-UI-04**: Interactive Manual Override Dialog Modal (Modal popup enabling operator to inspect flagged egg and confirm class)
+- [x] **TASK-EDGE-UI-05**: Conveyor Pause & Emergency Stop Controls (Instant physical rig pause and serial E-STOP command dispatch)
+
+---
+
+### Phase 4C: Central Backend REST API (`backend/`)
+#### Authentication & User Management
+- [x] **TASK-BE-AUTH-01**: `POST /api/v1/auth/login` (JWT authentication endpoint with bcrypt password verification and role extraction)
+- [x] **TASK-BE-AUTH-02**: `GET /api/v1/auth/me` (Retrieve current authenticated user profile, permissions, and active status)
+- [x] **TASK-BE-AUTH-03**: `POST /api/v1/auth/register` (Account registration endpoint with default Candling Worker role)
+- [x] **TASK-BE-USR-01**: `GET /api/v1/users` (List all system users with role filters: Worker, Supervisor, Admin)
+- [x] **TASK-BE-USR-02**: `POST /api/v1/users` (Admin user creation endpoint with RBAC role assignment)
+- [x] **TASK-BE-USR-03**: `PATCH /api/v1/users/{id}/status` (Toggle user active/deactivated state to revoke credentials)
+- [x] **TASK-BE-USR-04**: `PATCH /api/v1/users/me/profile` (Allow authenticated user to update display name and email)
+- [x] **TASK-BE-USR-05**: `PATCH /api/v1/users/me/password` (Secure password change with old password verification)
+
+#### Incubation Batches Lifecycle
+- [x] **TASK-BE-BAT-01**: `GET /api/v1/batches` (List incubation batches with status and genetic group filters)
+- [x] **TASK-BE-BAT-02**: `GET /api/v1/batches/active` (Retrieve currently active incubator batches needing candling inspection)
+- [x] **TASK-BE-BAT-03**: `POST /api/v1/batches` (Create new incubation batch specifying breed: Itim/Khaki/Kayumanggi and egg count)
+- [x] **TASK-BE-BAT-04**: `GET /api/v1/batches/{id}` (Get detailed batch record with tray matrix slots and current milestone)
+- [x] **TASK-BE-BAT-05**: `GET /api/v1/batches/{id}/analytics` (Incubation analytics: fertility rate, mortality curve, penoy salvage total)
+- [x] **TASK-BE-BAT-06**: `GET /api/v1/batches/{id}/forecast` (Hatch yield forecast calculation based on Day 10 and Day 18 viability rates)
+- [x] **TASK-BE-BAT-07**: `PUT /api/v1/batches/{id}` (Update batch metadata, notes, and incubator chamber ID)
+- [x] **TASK-BE-BAT-08**: `POST /api/v1/batches/{id}/advance-stage` (Advance batch milestone: Day 10 -> Day 18 -> Day 25)
+- [x] **TASK-BE-BAT-09**: `POST /api/v1/batches/{id}/finalize-hatch` (Close batch lifecycle and record final hatchling count on Day 28)
+- [x] **TASK-BE-BAT-10**: `GET /api/v1/batches/{id}/summary` (Comprehensive batch summary DTO for compliance and audit archiving)
+- [x] **TASK-BE-BAT-11**: `DELETE /api/v1/batches/{id}` (Soft-delete or purge batch; Admin only protection)
+- [x] **TASK-BE-BAT-12**: `POST /api/v1/batches/check-milestones` (Automated background cron to flag batches reaching Day 10, 18, 25)
+
+#### Candling Sessions & Scan Ingestion
+- [x] **TASK-BE-SES-01**: `GET /api/v1/sessions` (List all active and completed edge candling sorting sessions)
+- [x] **TASK-BE-SES-02**: `POST /api/v1/sessions` (Start new candling session linked to batch and edge sorter device ID)
+- [x] **TASK-BE-SES-03**: `GET /api/v1/sessions/{id}` (Get session progress: total eggs candled, fertile, infertile, abnormal counts)
+- [x] **TASK-BE-SES-04**: `PUT /api/v1/sessions/{id}/end` (Conclude candling session and trigger batch analytics recalculation)
+- [x] **TASK-BE-SCN-01**: `POST /api/v1/scans/sync` (Idempotent batch scan sync with `ON CONFLICT (scan_id) DO NOTHING`)
+- [x] **TASK-BE-SCN-02**: `POST /api/v1/scans/upload-image` (Upload high-res candling frame image associated with scan ID)
+- [x] **TASK-BE-SCN-03**: `GET /api/v1/scans` (Query historical scans with `batch_id`, stage, class, date filters)
+- [x] **TASK-BE-SCN-04**: `GET /api/v1/scans/{id}` (Retrieve single scan record with confidence, bounding box, image URI)
+- [x] **TASK-BE-SCN-05**: `PATCH /api/v1/scans/{id}/override` (Human-in-the-loop classification override with audit trail logging)
+
+#### Analytics, Economic Reports & Administration
+- [x] **TASK-BE-ANL-01**: `GET /api/v1/analytics/overview` (Aggregated hatchery statistics: total eggs, fertility rate, cull rate)
+- [x] **TASK-BE-ANL-02**: `GET /api/v1/analytics/breed-comparison` (Disaggregated analytics comparing IP-Itim vs IP-Khaki vs IP-Kayumanggi)
+- [x] **TASK-BE-ANL-03**: `GET /api/v1/analytics/mortality-trends` (Longitudinal mortality tracking across batches and candling stages)
+- [x] **TASK-BE-ANL-04**: `GET /api/v1/analytics/mortality-progression` (Progressive loss analysis from Day 10 to Day 18 to Day 25)
+- [x] **TASK-BE-ANL-05**: `GET /api/v1/analytics/economic-yield` (Day 10 Penoy salvage revenue: `Count * ₱14.00` & thermal energy savings)
+- [x] **TASK-BE-REP-01**: `GET /api/v1/reports/batch/{id}/csv` (Export CSV spreadsheet containing detailed scan log for batch)
+- [x] **TASK-BE-REP-02**: `GET /api/v1/reports/batch/{id}/pdf` (Generate official Foundation University formatted PDF compliance report)
+- [x] **TASK-BE-DEV-01**: `GET /api/v1/devices` (List registered edge sorter hardware rigs with online/offline status)
+- [x] **TASK-BE-DEV-02**: `POST /api/v1/devices/register` (Register new ESP32 / Raspberry Pi edge node with MAC & station ID)
+- [x] **TASK-BE-DEV-03**: `POST /api/v1/devices/{id}/heartbeat` (Edge node heartbeat ping transmitting status, temperature, and FPS)
+- [x] **TASK-BE-SET-01**: `GET /api/v1/settings` (Fetch system settings: penoy price ₱14, confidence threshold, sync interval)
+- [x] **TASK-BE-SET-02**: `PUT /api/v1/settings` (Update system settings with admin validation)
+- [x] **TASK-BE-SET-03**: `POST /api/v1/settings/backups/create` (Trigger compressed JSON.GZ snapshot of PostgreSQL database)
+- [x] **TASK-BE-SET-04**: `GET /api/v1/settings/backups` (List available database backup archive files)
+- [x] **TASK-BE-SET-05**: `GET /api/v1/settings/backups/{file}/download` (Secure endpoint to download encrypted database backup)
+- [x] **TASK-BE-AUD-01**: `GET /api/v1/audit_logs` (Query immutable system audit trail with user and timestamp filters)
+
+---
+
+### Phase 4D: Web Admin Dashboard (`dashboard/`)
+#### Pages & Workspaces
+- [x] **TASK-DASH-PG-01**: `LoginPage.tsx` (Login view with Foundation University maroon branding and token persistence)
+- [x] **TASK-DASH-PG-02**: `OverviewPage.tsx` (Real-time KPI summary cards of active batches, fertility %, and sorting volume)
+- [x] **TASK-DASH-PG-03**: `BatchesPage.tsx` (Table of all batches, stage advancement modal Day 10/18/25, hatch closure)
+- [x] **TASK-DASH-PG-04**: `ScanExplorerPage.tsx` (Filterable grid of historical scan captures with image lightbox inspection)
+- [x] **TASK-DASH-PG-05**: `AnalyticsPage.tsx` (Recharts visualizer for mortality curves, breed comparisons, Penoy revenue)
+- [x] **TASK-DASH-PG-06**: `RecordsPage.tsx` (Historical scan and session records table with one-click CSV/PDF download)
+- [x] **TASK-DASH-PG-07**: `DevicesPage.tsx` (Live cards showing connected Raspberry Pi and ESP32 sorter rigs)
+- [x] **TASK-DASH-PG-08**: `ModelsPage.tsx` (View deployed YOLOv8 ONNX model version, latency benchmarks, thresholds)
+- [x] **TASK-DASH-PG-09**: `UsersPage.tsx` (Admin table for managing operator, supervisor, and administrator accounts)
+- [x] **TASK-DASH-PG-10**: `AuditLogsPage.tsx` (Chronological table of all system events, login attempts, and overrides)
+- [x] **TASK-DASH-PG-11**: `SettingsPage.tsx` (Configure Penoy price ₱14, confidence thresholds, and DB backup downloads)
+
+#### Reusable UI Widgets & System Tokens
+- [x] **TASK-DASH-CP-01**: Incubation Tray Matrix 42 Slots ($A1 \to F7$) (Interactive SVG grid showing slot occupancy and status)
+- [x] **TASK-DASH-CP-02**: Interactive Penoy Economic Calculator (Widget computing Day 10 salvage income based on ₱14.00/egg price)
+- [x] **TASK-DASH-CP-03**: Breed Filter Dropdown (Dropdown to isolate metrics by `IP-Itim`, `IP-Khaki`, `IP-Kayumanggi`)
+- [x] **TASK-DASH-CP-04**: Milestone Filter Toggle (Toggle to filter analysis by candling milestone: `Day 10`, `Day 18`, `Day 25`)
+- [x] **TASK-DASH-CP-05**: Dark / Light Mode Theme System (TailwindCSS theme switcher with FU Maroon `#800000` accents)
+
+---
+
+### Phase 5: System Integration & Demonstration (Demonstration)
+- [ ] **TASK-INT-01**: End-to-End Sorting Pilot Simulation (Simulate 50-egg cycle: load -> index -> capture -> predict -> divert -> sync)
+- [ ] **TASK-INT-02**: Offline Network Replay Resilience Test (Cut network; confirm 100% sorting at edge; reconnect and verify bulk replay)
+- [ ] **TASK-INT-03**: Cradle Position Jam Recovery Test (Simulate mechanical index slip; verify conveyor pauses and resyncs)
+
+---
+
+### Phase 6: Empirical Evaluation & Benchmarking (Evaluation)
+- [ ] **TASK-EVL-01**: Physical Sorting Accuracy Benchmark (Run $\ge 100$ physical duck egg trials to measure sorting accuracy rate)
+- [ ] **TASK-EVL-02**: System Throughput & Cycle Time Profiling (Measure end-to-end cycle time per egg and throughput in eggs/min)
+
+---
+
+### Phase 7: Deployment & Defense Communication (Communication)
+- [ ] **TASK-DEF-01**: Manuscript Chapter 4 Results & Discussion (Draft Chapter 4 using empirical metrics, confusion matrices, latency charts)
+- [ ] **TASK-DEF-02**: Manuscript Chapter 5 Conclusions & Recommendations (Summarize findings, answer research questions 1–4)
+- [x] **TASK-DEF-03**: 1-Click Docker Production Packaging (Verify `docker-compose up` for PostgreSQL, FastAPI, React dashboard)
+
+---
+
+## 🔮 4. Backlog for Potential New Features & Expansions
+
+These features can be claimed by any agent using `python scripts/verify_and_commit.py --task <ID>`:
+
+- [ ] **TASK-NEW-WS-01**: Edge-to-Dashboard WebSocket Live Stream (`ws://localhost:8000/ws/live-feed` for real-time remote candling monitor)
+- [ ] **TASK-NEW-ZIP-01**: Bulk Dataset Zip Exporter (`GET /api/v1/batches/{id}/export-dataset` to package images + YOLO annotations)
+- [ ] **TASK-NEW-SMS-01**: Hatchery Supervisor SMS / Email Alerts (Notify supervisor when Day 10 penoy count exceeds 40% cull threshold)
+- [ ] **TASK-NEW-QR-01**: Incubation Tray QR Code Generator & Scanner (Print QR label for physical 42-egg incubation trays)
+- [ ] **TASK-NEW-LANE-01**: Multi-Lane Conveyor Scaling Support (Extend firmware and edge tracker from 1 lane to 4 parallel candling lanes)

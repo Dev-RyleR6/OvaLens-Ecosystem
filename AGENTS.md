@@ -213,6 +213,33 @@ OvaLens development follows an orchestrated **two-tier agent architecture**:
   - Focused implementation of discrete features, services, and components according to Antigravity's specification contracts.
   - Writing accompanying unit tests and adhering to strict architectural constraints.
 
+---
+
+## 🤖 5.2 Global Agent Protocol & Automated Checklist Standard (Inherited by Codex & All Agents)
+
+All AI agents (including Codex, subagents, and human contributors) operating within the OvaLens repository MUST inherit and follow this automated protocol:
+
+1. **Target Task Selection**:
+   - Always reference the target Task ID from [`PROJECT_PLAN.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/PROJECT_PLAN.md) (e.g., `TASK-EDGE-TRK-01`, `TASK-BE-AUTH-01`, or a new `TASK-NEW-...` ID).
+2. **Implementation & Accompanying Tests**:
+   - Write clean, modular code satisfying the specification contract.
+   - Include accompanying pytest unit tests (in `backend/tests/` or `edge/tests/`).
+   - Adhere strictly to the negative constraints (no Firebase, SQLite WAL at edge, 3 biological classes, Foundation University colors).
+3. **Automated Verification & Checklist Update**:
+   - Upon completing the code, run the automated verification utility specifying the `--task` flag:
+   ```bash
+   python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subject>"
+   ```
+   - **What this automatically achieves:**
+     1. Runs backend pytest (13 tests).
+     2. Runs edge CV pipeline pytest (8 tests).
+     3. Validates dashboard TypeScript types and build (`npm.cmd run build`).
+     4. Marks `- [ ] **<TASK_ID>**` to `- [x]` in [`PROJECT_PLAN.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/PROJECT_PLAN.md).
+     5. Updates [`docs/OvaLens_Capstone_Feature_Checklist.xlsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/docs/OvaLens_Capstone_Feature_Checklist.xlsx) marking that row as `Done`.
+     6. Appends the change entry to [`CHANGELOG.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/CHANGELOG.md).
+     7. Stages all changes and creates a standardized Conventional Git commit.
+4. **New Feature Protocol**:
+   - If developing a new capability or endpoint not yet cataloged, first register it under `4. Backlog for Potential New Features` in [`PROJECT_PLAN.md`](file:///d:/Ryle_Gabotero/side_projects/Capstone/PROJECT_PLAN.md), then claim and complete it using the `--task` flag.
 
 ---
 

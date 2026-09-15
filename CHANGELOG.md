@@ -10,8 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Docs**: add comprehensive capstone feature checklist excel workbook (2026-09-15)
-- **Capstone**: sync authentic manuscript, diagrams, dsrm project plan, and changelog (2026-09-15)
+- **Workflow**: [TASK-DOC-03] integrate automated task checklist and global agent protocol into workflow (2026-09-15)
 - Created `PROJECT_PLAN.md` living task backlog mapped to Design Science Research Methodology (DSRM) and Agile iteration cycles.
 - Integrated automated verification and conventional commit workflow (`scripts/verify_and_commit.py`).
 - Added Input-Process-Output (IPO) academic matrix (`IPO_Academic_Final.drawio` & `.html`) to `docs/diagrams/architecture/`.
@@ -50,3 +49,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial project conceptualization and Foundation University Capstone registration.
 - YOLOv8 model evaluation for 3-class duck egg candling (`FERTILE`, `INFERTILE`, `ABNORMAL`).
 - Monorepo structure initialization (`backend/`, `edge/`, `dashboard/`, `firmware/`, `docs/`).
+
