@@ -9,7 +9,6 @@ from app.core.database import Base
 class FertilityClass(str, enum.Enum):
     FERTILE = "FERTILE"
     INFERTILE = "INFERTILE"
-    ABNORMAL = "ABNORMAL"
 
 
 class RoutingAction(str, enum.Enum):

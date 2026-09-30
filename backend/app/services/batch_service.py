@@ -26,10 +26,6 @@ class BatchService:
         alert = None
         if current_stage == BatchStage.SETTING and elapsed >= 10:
             alert = "CANDLING DUE: Day 10 Embryo Viability & Penoy Salvage"
-        elif current_stage == BatchStage.DAY_10 and elapsed >= 18:
-            alert = "TRANSFER DUE: Day 18 Lockdown into Hatcher Trays"
-        elif current_stage == BatchStage.DAY_18 and elapsed >= 25:
-            alert = "PIPING WATCH: Day 25 Final Hatch Preparation"
         elif elapsed >= 28 and current_stage not in (BatchStage.HATCHED, BatchStage.COMPLETED):
             alert = "HATCH DUE: Day 28 Final Hatch Record Pending"
 
@@ -244,12 +240,12 @@ class BatchService:
         d10_tot = d10_stats.scanned or 0
         d10_fer = d10_stats.fertile or 0
         d10_inf = d10_stats.infertile or 0
-        d10_abn = d10_stats.abnormal or 0
+        d10_abn = 0
         d10_rate = (d10_fer / d10_tot * 100.0) if d10_tot > 0 else 0.0
 
         # Financial values
         penoy_val = d10_inf * penoy_price
-        power_saved = (d10_inf + d10_abn) * (kwh_rate * kwh_per_egg)
+        power_saved = d10_inf * (kwh_rate * kwh_per_egg)
         duckling_rev = batch.hatched_count * duckling_price
         hatch_rate = (batch.hatched_count / batch.initial_egg_count * 100.0) if batch.initial_egg_count > 0 else 0.0
 

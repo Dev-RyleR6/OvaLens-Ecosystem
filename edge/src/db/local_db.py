@@ -195,8 +195,8 @@ class LocalDatabaseManager:
                 image_path, det_json, scanned_at
             ))
 
-            # Update session rollup counters
-            col = "fertile_count" if final_class == "FERTILE" else ("infertile_count" if final_class == "INFERTILE" else "abnormal_count")
+            # Update session rollup counters (2-class model)
+            col = "fertile_count" if final_class == "FERTILE" else "infertile_count"
             conn.execute(f"""
                 UPDATE local_sessions
                 SET total_scanned = total_scanned + 1,

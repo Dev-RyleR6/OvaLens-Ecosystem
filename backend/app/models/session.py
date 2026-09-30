@@ -8,8 +8,6 @@ from app.core.database import Base
 
 class CandlingStage(str, enum.Enum):
     DAY_10 = "DAY_10"
-    DAY_18 = "DAY_18"
-    DAY_25 = "DAY_25"
 
 
 class CandlingSessionModel(Base):

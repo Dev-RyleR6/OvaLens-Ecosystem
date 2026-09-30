@@ -55,10 +55,6 @@ def create_session(
     # Update batch current stage
     if payload.stage == CandlingStage.DAY_10:
         batch.current_stage = BatchStage.DAY_10
-    elif payload.stage == CandlingStage.DAY_18:
-        batch.current_stage = BatchStage.DAY_18
-    elif payload.stage == CandlingStage.DAY_25:
-        batch.current_stage = BatchStage.DAY_25
 
     db.add(session)
     db.commit()

@@ -77,6 +77,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.fertile_count = 0
         self.infertile_count = 0
         self.abnormal_count = 0
+        self.review_count = 0
 
         # Window Configuration (Industrial Pro Gray Theme)
         self.title("OvaLens — Automated Duck Egg Candling System (Foundation University)")
@@ -410,7 +411,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.box_total = self._create_stat_box(grid, "TOTAL SCANNED", f"0 / {self.target_egg_count}", 0, 0, accent_color=FUTheme.PRIMARY_MAROON, bg_color=FUTheme.PANEL_LIGHT_ALT)
         self.box_fertile = self._create_stat_box(grid, "FERTILE (ACCEPT)", "0 (0%)", 0, 1, accent_color=FUTheme.FERTILE_GREEN, bg_color=FUTheme.FERTILE_GREEN_CARD)
         self.box_infertile = self._create_stat_box(grid, "INFERTILE (PENOY)", "0", 1, 0, accent_color=FUTheme.INFERTILE_AMBER, bg_color=FUTheme.INFERTILE_AMBER_CARD)
-        self.box_abnormal = self._create_stat_box(grid, "ABNORMAL (REJECT)", "0", 1, 1, accent_color=FUTheme.ABNORMAL_RED, bg_color=FUTheme.ABNORMAL_RED_CARD)
+        self.box_abnormal = self._create_stat_box(grid, "MANUAL REVIEW", "0", 1, 1, accent_color=FUTheme.TEXT_MUTED, bg_color=FUTheme.PANEL_LIGHT_ALT)
 
         # 3. Recent Scans Log
         log_frame = ctk.CTkFrame(
@@ -651,11 +652,11 @@ class OvaLensOperatorApp(ctk.CTk):
         ctk.CTkLabel(t3, text="PENOY SALVAGE YIELD", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.INFERTILE_AMBER_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
         ctk.CTkLabel(t3, text=f"{self.infertile_count} eggs -> ₱{penoy_salvage_val:,.2f}", font=(FUTheme.FONT_FAMILY, 14, "bold"), text_color=FUTheme.INFERTILE_AMBER).pack(anchor="w", padx=10, pady=(0, 6))
 
-        # Tile 4: Abnormal Culls
-        t4 = ctk.CTkFrame(grid, fg_color=FUTheme.ABNORMAL_RED_CARD, corner_radius=8, border_width=1, border_color=FUTheme.ABNORMAL_RED_BORDER)
+        # Tile 4: Manual Review
+        t4 = ctk.CTkFrame(grid, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         t4.grid(row=1, column=1, padx=4, pady=4, sticky="nsew")
-        ctk.CTkLabel(t4, text="ABNORMAL (REJECT)", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.ABNORMAL_RED_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
-        ctk.CTkLabel(t4, text=f"{self.abnormal_count} Eggs", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.ABNORMAL_RED).pack(anchor="w", padx=10, pady=(0, 6))
+        ctk.CTkLabel(t4, text="MANUAL REVIEW", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=10, pady=(6, 0))
+        ctk.CTkLabel(t4, text=f"{self.review_count} Eggs", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=10, pady=(0, 6))
 
         # Direct CSV Export Section Box
         export_box = ctk.CTkFrame(card, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=10, border_width=1, border_color=FUTheme.BORDER)
@@ -973,22 +974,14 @@ class OvaLensOperatorApp(ctk.CTk):
             title_color = FUTheme.FERTILE_GREEN_TEXT
             title_text = f"🟢 FERTILE — ACCEPT ({conf*100:.1f}%)"
             sub_text = "Viable spider embryo network verified • Routed to setter tray"
-        elif final_cls == "INFERTILE":
+        else:
             card_bg = FUTheme.INFERTILE_AMBER_CARD
             card_border = FUTheme.INFERTILE_AMBER_BORDER
             badge_bg = FUTheme.INFERTILE_AMBER_BG
             badge_text_color = FUTheme.INFERTILE_AMBER_TEXT
             title_color = FUTheme.INFERTILE_AMBER
             title_text = f"🟡 INFERTILE — REJECT ({conf*100:.1f}%)"
-            sub_text = "Clear unfertilized yolk • Diverted to Penoy salvage @ ₱14.00"
-        else:
-            card_bg = FUTheme.ABNORMAL_RED_CARD
-            card_border = FUTheme.ABNORMAL_RED_BORDER
-            badge_bg = FUTheme.ABNORMAL_RED_BG
-            badge_text_color = FUTheme.ABNORMAL_RED_TEXT
-            title_color = FUTheme.ABNORMAL_RED
-            title_text = f"🔴 ABNORMAL — REJECT ({conf*100:.1f}%)"
-            sub_text = "Dead embryo / Corrupted yolk • Ejected to cull bin"
+            sub_text = "Clear unfertilized yolk / non-viable embryo • Diverted to Penoy salvage @ ₱14.00"
 
         self.result_banner.configure(fg_color=card_bg, border_color=card_border)
         self.result_badge.configure(text=action, fg_color=badge_bg, text_color=badge_text_color)
@@ -1022,7 +1015,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.box_total.configure(text=f"{self.total_count} / {self.target_egg_count}")
         self.box_fertile.configure(text=f"{self.fertile_count} ({pct:.1f}%)")
         self.box_infertile.configure(text=str(self.infertile_count))
-        self.box_abnormal.configure(text=str(self.abnormal_count))
+        self.box_abnormal.configure(text=str(self.review_count))
 
     def _update_video_frame(self):
         """
@@ -1582,7 +1575,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         s3_body = ctk.CTkLabel(
             s3,
-            text="🟢 FERTILE (Accept): Spider blood veins verified -> stays on tray to Day 18.\n🟡 INFERTILE (Reject): Clear yolk -> servo diverts to Penoy salvage @ ₱14.00.\n🔴 ABNORMAL (Reject): Dead embryo / blood ring -> ejected to cull bin.",
+            text="🟢 FERTILE (Accept): Spider blood veins verified -> stays on tray for incubation.\n🟡 INFERTILE (Reject): Clear yolk or dead non-viable embryo -> diverted to Penoy salvage @ ₱14.00.\n⚪ MANUAL REVIEW: Low confidence (< 75%) or uncentered egg -> operator manual review.",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s3_body.pack(anchor="w", padx=14, pady=(2, 10))
@@ -1747,11 +1740,11 @@ class OvaLensOperatorApp(ctk.CTk):
         ctk.CTkLabel(t3, text="PENOY SALVAGE YIELD", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.INFERTILE_AMBER_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
         ctk.CTkLabel(t3, text=f"{self.infertile_count} eggs -> ₱{penoy_salvage_val:,.2f}", font=(FUTheme.FONT_FAMILY, 14, "bold"), text_color=FUTheme.INFERTILE_AMBER).pack(anchor="w", padx=10, pady=(0, 6))
 
-        # Tile 4: Abnormal Culls
-        t4 = ctk.CTkFrame(grid, fg_color=FUTheme.ABNORMAL_RED_CARD, corner_radius=8, border_width=1, border_color=FUTheme.ABNORMAL_RED_BORDER)
+        # Tile 4: Manual Review
+        t4 = ctk.CTkFrame(grid, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         t4.grid(row=1, column=1, padx=4, pady=4, sticky="nsew")
-        ctk.CTkLabel(t4, text="ABNORMAL (CULL)", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.ABNORMAL_RED_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
-        ctk.CTkLabel(t4, text=f"{self.abnormal_count} Eggs", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.ABNORMAL_RED).pack(anchor="w", padx=10, pady=(0, 6))
+        ctk.CTkLabel(t4, text="MANUAL REVIEW", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=10, pady=(6, 0))
+        ctk.CTkLabel(t4, text=f"{self.review_count} Eggs", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=10, pady=(0, 6))
 
         # Export Status Toast
         status_msg = ctk.CTkLabel(card, text="", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.FERTILE_GREEN_TEXT)
@@ -1893,7 +1886,7 @@ class OvaLensOperatorApp(ctk.CTk):
             fert_pct = (n_fert / max(1, n_tot)) * 100.0 if n_tot > 0 else 0.0
 
             stats_summary_label.configure(
-                text=f"Total: {n_tot} • Fertile: {fert_pct:.1f}% • Penoy: ₱{n_inf*14:,.0f} • Cull: {n_abn}"
+                text=f"Total: {n_tot} • Fertile: {fert_pct:.1f}% • Penoy Salvage: ₱{n_inf*14:,.0f}"
             )
 
             # Update tab label text
@@ -1903,8 +1896,6 @@ class OvaLensOperatorApp(ctk.CTk):
                 tab_btns["FERTILE"].configure(text=f"🟢 Fertile ({n_fert})")
             if "INFERTILE" in tab_btns:
                 tab_btns["INFERTILE"].configure(text=f"🟡 Infertile ({n_inf})")
-            if "ABNORMAL" in tab_btns:
-                tab_btns["ABNORMAL"].configure(text=f"🔴 Abnormal ({n_abn})")
 
         def render_table(*args):
             for child in table_container.winfo_children():
@@ -2004,8 +1995,7 @@ class OvaLensOperatorApp(ctk.CTk):
         tabs_spec = [
             ("ALL", "All"),
             ("FERTILE", "🟢 Fertile"),
-            ("INFERTILE", "🟡 Infertile"),
-            ("ABNORMAL", "🔴 Abnormal"),
+            ("INFERTILE", "🟡 Infertile (Penoy)"),
         ]
 
         for key, label in tabs_spec:

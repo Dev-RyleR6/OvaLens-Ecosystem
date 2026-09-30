@@ -14,14 +14,13 @@ This document serves as the **Master Source of Truth & Architecture Guide** for 
 2. **Central Monorepo Topology**:
    - Keep all code inside the root monorepo: `edge/`, `backend/`, `dashboard/`, and `firmware/`.
    - Never initialize nested `.git` repositories inside subdirectories.
-3. **Biological Model Classes & Genetic Scope (Strict 3-Class Vision Model)**:
+3. **Biological Model Classes & Genetic Scope (Strict 2-Class Vision Model)**:
    - **Target Breeds**: *Itik Pinas* Pure Lines (`IP-Itim`, `IP-Khaki`) and Commercial Hybrid (`IP-Kayumanggi`).
-   - **Candling Checkpoints**: Day 10, Day 18, and Day 25 of incubation.
+   - **Candling Checkpoint**: Day 10 of incubation (single standardized candling inspection).
    - **Dataset Split**: 70% Training, 15% Validation, 15% Testing.
    - **Classes**:
-     - `FERTILE`: Active embryo with spider blood veins or viable shadow (Action: `ACCEPT` $\to$ Incubation Tray).
-     - `INFERTILE`: Clear unfertilized yolk (Action: `REJECT` $\to$ Salvaged on Day 10 as Penoy @ ₱14.00).
-     - `ABNORMAL`: Dead embryo, blood ring, corrupted yolk (Action: `REJECT` $\to$ Discard Tray).
+     - `FERTILE`: Active embryo with spider blood veins or viable development (Action: `ACCEPT` $\to$ Incubation Tray).
+     - `INFERTILE`: Clear unfertilized yolk or dead non-viable embryo / blood ring (Action: `REJECT` $\to$ Salvaged on Day 10 as Penoy @ ₱14.00).
    - **Fallback State**: Low-confidence captures ($\tau < 0.75$) or synchronization errors MUST trigger `MANUAL_REVIEW`.
 4. **Offline-First Edge Resilience**:
    - The Edge application MUST record every scan to local SQLite (with WAL mode enabled) before syncing over the network.

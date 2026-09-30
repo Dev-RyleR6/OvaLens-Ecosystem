@@ -58,8 +58,7 @@ class ForecastService:
         scans_map = {c[0]: c[1] for c in scan_counts}
         fertile_scanned = scans_map.get(FertilityClass.FERTILE, 0)
         infertile_penoy = scans_map.get(FertilityClass.INFERTILE, 0)
-        abnormal_scanned = scans_map.get(FertilityClass.ABNORMAL, 0)
-        total_scanned = fertile_scanned + infertile_penoy + abnormal_scanned
+        total_scanned = fertile_scanned + infertile_penoy
 
         breed_params = cls.BREED_PARAMETERS.get(
             batch.breed,

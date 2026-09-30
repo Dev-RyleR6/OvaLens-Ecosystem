@@ -69,7 +69,7 @@ def test_inference_engine_and_latency_benchmark():
         latencies.append(lat)
 
         assert "final_class" in result
-        assert result["final_class"] in ["FERTILE", "INFERTILE", "ABNORMAL"]
+        assert result["final_class"] in ["FERTILE", "INFERTILE"]
         assert "routing_action" in result
         assert result["routing_action"] in ["ACCEPT", "REJECT"]
         assert 0.0 <= result["confidence"] <= 1.0
@@ -201,19 +201,18 @@ def test_session_completion_and_batch_querying(tmp_path):
         operator_name="Inspector"
     )
 
-    # Record 4 scans (2 Fertile, 1 Infertile, 1 Abnormal)
+    # Record 4 scans (2 Fertile, 2 Infertile - 2-class Day 10 model)
     db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 1, "FERTILE", 0.98, 15, "ACCEPT", [])
     db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 2, "FERTILE", 0.95, 17, "ACCEPT", [])
     db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 3, "INFERTILE", 0.89, 16, "REJECT", [])
-    db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 4, "ABNORMAL", 0.92, 19, "REJECT", [])
+    db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 4, "INFERTILE", 0.92, 19, "REJECT", [])
 
     # Test Session Completion Protocol
     completed_stats = db.complete_session(sess_id)
     assert completed_stats["ended_at"] is not None
     assert completed_stats["total_scanned"] == 4
     assert completed_stats["fertile_count"] == 2
-    assert completed_stats["infertile_count"] == 1
-    assert completed_stats["abnormal_count"] == 1
+    assert completed_stats["infertile_count"] == 2
 
     # Test Querying Batch Scans with filtering
     all_scans = db.get_scans_by_batch("BATCH-TEST-EXPLORER", class_filter="ALL")
@@ -223,10 +222,7 @@ def test_session_completion_and_batch_querying(tmp_path):
     assert len(fertile_scans) == 2
 
     infertile_scans = db.get_scans_by_batch("BATCH-TEST-EXPLORER", class_filter="INFERTILE")
-    assert len(infertile_scans) == 1
-
-    abnormal_scans = db.get_scans_by_batch("BATCH-TEST-EXPLORER", class_filter="ABNORMAL")
-    assert len(abnormal_scans) == 1
+    assert len(infertile_scans) == 2
 
     # Test Filtered Batch CSV Export
     csv_fertile = db.export_batch_csv("BATCH-TEST-EXPLORER", class_filter="FERTILE", output_dir=export_dir)

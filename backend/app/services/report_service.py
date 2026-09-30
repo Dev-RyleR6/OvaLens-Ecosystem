@@ -167,7 +167,7 @@ class ReportService:
             elements.append(Paragraph("<b>Candling Milestone Runs (Edge Optical Station)</b>", styles["Heading3"]))
             elements.append(Spacer(1, 4))
 
-            sess_data = [["Stage", "Operator / Researcher", "Total Scanned", "Fertile", "Infertile (Penoy)", "Abnormal", "Avg Latency"]]
+            sess_data = [["Stage", "Operator / Researcher", "Total Scanned", "Fertile", "Infertile (Penoy)", "Avg Latency"]]
             for s in sessions:
                 sess_data.append([
                     s.stage.value,
@@ -175,11 +175,10 @@ class ReportService:
                     str(s.total_scanned),
                     str(s.fertile_count),
                     str(s.infertile_count),
-                    str(s.abnormal_count),
                     f"{float(s.avg_inference_ms):.1f} ms"
                 ])
 
-            t_sess = Table(sess_data, colWidths=[65, 120, 70, 65, 85, 65, 70])
+            t_sess = Table(sess_data, colWidths=[75, 140, 80, 80, 95, 70])
             t_sess.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#800000")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),

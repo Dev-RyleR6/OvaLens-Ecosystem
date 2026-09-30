@@ -175,7 +175,7 @@ def seed_database(reset: bool = False):
                 "initial_egg_count": 450,
                 "set_date": now - timedelta(days=18),
                 "target_hatch_date": now - timedelta(days=18) + timedelta(days=28),
-                "current_stage": BatchStage.DAY_18,
+                "current_stage": BatchStage.DAY_10,
                 "status": BatchStatus.INCUBATING,
                 "notes": "Itim duck eggs, healthy batch."
             },
@@ -256,23 +256,18 @@ def seed_database(reset: bool = False):
             f_cnt, inf_cnt, ab_cnt = 0, 0, 0
 
             for seq in range(1, 501):
-                # 88.6% Fertile, 8.4% Infertile, 3.0% Abnormal
+                # 88.6% Fertile, 11.4% Infertile (Penoy Salvage @ ₱14)
                 rand = random.random()
                 if rand < 0.886:
                     cls = FertilityClass.FERTILE
                     action = RoutingAction.ACCEPT
                     conf = round(random.uniform(0.88, 0.98), 4)
                     f_cnt += 1
-                elif rand < 0.970:
+                else:
                     cls = FertilityClass.INFERTILE
                     action = RoutingAction.REJECT
                     conf = round(random.uniform(0.85, 0.96), 4)
                     inf_cnt += 1
-                else:
-                    cls = FertilityClass.ABNORMAL
-                    action = RoutingAction.REJECT
-                    conf = round(random.uniform(0.82, 0.94), 4)
-                    ab_cnt += 1
 
                 lat = random.randint(22, 38)
                 scan_time = sess_1.started_at + timedelta(seconds=seq * 6)
@@ -298,10 +293,10 @@ def seed_database(reset: bool = False):
             sess_1.total_scanned = 500
             sess_1.fertile_count = f_cnt
             sess_1.infertile_count = inf_cnt
-            sess_1.abnormal_count = ab_cnt
+            sess_1.abnormal_count = 0
             sess_1.avg_inference_ms = 28.50
             db.commit()
-            print(f"    [OK] 500 scans recorded: {f_cnt} Fertile, {inf_cnt} Infertile, {ab_cnt} Abnormal.")
+            print(f"    [OK] 500 scans recorded: {f_cnt} Fertile, {inf_cnt} Infertile.")
 
         # ----------------------------------------------------------------------
         # 5. Audit Log Seed

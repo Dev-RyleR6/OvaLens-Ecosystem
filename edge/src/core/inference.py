@@ -23,17 +23,14 @@ except ImportError:
 
 from .heuristics import CandlingHeuristics
 
-# Class label normalization mapping
+# Class label normalization mapping (Strict 2-Class Model)
 CLASS_MAP = {
     "0": "FERTILE",
     "1": "INFERTILE",
-    "2": "ABNORMAL",
     "fer": "FERTILE",
     "inf": "INFERTILE",
-    "abn": "ABNORMAL",
     "fertile": "FERTILE",
-    "infertile": "INFERTILE",
-    "abnormal": "ABNORMAL"
+    "infertile": "INFERTILE"
 }
 
 
@@ -246,8 +243,7 @@ class InferenceEngine:
 
         # Biological heuristic:
         # Fertile eggs exhibit dense internal blood webbing (higher variance and distinct saturation)
-        # Infertile eggs are clear/transparent (high uniform brightness, low variance)
-        # Abnormal eggs exhibit dark coagulation / blood rings
+        # Infertile / non-viable eggs are clear or coagulated -> salvaged as Penoy / rejected
         if mean_v > 130 and std_v < 30:
             cls = "INFERTILE"
             conf = 0.94
@@ -255,7 +251,7 @@ class InferenceEngine:
             cls = "FERTILE"
             conf = 0.92
         else:
-            cls = "ABNORMAL"
+            cls = "INFERTILE"
             conf = 0.88
 
         action = "ACCEPT" if cls == "FERTILE" else "REJECT"

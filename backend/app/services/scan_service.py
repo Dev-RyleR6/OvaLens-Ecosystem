@@ -63,14 +63,13 @@ class ScanService:
             func.count(EggScanModel.scan_id).label("total"),
             func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.FERTILE, 1), else_=0)), 0).label("fertile"),
             func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.INFERTILE, 1), else_=0)), 0).label("infertile"),
-            func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.ABNORMAL, 1), else_=0)), 0).label("abnormal"),
             func.coalesce(func.avg(EggScanModel.inference_ms), 0.0).label("avg_lat")
         ).filter(EggScanModel.session_id == session_id).first()
 
         session.total_scanned = aggregates.total or 0
         session.fertile_count = aggregates.fertile or 0
         session.infertile_count = aggregates.infertile or 0
-        session.abnormal_count = aggregates.abnormal or 0
+        session.abnormal_count = 0
         session.avg_inference_ms = round(float(aggregates.avg_lat or 0.0), 2)
 
         db.commit()
@@ -125,7 +124,6 @@ class ScanService:
             func.count(EggScanModel.scan_id).label("total"),
             func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.FERTILE, 1), else_=0)), 0).label("fertile"),
             func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.INFERTILE, 1), else_=0)), 0).label("infertile"),
-            func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.ABNORMAL, 1), else_=0)), 0).label("abnormal"),
             func.coalesce(func.avg(EggScanModel.inference_ms), 0.0).label("avg_lat")
         ).filter(EggScanModel.session_id == scan.session_id).first()
 
@@ -134,7 +132,7 @@ class ScanService:
             session.total_scanned = aggregates.total or 0
             session.fertile_count = aggregates.fertile or 0
             session.infertile_count = aggregates.infertile or 0
-            session.abnormal_count = aggregates.abnormal or 0
+            session.abnormal_count = 0
             session.avg_inference_ms = round(float(aggregates.avg_lat or 0.0), 2)
 
         db.commit()
