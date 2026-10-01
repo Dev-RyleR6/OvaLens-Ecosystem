@@ -23,14 +23,14 @@ except ImportError:
 
 from .heuristics import CandlingHeuristics
 
-# Class label normalization mapping (Strict 2-Class Model)
+# Strict Day 10 binary class label normalization.
 CLASS_MAP = {
     "0": "FERTILE",
     "1": "INFERTILE",
     "fer": "FERTILE",
     "inf": "INFERTILE",
     "fertile": "FERTILE",
-    "infertile": "INFERTILE"
+    "infertile": "INFERTILE",
 }
 
 
@@ -99,7 +99,7 @@ class InferenceEngine:
         Run inference on a raw BGR frame.
         Returns standardized dict:
         {
-            'final_class': 'FERTILE' | 'INFERTILE' | 'ABNORMAL',
+            'final_class': 'FERTILE' | 'INFERTILE',
             'confidence': float,
             'routing_action': 'ACCEPT' | 'REJECT',
             'inference_ms': int,
@@ -243,7 +243,7 @@ class InferenceEngine:
 
         # Biological heuristic:
         # Fertile eggs exhibit dense internal blood webbing (higher variance and distinct saturation)
-        # Infertile / non-viable eggs are clear or coagulated -> salvaged as Penoy / rejected
+        # All non-fertile Day 10 outcomes are classified as INFERTILE.
         if mean_v > 130 and std_v < 30:
             cls = "INFERTILE"
             conf = 0.94

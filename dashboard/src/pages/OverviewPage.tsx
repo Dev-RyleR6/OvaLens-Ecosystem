@@ -73,7 +73,7 @@ export const OverviewPage: React.FC = () => {
   // Filtered / Aggregate KPI calculations
   const totalScanned = useMemo(() => {
     if (isFiltered && currentBatch) {
-      const sum = (currentBatch.fertile_count || 0) + (currentBatch.infertile_count || 0) + (currentBatch.abnormal_count || 0);
+      const sum = (currentBatch.fertile_count || 0) + (currentBatch.infertile_count || 0);
       return sum > 0 ? sum : (currentBatch.initial_egg_count || 500);
     }
     return overview?.total_eggs_scanned ?? (batches.reduce((acc, b) => acc + (b.initial_egg_count || 0), 0) || 2050);
@@ -93,22 +93,13 @@ export const OverviewPage: React.FC = () => {
     return overview?.total_infertile ?? (batches.reduce((acc, b) => acc + (b.infertile_count || 0), 0) || 168);
   }, [isFiltered, currentBatch, overview, batches]);
 
-  const abnormalCount = useMemo(() => {
-    if (isFiltered && currentBatch) {
-      return currentBatch.abnormal_count || 0;
-    }
-    return overview?.total_abnormal ?? (batches.reduce((acc, b) => acc + (b.abnormal_count || 0), 0) || 70);
-  }, [isFiltered, currentBatch, overview, batches]);
-
   const fertilePct = Number(((fertileCount / (totalScanned || 1)) * 100).toFixed(1));
   const penoyPct = Number(((penoyCount / (totalScanned || 1)) * 100).toFixed(1));
-  const abnormalPct = Number(((abnormalCount / (totalScanned || 1)) * 100).toFixed(1));
 
   // Pie chart data
   const pieData = [
     { name: 'Fertile Embryos (Accept)', value: fertileCount, color: '#357a38' },
     { name: 'Penoy Salvaged @ ₱14', value: penoyCount, color: '#d97706' },
-    { name: 'Dead / Abnormal (Discard)', value: abnormalCount, color: '#dc2626' },
   ];
 
   // Hourly Sorting Velocity telemetry
@@ -334,7 +325,7 @@ export const OverviewPage: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">Embryo Classification Yield</h3>
-                <p className="text-xs text-slate-500">Day 10 Optical Candling 3-Class Breakdown</p>
+                <p className="text-xs text-slate-500">Day 10 Binary Candling Breakdown</p>
               </div>
               <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                 {fertilePct}% Fertile
@@ -393,13 +384,6 @@ export const OverviewPage: React.FC = () => {
                 <span className="font-mono font-bold text-amber-900">{penoyCount} ({penoyPct}%)</span>
               </div>
 
-              <div className="flex items-center justify-between p-2 rounded-lg bg-red-50/70 border border-red-200">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-600" />
-                  <span className="font-semibold text-red-950">Dead / Abnormal (Discard)</span>
-                </div>
-                <span className="font-mono font-bold text-red-900">{abnormalCount} ({abnormalPct}%)</span>
-              </div>
             </div>
           </div>
 

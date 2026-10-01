@@ -115,7 +115,6 @@ def test_local_sqlite_wal_and_queue_diagnostics(tmp_path):
     assert stats["total_scanned"] == 3
     assert stats["fertile_count"] == 2
     assert stats["infertile_count"] == 1
-    assert stats["abnormal_count"] == 0
 
     # Mark s1, s2 as synced
     db.mark_scans_synced([s1, s2])
@@ -201,7 +200,7 @@ def test_session_completion_and_batch_querying(tmp_path):
         operator_name="Inspector"
     )
 
-    # Record 4 scans (2 Fertile, 2 Infertile - 2-class Day 10 model)
+    # Record 4 scans (2 Fertile, 2 Infertile)
     db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 1, "FERTILE", 0.98, 15, "ACCEPT", [])
     db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 2, "FERTILE", 0.95, 17, "ACCEPT", [])
     db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 3, "INFERTILE", 0.89, 16, "REJECT", [])
@@ -241,5 +240,20 @@ def test_session_completion_and_batch_querying(tmp_path):
     searched = db.get_scans_by_batch("BATCH-TEST-EXPLORER", search_query="3")
     assert len(searched) == 1
     assert searched[0]["sequence_number"] == 3
+
+
+def test_edge_rejects_removed_classes_and_stages(tmp_path):
+    db = LocalDatabaseManager(db_path=str(tmp_path / "strict_contract.db"))
+    session_id = str(uuid.uuid4())
+
+    with pytest.raises(ValueError, match="DAY_10"):
+        db.create_session(session_id, "BATCH-01", "STATION-1", "DAY_18", "Tester")
+
+    db.create_session(session_id, "BATCH-01", "STATION-1", "DAY_10", "Tester")
+    with pytest.raises(ValueError, match="FERTILE or INFERTILE"):
+        db.record_scan(
+            str(uuid.uuid4()), session_id, "BATCH-01", 1,
+            "ABNORMAL", 0.90, 20, "REJECT", []
+        )
 
 

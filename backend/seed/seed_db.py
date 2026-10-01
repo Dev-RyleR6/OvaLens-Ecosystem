@@ -253,10 +253,10 @@ def seed_database(reset: bool = False):
 
             print("  + Generating 500 conveyor scans for BATCH-2026-08-KAY-01 (Day 10)...")
             scans_to_add = []
-            f_cnt, inf_cnt, ab_cnt = 0, 0, 0
+            f_cnt, inf_cnt = 0, 0
 
             for seq in range(1, 501):
-                # 88.6% Fertile, 11.4% Infertile (Penoy Salvage @ ₱14)
+                # Day 10 binary outcome: fertile or infertile.
                 rand = random.random()
                 if rand < 0.886:
                     cls = FertilityClass.FERTILE
@@ -293,7 +293,6 @@ def seed_database(reset: bool = False):
             sess_1.total_scanned = 500
             sess_1.fertile_count = f_cnt
             sess_1.infertile_count = inf_cnt
-            sess_1.abnormal_count = 0
             sess_1.avg_inference_ms = 28.50
             db.commit()
             print(f"    [OK] 500 scans recorded: {f_cnt} Fertile, {inf_cnt} Infertile.")

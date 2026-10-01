@@ -49,14 +49,12 @@ flowchart TD
     SegStation --> CheckEmpty{Cradle Empty?}
     CheckEmpty -- "Yes" --> CheckCont
     
-    CheckEmpty -- "No" --> ClassifyChoice{Target Class?}
-    ClassifyChoice -- "Fertile" --> TrayFertile["Release to Fertile Incubation Tray"]
+    CheckEmpty -- "No" --> ClassifyChoice{Fertile?}
+    ClassifyChoice -- "Yes" --> TrayFertile["Release to Fertile Incubation Tray"]
     ClassifyChoice -- "Infertile" --> TrayInfertile["Divert to Infertile Tray\n(Day 10 Penoy Salvage @ ₱14)"]
-    ClassifyChoice -- "Abnormal" --> TrayAbnormal["Divert to Abnormal / Discard Tray"]
     
     TrayFertile --> RecordOutcome["Record Segregation Outcome\n& Update Session Statistics"]
     TrayInfertile --> RecordOutcome
-    TrayAbnormal --> RecordOutcome
     
     RecordOutcome --> CheckCont{Continue Session?}
     CheckCont -- "Yes (More Eggs)" --> LoadEgg
@@ -73,5 +71,5 @@ flowchart TD
     class InitApp,ConfigBatch,InitSys,LoadEgg,AssignID,IndexCandle,Capture,DetectYOLO,AssocCradle,LocalSave,IndexTrack,PauseResync,SegStation,RecordOutcome,Finalize,Override action;
     class SysReady,ReInit,CheckValid,CheckSync,CheckEmpty,ClassifyChoice,CheckCont decision;
     class TrayFertile,BackgroundSync success;
-    class TrayInfertile,TrayAbnormal,DispFault,FlagReview reject;
+    class TrayInfertile,DispFault,FlagReview reject;
 ```

@@ -77,7 +77,7 @@ export const ModelsPage: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            YOLOv8 ONNX FP16 candling classification architecture, 100-epoch convergence, 3-class confusion matrix, and edge benchmarks.
+            YOLOv8 ONNX FP16 candling classification architecture, 100-epoch convergence, 2-class confusion matrix, and edge benchmarks.
           </p>
         </div>
 
@@ -139,14 +139,14 @@ export const ModelsPage: React.FC = () => {
 
       {/* Confusion Matrix & Hardware Runtime Benchmark */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left 6 Cols: 3-Class Confusion Matrix */}
+        {/* Left 6 Cols: 2-Class Confusion Matrix */}
         <div className="lg:col-span-6">
           <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs h-full flex flex-col justify-between space-y-4">
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="text-sm font-bold text-[#0F172A]">
-                    3-Class Normalized Confusion Matrix
+                    2-Class Normalized Confusion Matrix
                   </h3>
                   <p className="text-xs text-slate-500">
                     Validation dataset evaluation ($N = 4,850$ frames)
@@ -169,9 +169,6 @@ export const ModelsPage: React.FC = () => {
                       <th className="p-2 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-t">
                         PENOY
                       </th>
-                      <th className="p-2 text-[11px] font-bold text-rose-800 bg-rose-50 border border-rose-200 rounded-t">
-                        ABNORMAL
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
@@ -185,12 +182,8 @@ export const ModelsPage: React.FC = () => {
                         <span className="block text-[10px] font-normal text-emerald-100">(2,700)</span>
                       </td>
                       <td className="p-2.5 bg-amber-50 text-amber-900 font-semibold border border-amber-200">
-                        2.1%
-                        <span className="block text-[10px] text-amber-600">(59)</span>
-                      </td>
-                      <td className="p-2.5 bg-rose-50 text-rose-900 font-semibold border border-rose-200">
-                        1.5%
-                        <span className="block text-[10px] text-rose-600">(41)</span>
+                        3.6%
+                        <span className="block text-[10px] text-amber-600">(100)</span>
                       </td>
                     </tr>
 
@@ -200,35 +193,12 @@ export const ModelsPage: React.FC = () => {
                         INFERTILE (Penoy)
                       </td>
                       <td className="p-2.5 bg-emerald-50 text-emerald-900 font-semibold border border-emerald-200">
-                        3.2%
-                        <span className="block text-[10px] text-emerald-600">(46)</span>
+                        5.2%
+                        <span className="block text-[10px] text-emerald-600">(107)</span>
                       </td>
                       <td className="p-2.5 bg-amber-500 text-white font-extrabold text-sm border border-amber-600 shadow-2xs">
                         94.8%
-                        <span className="block text-[10px] font-normal text-amber-100">(1,375)</span>
-                      </td>
-                      <td className="p-2.5 bg-rose-50 text-rose-900 font-semibold border border-rose-200">
-                        2.0%
-                        <span className="block text-[10px] text-rose-600">(29)</span>
-                      </td>
-                    </tr>
-
-                    {/* Row 3: Actual ABNORMAL */}
-                    <tr>
-                      <td className="p-2.5 text-left font-bold text-rose-950 bg-rose-50/50 border border-rose-200 font-mono text-[11px]">
-                        ABNORMAL (Dead)
-                      </td>
-                      <td className="p-2.5 bg-emerald-50 text-emerald-900 font-semibold border border-emerald-200">
-                        4.2%
-                        <span className="block text-[10px] text-emerald-600">(25)</span>
-                      </td>
-                      <td className="p-2.5 bg-amber-50 text-amber-900 font-semibold border border-amber-200">
-                        3.7%
-                        <span className="block text-[10px] text-amber-600">(22)</span>
-                      </td>
-                      <td className="p-2.5 bg-rose-600 text-white font-extrabold text-sm border border-rose-700 shadow-2xs">
-                        92.1%
-                        <span className="block text-[10px] font-normal text-rose-100">(553)</span>
+                        <span className="block text-[10px] font-normal text-amber-100">(1,943)</span>
                       </td>
                     </tr>
                   </tbody>

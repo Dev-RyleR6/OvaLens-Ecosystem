@@ -69,7 +69,7 @@ All endpoints are versioned under `/api/v1`. Interactive Swagger documentation i
 | `GET` | `/api/v1/batches/{id}` | Public Read | Retrieves single batch record and metadata. |
 | `GET` | `/api/v1/batches/{id}/analytics`| Public Read | Returns deep batch analytics: Day 10 fertility %, Penoy salvage ₱, and power savings ₱. |
 | `PUT` | `/api/v1/batches/{id}` | `Manager / Admin` | Updates batch parameters and logs changes to audit trail. |
-| `POST` | `/api/v1/batches/{id}/advance-stage` | `Manager / Admin` | Advances milestone (`SETTING` $\to$ `DAY_10` $\to$ `DAY_18` $\to$ `DAY_25` $\to$ `HATCHED`). |
+| `POST` | `/api/v1/batches/{id}/advance-stage` | `Manager / Admin` | Advances lifecycle (`SETTING` $\to$ `DAY_10` $\to$ `HATCHED` $\to$ `COMPLETED`). |
 | `POST` | `/api/v1/batches/{id}/finalize-hatch` | `Manager / Admin` | Finalizes Day 28 harvest metrics with actual hatched vs unhatched counts. |
 | `DELETE` | `/api/v1/batches/{id}` | `Manager / Admin` | Archives/removes batch cohort and records audit event. |
 | `POST` | `/api/v1/batches/check-milestones` | Public Read | Evaluates incubation days and alerts if candling/transfer is due. |
@@ -104,7 +104,7 @@ All endpoints are versioned under `/api/v1`. Interactive Swagger documentation i
 | `GET` | `/api/v1/analytics/overview` | Public Read | Top-level KPIs: total scanned, fertility rate, cull rate, and hatchability. |
 | `GET` | `/api/v1/analytics/economic-yield`| Public Read | Penoy salvage revenue (₱), thermal power savings (kWh/₱), and total economic ROI. |
 | `GET` | `/api/v1/analytics/breed-comparison`| Public Read | Biological and commercial yield comparison across duck breeds. |
-| `GET` | `/api/v1/analytics/mortality-trends`| Public Read | Early (Day 10), mid (Day 18), and late (Day 25) embryonic mortality breakdown. |
+| `GET` | `/api/v1/analytics/mortality-trends`| Public Read | Day 10 infertile/cull rate and rejected total. |
 | `GET` | `/api/v1/analytics/mortality-progression`| Public Read | Developmental mortality curve and viability retention benchmarks. |
 
 ### 8. Audit Trail & Compliance (`/api/v1/audit-logs`)

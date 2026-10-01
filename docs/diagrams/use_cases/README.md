@@ -25,7 +25,7 @@ classDiagram
 * **Log In / Authenticate User**
 * **Manage Candling Session** (Start, Pause, Terminate indexed sorting)
 * **Monitor Live Video Feed** (Direct camera frame grabber stream)
-* **View Session Statistics** (Real-time count of fertile, infertile, abnormal, processed eggs)
+* **View Session Statistics** (Real-time count of fertile, infertile, and processed eggs)
 * **Review Flagged Classifications** (Inspect low-confidence captures, manual override)
 
 ### 2. Hatchery Supervisor (Hatchery Management & Analytics)

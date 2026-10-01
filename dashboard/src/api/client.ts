@@ -273,24 +273,21 @@ export const apiClient = {
       total_training_images: 4800,
       dataset_distribution: {
         fertile: 3200,
-        infertile: 1100,
-        abnormal: 500,
+        infertile: 1600,
       },
       overall_map50: 0.958,
       overall_precision: 0.942,
       overall_recall: 0.961,
       avg_latency_ms: 24.6,
       confusion_matrix: {
-        classes: ['FERTILE', 'INFERTILE', 'ABNORMAL'],
+        classes: ['FERTILE', 'INFERTILE'],
         matrix: [
-          [0.96, 0.03, 0.01],
-          [0.02, 0.95, 0.03],
-          [0.02, 0.04, 0.94],
+          [0.96, 0.04],
+          [0.05, 0.95],
         ],
         raw_counts: [
-          [480, 15, 5],
-          [10, 475, 15],
-          [10, 20, 470],
+          [480, 20],
+          [25, 475],
         ],
       },
     };

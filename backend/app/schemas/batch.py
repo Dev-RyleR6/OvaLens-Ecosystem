@@ -63,7 +63,6 @@ class BatchSummaryResponse(BaseModel):
     total_scanned: int = 0
     fertile_count: int = 0
     infertile_count: int = 0
-    abnormal_count: int = 0
     fertility_rate: float = 0.0
     hatchability_rate: float = 0.0
     notes: Optional[str] = None
@@ -85,7 +84,6 @@ class SessionSummaryItem(BaseModel):
     total_scanned: int
     fertile_count: int
     infertile_count: int
-    abnormal_count: int
     fertility_rate: float
     avg_inference_ms: float
 
@@ -106,7 +104,6 @@ class BatchAnalyticsResponse(BaseModel):
     total_scanned_day_10: int
     fertile_day_10: int
     infertile_penoy_day_10: int
-    abnormal_day_10: int
     day_10_fertility_rate: float
     
     # Financial Salvage
@@ -159,4 +156,3 @@ class BatchForecastResponse(BaseModel):
     anomaly_status: str  # OPTIMAL | WARNING | CRITICAL
     confidence_level: str  # HIGH | MEDIUM | LOW
     advisory_notes: List[str]
-

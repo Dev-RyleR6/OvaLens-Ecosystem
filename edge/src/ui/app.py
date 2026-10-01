@@ -76,7 +76,6 @@ class OvaLensOperatorApp(ctk.CTk):
         self.total_count = 0
         self.fertile_count = 0
         self.infertile_count = 0
-        self.abnormal_count = 0
         self.review_count = 0
 
         # Window Configuration (Industrial Pro Gray Theme)
@@ -301,7 +300,7 @@ class OvaLensOperatorApp(ctk.CTk):
         # Quick End Session Button on HUD Bar (dynamically revealed during active sessions)
         self.hud_cancel_btn = ctk.CTkButton(
             self.cycle_hud, text="⏹ End Session [ESC]", font=(FUTheme.FONT_FAMILY, 10, "bold"),
-            fg_color="transparent", hover_color=FUTheme.ABNORMAL_RED_BG,
+            fg_color="transparent", hover_color=FUTheme.REJECT_RED_BG,
             text_color=FUTheme.TEXT_MUTED, border_width=1, border_color=FUTheme.BORDER,
             command=self.open_end_session_modal, height=26, width=135, corner_radius=6
         )
@@ -411,7 +410,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.box_total = self._create_stat_box(grid, "TOTAL SCANNED", f"0 / {self.target_egg_count}", 0, 0, accent_color=FUTheme.PRIMARY_MAROON, bg_color=FUTheme.PANEL_LIGHT_ALT)
         self.box_fertile = self._create_stat_box(grid, "FERTILE (ACCEPT)", "0 (0%)", 0, 1, accent_color=FUTheme.FERTILE_GREEN, bg_color=FUTheme.FERTILE_GREEN_CARD)
         self.box_infertile = self._create_stat_box(grid, "INFERTILE (PENOY)", "0", 1, 0, accent_color=FUTheme.INFERTILE_AMBER, bg_color=FUTheme.INFERTILE_AMBER_CARD)
-        self.box_abnormal = self._create_stat_box(grid, "MANUAL REVIEW", "0", 1, 1, accent_color=FUTheme.TEXT_MUTED, bg_color=FUTheme.PANEL_LIGHT_ALT)
+        self.box_review = self._create_stat_box(grid, "MANUAL REVIEW", "0", 1, 1, accent_color=FUTheme.TEXT_MUTED, bg_color=FUTheme.PANEL_LIGHT_ALT)
 
         # 3. Recent Scans Log
         log_frame = ctk.CTkFrame(
@@ -531,7 +530,7 @@ class OvaLensOperatorApp(ctk.CTk):
         # Dedicated Terminate / Cancel / End Session Button (hidden in Standby, visible when active)
         self.cancel_btn = ctk.CTkButton(
             self.footer_frame, text="⏹ End Session [ESC]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
-            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.ABNORMAL_RED_BG,
+            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.REJECT_RED_BG,
             border_width=1, border_color=FUTheme.BORDER_DARK,
             text_color=FUTheme.TEXT_PRIMARY, command=self.open_end_session_modal,
             width=165, height=42, corner_radius=8
@@ -541,9 +540,9 @@ class OvaLensOperatorApp(ctk.CTk):
         # Manual Eject Button with High-Contrast Luminous Text
         self.eject_btn = ctk.CTkButton(
             self.footer_frame, text="⏏ Manual Eject [R]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
-            fg_color=FUTheme.ABNORMAL_RED_BG, hover_color=FUTheme.ABNORMAL_RED_HOVER,
-            border_width=1, border_color=FUTheme.ABNORMAL_RED_BORDER,
-            text_color=FUTheme.ABNORMAL_RED_TEXT, command=self.trigger_manual_eject,
+            fg_color=FUTheme.REJECT_RED_BG, hover_color=FUTheme.REJECT_RED_HOVER,
+            border_width=1, border_color=FUTheme.REJECT_RED_BORDER,
+            text_color=FUTheme.REJECT_RED_TEXT, command=self.trigger_manual_eject,
             width=145, height=42, corner_radius=8
         )
         self.eject_btn.pack(side="left", padx=6, pady=13)
@@ -575,8 +574,8 @@ class OvaLensOperatorApp(ctk.CTk):
             self.hud_cancel_btn.pack(side="right", padx=(0, 8), pady=5)
             if self.is_auto_cycle_running:
                 self.session_btn.configure(
-                    text="⏹ STOP AUTO SORTING", fg_color=FUTheme.ABNORMAL_RED,
-                    hover_color=FUTheme.ABNORMAL_RED_HOVER
+                    text="⏹ STOP AUTO SORTING", fg_color=FUTheme.REJECT_RED,
+                    hover_color=FUTheme.REJECT_RED_HOVER
                 )
         else:
             # Hide cancel buttons when in standby
@@ -652,7 +651,7 @@ class OvaLensOperatorApp(ctk.CTk):
         ctk.CTkLabel(t3, text="PENOY SALVAGE YIELD", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.INFERTILE_AMBER_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
         ctk.CTkLabel(t3, text=f"{self.infertile_count} eggs -> ₱{penoy_salvage_val:,.2f}", font=(FUTheme.FONT_FAMILY, 14, "bold"), text_color=FUTheme.INFERTILE_AMBER).pack(anchor="w", padx=10, pady=(0, 6))
 
-        # Tile 4: Manual Review
+        # Tile 4: Manual review fallback
         t4 = ctk.CTkFrame(grid, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         t4.grid(row=1, column=1, padx=4, pady=4, sticky="nsew")
         ctk.CTkLabel(t4, text="MANUAL REVIEW", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=10, pady=(6, 0))
@@ -679,7 +678,7 @@ class OvaLensOperatorApp(ctk.CTk):
                 status_msg.configure(text=f"✓ Exported successfully: {os.path.basename(path)}", text_color=FUTheme.FERTILE_GREEN_TEXT)
                 self._log(f"[EXPORT] CSV Report saved: {path}")
             except Exception as e:
-                status_msg.configure(text=f"Export failed: {e}", text_color=FUTheme.ABNORMAL_RED_TEXT)
+                status_msg.configure(text=f"Export failed: {e}", text_color=FUTheme.REJECT_RED_TEXT)
 
         ctk.CTkButton(
             export_box, text="📄 Export Records directly into CSV", fg_color=FUTheme.PRIMARY_MAROON,
@@ -708,9 +707,9 @@ class OvaLensOperatorApp(ctk.CTk):
             self._animate_modal_close(dialog, on_close=do_resume)
 
         ctk.CTkButton(
-            btn_row, text="⏹ Confirm & End Session", fg_color=FUTheme.ABNORMAL_RED_BG,
-            hover_color=FUTheme.ABNORMAL_RED_HOVER, border_width=1, border_color=FUTheme.ABNORMAL_RED_BORDER,
-            text_color=FUTheme.ABNORMAL_RED_TEXT, font=(FUTheme.FONT_FAMILY, 12, "bold"),
+            btn_row, text="⏹ Confirm & End Session", fg_color=FUTheme.REJECT_RED_BG,
+            hover_color=FUTheme.REJECT_RED_HOVER, border_width=1, border_color=FUTheme.REJECT_RED_BORDER,
+            text_color=FUTheme.REJECT_RED_TEXT, font=(FUTheme.FONT_FAMILY, 12, "bold"),
             command=confirm_end, height=40, corner_radius=8
         ).pack(side="left", fill="x", expand=True, padx=(0, 8))
 
@@ -789,7 +788,7 @@ class OvaLensOperatorApp(ctk.CTk):
             self.total_count = 0
             self.fertile_count = 0
             self.infertile_count = 0
-            self.abnormal_count = 0
+            self.review_count = 0
 
             # Record in SQLite WAL
             self.db.create_session(
@@ -934,8 +933,6 @@ class OvaLensOperatorApp(ctk.CTk):
             self.fertile_count += 1
         elif final_cls == "INFERTILE":
             self.infertile_count += 1
-        else:
-            self.abnormal_count += 1
 
         self._update_counters_ui()
         self._update_result_banner(final_cls, conf, action, lat_ms)
@@ -959,9 +956,9 @@ class OvaLensOperatorApp(ctk.CTk):
     def trigger_manual_eject(self):
         """Fire servo kicker immediately with visual confirmation on UI."""
         self.iot.trigger_ejection_now()
-        self.result_banner.configure(fg_color=FUTheme.ABNORMAL_RED_CARD, border_color=FUTheme.ABNORMAL_RED_BORDER)
-        self.result_badge.configure(text="MANUAL EJECT", fg_color=FUTheme.ABNORMAL_RED_BG, text_color=FUTheme.ABNORMAL_RED_TEXT)
-        self.result_title.configure(text="⏏ Manual Ejection Triggered", text_color=FUTheme.ABNORMAL_RED)
+        self.result_banner.configure(fg_color=FUTheme.REJECT_RED_CARD, border_color=FUTheme.REJECT_RED_BORDER)
+        self.result_badge.configure(text="MANUAL EJECT", fg_color=FUTheme.REJECT_RED_BG, text_color=FUTheme.REJECT_RED_TEXT)
+        self.result_title.configure(text="⏏ Manual Ejection Triggered", text_color=FUTheme.REJECT_RED)
         self.result_subtitle.configure(text="Hardware servo diverter gate pulsed via ESP32 GPIO override")
         self._log("[ACTION] Manual Ejection Triggered.")
 
@@ -981,7 +978,7 @@ class OvaLensOperatorApp(ctk.CTk):
             badge_text_color = FUTheme.INFERTILE_AMBER_TEXT
             title_color = FUTheme.INFERTILE_AMBER
             title_text = f"🟡 INFERTILE — REJECT ({conf*100:.1f}%)"
-            sub_text = "Clear unfertilized yolk / non-viable embryo • Diverted to Penoy salvage @ ₱14.00"
+            sub_text = "Clear unfertilized yolk • Diverted to Penoy salvage @ ₱14.00"
 
         self.result_banner.configure(fg_color=card_bg, border_color=card_border)
         self.result_badge.configure(text=action, fg_color=badge_bg, text_color=badge_text_color)
@@ -1015,7 +1012,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.box_total.configure(text=f"{self.total_count} / {self.target_egg_count}")
         self.box_fertile.configure(text=f"{self.fertile_count} ({pct:.1f}%)")
         self.box_infertile.configure(text=str(self.infertile_count))
-        self.box_abnormal.configure(text=str(self.review_count))
+        self.box_review.configure(text=str(self.review_count))
 
     def _update_video_frame(self):
         """
@@ -1056,12 +1053,9 @@ class OvaLensOperatorApp(ctk.CTk):
                         if cls_name == "FERTILE":
                             box_bgr = (56, 122, 53)     # Agri-Green
                             label_str = f"FERTILE: {conf*100:.1f}%"
-                        elif cls_name == "INFERTILE":
+                        else:
                             box_bgr = (6, 119, 217)     # Penoy Amber
                             label_str = f"INFERTILE (PENOY): {conf*100:.1f}%"
-                        else:
-                            box_bgr = (38, 38, 220)     # Reject Red
-                            label_str = f"ABNORMAL: {conf*100:.1f}%"
 
                         cv2.rectangle(disp_frame, (x1, y1), (x2, y2), box_bgr, 2)
                         (tw, th), _ = cv2.getTextSize(label_str, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
@@ -1397,12 +1391,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # COMMON PARAMETERS: Candling Stage
         ctk.CTkLabel(content, text="Candling Stage:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=16, pady=(4, 2))
-        stage_opts = [
-            "DAY_10 (Primary Penoy Salvage @ ₱14.00)",
-            "DAY_18 (Lockdown Hatcher Transfer)",
-            "DAY_25 (Pipping Watch)",
-            "DAY_7 (Initial Blood Ring Check)"
-        ]
+        stage_opts = ["DAY_10 (Primary Penoy Salvage @ ₱14.00)"]
         stage_dropdown = ctk.CTkOptionMenu(
             content, values=stage_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
             button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
@@ -1491,7 +1480,7 @@ class OvaLensOperatorApp(ctk.CTk):
                 self.total_count = 0
                 self.fertile_count = 0
                 self.infertile_count = 0
-                self.abnormal_count = 0
+                self.review_count = 0
                 self._render_standby_hud()
 
             self.batch_btn.configure(text=f"📋 Batch: {self.current_batch_id}  ({self.current_stage})  ▾")
@@ -1571,11 +1560,11 @@ class OvaLensOperatorApp(ctk.CTk):
         s3.pack(fill="x", pady=(0, 10))
         s3_hdr = ctk.CTkFrame(s3, fg_color=FUTheme.INFERTILE_AMBER, height=28, corner_radius=6)
         s3_hdr.pack(fill="x", padx=6, pady=6)
-        ctk.CTkLabel(s3_hdr, text="STEP 3: 3-CLASS SORTING & DIVERTER ACTIONS", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_WHITE).pack(side="left", padx=10)
+        ctk.CTkLabel(s3_hdr, text="STEP 3: BINARY SORTING & DIVERTER ACTIONS", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_WHITE).pack(side="left", padx=10)
 
         s3_body = ctk.CTkLabel(
             s3,
-            text="🟢 FERTILE (Accept): Spider blood veins verified -> stays on tray for incubation.\n🟡 INFERTILE (Reject): Clear yolk or dead non-viable embryo -> diverted to Penoy salvage @ ₱14.00.\n⚪ MANUAL REVIEW: Low confidence (< 75%) or uncentered egg -> operator manual review.",
+            text="🟢 FERTILE (Accept): Day 10 embryo viability verified -> remains in incubation.\n🟡 INFERTILE (Reject): Non-fertile Day 10 result -> diverted to Penoy salvage @ ₱14.00.\n⚪ MANUAL REVIEW: Low confidence (< 75%) or synchronization error -> operator review.",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s3_body.pack(anchor="w", padx=14, pady=(2, 10))
@@ -1740,7 +1729,7 @@ class OvaLensOperatorApp(ctk.CTk):
         ctk.CTkLabel(t3, text="PENOY SALVAGE YIELD", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.INFERTILE_AMBER_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
         ctk.CTkLabel(t3, text=f"{self.infertile_count} eggs -> ₱{penoy_salvage_val:,.2f}", font=(FUTheme.FONT_FAMILY, 14, "bold"), text_color=FUTheme.INFERTILE_AMBER).pack(anchor="w", padx=10, pady=(0, 6))
 
-        # Tile 4: Manual Review
+        # Tile 4: Manual review fallback
         t4 = ctk.CTkFrame(grid, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         t4.grid(row=1, column=1, padx=4, pady=4, sticky="nsew")
         ctk.CTkLabel(t4, text="MANUAL REVIEW", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=10, pady=(6, 0))
@@ -1756,7 +1745,7 @@ class OvaLensOperatorApp(ctk.CTk):
                 status_msg.configure(text=f"✓ Report Exported to {os.path.basename(path)}", text_color=FUTheme.FERTILE_GREEN_TEXT)
                 self._log(f"[EXPORT] CSV Report saved: {path}")
             except Exception as e:
-                status_msg.configure(text=f"Export failed: {e}", text_color=FUTheme.ABNORMAL_RED_TEXT)
+                status_msg.configure(text=f"Export failed: {e}", text_color=FUTheme.REJECT_RED_TEXT)
 
         # Export Button
         ctk.CTkButton(
@@ -1882,11 +1871,10 @@ class OvaLensOperatorApp(ctk.CTk):
             n_tot = len(all_b_scans)
             n_fert = sum(1 for s in all_b_scans if s["final_class"] == "FERTILE")
             n_inf = sum(1 for s in all_b_scans if s["final_class"] == "INFERTILE")
-            n_abn = sum(1 for s in all_b_scans if s["final_class"] == "ABNORMAL")
             fert_pct = (n_fert / max(1, n_tot)) * 100.0 if n_tot > 0 else 0.0
 
             stats_summary_label.configure(
-                text=f"Total: {n_tot} • Fertile: {fert_pct:.1f}% • Penoy Salvage: ₱{n_inf*14:,.0f}"
+                text=f"Total: {n_tot} • Fertile: {fert_pct:.1f}% • Penoy: ₱{n_inf*14:,.0f}"
             )
 
             # Update tab label text
@@ -1928,16 +1916,11 @@ class OvaLensOperatorApp(ctk.CTk):
                     badge_border = FUTheme.FERTILE_GREEN_BORDER
                     badge_text = FUTheme.FERTILE_GREEN_TEXT
                     pill = "🟢 FERTILE"
-                elif cls_name == "INFERTILE":
+                else:
                     badge_fg = FUTheme.INFERTILE_AMBER_CARD
                     badge_border = FUTheme.INFERTILE_AMBER_BORDER
                     badge_text = FUTheme.INFERTILE_AMBER_TEXT
                     pill = "🟡 INFERTILE"
-                else:
-                    badge_fg = FUTheme.ABNORMAL_RED_CARD
-                    badge_border = FUTheme.ABNORMAL_RED_BORDER
-                    badge_text = FUTheme.ABNORMAL_RED_TEXT
-                    pill = "🔴 ABNORMAL"
 
                 row_card = ctk.CTkFrame(table_container, fg_color=FUTheme.PANEL_LIGHT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
                 row_card.pack(fill="x", pady=3, padx=4)
@@ -1995,7 +1978,7 @@ class OvaLensOperatorApp(ctk.CTk):
         tabs_spec = [
             ("ALL", "All"),
             ("FERTILE", "🟢 Fertile"),
-            ("INFERTILE", "🟡 Infertile (Penoy)"),
+            ("INFERTILE", "🟡 Infertile"),
         ]
 
         for key, label in tabs_spec:
@@ -2024,7 +2007,7 @@ class OvaLensOperatorApp(ctk.CTk):
                 toast_label.configure(text=f"✓ Exported {flt} scans to: {os.path.basename(path)}", text_color=FUTheme.FERTILE_GREEN_TEXT)
                 self._log(f"[EXPORT] Filtered CSV saved: {path}")
             except Exception as e:
-                toast_label.configure(text=f"Export error: {e}", text_color=FUTheme.ABNORMAL_RED_TEXT)
+                toast_label.configure(text=f"Export error: {e}", text_color=FUTheme.REJECT_RED_TEXT)
 
         def export_all():
             try:
@@ -2033,7 +2016,7 @@ class OvaLensOperatorApp(ctk.CTk):
                 toast_label.configure(text=f"✓ Exported ALL batch scans to: {os.path.basename(path)}", text_color=FUTheme.FERTILE_GREEN_TEXT)
                 self._log(f"[EXPORT] Complete batch CSV saved: {path}")
             except Exception as e:
-                toast_label.configure(text=f"Export error: {e}", text_color=FUTheme.ABNORMAL_RED_TEXT)
+                toast_label.configure(text=f"Export error: {e}", text_color=FUTheme.REJECT_RED_TEXT)
 
         ctk.CTkButton(
             b_bar, text="📄 Export Current Filter (CSV)", fg_color=FUTheme.PRIMARY_MAROON,

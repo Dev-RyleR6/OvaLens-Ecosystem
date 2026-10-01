@@ -62,7 +62,6 @@ class BackupService:
                 "total_scanned": s.total_scanned,
                 "fertile_count": s.fertile_count,
                 "infertile_count": s.infertile_count,
-                "abnormal_count": s.abnormal_count,
                 "started_at": s.started_at.isoformat(),
             }
             for s in db.query(CandlingSessionModel).all()

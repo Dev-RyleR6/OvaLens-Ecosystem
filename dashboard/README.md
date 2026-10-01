@@ -77,7 +77,6 @@ graph TD
 3. The **ONNX Runtime FP16 Inference Engine** classifies the egg into one of three strict biological classes within $\le 35\text{ms}$:
    - **`FERTILE`**: Active embryo with visible blood vessels/spider veins $\rightarrow$ **Action: `ACCEPT`** (continues to incubator).
    - **`INFERTILE`**: Clear, unfertilized yolk / *bugok* $\rightarrow$ **Action: `REJECT`** (routed to Day-10 *Penoy* salvage bin).
-   - **`ABNORMAL`**: Dead embryo, blood ring, or ruptured yolk $\rightarrow$ **Action: `REJECT`** (routed to early discard bin).
 4. A non-blocking sorting command is dispatched over PySerial (115200 baud) to the ESP32 to actuate the diverter mechanism.
 
 #### Layer 2: Offline-First Local Persistence
@@ -108,8 +107,8 @@ graph TD
 
 | Page / Route | File | Key Capabilities & Features |
 | :--- | :--- | :--- |
-| **Overview** (`/`) | [`OverviewPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/OverviewPage.tsx) | Real-time KPI stat cards (Total Eggs Scanned, Overall Fertility %, Infertility %, Abnormal Rate), active batch quick monitor, live candling activity feed stream, and hardware health indicator. |
-| **Batches** (`/batches`) | [`BatchesPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/BatchesPage.tsx) | 28-day developmental lifecycle state machine (`SETTING` $\rightarrow$ `DAY_10` $\rightarrow$ `DAY_18` $\rightarrow$ `DAY_25` $\rightarrow$ `HATCHED`), duck breed categorization (Kayumanggi, Native Itim, Khaki Campbell), Day-10 *Penoy* economic salvage calculator, and Finalize Hatch Trial modal ([`FinalizeHatchModal.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/components/FinalizeHatchModal.tsx)). |
+| **Overview** (`/`) | [`OverviewPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/OverviewPage.tsx) | Real-time KPI stat cards (Total Eggs Scanned, Fertility %, and Infertility %), active batch monitoring, live candling activity, and hardware health. |
+| **Batches** (`/batches`) | [`BatchesPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/BatchesPage.tsx) | Lifecycle tracking (`SETTING` $\rightarrow$ `DAY_10` $\rightarrow$ `HATCHED`), duck breed categorization, Day 10 *Penoy* economic salvage, and hatch finalization. |
 | **Scan Explorer** (`/scans`) | [`ScanExplorerPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/ScanExplorerPage.tsx) | Dual Card-Grid and Data-Table views, egg-by-egg searchable audit explorer, multi-parameter filtering, candling image viewer with bounding box overlays, and Human-in-the-Loop classification override modal ([`HumanInTheLoopOverrideModal.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/components/HumanInTheLoopOverrideModal.tsx)). |
 | **Analytics** (`/analytics`) | [`AnalyticsPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/AnalyticsPage.tsx) | Connected Multi-Filter Toolbar (Breed, Status, Batch selector), Day 28 Biological Hatch Yield Forecast Card ([`BatchForecastCard.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/components/BatchForecastCard.tsx)), interactive financial salvage simulator (custom Penoy price & electricity tariff), and 28-day embryo viability curve. |
 | **Records** (`/records`) | [`RecordsPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/RecordsPage.tsx) | Official hatchery compliance records archive, export engine for formal signed PDF batch inspection certificates and full CSV datasets for research and regulatory reporting. |
@@ -237,6 +236,6 @@ docker run -d -p 3000:80 --name ovalens-dashboard-app ovalens-dashboard
 | **FU Primary Maroon** | `#800000` | Header navbar, primary call-to-action buttons, active navigation states. |
 | **FU Dark Maroon** | `#5C0000` | Hover states and dark accents. |
 | **Agri-Green (Fertile)** | `#357a38` | `FERTILE` egg status badge, positive trends, high fertility indicators. |
-| **Reject Red (Infertile/Abnormal)**| `#DC2626` | `INFERTILE` / `ABNORMAL` badges, rejection alerts, critical warnings. |
+| **Reject Red**| `#DC2626` | Rejection alerts and critical warnings. |
 | **Slate Dark Theme** | `#0F172A` | Background for dark mode and data card containers. |
 | **Clean Light Theme** | `#F8FAFC` | Default crisp background for high readability in hatchery environments. |

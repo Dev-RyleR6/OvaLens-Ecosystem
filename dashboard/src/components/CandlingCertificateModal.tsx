@@ -37,7 +37,6 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
 
   const fertileCount = displayBatch.fertile_count || 451;
   const penoyCount = displayBatch.infertile_count || 37;
-  const abnormalCount = displayBatch.abnormal_count || 12;
   const totalScanned = displayBatch.total_scanned || 500;
   const penoySalvageValue = (penoyCount * 14.0).toFixed(2);
 
@@ -112,7 +111,7 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
                   <td className="py-2.5 px-3 text-center text-emerald-800 font-bold">ACCEPT</td>
                   <td className="py-2.5 px-3 text-right font-extrabold text-emerald-900">{fertileCount}</td>
                   <td className="py-2.5 px-3 text-right text-emerald-800">{((fertileCount / totalScanned) * 100).toFixed(1)}%</td>
-                  <td className="py-2.5 px-3 text-right text-slate-600">Transferred to Day 18 Hatcher</td>
+                  <td className="py-2.5 px-3 text-right text-slate-600">Retained for incubation</td>
                 </tr>
 
                 <tr className="bg-amber-50/40 font-medium">
@@ -121,14 +120,6 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
                   <td className="py-2.5 px-3 text-right font-extrabold text-amber-900">{penoyCount}</td>
                   <td className="py-2.5 px-3 text-right text-amber-800">{((penoyCount / totalScanned) * 100).toFixed(1)}%</td>
                   <td className="py-2.5 px-3 text-right font-bold text-amber-900">₱{penoySalvageValue} (@ ₱14.00)</td>
-                </tr>
-
-                <tr className="bg-red-50/40 font-medium">
-                  <td className="py-2.5 px-3 font-bold text-red-950">Abnormal / Dead Embryo</td>
-                  <td className="py-2.5 px-3 text-center text-red-800 font-bold">DISCARD</td>
-                  <td className="py-2.5 px-3 text-right font-extrabold text-red-900">{abnormalCount}</td>
-                  <td className="py-2.5 px-3 text-right text-red-800">{((abnormalCount / totalScanned) * 100).toFixed(1)}%</td>
-                  <td className="py-2.5 px-3 text-right text-slate-500">Culled to prevent burst</td>
                 </tr>
 
                 <tr className="bg-slate-100 font-bold text-slate-900 border-t border-slate-300">

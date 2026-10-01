@@ -30,14 +30,14 @@ The physical and software architecture comprises four tightly coupled subsystems
 2. **Electromechanical Transport & Actuation Mechanism (`firmware/`)**:
    - **Indexed Pocket-Conveyor**: Stepper motor-driven conveyor with individual cradle pockets ensuring steady transport and positional synchronization.
    - **Candling Chamber**: Enclosed optical chamber with high-intensity cold-LED transillumination strobe.
-   - **IoT Controller (ESP32 Dev Module)**: Handles positional reference sensing (infrared optical beam-break interrupts) and actuates the high-torque diverter servo to sort eggs into designated collection paths (Fertile Accept -> Incubation Tray vs. Infertile Reject -> Penoy Salvage Tray).
+   - **IoT Controller (ESP32 Dev Module)**: Handles positional reference sensing (infrared optical beam-break interrupts) and actuates the binary sorting mechanism for Fertile and Infertile/Penoy destinations.
 3. **Central Hatchery Management Engine (`backend/`)**:
    - **REST API**: FastAPI service utilizing Pydantic v2 schemas and SQLAlchemy 2.0 ORM.
    - **Central Database**: PostgreSQL 16 database storing multi-batch historical records, incubation tray mappings, and batch summary metrics.
    - **Idempotent Ingestion**: Handles network sync payloads from edge nodes with `ON CONFLICT DO NOTHING` guarantees.
 4. **Administrative Web Portal (`dashboard/`)**:
    - **Web Dashboard**: React 18 + Vite + TypeScript + TailwindCSS administrative frontend.
-   - **Hatchery Analytics**: Real-time batch statistics, Day 10 fertility rates, economic Penoy recovery calculations, incubation tray visualizations, and downloadable CSV/PDF audit reports.
+   - **Hatchery Analytics**: Real-time batch statistics, egg-stage distributions (Day 10, 18, 25), incubation tray visualizations, and downloadable CSV/PDF audit reports.
 
 ---
 
@@ -50,14 +50,14 @@ The physical and software architecture comprises four tightly coupled subsystems
   2. **IP-Khaki** (*Itik Pinas Khaki* - pure line)
   3. **IP-Kayumanggi** (*Commercial hybrid* of male IP-Khaki and female IP-Itim)
 * **Candling Checkpoint**:
-  - **Day 10**: Definitive commercial duck egg candling milestone; separation of viable developing embryos from unfertilized and non-viable eggs (marketed as commercial *penoy* @ ₱14.00).
+  - **Day 10 only**: Fertility assessment and identification of non-fertile eggs for *penoy* salvage.
 
 ### Target Dataset Volume & Split
 * **Target Sample Size**: $\ge 3,000$ locally collected, annotated duck egg candling frames.
 * **Operational Classes**:
-  * `FERTILE`: Continuing viable embryonic development with prominent spider vascularization or distinct embryo shadow (Action: `ACCEPT` $\to$ Incubation tray).
-  * `INFERTILE`: Clear unfertilized yolk or early non-viable dead embryo/blood ring (Action: `REJECT` $\to$ Day 10 Penoy salvage @ ₱14.00).
-* **Data Partitioning**: 70% Training, 15% Validation, and 15% Testing (stratified across genetic groups IP-Itim, IP-Khaki, and IP-Kayumanggi).
+  * `FERTILE`: Continuing viable embryonic development with prominent spider vascularization or advanced embryo shadow.
+  * `INFERTILE`: Any Day 10 egg that is not classified as fertile and is rejected for Penoy salvage.
+* **Data Partitioning**: 70% Training, 15% Validation, and 15% Testing (stratified across genetic groups).
 * **Annotation Format**: Whole-egg bounding box YOLO format (`[class_id, x_center, y_center, width, height]`), verifying presence and centering before classification.
 
 ---
@@ -83,7 +83,7 @@ The physical and software architecture comprises four tightly coupled subsystems
 ## 3.4 Electromechanical Kinematics & Cradle Tracking
 
 ```
-[Loading Station] ---> [Candling Chamber (Stop & Image)] ---> [High-Torque Diverter Servo: Infertile/Penoy] ---> [Incubation Tray: Fertile]
+[Loading Station] ---> [Candling Chamber (Stop & Image)] ---> [Infertile Diverter] ---> [Fertile Tray]
 ```
 
 ### Indexed Stepper Kinematics
@@ -96,9 +96,9 @@ Where:
 * Nominal actuation delay: $\Delta t = 2,000\text{ ms}$ (software tracked by cradle queue index).
 
 ### Sorting Routing
-* **Fertile (Accept)**: Continues along main conveyor lane and slides gently onto cushioned incubation setter tray.
-* **Infertile (Reject)**: Diverted by servo arm into padded collection tray for immediate Day 10 commercial Penoy food salvage (₱14.00/egg).
-* **Manual Review**: Retained in cradle and flagged on operator GUI when detection confidence $\tau < 0.75$ or synchronization fault occurs.
+* **Fertile**: Retained on conveyor or gently slid onto cushioned incubation tray.
+* **Infertile / Penoy**: Diverted to collection tray for Day 10 commercial food salvage (₱14.00/egg).
+* **Manual Review**: Diverted to separate inspection lane or alerted on operator GUI when detection is uncertain.
 
 ---
 
@@ -108,7 +108,9 @@ Where:
 * **Precision, Recall, F1-Score** per operational class (`FERTILE`, `INFERTILE`).
 * **Mean Average Precision**: $\text{mAP}_{50}$ and $\text{mAP}_{50-95}$.
 * **Inference Latency**: Single-frame inference latency ($\le 200\text{ ms}$ SLA target on Raspberry Pi).
-* **Subgroup Reporting**: Performance broken down across genetic lines (IP-Itim vs IP-Khaki vs IP-Kayumanggi) at Day 10 candling.
+* **Subgroup Reporting**: Performance broken down across:
+  * Genetic lines: IP-Itim vs IP-Khaki vs IP-Kayumanggi.
+  * Day 10 batches and genetic groups.
 
 ### System & Hardware Evaluation Metrics
 * **Sorting Accuracy**: Percentage of physical eggs routed to the correct destination tray matching ground truth.

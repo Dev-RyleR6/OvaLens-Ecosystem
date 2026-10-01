@@ -176,11 +176,11 @@ export const RecordsPage: React.FC = () => {
 
     const csvContent =
       "data:text/csv;charset=utf-8," +
-      "BatchCode,Breed,Incubator,InitialSet,Fertile,Penoy,Dead,FertilityRate,HatchabilityRate,SetDate\n" +
+      "BatchCode,Breed,Incubator,InitialSet,Fertile,Penoy,FertilityRate,HatchabilityRate,SetDate\n" +
       toExport
         .map(
           (b) =>
-            `${b.batch_code},${b.breed},${b.incubator_id},${b.initial_egg_count},${b.fertile_count},${b.infertile_count},${b.abnormal_count},${b.fertility_rate}%,${b.hatchability_rate}%,${b.set_date}`
+            `${b.batch_code},${b.breed},${b.incubator_id},${b.initial_egg_count},${b.fertile_count},${b.infertile_count},${b.fertility_rate}%,${b.hatchability_rate}%,${b.set_date}`
         )
         .join("\n");
 
@@ -436,7 +436,6 @@ export const RecordsPage: React.FC = () => {
                       </th>
                       <th className="py-3 px-4">Fertile</th>
                       <th className="py-3 px-4">Penoy (₱14)</th>
-                      <th className="py-3 px-4">Dead</th>
                       <th
                         className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
                         onClick={() => toggleSort('fertility_rate')}
@@ -491,7 +490,6 @@ export const RecordsPage: React.FC = () => {
                           <td className="py-3 px-4 text-slate-800 font-bold">{b.initial_egg_count}</td>
                           <td className="py-3 px-4 text-emerald-700 font-bold">{b.fertile_count}</td>
                           <td className="py-3 px-4 text-amber-700 font-bold">{b.infertile_count}</td>
-                          <td className="py-3 px-4 text-red-700 font-bold">{b.abnormal_count}</td>
                           <td className="py-3 px-4 font-extrabold text-slate-900">
                             {b.fertility_rate > 0 ? (
                               <span className={b.fertility_rate >= 90 ? 'text-emerald-700' : 'text-slate-800'}>
@@ -558,7 +556,7 @@ export const RecordsPage: React.FC = () => {
                     </div>
 
                     {/* Stats */}
-                    <div className="grid grid-cols-3 gap-2 text-center mt-3">
+                    <div className="grid grid-cols-2 gap-2 text-center mt-3">
                       <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-200">
                         <span className="text-[10px] text-emerald-700 font-bold block">Fertile</span>
                         <span className="text-base font-extrabold text-emerald-900">{b.fertile_count}</span>
@@ -566,10 +564,6 @@ export const RecordsPage: React.FC = () => {
                       <div className="p-2 bg-amber-50 rounded-lg border border-amber-200">
                         <span className="text-[10px] text-amber-700 font-bold block">Penoy</span>
                         <span className="text-base font-extrabold text-amber-900">{b.infertile_count}</span>
-                      </div>
-                      <div className="p-2 bg-red-50 rounded-lg border border-red-200">
-                        <span className="text-[10px] text-red-700 font-bold block">Dead</span>
-                        <span className="text-base font-extrabold text-red-900">{b.abnormal_count}</span>
                       </div>
                     </div>
 
@@ -695,7 +689,6 @@ export const RecordsPage: React.FC = () => {
                   <th className="py-3 px-4">Total Candled</th>
                   <th className="py-3 px-4">Fertile</th>
                   <th className="py-3 px-4">Penoy</th>
-                  <th className="py-3 px-4">Dead</th>
                   <th className="py-3 px-4">Speed</th>
                   <th className="py-3 px-4">Latency</th>
                 </tr>
@@ -715,7 +708,6 @@ export const RecordsPage: React.FC = () => {
                     <td className="py-3 px-4 font-bold text-slate-900">{sess.total_scanned}</td>
                     <td className="py-3 px-4 font-bold text-emerald-700">{sess.fertile_count}</td>
                     <td className="py-3 px-4 font-bold text-amber-700">{sess.infertile_count}</td>
-                    <td className="py-3 px-4 font-bold text-red-700">{sess.abnormal_count}</td>
                     <td className="py-3 px-4">
                       <span className="inline-flex items-center gap-1 font-bold text-emerald-800 text-[11px] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                         <Zap className="w-3 h-3 text-emerald-600" />
@@ -762,9 +754,8 @@ export const RecordsPage: React.FC = () => {
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg space-y-1">
               <span className="font-bold text-emerald-950 block">Classification Breakdown</span>
               <p className="text-[11px] text-emerald-800">
-                • <strong>{selectedBatch.fertile_count}</strong> Fertile Embryos (Transferred to Day 18 Hatcher)<br/>
-                • <strong>{selectedBatch.infertile_count}</strong> Penoy Salvaged (@ ₱14.00 = ₱{(selectedBatch.infertile_count * 14.0).toFixed(2)})<br/>
-                • <strong>{selectedBatch.abnormal_count}</strong> Abnormal/Dead Culled
+                • <strong>{selectedBatch.fertile_count}</strong> Fertile Embryos (Retained for Incubation)<br/>
+                • <strong>{selectedBatch.infertile_count}</strong> Penoy Salvaged (@ ₱14.00 = ₱{(selectedBatch.infertile_count * 14.0).toFixed(2)})
               </p>
             </div>
 

@@ -144,7 +144,6 @@ Capstone/
                             │     current_stage       │       │     total_scanned     │
                             │     set_date            │       │     fertile_count     │
                             │     target_hatch_date   │       │     infertile_count   │
-                            │     status              │       │     abnormal_count    │
                             └───────────┬─────────────┘       └───────────┬───────────┘
                                         │                                 │
                                         │     ┌─────────────────────┐     │
@@ -154,7 +153,7 @@ Capstone/
                                               │ FK  session_id      │
                                               │ FK  batch_id        │
                                               │     sequence_number │
-                                              │     final_class     │ (FERTILE/INFERTILE/ABNORMAL)
+                                              │     final_class     │ (FERTILE/INFERTILE)
                                               │     confidence      │
                                               │     inference_ms    │
                                               │     routing_action  │ (ACCEPT/REJECT)
@@ -210,7 +209,7 @@ The FastAPI backend exposes versioned, high-throughput REST endpoints under `/ap
 | `GET` | `/api/v1/batches/{id}` | Public Read | Retrieves detailed batch metadata, egg count history, and assigned incubator. |
 | `GET` | `/api/v1/batches/{id}/analytics` | Public Read | Deep analytics: Day 10 fertility %, Penoy salvage ₱, and thermal power savings ₱. |
 | `PUT` | `/api/v1/batches/{id}` | `Manager / Admin` | Updates batch parameters and logs changes to the audit trail. |
-| `POST` | `/api/v1/batches/{id}/advance-stage` | `Manager / Admin` | Advances incubation milestone (`SETTING` $\to$ `DAY_10` $\to$ `DAY_18` $\to$ `DAY_25` $\to$ `HATCHED`). |
+| `POST` | `/api/v1/batches/{id}/advance-stage` | `Manager / Admin` | Advances the lifecycle (`SETTING` $\to$ `DAY_10` $\to$ `HATCHED` $\to$ `COMPLETED`). |
 | `POST` | `/api/v1/batches/{id}/finalize-hatch` | `Manager / Admin` | Finalizes Day 28 harvest trial with actual hatched vs unhatched counts. |
 | `DELETE` | `/api/v1/batches/{id}` | `Manager / Admin` | Archives or removes batch record with audit log tracking. |
 | `POST` | `/api/v1/batches/check-milestones` | Public Read | Automated milestone checker flagging due candling and hatcher transfer schedules. |
@@ -225,7 +224,7 @@ The FastAPI backend exposes versioned, high-throughput REST endpoints under `/ap
 | `PATCH` | `/api/v1/scans/{id}/override` | `Bearer JWT` | Human-in-the-Loop classification override with reason logging and session rollup updates. |
 | `GET` | `/api/v1/sessions` | Public Read | Lists candling shifts by batch, milestone stage, or date. |
 | `POST` | `/api/v1/sessions` | `X-API-Key` | Starts a new candling session on an edge sorter machine. |
-| `GET` | `/api/v1/sessions/{id}` | Public Read | Retrieves session totals, fertile/infertile/abnormal distribution, and avg latency. |
+| `GET` | `/api/v1/sessions/{id}` | Public Read | Retrieves Day 10 session totals, fertile/infertile distribution, and average latency. |
 | `PUT` | `/api/v1/sessions/{id}/end` | `X-API-Key` | Concludes active candling shift and stamps completion timestamp. |
 
 #### ⚙️ 4. Edge Sorter Hardware & Telemetry (`/api/v1/devices`)
@@ -241,7 +240,7 @@ The FastAPI backend exposes versioned, high-throughput REST endpoints under `/ap
 | `GET` | `/api/v1/analytics/overview` | Public Read | Facility-wide KPIs: total eggs scanned, fertility rate, cull rate, and hatchability. |
 | `GET` | `/api/v1/analytics/economic-yield` | Public Read | Day-10 Penoy salvage revenue (₱), thermal energy saved (kWh/₱), and total financial ROI. |
 | `GET` | `/api/v1/analytics/breed-comparison` | Public Read | Biological fertility and commercial yield benchmarks across duck breeds. |
-| `GET` | `/api/v1/analytics/mortality-trends` | Public Read | Early (Day 10), mid (Day 18), and late (Day 25) embryonic mortality breakdown. |
+| `GET` | `/api/v1/analytics/mortality-trends` | Public Read | Day 10 infertile/cull rate and total rejected eggs. |
 | `GET` | `/api/v1/analytics/mortality-progression` | Public Read | 28-day developmental mortality curve and viability retention benchmarks. |
 | `GET` | `/api/v1/audit-logs` | `Manager / Admin` | Immutable PostgreSQL audit records with dynamic severity categorization. |
 | `GET` | `/api/v1/settings` | Public Read | Retrieves facility profile, confidence thresholds, and economic unit prices. |

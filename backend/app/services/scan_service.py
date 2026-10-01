@@ -69,7 +69,6 @@ class ScanService:
         session.total_scanned = aggregates.total or 0
         session.fertile_count = aggregates.fertile or 0
         session.infertile_count = aggregates.infertile or 0
-        session.abnormal_count = 0
         session.avg_inference_ms = round(float(aggregates.avg_lat or 0.0), 2)
 
         db.commit()
@@ -132,7 +131,6 @@ class ScanService:
             session.total_scanned = aggregates.total or 0
             session.fertile_count = aggregates.fertile or 0
             session.infertile_count = aggregates.infertile or 0
-            session.abnormal_count = 0
             session.avg_inference_ms = round(float(aggregates.avg_lat or 0.0), 2)
 
         db.commit()

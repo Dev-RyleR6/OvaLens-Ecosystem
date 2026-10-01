@@ -151,9 +151,7 @@ export const AnalyticsPage: React.FC = () => {
   // 28-day duck egg developmental viability curve
   const cohortSurvivalData = [
     { day: 'Day 0 (Set)', viablePct: 100 },
-    { day: 'Day 10 (1st Candle)', viablePct: 91.2 },
-    { day: 'Day 18 (Transfer)', viablePct: 88.5 },
-    { day: 'Day 25 (Pipping)', viablePct: 87.1 },
+    { day: 'Day 10 (Candling)', viablePct: 91.2 },
     { day: 'Day 28 (Hatch)', viablePct: 86.8 },
   ];
 
@@ -161,21 +159,9 @@ export const AnalyticsPage: React.FC = () => {
   const mortalityBarData = [
     {
       stage: 'Day 10 (Early / Penoy)',
-      rate: mortality?.day_10_early_mortality_rate ?? 8.8,
+      rate: mortality?.day_10_cull_rate ?? 8.8,
       desc: 'Unfertilized yolk / dead germinal disc (100% salvaged @ ₱14)',
       color: '#D97706',
-    },
-    {
-      stage: 'Day 18 (Mid-Term)',
-      rate: mortality?.day_18_mid_mortality_rate ?? 3.2,
-      desc: 'Mid embryonic arrest before hatcher transfer',
-      color: '#DC2626',
-    },
-    {
-      stage: 'Day 25 (Late / Pipping)',
-      rate: mortality?.day_25_late_mortality_rate ?? 1.4,
-      desc: 'Late dead-in-shell during shell pipping',
-      color: '#991B1B',
     },
   ];
 

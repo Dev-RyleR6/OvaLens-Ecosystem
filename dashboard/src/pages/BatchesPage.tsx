@@ -124,9 +124,7 @@ export const BatchesPage: React.FC = () => {
   const getNextStage = (stage: BatchStage): BatchStage | null => {
     switch (stage) {
       case 'SETTING': return 'DAY_10';
-      case 'DAY_10': return 'DAY_18';
-      case 'DAY_18': return 'DAY_25';
-      case 'DAY_25': return 'HATCHED';
+      case 'DAY_10': return 'HATCHED';
       case 'HATCHED': return 'COMPLETED';
       default: return null;
     }
@@ -368,9 +366,7 @@ export const BatchesPage: React.FC = () => {
             >
               <option value="ALL">All Incubation Stages</option>
               <option value="SETTING">Setting (Day 0-9)</option>
-              <option value="DAY_10">Day 10 (1st Candling)</option>
-              <option value="DAY_18">Day 18 (2nd Candling)</option>
-              <option value="DAY_25">Day 25 (Pipping)</option>
+              <option value="DAY_10">Day 10 (Candling)</option>
               <option value="COMPLETED">Completed</option>
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -522,7 +518,7 @@ export const BatchesPage: React.FC = () => {
                             <span>Analytics</span>
                           </button>
 
-                          {(b.current_stage === 'DAY_25' || b.current_stage === 'HATCHED' || b.current_stage === 'COMPLETED') && (
+                          {(b.current_stage === 'HATCHED' || b.current_stage === 'COMPLETED') && (
                             <button
                               onClick={(e) => handleOpenFinalize(b, e)}
                               className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-colors cursor-pointer"
@@ -588,7 +584,7 @@ export const BatchesPage: React.FC = () => {
                 </div>
 
                 {/* Classification Breakdown */}
-                <div className="grid grid-cols-3 gap-2 text-center mt-3">
+                <div className="grid grid-cols-2 gap-2 text-center mt-3">
                   <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-200">
                     <span className="text-[10px] text-emerald-700 font-bold block">Fertile</span>
                     <span className="text-base font-extrabold text-emerald-900">{b.fertile_count}</span>
@@ -596,10 +592,6 @@ export const BatchesPage: React.FC = () => {
                   <div className="p-2 bg-amber-50 rounded-lg border border-amber-200">
                     <span className="text-[10px] text-amber-700 font-bold block">Penoy</span>
                     <span className="text-base font-extrabold text-amber-900">{b.infertile_count}</span>
-                  </div>
-                  <div className="p-2 bg-red-50 rounded-lg border border-red-200">
-                    <span className="text-[10px] text-red-700 font-bold block">Dead</span>
-                    <span className="text-base font-extrabold text-red-900">{b.abnormal_count}</span>
                   </div>
                 </div>
 
@@ -803,7 +795,7 @@ export const BatchesPage: React.FC = () => {
             {/* Classification Yield Breakdown */}
             <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
               <h4 className="font-bold text-slate-800">Candling Yield Summary</h4>
-              <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="grid grid-cols-2 gap-2 text-center">
                 <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-200">
                   <span className="text-[10px] text-emerald-700 font-semibold block">Fertile</span>
                   <span className="text-base font-extrabold text-emerald-900">{selectedBatch.fertile_count}</span>
@@ -811,10 +803,6 @@ export const BatchesPage: React.FC = () => {
                 <div className="p-2 bg-amber-50 rounded-lg border border-amber-200">
                   <span className="text-[10px] text-amber-700 font-semibold block">Penoy</span>
                   <span className="text-base font-extrabold text-amber-900">{selectedBatch.infertile_count}</span>
-                </div>
-                <div className="p-2 bg-red-50 rounded-lg border border-red-200">
-                  <span className="text-[10px] text-red-700 font-semibold block">Dead</span>
-                  <span className="text-base font-extrabold text-red-900">{selectedBatch.abnormal_count}</span>
                 </div>
               </div>
             </div>

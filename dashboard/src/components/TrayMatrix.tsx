@@ -67,9 +67,6 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
         if (seed < 8) {
           status = 'INFERTILE';
           conf = 0.87 + (r % 5) * 0.02;
-        } else if (seed < 12) {
-          status = 'ABNORMAL';
-          conf = 0.84 + (c % 4) * 0.02;
         } else if (currentTray === 12 && r === 6 && c >= 5) {
           status = 'EMPTY';
           conf = 0;
@@ -85,7 +82,7 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
           status,
           confidence: Number(conf.toFixed(3)),
           aspect_ratio: Number((0.74 + ((r * c) % 10) * 0.01).toFixed(2)),
-          luminance_v: status === 'FERTILE' ? 55 + ((r + c * 3) % 18) : status === 'INFERTILE' ? 82 + ((r + c) % 12) : 38 + ((r * c) % 15),
+          luminance_v: status === 'FERTILE' ? 55 + ((r + c * 3) % 18) : 82 + ((r + c) % 12),
           candled_at: new Date(Date.now() - (42 - (r * 7 + c)) * 12000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         });
       }
@@ -103,14 +100,12 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
         viability: Number(rate.toFixed(1)),
         fertile: Math.round(42 * (rate / 100)),
         penoy: Math.round(42 * 0.08),
-        abnormal: Math.round(42 * 0.04),
       };
     });
   }, [totalTrays]);
 
   const fertileCount = traySlots.filter(s => s.status === 'FERTILE').length;
   const infertileCount = traySlots.filter(s => s.status === 'INFERTILE').length;
-  const abnormalCount = traySlots.filter(s => s.status === 'ABNORMAL').length;
   const emptyCount = traySlots.filter(s => s.status === 'EMPTY').length;
   const occupiedCount = 42 - emptyCount;
   const trayFertilityRate = occupiedCount > 0 ? ((fertileCount / occupiedCount) * 100).toFixed(1) : '0.0';
@@ -276,17 +271,6 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
               {infertileCount} Penoy (Salvage)
             </button>
-            <button
-              onClick={() => setFilterClass('ABNORMAL')}
-              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition-colors cursor-pointer border ${
-                filterClass === 'ABNORMAL'
-                  ? 'bg-red-600 text-white border-red-600'
-                  : 'bg-red-50 text-red-800 border-red-200 hover:bg-red-100'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
-              {abnormalCount} Dead (Discard)
-            </button>
           </div>
 
           <span className="text-xs text-slate-500 font-medium">
@@ -327,7 +311,7 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
                   </div>
                   <div className="text-[10px] text-slate-500 flex justify-between">
                     <span>{t.fertile} viable</span>
-                    <span>{t.penoy + t.abnormal} cull</span>
+                    <span>{t.penoy} cull</span>
                   </div>
                 </button>
               );
@@ -390,9 +374,6 @@ export const TrayMatrix: React.FC<TrayMatrixProps> = ({
                       } else if (slot.status === 'INFERTILE') {
                         cellBg = "bg-amber-50/60 border-amber-200 hover:border-amber-500 text-amber-950";
                         dotBg = "bg-amber-500";
-                      } else if (slot.status === 'ABNORMAL') {
-                        cellBg = "bg-red-50/60 border-red-200 hover:border-red-500 text-red-950";
-                        dotBg = "bg-red-600";
                       }
 
                       return (

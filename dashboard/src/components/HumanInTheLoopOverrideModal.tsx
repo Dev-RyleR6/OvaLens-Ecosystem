@@ -32,11 +32,6 @@ const REASON_PRESETS: Record<FertilityClass, string[]> = {
     'Yolk mobility verified; salvageable as commercial Penoy @ ₱14.00.',
     'False positive: Yolk density misinterpreted as embryo.',
   ],
-  ABNORMAL: [
-    'Blood ring / early dead embryo termination observed.',
-    'Corrupted yolk / cloudiness culled to prevent incubator contamination.',
-    'Cracked air cell / physical shell imperfection.',
-  ],
 };
 
 export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalProps> = ({

@@ -59,7 +59,7 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 ---
 
 ### Phase 2: Data Collection & Preparation (Dataset Pipeline)
-- [ ] **TASK-AI-DS-01**: Dataset 70/15/15 Stratification Pipeline (Split 3,000+ candling images into 70% Train, 15% Val, 15% Test across IP-Itim, IP-Khaki, IP-Kayumanggi Day 10 candling)
+- [ ] **TASK-AI-DS-01**: Dataset 70/15/15 Stratification Pipeline (Split 3,000+ candling images into 70% Train, 15% Val, 15% Test across IP-Itim, IP-Khaki, IP-Kayumanggi and Day 10, 18, 25)
 - [ ] **TASK-AI-DS-02**: Whole-Egg YOLO Bounding Box Validator (Verify darknet `[class_id, x, y, w, h]` enclosing the entire egg)
 - [ ] **TASK-AI-DS-03**: Candling Transillumination Augmentations (HSV luminance jitter `V +/-20%` and `+/-15 deg` rotation pipeline)
 - [ ] **TASK-AI-DS-04**: Dataset Distribution Summary Exporter (Generate automated Markdown and LaTeX tables for Chapter 3 & 4 manuscript)
@@ -72,8 +72,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 - [x] **TASK-AI-OPT-02**: Production Weights Verified (`edge/models/weights/best.onnx` ready for runtime execution)
 - [x] **TASK-AI-LAT-01**: Edge Inference Latency Benchmark (Enforce `<= 200 ms` SLA constraint on target hardware)
 - [ ] **TASK-AI-EVL-01**: Breed Subgroup Metric Evaluator (Compute Precision, Recall, F1, mAP for IP-Itim vs IP-Khaki vs IP-Kayumanggi)
-- [ ] **TASK-AI-EVL-02**: Candling Batch Subgroup Metric Evaluator (Compute Precision, Recall, F1, mAP across Day 10 batches and genetic lines)
-- [ ] **TASK-AI-EVL-03**: 2-Class Confusion Matrix & PR Curve Generator (Generate formal 2-class confusion matrix [Fertile, Infertile] for Chapter 4)
+- [ ] **TASK-AI-EVL-02**: Day 10 Breed/Batch Subgroup Metric Evaluator (Compute Precision, Recall, F1, and mAP across Day 10 cohorts)
+- [ ] **TASK-AI-EVL-03**: 2-Class Confusion Matrix & PR Curve Generator (Generate the Fertile/Infertile evaluation artifacts for Chapter 4)
 
 ---
 
@@ -82,10 +82,10 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 - [x] **TASK-FW-INT-02**: 600ms Hardware Optical Debounce Lockout (Non-blocking timer lockout preventing false double-triggers)
 - [x] **TASK-FW-LED-01**: Candling Strobe LED Driver Relay (GPIO 19 strobe trigger synchronized with camera exposure)
 - [x] **TASK-FW-SER-01**: Non-Blocking Serial UART Command Parser (Buffer incoming 115200 baud UART bytes without `delay()` calls)
-- [x] **TASK-FW-SER-02**: Serial ACK / NACK Status Protocol (Transmit acknowledgement packets upon command execution to edge driver)
+- [ ] **TASK-FW-SER-02**: Serial ACK / NACK Status Protocol (Transmit acknowledgement packets upon command execution to edge driver)
 - [ ] **TASK-FW-STP-01**: Stepper Pocket-Conveyor Transport Routine (Indexed step timing to advance pocket conveyor one cradle at a time)
-- [x] **TASK-FW-SRV-01**: Servo Diverter - Fertile Pass-Through (Maintain idle servo position 0 deg for Fertile eggs continuing to incubation tray)
-- [x] **TASK-FW-SRV-02**: Servo Diverter - Infertile / Penoy Salvage (Actuate servo diverter 60 deg for Day 10 Penoy salvage sale @ ₱14.00)
+- [x] **TASK-FW-SRV-01**: Servo Gate 1 - Fertile Release (Actuate servo diverter for Fertile eggs into cushioned incubation tray)
+- [ ] **TASK-FW-SRV-02**: Servo Gate 2 - Infertile / Penoy Salvage (Actuate servo diverter for Day 10 Penoy salvage sale @ ₱14.00)
 - [x] **TASK-FW-KIN-01**: Kinematic Actuation Delay Timer ($\Delta t = D / v = 25\text{ cm} / 12.5\text{ cm/s} = 2,000\text{ ms}$ delay before servo firing)
 
 ---
@@ -109,7 +109,7 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 - [ ] **TASK-EDGE-REV-01**: Manual Review Fallback State Machine (Trigger manual review flag when confidence $< 0.75$ or egg uncentered)
 - [x] **TASK-EDGE-UI-01**: CustomTkinter 60 FPS Operator Desktop UI (Main Thread: CustomTkinter operator GUI with Foundation University theme)
 - [x] **TASK-EDGE-UI-02**: Live Candling Video Viewport (Smooth video rendering canvas with overlay bounding box and class tag)
-- [x] **TASK-EDGE-UI-03**: Real-Time Session Statistics Counters (Live counters for Fertile, Infertile, and Manual Review count)
+- [x] **TASK-EDGE-UI-03**: Real-Time Session Statistics Counters (Live counters for Fertile, Infertile, and Manual Review)
 - [ ] **TASK-EDGE-UI-04**: Interactive Manual Override Dialog Modal (Modal popup enabling operator to inspect flagged egg and confirm class)
 - [x] **TASK-EDGE-UI-05**: Conveyor Pause & Emergency Stop Controls (Instant physical rig pause and serial E-STOP command dispatch)
 
@@ -132,18 +132,18 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 - [x] **TASK-BE-BAT-03**: `POST /api/v1/batches` (Create new incubation batch specifying breed: Itim/Khaki/Kayumanggi and egg count)
 - [x] **TASK-BE-BAT-04**: `GET /api/v1/batches/{id}` (Get detailed batch record with tray matrix slots and current milestone)
 - [x] **TASK-BE-BAT-05**: `GET /api/v1/batches/{id}/analytics` (Incubation analytics: fertility rate, mortality curve, penoy salvage total)
-- [x] **TASK-BE-BAT-06**: `GET /api/v1/batches/{id}/forecast` (Hatch yield forecast calculation based on Day 10 fertility viability rate)
+- [x] **TASK-BE-BAT-06**: `GET /api/v1/batches/{id}/forecast` (Hatch yield forecast based on the Day 10 fertility rate)
 - [x] **TASK-BE-BAT-07**: `PUT /api/v1/batches/{id}` (Update batch metadata, notes, and incubator chamber ID)
-- [x] **TASK-BE-BAT-08**: `POST /api/v1/batches/{id}/advance-stage` (Advance batch milestone: SETTING -> DAY_10 -> HATCHED -> COMPLETED)
+- [x] **TASK-BE-BAT-08**: `POST /api/v1/batches/{id}/advance-stage` (Advance batch lifecycle: Setting -> Day 10 -> Hatched -> Completed)
 - [x] **TASK-BE-BAT-09**: `POST /api/v1/batches/{id}/finalize-hatch` (Close batch lifecycle and record final hatchling count on Day 28)
 - [x] **TASK-BE-BAT-10**: `GET /api/v1/batches/{id}/summary` (Comprehensive batch summary DTO for compliance and audit archiving)
 - [x] **TASK-BE-BAT-11**: `DELETE /api/v1/batches/{id}` (Soft-delete or purge batch; Admin only protection)
-- [x] **TASK-BE-BAT-12**: `POST /api/v1/batches/check-milestones` (Automated background cron to flag batches reaching Day 10 candling milestone)
+- [x] **TASK-BE-BAT-12**: `POST /api/v1/batches/check-milestones` (Automated background cron to flag batches reaching Day 10, 18, 25)
 
 #### Candling Sessions & Scan Ingestion
 - [x] **TASK-BE-SES-01**: `GET /api/v1/sessions` (List all active and completed edge candling sorting sessions)
 - [x] **TASK-BE-SES-02**: `POST /api/v1/sessions` (Start new candling session linked to batch and edge sorter device ID)
-- [x] **TASK-BE-SES-03**: `GET /api/v1/sessions/{id}` (Get session progress: total eggs candled, fertile, infertile counts)
+- [x] **TASK-BE-SES-03**: `GET /api/v1/sessions/{id}` (Get Day 10 session progress: total, fertile, and infertile counts)
 - [x] **TASK-BE-SES-04**: `PUT /api/v1/sessions/{id}/end` (Conclude candling session and trigger batch analytics recalculation)
 - [x] **TASK-BE-SCN-01**: `POST /api/v1/scans/sync` (Idempotent batch scan sync with `ON CONFLICT (scan_id) DO NOTHING`)
 - [x] **TASK-BE-SCN-02**: `POST /api/v1/scans/upload-image` (Upload high-res candling frame image associated with scan ID)
@@ -154,8 +154,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 #### Analytics, Economic Reports & Administration
 - [x] **TASK-BE-ANL-01**: `GET /api/v1/analytics/overview` (Aggregated hatchery statistics: total eggs, fertility rate, cull rate)
 - [x] **TASK-BE-ANL-02**: `GET /api/v1/analytics/breed-comparison` (Disaggregated analytics comparing IP-Itim vs IP-Khaki vs IP-Kayumanggi)
-- [x] **TASK-BE-ANL-03**: `GET /api/v1/analytics/mortality-trends` (Longitudinal fertility and cull tracking across historical batches)
-- [x] **TASK-BE-ANL-04**: `GET /api/v1/analytics/mortality-progression` (Loss analysis and commercial Penoy recovery on Day 10)
+- [x] **TASK-BE-ANL-03**: `GET /api/v1/analytics/mortality-trends` (Longitudinal mortality tracking across batches and candling stages)
+- [x] **TASK-BE-ANL-04**: `GET /api/v1/analytics/mortality-progression` (Day 10 cull analysis by breed)
 - [x] **TASK-BE-ANL-05**: `GET /api/v1/analytics/economic-yield` (Day 10 Penoy salvage revenue: `Count * ₱14.00` & thermal energy savings)
 - [x] **TASK-BE-REP-01**: `GET /api/v1/reports/batch/{id}/csv` (Export CSV spreadsheet containing detailed scan log for batch)
 - [x] **TASK-BE-REP-02**: `GET /api/v1/reports/batch/{id}/pdf` (Generate official Foundation University formatted PDF compliance report)
@@ -175,7 +175,7 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 #### Pages & Workspaces
 - [x] **TASK-DASH-PG-01**: `LoginPage.tsx` (Login view with Foundation University maroon branding and token persistence)
 - [x] **TASK-DASH-PG-02**: `OverviewPage.tsx` (Real-time KPI summary cards of active batches, fertility %, and sorting volume)
-- [x] **TASK-DASH-PG-03**: `BatchesPage.tsx` (Table of all batches, stage advancement modal [Day 10, Hatched, Completed], hatch closure)
+- [x] **TASK-DASH-PG-03**: `BatchesPage.tsx` (Table of all batches, Day 10 stage advancement, and hatch closure)
 - [x] **TASK-DASH-PG-04**: `ScanExplorerPage.tsx` (Filterable grid of historical scan captures with image lightbox inspection)
 - [x] **TASK-DASH-PG-05**: `AnalyticsPage.tsx` (Recharts visualizer for mortality curves, breed comparisons, Penoy revenue)
 - [x] **TASK-DASH-PG-06**: `RecordsPage.tsx` (Historical scan and session records table with one-click CSV/PDF download)
@@ -189,7 +189,7 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 - [x] **TASK-DASH-CP-01**: Incubation Tray Matrix 42 Slots ($A1 \to F7$) (Interactive SVG grid showing slot occupancy and status)
 - [x] **TASK-DASH-CP-02**: Interactive Penoy Economic Calculator (Widget computing Day 10 salvage income based on ₱14.00/egg price)
 - [x] **TASK-DASH-CP-03**: Breed Filter Dropdown (Dropdown to isolate metrics by `IP-Itim`, `IP-Khaki`, `IP-Kayumanggi`)
-- [x] **TASK-DASH-CP-04**: Incubation Stage Filter Toggle (Filter analysis by incubation stage: `Setting`, `Day 10`, `Hatched`, `Completed`)
+- [x] **TASK-DASH-CP-04**: Day 10 Candling Filter Toggle
 - [x] **TASK-DASH-CP-05**: Dark / Light Mode Theme System (TailwindCSS theme switcher with FU Maroon `#800000` accents)
 
 ---
@@ -223,3 +223,4 @@ These features can be claimed by any agent using `python scripts/verify_and_comm
 - [ ] **TASK-NEW-SMS-01**: Hatchery Supervisor SMS / Email Alerts (Notify supervisor when Day 10 penoy count exceeds 40% cull threshold)
 - [ ] **TASK-NEW-QR-01**: Incubation Tray QR Code Generator & Scanner (Print QR label for physical 42-egg incubation trays)
 - [ ] **TASK-NEW-LANE-01**: Multi-Lane Conveyor Scaling Support (Extend firmware and edge tracker from 1 lane to 4 parallel candling lanes)
+- [x] **TASK-NEW-SCOPE-01**: Refactor OvaLens to the single Day 10 checkpoint and strict two-class (`FERTILE`, `INFERTILE`) domain contract

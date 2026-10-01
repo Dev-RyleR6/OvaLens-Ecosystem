@@ -218,25 +218,6 @@ class ServoController:
             command=lambda: self.send_command("SORT:INFERTILE")
         ).grid(row=1, column=3, padx=5)
 
-        tk.Label(preset_frame, text="Abnormal:").grid(
-            row=2, column=0, padx=5, pady=5
-        )
-        self.abnormal_entry = ttk.Entry(preset_frame, width=8)
-        self.abnormal_entry.insert(0, "150")
-        self.abnormal_entry.grid(row=2, column=1, padx=5)
-
-        ttk.Button(
-            preset_frame,
-            text="Save",
-            command=self.save_abnormal
-        ).grid(row=2, column=2, padx=5)
-
-        ttk.Button(
-            preset_frame,
-            text="TEST ABNORMAL",
-            command=lambda: self.send_command("SORT:ABNORMAL")
-        ).grid(row=2, column=3, padx=5)
-
         ttk.Button(
             preset_frame,
             text="RESET / NEUTRAL",
@@ -497,15 +478,6 @@ class ServoController:
                 f"SET_INFERTILE:{angle}"
             )
 
-    def save_abnormal(self):
-        angle = self.get_valid_angle(
-            self.abnormal_entry
-        )
-        if angle is not None:
-            self.send_command(
-                f"SET_ABNORMAL:{angle}"
-            )
-
     def read_serial(self):
         while self.running:
             try:
@@ -560,11 +532,6 @@ class ServoController:
             value = message.split(":", 1)[1]
             self.infertile_entry.delete(0, tk.END)
             self.infertile_entry.insert(0, value)
-
-        elif message.startswith("ABNORMAL:"):
-            value = message.split(":", 1)[1]
-            self.abnormal_entry.delete(0, tk.END)
-            self.abnormal_entry.insert(0, value)
 
         elif message.startswith("STATE:"):
             state = message.split(":", 1)[1]

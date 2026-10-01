@@ -79,8 +79,29 @@ def test_mortality_progression():
     resp = client.get("/api/v1/analytics/mortality-progression")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data["overall_stages"]) == 3
+    assert data["day_10_outcome"]["day_marker"] == 10
     assert len(data["breed_breakdown"]) >= 3
+
+
+def test_strict_day_10_two_class_contract():
+    from pydantic import ValidationError
+    from app.models.batch import BatchStage
+    from app.models.scan import FertilityClass
+    from app.models.session import CandlingStage
+    from app.schemas.session import SessionCreate
+    from datetime import datetime, timezone
+    from uuid import uuid4
+
+    assert {item.value for item in FertilityClass} == {"FERTILE", "INFERTILE"}
+    assert {item.value for item in CandlingStage} == {"DAY_10"}
+    assert "DAY_18" not in {item.value for item in BatchStage}
+    assert "DAY_25" not in {item.value for item in BatchStage}
+
+    with pytest.raises(ValidationError):
+        SessionCreate(
+            session_id=uuid4(), batch_id="BATCH-01", device_id="STATION-1",
+            stage="DAY_18", operator_name="Tester", started_at=datetime.now(timezone.utc)
+        )
 
 
 def test_batch_analytics_and_milestones():
@@ -277,7 +298,6 @@ def test_user_profile_and_password_change_flow():
     )
     assert new_login.status_code == 200
     assert "access_token" in new_login.json()
-
 
 
 

@@ -28,12 +28,12 @@ class FUTheme:
     INFERTILE_AMBER_BORDER = "#6B3D10"
     INFERTILE_AMBER_TEXT = "#FDE68A"  # High-contrast amber text
 
-    ABNORMAL_RED = "#F87171"          # Reject Red Luminous
-    ABNORMAL_RED_HOVER = "#EF4444"
-    ABNORMAL_RED_BG = "#4C1D24"       # Deep red badge container
-    ABNORMAL_RED_CARD = "#33161A"     # Subtle red card fill
-    ABNORMAL_RED_BORDER = "#6E222C"
-    ABNORMAL_RED_TEXT = "#FECACA"    # High-contrast red text
+    REJECT_RED = "#F87171"
+    REJECT_RED_HOVER = "#EF4444"
+    REJECT_RED_BG = "#4C1D24"
+    REJECT_RED_CARD = "#33161A"
+    REJECT_RED_BORDER = "#6E222C"
+    REJECT_RED_TEXT = "#FECACA"
 
     # Industrial Pro Gray Surfaces (Mid-Tone Charcoal & Slate)
     BG_LIGHT = "#181A20"              # Canvas Background (Neutral Charcoal)

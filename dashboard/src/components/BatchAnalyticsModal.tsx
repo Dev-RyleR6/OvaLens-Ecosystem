@@ -69,7 +69,6 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
     ? [
         { name: 'Fertile (Active)', value: data.fertile_day_10, color: '#357a38' },
         { name: 'Infertile (Penoy)', value: data.infertile_penoy_day_10, color: '#d97706' },
-        { name: 'Abnormal (Dead)', value: data.abnormal_day_10, color: '#dc2626' },
       ]
     : [];
 
@@ -220,7 +219,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                     </ResponsiveContainer>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center text-xs">
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-center text-xs">
                     <div>
                       <div className="text-emerald-700 font-bold">{data.fertile_day_10}</div>
                       <div className="text-[10px] text-slate-500 font-medium">Fertile</div>
@@ -228,10 +227,6 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                     <div>
                       <div className="text-amber-700 font-bold">{data.infertile_penoy_day_10}</div>
                       <div className="text-[10px] text-slate-500 font-medium">Infertile (Penoy)</div>
-                    </div>
-                    <div>
-                      <div className="text-red-700 font-bold">{data.abnormal_day_10}</div>
-                      <div className="text-[10px] text-slate-500 font-medium">Abnormal (Dead)</div>
                     </div>
                   </div>
                 </div>
@@ -277,7 +272,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                         Transfer {data.infertile_penoy_day_10} culled penoy eggs immediately to cold room (10-15°C) to maintain market freshness @ ₱14.00.
                       </p>
                     ) : (
-                      <p>Continue incubator climate regime (37.5°C / 60% RH) until Day 18 transfer.</p>
+                      <p>Continue the hatchery's post-candling incubation protocol.</p>
                     )}
                   </div>
                 </div>
@@ -303,7 +298,6 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                           <th className="py-2 px-3 font-semibold text-right">Scanned</th>
                           <th className="py-2 px-3 font-semibold text-right">Fertile</th>
                           <th className="py-2 px-3 font-semibold text-right">Penoy</th>
-                          <th className="py-2 px-3 font-semibold text-right">Dead</th>
                           <th className="py-2 px-3 font-semibold text-right">Fertility Rate</th>
                           <th className="py-2 px-3 font-semibold text-right">Avg ONNX Latency</th>
                         </tr>
@@ -316,7 +310,6 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                             <td className="py-2 px-3 text-right font-semibold text-slate-900">{s.total_scanned}</td>
                             <td className="py-2 px-3 text-right text-emerald-700 font-bold">{s.fertile_count}</td>
                             <td className="py-2 px-3 text-right text-amber-700 font-bold">{s.infertile_count}</td>
-                            <td className="py-2 px-3 text-right text-red-700 font-bold">{s.abnormal_count}</td>
                             <td className="py-2 px-3 text-right font-bold text-[#800000]">{s.fertility_rate}%</td>
                             <td className="py-2 px-3 text-right text-slate-500">{s.avg_inference_ms} ms</td>
                           </tr>

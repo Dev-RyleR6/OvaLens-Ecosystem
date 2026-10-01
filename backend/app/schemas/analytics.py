@@ -1,4 +1,5 @@
-from typing import List, Dict
+from typing import List
+
 from pydantic import BaseModel
 
 
@@ -17,7 +18,6 @@ class BreedMetricItem(BaseModel):
     total_eggs: int
     fertile_count: int
     infertile_count: int
-    abnormal_count: int
     fertility_rate: float
     hatched_count: int
     hatchability_rate: float
@@ -28,44 +28,36 @@ class BreedComparisonResponse(BaseModel):
 
 
 class MortalityTrendsResponse(BaseModel):
-    day_10_early_mortality_rate: float
-    day_18_mid_mortality_rate: float
-    day_25_late_mortality_rate: float
+    day_10_cull_rate: float
     total_culled_eggs: int
 
 
 class EconomicYieldResponse(BaseModel):
     penoy_culled_day_10: int
     penoy_unit_price_php: float = 14.00
-    estimated_penoy_salvage_value_php: float  # Infertile * ₱14
-    projected_duckling_revenue_php: float     # Hatched * ₱40
-    electricity_saved_estimated_php: float    # Culled * ₱2.50
+    estimated_penoy_salvage_value_php: float
+    projected_duckling_revenue_php: float
+    electricity_saved_estimated_php: float
     total_economic_benefit_php: float
 
 
-class StageMortalityItem(BaseModel):
+class Day10OutcomeItem(BaseModel):
     stage_name: str
-    day_marker: int
-    culled_count: int
+    day_marker: int = 10
+    infertile_count: int
     cull_rate_percentage: float
     description: str
 
 
-class BreedMortalityProgression(BaseModel):
+class BreedDay10Outcome(BaseModel):
     breed: str
     initial_eggs: int
     day_10_infertile_penoy: int
-    day_10_early_dead: int
-    day_18_mid_dead: int
-    day_25_late_dead: int
     hatched_ducklings: int
-    early_mortality_rate: float
-    mid_mortality_rate: float
-    late_mortality_rate: float
+    day_10_cull_rate: float
     final_hatchability_rate: float
 
 
 class MortalityProgressionResponse(BaseModel):
-    overall_stages: List[StageMortalityItem]
-    breed_breakdown: List[BreedMortalityProgression]
-
+    day_10_outcome: Day10OutcomeItem
+    breed_breakdown: List[BreedDay10Outcome]

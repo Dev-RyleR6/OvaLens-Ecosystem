@@ -52,7 +52,7 @@
     - Primary Maroon: `#800000`
     - Dark Maroon: `#5C0000`
     - Agri-Green (Fertile / Accept): `#357a38`
-    - Reject Red (Abnormal / Dead): `#DC2626`
+    - Reject Red (alerts / critical states): `#DC2626`
     - Penoy Amber: `#D97706`
     - Slate Dark Theme: `#0F172A` / `#1E293B`
 * **Typography**: Clean hierarchy with Inter and Segoe UI fonts across both Desktop GUI and Web Dashboard.

@@ -77,7 +77,6 @@ graph TD
 3. The **ONNX Runtime FP16 Inference Engine** classifies the egg into one of three strict biological classes within $\le 35\text{ms}$:
    - **`FERTILE`**: Active embryo with visible blood vessels/spider veins $\rightarrow$ **Action: `ACCEPT`** (continues to incubator).
    - **`INFERTILE`**: Clear, unfertilized yolk / *bugok* $\rightarrow$ **Action: `REJECT`** (routed to Day-10 *Penoy* salvage bin).
-   - **`ABNORMAL`**: Dead embryo, blood ring, or ruptured yolk $\rightarrow$ **Action: `REJECT`** (routed to early discard bin).
 4. A non-blocking sorting command is dispatched over PySerial (115200 baud) to the ESP32 to actuate the diverter mechanism.
 
 #### Layer 2: Offline-First Local Persistence
@@ -108,10 +107,10 @@ graph TD
 
 | Page / Route | File | Key Capabilities & Features |
 | :--- | :--- | :--- |
-| **Overview** (`/`) | [`OverviewPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/OverviewPage.tsx) | Real-time KPI stat cards (Total Eggs Scanned, Overall Fertility %, Infertility %, Abnormal Rate), active batch quick monitor, live candling activity feed stream, and hardware health indicator. |
+| **Overview** (`/`) | [`OverviewPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/OverviewPage.tsx) | Real-time KPI stat cards for total eggs, fertility, and infertility, plus active batch and hardware monitoring. |
 | **Batches** (`/batches`) | [`BatchesPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/BatchesPage.tsx) | 28-day developmental lifecycle state machine (`CREATED` $\rightarrow$ `CANDLING` $\rightarrow$ `INCUBATING` $\rightarrow$ `HATCHED` $\rightarrow$ `COMPLETED`), egg breed categorization (Mallard/*Itik*, Pekin, Muscovy), Day-10 *Penoy* economic salvage value calculator, and batch creation modal. |
 | **Scan Explorer** (`/scans`) | [`ScanExplorerPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/ScanExplorerPage.tsx) | Egg-by-egg searchable audit table, multi-parameter filtering (by biological class, confidence, date range, device), candling image viewer modal with bounding box overlay and inference latency breakdown, CSV export. |
-| **Analytics** (`/analytics`) | [`AnalyticsPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/AnalyticsPage.tsx) | Longitudinal fertility trend lines, 3-class biological proportion charts (Embryo vs Bugok vs Dead Germ), candling throughput rate (eggs/min), inference speed profiles, and supplier flock fertility benchmarks. |
+| **Analytics** (`/analytics`) | [`AnalyticsPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/AnalyticsPage.tsx) | Day 10 binary outcome charts, throughput, inference speed, economic salvage, and breed fertility benchmarks. |
 | **Records** (`/records`) | [`RecordsPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/RecordsPage.tsx) | Official hatchery compliance records archive, export engine for formal PDF batch certificates and full CSV datasets for research and regulatory reporting. |
 | **Devices** (`/devices`) | [`DevicesPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/DevicesPage.tsx) | Edge station fleet management, real-time online/offline heartbeat, PySerial connection health, firmware/model weight version tracking, and station sync queue backlog status. |
 | **AI Models** (`/models`) | [`ModelsPage.tsx`](file:///d:/Ryle_Gabotero/side_projects/Capstone/dashboard/src/pages/ModelsPage.tsx) | YOLO ONNX model registry, FP16 deployment benchmarks, mAP@50 and inference latency tracking across model versions. |
@@ -202,6 +201,6 @@ Content-Type: application/json
 | **FU Primary Maroon** | `#800000` | Header navbar, primary call-to-action buttons, active navigation states. |
 | **FU Dark Maroon** | `#5C0000` | Hover states and dark accents. |
 | **Agri-Green (Fertile)** | `#357a38` | `FERTILE` egg status badge, positive trends, high fertility indicators. |
-| **Reject Red (Infertile/Abnormal)**| `#DC2626` | `INFERTILE` / `ABNORMAL` badges, rejection alerts, critical warnings. |
+| **Reject Red**| `#DC2626` | Rejection alerts and critical warnings. |
 | **Slate Dark Theme** | `#0F172A` | Background for dark mode and data card containers. |
 | **Clean Light Theme** | `#F8FAFC` | Default crisp background for high readability in hatchery environments. |

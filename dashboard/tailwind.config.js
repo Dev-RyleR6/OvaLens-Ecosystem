@@ -53,7 +53,7 @@ export default {
           amber: "#D97706",     // Infertile / Penoy Salvage
           amberBg: "#FFFBEB",
           amberBorder: "#FDE68A",
-          red: "#DC2626",       // Abnormal / Dead
+          red: "#DC2626",       // Reject / critical alert
           redBg: "#FEF2F2",
           redBorder: "#FECACA",
         }

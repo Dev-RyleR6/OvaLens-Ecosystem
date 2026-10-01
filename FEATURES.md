@@ -57,10 +57,10 @@ This document details **what each feature does** across the **FastAPI Backend** 
 ### 1.3 28-Day Duck Incubation State Machine & Proactive Milestone Alerts
 * **What does it do?**
   - Manages the biological duck egg incubation timeline:
-    $$\text{SETTING (Day 0)} \longrightarrow \text{DAY 10 (Candling)} \longrightarrow \text{DAY 18 (Lockdown/Hatcher)} \longrightarrow \text{DAY 25 (Piping)} \longrightarrow \text{HATCHED (Day 28)}$$
+    $$\text{SETTING (Day 0)} \longrightarrow \text{DAY 10 (Candling)} \longrightarrow \text{HATCHED (Day 28)} \longrightarrow \text{COMPLETED}$$
   - Proactively evaluates elapsed incubation days and raises actionable alarms when milestones are reached (e.g. *"CANDLING DUE: Day 10 Embryo Viability & Penoy Salvage"*).
 * **How is it relevant?**
-  - Duck eggs require strictly timed environmental shifts (temperature, humidity, turning). Missing Day 10 means infertile eggs rot inside the setter; missing Day 18 means eggs aren't moved to hatcher baskets before ducklings begin pipping. The state machine automates compliance and prevents human error.
+  - The system tracks the single Day 10 candling checkpoint so infertile eggs are removed promptly while fertile eggs continue through the hatchery's existing incubation process.
 
 ---
 

@@ -168,7 +168,7 @@ Capstone/
    * The **Optical Sensor** triggers a snapshot.
    * **YOLOv8 ONNX FP16** classifies the egg in $\le 30\text{ms}$.
    * If **`FERTILE`**: Egg passes freely to the incubator collection tray.
-   * If **`INFERTILE`** or **`ABNORMAL`**: The ESP32 microsecond timer fires the servo flipper gate at the exact arrival moment ($\Delta t = D/v$), directing the egg into the cull chute.
+   * If **`INFERTILE`**: The ESP32 microsecond timer fires the servo flipper gate at the exact arrival moment ($\Delta t = D/v$), directing the egg into the Day 10 Penoy salvage chute.
 5. Review real-time batch counts and the Day-10 Penoy salvage revenue on the Web Dashboard.
 
 ### 3. Keyboard Shortcuts & Overrides:

@@ -327,7 +327,6 @@ export const ScanExplorerPage: React.FC = () => {
             <option value="ALL">All Classes</option>
             <option value="FERTILE">Fertile (Accept)</option>
             <option value="INFERTILE">Infertile (Penoy)</option>
-            <option value="ABNORMAL">Abnormal (Dead)</option>
           </select>
 
           <select
@@ -609,10 +608,8 @@ export const ScanExplorerPage: React.FC = () => {
               </div>
               <p className="text-slate-600 text-[11px]">
                 {selectedScan.final_class === 'FERTILE'
-                  ? 'Viable spider embryo network verified. Accepted to Day 18 hatcher tray.'
-                  : selectedScan.final_class === 'INFERTILE'
-                  ? 'Clear unfertilized yolk. Diverted to Penoy food salvage tray @ ₱14.00.'
-                  : 'Dead embryo or corrupted yolk. Culled to prevent incubator burst.'}
+                  ? 'Viable Day 10 embryo verified. Retained for incubation.'
+                  : 'Non-fertile Day 10 result. Diverted to Penoy food salvage tray @ ₱14.00.'}
               </p>
             </div>
 
@@ -652,17 +649,6 @@ export const ScanExplorerPage: React.FC = () => {
                   Override to PENOY
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => handlePromptOverride('ABNORMAL')}
-                  className={`px-2.5 py-1 text-xs font-bold rounded border transition-colors cursor-pointer ${
-                    selectedScan.final_class === 'ABNORMAL'
-                      ? 'bg-rose-700 text-white border-rose-800'
-                      : 'bg-white text-rose-800 border-rose-300 hover:bg-rose-50'
-                  }`}
-                >
-                  Override to DEAD
-                </button>
               </div>
             </div>
 

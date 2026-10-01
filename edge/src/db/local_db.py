@@ -46,7 +46,6 @@ class LocalDatabaseManager:
                     total_scanned INTEGER DEFAULT 0,
                     fertile_count INTEGER DEFAULT 0,
                     infertile_count INTEGER DEFAULT 0,
-                    abnormal_count INTEGER DEFAULT 0,
                     avg_inference_ms REAL DEFAULT 0.0
                 );
             """)
@@ -74,7 +73,29 @@ class LocalDatabaseManager:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_session ON local_scans(session_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_batch_seq ON local_scans(batch_id, sequence_number);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_batch_class ON local_scans(batch_id, final_class, sequence_number);")
+            self._migrate_legacy_contract(conn)
             conn.commit()
+
+    @staticmethod
+    def _migrate_legacy_contract(conn: sqlite3.Connection) -> None:
+        """Normalize records from the retired domain contract before operation."""
+        session_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(local_sessions);").fetchall()
+        }
+        if "abnormal_count" in session_columns:
+            conn.execute("""
+                UPDATE local_sessions
+                SET infertile_count = infertile_count + abnormal_count,
+                    stage = 'DAY_10';
+            """)
+            try:
+                conn.execute("ALTER TABLE local_sessions DROP COLUMN abnormal_count;")
+            except sqlite3.OperationalError:
+                # Older SQLite versions may retain the unused legacy column.
+                pass
+        else:
+            conn.execute("UPDATE local_sessions SET stage = 'DAY_10' WHERE stage <> 'DAY_10';")
+        conn.execute("UPDATE local_scans SET final_class = 'INFERTILE' WHERE final_class = 'ABNORMAL';")
 
     def get_distinct_batches(self) -> List[Dict[str, Any]]:
         """Fetch all unique batches stored in local SQLite with scan counts and latest timestamp."""
@@ -85,7 +106,6 @@ class LocalDatabaseManager:
                     COUNT(*) as total_scans,
                     SUM(CASE WHEN final_class = 'FERTILE' THEN 1 ELSE 0 END) as fertile_count,
                     SUM(CASE WHEN final_class = 'INFERTILE' THEN 1 ELSE 0 END) as infertile_count,
-                    SUM(CASE WHEN final_class = 'ABNORMAL' THEN 1 ELSE 0 END) as abnormal_count,
                     MAX(scanned_at) as last_scanned_at
                 FROM local_scans
                 GROUP BY batch_id
@@ -159,6 +179,8 @@ class LocalDatabaseManager:
         return filepath
 
     def create_session(self, session_id: str, batch_id: str, device_id: str, stage: str, operator_name: str) -> Dict[str, Any]:
+        if stage != "DAY_10":
+            raise ValueError("OvaLens supports only the DAY_10 candling stage.")
         started_at = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             conn.execute("""
@@ -179,6 +201,8 @@ class LocalDatabaseManager:
     def record_scan(self, scan_id: str, session_id: str, batch_id: str, sequence_number: int,
                     final_class: str, confidence: float, inference_ms: int, routing_action: str,
                     detections: list, image_path: Optional[str] = None) -> Dict[str, Any]:
+        if final_class not in {"FERTILE", "INFERTILE"}:
+            raise ValueError("final_class must be FERTILE or INFERTILE.")
         scanned_at = datetime.now(timezone.utc).isoformat()
         det_json = json.dumps(detections)
 
@@ -195,7 +219,7 @@ class LocalDatabaseManager:
                 image_path, det_json, scanned_at
             ))
 
-            # Update session rollup counters (2-class model)
+            # Update session rollup counters
             col = "fertile_count" if final_class == "FERTILE" else "infertile_count"
             conn.execute(f"""
                 UPDATE local_sessions

@@ -99,7 +99,6 @@ class ReportService:
             total_scanned = sum(s.total_scanned for s in sessions)
             total_fertile = sum(s.fertile_count for s in sessions)
             total_infertile = sum(s.infertile_count for s in sessions)
-            total_abnormal = sum(s.abnormal_count for s in sessions)
             fertility_rate = round((total_fertile / total_scanned * 100), 2) if total_scanned > 0 else 0.0
             hatchability_rate = round((batch.hatched_count / batch.initial_egg_count * 100), 2) if batch.initial_egg_count > 0 and batch.hatched_count else 0.0
 
@@ -178,7 +177,7 @@ class ReportService:
                     f"{float(s.avg_inference_ms):.1f} ms"
                 ])
 
-            t_sess = Table(sess_data, colWidths=[75, 140, 80, 80, 95, 70])
+            t_sess = Table(sess_data, colWidths=[70, 145, 80, 75, 100, 80])
             t_sess.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#800000")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),

@@ -19,7 +19,6 @@ export const CandlingAperture: React.FC<CandlingApertureProps> = ({
 }) => {
   const isFertile = finalClass === 'FERTILE';
   const isInfertile = finalClass === 'INFERTILE';
-  const isAbnormal = finalClass === 'ABNORMAL';
 
   return (
     <div className="space-y-3 group">
@@ -58,14 +57,6 @@ export const CandlingAperture: React.FC<CandlingApertureProps> = ({
                   <stop offset="100%" stopColor="#290E05" stopOpacity="0.98" />
                 </>
               )}
-              {isAbnormal && (
-                <>
-                  <stop offset="0%" stopColor="#F87171" stopOpacity="0.85" />
-                  <stop offset="40%" stopColor="#B91C1C" stopOpacity="0.9" />
-                  <stop offset="80%" stopColor="#450A0A" stopOpacity="0.95" />
-                  <stop offset="100%" stopColor="#1A0303" stopOpacity="0.98" />
-                </>
-              )}
             </radialGradient>
           </defs>
 
@@ -95,12 +86,6 @@ export const CandlingAperture: React.FC<CandlingApertureProps> = ({
             <circle cx="200" cy="260" r="60" fill="rgba(217,119,6,0.35)" stroke="rgba(245,158,11,0.5)" strokeWidth="1.5" />
           )}
 
-          {isAbnormal && (
-            <g>
-              <ellipse cx="195" cy="245" rx="55" ry="40" fill="none" stroke="#991B1B" strokeWidth="4" strokeDasharray="8 4" />
-              <circle cx="195" cy="245" r="20" fill="#450A0A" />
-            </g>
-          )}
         </svg>
 
         {/* Optical Metadata Overlay */}

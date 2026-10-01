@@ -16,11 +16,11 @@ This document serves as the **Master Source of Truth & Architecture Guide** for 
    - Never initialize nested `.git` repositories inside subdirectories.
 3. **Biological Model Classes & Genetic Scope (Strict 2-Class Vision Model)**:
    - **Target Breeds**: *Itik Pinas* Pure Lines (`IP-Itim`, `IP-Khaki`) and Commercial Hybrid (`IP-Kayumanggi`).
-   - **Candling Checkpoint**: Day 10 of incubation (single standardized candling inspection).
+   - **Candling Checkpoint**: Day 10 of incubation only.
    - **Dataset Split**: 70% Training, 15% Validation, 15% Testing.
    - **Classes**:
-     - `FERTILE`: Active embryo with spider blood veins or viable development (Action: `ACCEPT` $\to$ Incubation Tray).
-     - `INFERTILE`: Clear unfertilized yolk or dead non-viable embryo / blood ring (Action: `REJECT` $\to$ Salvaged on Day 10 as Penoy @ ₱14.00).
+     - `FERTILE`: Active embryo with spider blood veins or viable shadow (Action: `ACCEPT` $\to$ Incubation Tray).
+     - `INFERTILE`: Any non-fertile Day 10 result (Action: `REJECT` $\to$ Salvaged as Penoy @ ₱14.00).
    - **Fallback State**: Low-confidence captures ($\tau < 0.75$) or synchronization errors MUST trigger `MANUAL_REVIEW`.
 4. **Offline-First Edge Resilience**:
    - The Edge application MUST record every scan to local SQLite (with WAL mode enabled) before syncing over the network.

@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Master UML Use Case Diagram (`OvaLens_Use_Case_Diagram.drawio` & `.html`) to `docs/diagrams/use_cases/`.
 - Updated Capstone Manuscript Chapters 1, 2, 3, and References in `docs/manuscript/` with authentic proposal text and 15 APA 7th academic citations.
 
+### Changed
+- **System scope**: [TASK-NEW-SCOPE-01] standardize OvaLens on Day 10 candling with the strict `FERTILE`/`INFERTILE` class contract across backend, edge, dashboard, firmware, tests, and documentation (2026-09-30).
+- **Data compatibility**: add one-way PostgreSQL and automatic edge SQLite migration paths that merge legacy `ABNORMAL` outcomes into `INFERTILE` before removing obsolete stages and counters (2026-09-30).
+
 ---
 
 ## [0.2.0] - 2026-03-14
