@@ -8,6 +8,26 @@ import time
 import serial
 
 
+def choose_port(available, current="", preferred="", used=()):
+    """Preserve explicit choices; assign distinct initial ports for two boards."""
+    if current and current != "No ports":
+        return current
+    if preferred:
+        return preferred
+    return next((port for port in available if port not in used), "No ports")
+
+
+def egg_status(busy, automatic):
+    """Interpret the deployed conveyor's STATUS flags without inventing movement."""
+    if automatic == "1":
+        return "AUTO_RUNNING"
+    if busy == "1":
+        return "MOVING"
+    if busy == "0" and automatic == "0":
+        return "IDLE"
+    return "RESPONDING"
+
+
 def integer(value, minimum, maximum, label):
     """Validate operator input without silently clamping mechanical settings."""
     text = str(value).strip()

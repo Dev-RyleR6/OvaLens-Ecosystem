@@ -11,7 +11,7 @@ import serial
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from firmware.prototype.controller import (  # noqa: E402
-    PrototypeRig, SerialLink, SimulatedBoard, integer, validate_command,
+    PrototypeRig, SerialLink, SimulatedBoard, choose_port, egg_status, integer, validate_command,
 )
 
 
@@ -58,6 +58,24 @@ def test_operator_validation_does_not_clamp_or_truncate():
     for value in ("abc", "1.5", 90.5, -1, 181):
         with pytest.raises(ValueError):
             integer(value, 0, 180, "Angle")
+
+
+def test_hardware_port_choices_survive_refresh_and_do_not_pick_one_board_twice():
+    ports = ["COM7", "COM5"]
+    assert choose_port(ports, preferred="COM5") == "COM5"
+    assert choose_port(ports, preferred="COM7", used={"COM5"}) == "COM7"
+    assert choose_port(ports, current="COM5", preferred="COM7") == "COM5"
+    assert choose_port(["COM7"], current="COM5") == "COM5"
+    assert choose_port(ports, used={"COM7"}) == "COM5"
+    assert choose_port(["COM5"], used={"COM5"}) == "No ports"
+
+
+@pytest.mark.parametrize("busy,automatic,state", [
+    ("0", "0", "IDLE"), ("1", "0", "MOVING"), ("0", "1", "AUTO_RUNNING"),
+    ("1", "1", "AUTO_RUNNING"), (None, None, "RESPONDING"),
+])
+def test_deployed_conveyor_status_flags(busy, automatic, state):
+    assert egg_status(busy, automatic) == state
 
 
 def test_simulated_calibration_motion_and_two_class_presets():

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Firmware**: [TASK-NEW-FW-APP-01] preserve explicit egg/servo port assignments, add the COM5/COM7 hardware launcher, and display deployed controller status replies (2026-10-02).
+
 ### Added
 - **Firmware**: [TASK-NEW-FW-APP-01] integrate egg and servo prototype controls (2026-10-02)
 - **Workflow**: establish multi-agent orchestra and cross-agent communication protocols (2026-09-15)

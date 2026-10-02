@@ -15,6 +15,24 @@ python -m pip install -r firmware/prototype/requirements.txt
 python -m firmware.prototype.app
 ```
 
+For the prototype rig with **egg controller COM5** and **servo controller COM7**:
+
+```powershell
+python -m firmware.prototype.app --egg-port COM5 --servo-port COM7 --connect
+```
+
+From inside the `firmware` directory, run:
+
+```powershell
+python -m prototype.app --egg-port COM5 --servo-port COM7 --connect
+```
+
+Or double-click `firmware/test_integration.cmd`. This launcher uses real
+hardware, connects both boards, and requests their status. Movement begins
+only when an operator clicks a transport or servo control. Close the other
+standalone controllers and any Arduino serial monitor first so the COM ports
+are available. Explicit port selections are retained when ports are refreshed.
+
 For a hardware-free demo:
 
 ```powershell
@@ -76,6 +94,11 @@ Commands are newline-terminated. The serial monitor tags each line by board
 and retains the most recent 500 entries. TX means the worker wrote the
 command; reported state comes from board replies. Edited fields are requested
 settings; telemetry cards show the board's reported settings.
+
+The deployed conveyor also reports `BUSY:0|1` and `AUTO:0|1`; these update
+the state to Idle, Moving, or Auto Running. The deployed servo's `ANGLE:`
+reply marks it Responding when no `STATE:` line is supplied. Additional
+servo calibration lines such as `NEUTRAL:` remain visible in the serial log.
 
 Simulation exercises calibration, one-step distance tests, presets, and an
 automatic chamber/output/home position loop. Its moves are synthetic and

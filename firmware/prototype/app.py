@@ -10,7 +10,7 @@ import time
 import customtkinter as ctk
 from serial.tools import list_ports
 
-from .controller import PrototypeRig, integer
+from .controller import PrototypeRig, choose_port, egg_status, integer
 
 
 BG = "#0F172A"
@@ -24,7 +24,7 @@ MUTED = "#CBD5E1"
 
 
 class PrototypeApp(ctk.CTk):
-    def __init__(self, simulate=False):
+    def __init__(self, simulate=False, egg_port="", servo_port="", connect=False):
         super().__init__()
         self.title("OvaLens | Edge Hardware Prototype")
         self.geometry("1180x900")
@@ -32,6 +32,8 @@ class PrototypeApp(ctk.CTk):
         self.configure(fg_color=BG)
         self.events = queue.Queue()
         self.rig = PrototypeRig(self.events)
+        self.preferred_ports = {"egg": egg_port, "servo": servo_port}
+        self.egg_flags = {"BUSY": None, "AUTO": None}
         self.connection_widgets = {}
         self.telemetry = {}
         self.entries = {}
@@ -50,6 +52,8 @@ class PrototypeApp(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.close)
         self.after(0, self.refresh_ports)
         self.after(16, self.poll)
+        if connect:
+            self.after(0, self.connect_all)
 
     def label(self, parent, text, size=13, color=TEXT, **kwargs):
         return ctk.CTkLabel(parent, text=text, text_color=color,
@@ -91,7 +95,9 @@ class PrototypeApp(ctk.CTk):
             frame.grid_columnconfigure(0, weight=1)
             self.label(frame, f"{role.title()} ESP32  /  115200 baud", 16).grid(
                 row=0, column=0, columnspan=3, sticky="w", padx=12, pady=8)
-            port = ctk.CTkComboBox(frame, values=["No ports"], state="readonly", width=140)
+            preferred = self.preferred_ports[role]
+            port = ctk.CTkComboBox(frame, values=[preferred or "No ports"], state="readonly", width=140)
+            port.set(preferred or "No ports")
             port.grid(row=1, column=0, sticky="ew", padx=12, pady=6)
             self.button(frame, "Refresh", self.refresh_ports, width=70).grid(
                 row=1, column=1, padx=4)
@@ -136,7 +142,7 @@ class PrototypeApp(ctk.CTk):
         self.log_box.pack(fill="both", expand=True, padx=12, pady=6)
         self.log_box.configure(state="disabled")
         self.button(monitor, "Clear log", self.clear_log, width=100).pack(anchor="e", padx=12, pady=6)
-        self.notice = self.label(self, "Ready. Connect two boards, or enable simulation for both.",
+        self.notice = self.label(self, "Hardware mode. Select each board's COM port and connect both controllers.",
                                  color=MUTED, wraplength=950, anchor="w")
         self.notice.grid(row=4, column=0, sticky="ew", padx=24, pady=(0, 4))
         self.label(self, "Manual hardware prototype • Sorting buttons test presets; no AI inference. "
@@ -282,6 +288,10 @@ class PrototypeApp(ctk.CTk):
         port, _, mock, _, _ = self.connection_widgets[role]
         self.rig.connect(role, "" if port.get() == "No ports" else port.get(), mock.get())
 
+    def connect_all(self):
+        for role in self.rig.links:
+            self.perform(lambda r=role: self.toggle_connection(r))
+
     def status_all(self):
         failures = []
         for role in self.rig.links:
@@ -311,6 +321,17 @@ class PrototypeApp(ctk.CTk):
             label.configure(text=f"{caption}: {value.replace('_', ' ')}")
             if parts[0] == "STATE":
                 self.states[role] = value
+            elif role == "servo" and parts[0] == "ANGLE":
+                self.states[role] = "RESPONDING"
+                state_label, caption = self.telemetry[(role, "STATE")]
+                state_label.configure(text=f"{caption}: RESPONDING")
+        elif role == "egg" and len(parts) == 2 and parts[0] in self.egg_flags:
+            if parts[1] in {"0", "1"}:
+                self.egg_flags[parts[0]] = parts[1]
+                state = egg_status(self.egg_flags["BUSY"], self.egg_flags["AUTO"])
+                self.states[role] = state
+                state_label, caption = self.telemetry[(role, "STATE")]
+                state_label.configure(text=f"{caption}: {state.replace('_', ' ')}")
         elif line == "OK:HOME_SET":
             label, caption = self.telemetry[(role, "POSITION")]
             label.configure(text=f"{caption}: 0")
@@ -326,11 +347,16 @@ class PrototypeApp(ctk.CTk):
             if isinstance(event, tuple):
                 kind, value = event
                 if kind == "ports":
-                    for port, _, _, _, _ in self.connection_widgets.values():
-                        selected = port.get()
-                        port.configure(values=value or ["No ports"])
-                        if selected not in value:
-                            port.set(value[0] if value else "No ports")
+                    used = set()
+                    for role, widgets in self.connection_widgets.items():
+                        port = widgets[0]
+                        selected = choose_port(value, port.get(), self.preferred_ports[role], used)
+                        choices = list(value)
+                        if selected not in choices:
+                            choices.append(selected)
+                        port.configure(values=choices)
+                        port.set(selected)
+                        used.add(selected)
                 else:
                     self.notice.configure(text=f"Port discovery failed: {value}", text_color="#FCA5A5")
                 continue
@@ -342,9 +368,19 @@ class PrototypeApp(ctk.CTk):
                 button.configure(text="Connect" if event.value == "DISCONNECTED" else "Disconnect")
                 if event.value == "DISCONNECTED":
                     self.states[event.role] = "OFFLINE"
+                    if event.role == "egg":
+                        self.egg_flags = {"BUSY": None, "AUTO": None}
                     for (role, field), (label, caption) in self.telemetry.items():
                         if role == event.role:
                             label.configure(text=f"{caption}: {'OFFLINE' if field == 'STATE' else '—'}")
+                elif event.value.startswith("CONNECTED "):
+                    label, caption = self.telemetry[(event.role, "STATE")]
+                    label.configure(text=f"{caption}: Awaiting board status")
+                    self.notice.configure(text="Hardware connected. Use Status: both boards to check replies.",
+                                          text_color=MUTED)
+                elif event.value == "SIMULATED":
+                    self.notice.configure(text="Simulation mode: commands do not move physical hardware.",
+                                          text_color=MUTED)
             elif event.kind == "rx":
                 self.receive(event.role, event.value)
             elif event.kind == "error":
@@ -379,12 +415,25 @@ class PrototypeApp(ctk.CTk):
         self.rig.close()
 
 
-def main():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="OvaLens egg + servo hardware prototype")
     parser.add_argument("--simulate", action="store_true", help="Preselect simulation for both boards")
-    args = parser.parse_args()
+    parser.add_argument("--egg-port", default="", help="Egg controller port, e.g. COM5")
+    parser.add_argument("--servo-port", default="", help="Servo controller port, e.g. COM7")
+    parser.add_argument("--connect", action="store_true", help="Connect both selected boards at startup; queries STATUS only")
+    args = parser.parse_args(argv)
+    if args.connect and not args.simulate and (not args.egg_port or not args.servo_port):
+        parser.error("--connect requires --egg-port and --servo-port in hardware mode")
+    if args.egg_port and args.servo_port and args.egg_port.casefold() == args.servo_port.casefold():
+        parser.error("The egg and servo controllers require different ports")
+    return args
+
+
+def main():
+    args = parse_args()
     ctk.set_appearance_mode("dark")
-    app = PrototypeApp(simulate=args.simulate)
+    app = PrototypeApp(simulate=args.simulate, egg_port=args.egg_port,
+                       servo_port=args.servo_port, connect=args.connect)
     app.mainloop()
 
 
