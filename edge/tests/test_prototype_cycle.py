@@ -41,6 +41,7 @@ class Rig:
 
 class Vision:
     active = True
+    ready = True
 
     def __init__(self):
         self.latest = self.scan = None
@@ -255,6 +256,33 @@ def test_servo_requires_echo_and_mechanical_settling_before_clearance(setup_cycl
     now[0] += 0.31
     cycle.tick()
     assert cycle.state == "CLEARING"
+
+
+def test_initial_move_waits_for_model_and_store_readiness(setup_cycle):
+    cycle, rig, vision, now = setup_cycle
+    vision.ready = False
+    initialize(cycle)
+    assert cycle.state == "INITIALIZING"
+    assert not any(command.startswith("JOG:") for command in rig.links["egg"].commands)
+    vision.ready = True
+    cycle.tick()
+    assert cycle.state == "TO_CAMERA"
+
+
+def test_maximum_servo_settling_does_not_exceed_phase_timeout(setup_cycle):
+    cycle, rig, vision, now = setup_cycle
+    initialize(cycle)
+    complete_move(cycle)
+    record(vision, cycle)
+    cycle.tick()
+    cycle.settings = replace(cycle.settings, servo_settle_ms=5000)
+    complete_move(cycle)
+    event(cycle, "servo", "SORT:FERTILE", "tx")
+    event(cycle, "servo", "ANGLE:30")
+    cycle.tick()
+    now[0] += 5.01
+    cycle.tick()
+    assert cycle.state == "CLEARING" and rig.stops == 0
 
 
 @pytest.mark.parametrize("settings", [

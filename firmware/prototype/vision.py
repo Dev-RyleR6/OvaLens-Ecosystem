@@ -186,6 +186,7 @@ class VisionWorker:
         self.counts = {"FERTILE": 0, "INFERTILE": 0, "MANUAL_REVIEW": 0}
         self.session_id = None
         self.routed_id = None
+        self.ready = False
         self._inspection_id = 0
         self._inspection_after = 0.0
 
@@ -198,6 +199,7 @@ class VisionWorker:
         if self.active:
             raise ValueError("Stop the current camera session before starting another.")
         self._stop.clear()
+        self.ready = False
         with self._lock:
             self.latest = self.last_scan = None
             self._inspection_id += 1
@@ -241,6 +243,7 @@ class VisionWorker:
             store = self.store_factory()
             batch = f"PROTOTYPE-{self.session_id[:8]}"
             store.create_session(self.session_id, batch, "PROTOTYPE-COM5-COM7", "DAY_10", "Prototype operator")
+            self.ready = True
             self.events.put(VisionEvent("status", "Camera detection running"))
             latch, last_frame, sequence, inspection_id = PresenceLatch(), -1, 0, -1
             while not self._stop.is_set():
@@ -294,6 +297,7 @@ class VisionWorker:
         except Exception as exc:
             self.events.put(VisionEvent("error", str(exc)))
         finally:
+            self.ready = False
             if self.camera:
                 self.camera.stop()
             if store:

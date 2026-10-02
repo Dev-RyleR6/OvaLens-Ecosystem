@@ -85,7 +85,8 @@ class AutomaticCycle:
         self.move_sent = self.servo_sent = False
         self.servo_ack_at = None
         self.expected_angle = settings.neutral_angle
-        self._phase("INITIALIZING", "Checking stepper idle and resetting servo", 5)
+        self._phase("INITIALIZING", "Checking camera readiness, stepper idle and servo neutral",
+                    max(5, settings.detection_timeout) + settings.servo_settle_ms / 1000)
         try:
             self.vision.suspend_inspection()
             self.rig.links["egg"].send_many([f"SPEED:{settings.step_delay}", "STATUS"])
@@ -113,7 +114,7 @@ class AutomaticCycle:
     def _servo(self, command, angle, state, message):
         self.expected_angle, self.servo_angle, self.servo_sent = angle, None, False
         self.servo_ack_at = None
-        self._phase(state, message, 5)
+        self._phase(state, message, 5 + self.settings.servo_settle_ms / 1000)
         self.rig.links["servo"].send(command)
 
     def event(self, event):
@@ -183,7 +184,7 @@ class AutomaticCycle:
             if self.state == "INITIALIZING":
                 if self.feedback.get("BUSY") == 1 or self.feedback.get("AUTO") == 1:
                     self.fail("Stepper must be idle before starting the cycle")
-                elif self._idle_at() and servo_ready:
+                elif self._idle_at() and servo_ready and self.vision.ready:
                     self._move(self.settings.camera_steps, "TO_CAMERA", "Moving to camera")
             elif self.state == "TO_CAMERA" and self._idle_at(self.target):
                 self.inspection_after = now + self.settings.settle_ms / 1000
