@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Firmware**: [TASK-NEW-FW-APP-01] integrate egg and servo prototype controls (2026-10-02)
 - **Workflow**: establish multi-agent orchestra and cross-agent communication protocols (2026-09-15)
 - **Workflow**: [TASK-DOC-03] integrate automated task checklist and global agent protocol into workflow (2026-09-15)
 - Created `PROJECT_PLAN.md` living task backlog mapped to Design Science Research Methodology (DSRM) and Agile iteration cycles.

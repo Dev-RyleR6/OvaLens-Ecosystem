@@ -162,7 +162,7 @@ def main():
         run_command(f"{sys.executable} -m pytest tests/test_api.py -v", cwd=os.path.join(repo_root, "backend"))
 
         print("\n🧪 [2/3] Running Edge CV Pipeline Test Suite...")
-        run_command(f"{sys.executable} -m pytest tests/test_edge_pipeline.py -v", cwd=os.path.join(repo_root, "edge"))
+        run_command(f"{sys.executable} -m pytest tests -v", cwd=os.path.join(repo_root, "edge"))
 
         if not args.skip_frontend:
             print("\n🧪 [3/3] Checking React Dashboard Build...")

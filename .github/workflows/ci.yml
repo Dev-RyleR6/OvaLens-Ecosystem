@@ -91,7 +91,7 @@ jobs:
       - name: Run Edge CV Pytest Suite
         run: |
           cd edge
-          python -m pytest tests/test_edge_pipeline.py -v
+          python -m pytest tests -v
 
   dashboard-build:
     name: React Dashboard Typecheck & Production Build
