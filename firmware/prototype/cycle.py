@@ -8,9 +8,8 @@ from .controller import integer
 
 @dataclass(frozen=True)
 class CycleSettings:
-    camera_steps: int = 120
-    gate_steps: int = 40
-    clearance_steps: int = 40
+    camera_steps: int = 1000
+    resume_steps: int = 1000
     step_delay: int = 1800
     neutral_angle: int = 90
     block_angle: int = 30
@@ -19,11 +18,19 @@ class CycleSettings:
     settle_ms: int = 300
     servo_settle_ms: int = 300
     detection_timeout: int = 15
-    mode: str = "Classify & sort"
+    mode: str = "Detect & block"
+
+    @property
+    def gate_steps(self):
+        return self.resume_steps // 2
+
+    @property
+    def clearance_steps(self):
+        return self.resume_steps - self.gate_steps
 
     def validate(self):
-        for name in ("camera_steps", "gate_steps", "clearance_steps"):
-            integer(getattr(self, name), 1, 100000, name.replace("_", " "))
+        integer(self.camera_steps, 1, 100000, "Camera travel")
+        integer(self.resume_steps, 2, 100000, "Resumed travel")
         integer(self.step_delay, 200, 5000, "Step delay")
         for name in ("neutral_angle", "block_angle", "fertile_angle", "infertile_angle"):
             integer(getattr(self, name), 0, 180, name.replace("_", " "))
@@ -205,7 +212,7 @@ class AutomaticCycle:
                         return
                     self.scan = scan
                     self.vision.mark_routed(scan["scan_id"])
-                    self._move(self.settings.gate_steps, "TO_GATE", "Egg recorded · moving to servo")
+                    self._move(self.settings.gate_steps, "TO_GATE", "Egg recorded · moving to halfway servo trigger")
             elif self.state == "TO_GATE" and self._idle_at(self.target):
                 if self.settings.mode == "Detect & block":
                     command, angle = f"SERVO:{self.settings.block_angle}", self.settings.block_angle
@@ -213,7 +220,7 @@ class AutomaticCycle:
                     cls = self.scan["final_class"]
                     command = f"SORT:{cls}"
                     angle = self.settings.fertile_angle if cls == "FERTILE" else self.settings.infertile_angle
-                self._servo(command, angle, "BLOCKING", "Activating servo gate")
+                self._servo(command, angle, "BLOCKING", "Halfway through resumed travel · activating servo gate")
             elif self.state == "BLOCKING" and servo_ready:
                 self._move(self.settings.clearance_steps, "CLEARING", "Servo held · stepper moving past gate")
             elif self.state == "CLEARING" and self._idle_at(self.target):

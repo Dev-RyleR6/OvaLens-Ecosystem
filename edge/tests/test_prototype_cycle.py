@@ -77,7 +77,8 @@ def setup_cycle():
     now = [100.0]
     rig, vision = Rig(), Vision()
     cycle = AutomaticCycle(rig, vision, clock=lambda: now[0])
-    settings = CycleSettings(settle_ms=0, servo_settle_ms=0)
+    settings = CycleSettings(camera_steps=120, resume_steps=80, mode="Classify & sort",
+                             settle_ms=0, servo_settle_ms=0)
     cycle.start(settings)
     return cycle, rig, vision, now
 
@@ -287,6 +288,7 @@ def test_maximum_servo_settling_does_not_exceed_phase_timeout(setup_cycle):
 
 @pytest.mark.parametrize("settings", [
     CycleSettings(camera_steps=0), CycleSettings(step_delay=199), CycleSettings(neutral_angle=181),
+    CycleSettings(resume_steps=1), CycleSettings(resume_steps=100001),
     CycleSettings(detection_timeout=0), CycleSettings(mode="Unknown"),
     CycleSettings(mode="Detect & block", block_angle=90),
 ])
@@ -295,3 +297,34 @@ def test_invalid_settings_do_not_enqueue_any_command(settings):
     with pytest.raises(ValueError):
         AutomaticCycle(rig, vision).start(settings)
     assert not any(link.commands for link in rig.links.values())
+
+
+def test_default_start_moves_1000_and_blocks_halfway_through_next_1000(setup_cycle):
+    cycle, rig, vision, now = setup_cycle
+    cycle.settings = CycleSettings(settle_ms=0, servo_settle_ms=0)
+    initialize(cycle)
+    assert cycle.target == 1000 and rig.links["egg"].commands[-1] == "JOG:1000"
+    complete_move(cycle)
+    assert cycle.state == "INSPECTING"
+    record(vision, cycle, "INFERTILE")
+    cycle.tick()
+    assert cycle.target == 1500 and rig.links["egg"].commands[-1] == "JOG:500"
+    assert rig.links["servo"].commands[-1] == "STATUS"  # gate has not fired yet
+    complete_move(cycle)
+    assert cycle.state == "BLOCKING" and rig.links["servo"].commands[-1] == "SERVO:30"
+    event(cycle, "servo", "SERVO:30", "tx")
+    event(cycle, "servo", "ANGLE:30")
+    cycle.tick()
+    assert cycle.target == 2000 and rig.links["egg"].commands[-1] == "JOG:500"
+    complete_move(cycle)
+    assert rig.links["servo"].commands[-1] == "SERVO:90"
+    event(cycle, "servo", "SERVO:90", "tx")
+    event(cycle, "servo", "ANGLE:90")
+    cycle.tick()
+    assert cycle.completed == 1 and cycle.target == 3000
+
+
+def test_midpoint_split_preserves_total_for_odd_step_distances():
+    settings = CycleSettings(resume_steps=1001).validate()
+    assert settings.gate_steps == 500 and settings.clearance_steps == 501
+    assert settings.gate_steps + settings.clearance_steps == settings.resume_steps

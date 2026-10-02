@@ -219,7 +219,8 @@ class PrototypeApp(ctk.CTk):
         self.cycle_status = self.label(cycle_card, "Ready · 0 cycles completed", color=MUTED,
                                        wraplength=360, anchor="w", justify="left")
         self.cycle_status.pack(fill="x", padx=16, pady=(0, 8))
-        self.label(cycle_card, "Travel distances and gate mode are editable in Calibration.",
+        self.label(cycle_card, "Defaults: move 1000 → detect → resume 1000. Servo activates halfway. "
+                   "Travel and gate mode are editable in Calibration.",
                    color=MUTED, wraplength=360, justify="left").pack(anchor="w", padx=16, pady=(0, 10))
         board_status = ctk.CTkFrame(right, fg_color="transparent")
         board_status.pack(fill="x")
@@ -336,13 +337,12 @@ class PrototypeApp(ctk.CTk):
 
     def _build_egg(self, panel):
         frame = self.card(panel, "Automatic cycle settings · steps")
-        self.cycle_mode = ctk.CTkOptionMenu(frame, values=["Classify & sort", "Detect & block"],
+        self.cycle_mode = ctk.CTkOptionMenu(frame, values=["Detect & block", "Classify & sort"],
                                            fg_color=MAROON, button_color=MAROON)
         self.cycle_mode.pack(fill="x", padx=16, pady=8)
         self.cycle_fields = [
-            ("camera_steps", "Move to camera (steps)", "120", 1, 100000),
-            ("gate_steps", "Camera → servo (steps)", "40", 1, 100000),
-            ("clearance_steps", "Travel with servo held (steps)", "40", 1, 100000),
+            ("camera_steps", "Move to camera (steps)", "1000", 1, 100000),
+            ("resume_steps", "Total travel after detection (steps)", "1000", 2, 100000),
             ("step_delay", "Step delay (µs)", "1800", 200, 5000),
             ("neutral_angle", "Neutral angle (°)", "90", 0, 180),
             ("block_angle", "Detection blocking angle (°)", "30", 0, 180),
@@ -352,7 +352,8 @@ class PrototypeApp(ctk.CTk):
         ]
         for key, caption, initial, _, _ in self.cycle_fields:
             self.field(frame, f"cycle_{key}", caption, initial)
-        self.label(frame, "Classification uses the fertile/infertile angles in the servo panel. "
+        self.label(frame, "Servo triggers at half the resumed travel (500 of 1000 steps by default). "
+                   "Classification uses the fertile/infertile angles in the servo panel. "
                    "Start snapshots these settings. Finite moves stop at each station.",
                    color=MUTED, wraplength=420, justify="left").pack(anchor="w", padx=16, pady=10)
         self.telemetry_card(panel, "egg", "Reported conveyor settings", [

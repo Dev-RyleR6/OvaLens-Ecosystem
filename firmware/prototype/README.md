@@ -42,30 +42,35 @@ sessions remain local; they do not sync to the backend.
 
 **COM5 is the stepper; COM7 is the servo.** In **Calibration**, choose:
 
+- **Detect & block** (default): wait for a stable, recorded egg detection and use a
+  fixed blocking angle, regardless of the fertility class.
 - **Classify & sort**: wait for a stable, recorded fertility result and use
   the Fertile/Infertile angles in the servo panel.
-- **Detect & block**: wait for a stable, recorded egg detection and use a
-  fixed blocking angle, regardless of the fertility class.
 
 Both modes require real camera/model results, confidence at least 0.75,
 and successful SQLite persistence. No imaginary egg or simulated detection
 is injected. An empty view waits for an egg until the timeout.
 
-Set the initial travel, camera-to-servo travel, and clearance travel in
-**motor steps**, then press **START AUTO CYCLE**. Initial test values are
-120 / 40 / 40 steps; these are editable prototype values, not measured rig
-dimensions. Camera index defaults to 0 and starts automatically if needed.
+Set **Move to camera** and **Total travel after detection** in motor steps,
+then press **START AUTO CYCLE**. Both default to **1000 steps**. The resumed
+travel automatically splits at its midpoint: **500 steps to the servo trigger,
+then 500 steps with the servo held**. Odd totals round the first half down;
+the second half contains the remaining steps. These are editable prototype
+values, not measured rig dimensions. Camera index defaults to 0 and starts
+automatically if needed.
 
 1. Query stepper status, require it to be idle, apply the selected speed,
    configure fertility presets, and move the servo to neutral.
-2. Move forward by the camera distance using `JOG`. Wait for the actual
+2. Move forward **1000 steps** by default using `JOG`. Wait for the actual
    target `POSITION`, `BUSY:0`, and `AUTO:0` after the command is written.
 3. Keep the stepper stopped, allow camera settling, then collect three
    stable detections from fresh stationary frames and commit the scan.
-4. Resume for the camera-to-servo distance and wait for target/idle feedback.
-5. Activate the sorting/blocking angle. Require `ANGLE:` feedback and allow
+4. Resume for the first **500 steps** of the 1000-step resumed travel and
+   wait for target/idle feedback.
+5. At the halfway point, activate the sorting/blocking angle (default blocking
+   angle **30°**, neutral **90°**). Require `ANGLE:` feedback and allow
    the configured servo settling time before moving again.
-6. Move through the clearance distance with the servo held, then return the
+6. Move the remaining **500 steps** with the servo held, then return the
    servo to neutral. Count the completed cycle and repeat from step 2.
 
 Distances are **relative forward moves**: repeated cycles advance the belt;
