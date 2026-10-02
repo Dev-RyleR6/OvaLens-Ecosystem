@@ -186,6 +186,8 @@ class VisionWorker:
         self.counts = {"FERTILE": 0, "INFERTILE": 0, "MANUAL_REVIEW": 0}
         self.session_id = None
         self.routed_id = None
+        self._inspection_id = 0
+        self._inspection_after = 0.0
 
     @property
     def active(self):
@@ -196,7 +198,10 @@ class VisionWorker:
         if self.active:
             raise ValueError("Stop the current camera session before starting another.")
         self._stop.clear()
-        self.latest = self.last_scan = None
+        with self._lock:
+            self.latest = self.last_scan = None
+            self._inspection_id += 1
+            self._inspection_after = 0.0
         self.routed_id = None
         self.counts = {"FERTILE": 0, "INFERTILE": 0, "MANUAL_REVIEW": 0}
         self.session_id = str(uuid.uuid4())
@@ -214,6 +219,18 @@ class VisionWorker:
         with self._lock:
             return self.latest
 
+    def begin_inspection(self, after):
+        """Rearm only after a confirmed stationary cycle stop and settling time."""
+        with self._lock:
+            self._inspection_id += 1
+            self._inspection_after = after
+            self.latest = self.last_scan = None
+            return self._inspection_id
+
+    def suspend_inspection(self):
+        """Keep draining camera frames, but do not classify eggs during travel."""
+        return self.begin_inspection(float("inf"))
+
     def _run(self):
         store = None
         try:
@@ -225,10 +242,14 @@ class VisionWorker:
             batch = f"PROTOTYPE-{self.session_id[:8]}"
             store.create_session(self.session_id, batch, "PROTOTYPE-COM5-COM7", "DAY_10", "Prototype operator")
             self.events.put(VisionEvent("status", "Camera detection running"))
-            latch, last_frame, sequence = PresenceLatch(), -1, 0
+            latch, last_frame, sequence, inspection_id = PresenceLatch(), -1, 0, -1
             while not self._stop.is_set():
+                with self._lock:
+                    current_id, after = self._inspection_id, self._inspection_after
+                if current_id != inspection_id:
+                    latch, inspection_id = PresenceLatch(), current_id
                 number, stamp, frame, fps = self.camera.snapshot()
-                if frame is None or number == last_frame or time.monotonic() - stamp > 0.5:
+                if frame is None or number == last_frame or stamp < after or time.monotonic() - stamp > 0.5:
                     if not self.camera.active:
                         break
                     self._stop.wait(0.02)
@@ -236,6 +257,9 @@ class VisionWorker:
                 started = time.perf_counter()
                 last_frame = number
                 result = engine.predict(frame)
+                with self._lock:
+                    if inspection_id != self._inspection_id:
+                        continue
                 candidate = primary_egg(result, frame)
                 state = "NO_EGG" if candidate is None else (
                     "MANUAL_REVIEW" if candidate["confidence"] < 0.75 else candidate["class"])
@@ -246,8 +270,11 @@ class VisionWorker:
                     scan = store.record_scan(str(uuid.uuid4()), self.session_id, batch, sequence,
                                              candidate["class"], candidate["confidence"],
                                              result["inference_ms"], action, result["detections"])
-                    scan = {**scan, "recorded_at": time.monotonic(), "state": state}
+                    scan = {**scan, "recorded_at": time.monotonic(), "state": state,
+                            "captured_at": stamp, "inspection_id": inspection_id}
                     with self._lock:
+                        if inspection_id != self._inspection_id:
+                            continue
                         self.last_scan = scan
                         self.counts[state] += 1
                     self.events.put(VisionEvent("scan", scan))
@@ -255,7 +282,10 @@ class VisionWorker:
                     with self._lock:
                         self.last_scan = None
                 with self._lock:
+                    if inspection_id != self._inspection_id:
+                        continue
                     self.latest = {"frame_number": number, "frame": frame, "timestamp": stamp,
+                                   "inspection_id": inspection_id,
                                    "candidate": candidate, "state": state, "fps": fps,
                                    "inference_ms": result["inference_ms"], "engine": result["engine"],
                                    "counts": dict(self.counts), "last_scan": self.last_scan}

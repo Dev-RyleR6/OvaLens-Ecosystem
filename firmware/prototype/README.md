@@ -34,11 +34,60 @@ a fresh matching detection, confidence at least 0.75, and a scan under 10 second
 old. One sort request is permitted per saved scan. The monitor confirms USB
 write, not physical delivery; this firmware does not provide a shared ACK protocol.
 
-Sorting is operator-controlled. This prototype does not track conveyor cradles,
-schedule an automatic diverter stroke, or sync its prototype sessions to the
-backend. Align the tested egg with the sorting station before requesting its
-preset. Low-confidence eggs require operator inspection. Preview classification
-and manual hardware test buttons do not imply a verified physical routing result.
+Manual sorting remains available when the automatic cycle is stopped. The
+prototype also provides the repeatable integration cycle below. Prototype
+sessions remain local; they do not sync to the backend.
+
+## Automatic stepper / camera / servo cycle
+
+**COM5 is the stepper; COM7 is the servo.** In **Calibration**, choose:
+
+- **Classify & sort**: wait for a stable, recorded fertility result and use
+  the Fertile/Infertile angles in the servo panel.
+- **Detect & block**: wait for a stable, recorded egg detection and use a
+  fixed blocking angle, regardless of the fertility class.
+
+Both modes require real camera/model results, confidence at least 0.75,
+and successful SQLite persistence. No imaginary egg or simulated detection
+is injected. An empty view waits for an egg until the timeout.
+
+Set the initial travel, camera-to-servo travel, and clearance travel in
+**motor steps**, then press **START AUTO CYCLE**. Initial test values are
+120 / 40 / 40 steps; these are editable prototype values, not measured rig
+dimensions. Camera index defaults to 0 and starts automatically if needed.
+
+1. Query stepper status, require it to be idle, apply the selected speed,
+   configure fertility presets, and move the servo to neutral.
+2. Move forward by the camera distance using `JOG`. Wait for the actual
+   target `POSITION`, `BUSY:0`, and `AUTO:0` after the command is written.
+3. Keep the stepper stopped, allow camera settling, then collect three
+   stable detections from fresh stationary frames and commit the scan.
+4. Resume for the camera-to-servo distance and wait for target/idle feedback.
+5. Activate the sorting/blocking angle. Require `ANGLE:` feedback and allow
+   the configured servo settling time before moving again.
+6. Move through the clearance distance with the servo held, then return the
+   servo to neutral. Count the completed cycle and repeat from step 2.
+
+Distances are **relative forward moves**: repeated cycles advance the belt;
+they do not return home or redefine software zero. Camera capture continues
+during travel, while inference/scan recording are suspended. Each camera stop
+explicitly rearms inspection, so neither an old frame nor an earlier saved
+scan can resume the stepper. Manual motion controls are locked during a cycle.
+
+This is a segmented integration cycle with a brief stop at the gate. The
+legacy boards cannot schedule an accurately synchronized servo stroke during
+one continuous stepper move. Missing status/angle feedback, failed storage,
+camera loss, controller errors, low confidence, or a detection timeout enter
+**Manual review** and cancel the loop. There is no automatic retry or reconnect.
+Inspect the issue before pressing Start again. Stop also suspends inference;
+restart the camera for independent manual detection, or start another cycle.
+
+`STOP & HOME + NEUTRAL` cancels the cycle, discards queued commands, sends
+stepper `STOP`, and resets the servo. **The deployed `STOP` returns home and
+can cause movement**; routine station pauses therefore use completed finite
+moves. This prototype does not track multiple cradles or confirm mechanical
+egg passage. Position and angle replies report board state, not independent
+physical encoders. Verify the travel and gate geometry on the rig.
 
 An optical counter recognizes `EVENT:EGG_DETECTED` from the egg board with a
 600 ms debounce. Camera presence and optical triggers are separate counts.
@@ -106,8 +155,8 @@ a successful USB connection alone does not confirm protocol compatibility.
    test from home; return home before repeating it.
 5. Move the servo to test angles (0–180 degrees), save the fertile and
    infertile presets, then test each sorting position.
-6. **Start conveyor** sends `START` to the egg board after both connections
-   are ready. Servo sorting remains manual through the test buttons.
+6. For repeated integration, configure **Automatic cycle settings** and click
+   **START AUTO CYCLE**. Manual test buttons remain available outside a cycle.
 7. **Stop & Home + Neutral** discards pending commands and independently
    queues `STOP` for the egg board and `RESET` for the servo board. If one
    connection fails, the other still receives its command.
@@ -144,17 +193,19 @@ automatic chamber/output/home position loop. Its moves are synthetic and
 do not model motor timing, loads, sensors, or real sorting accuracy.
 
 The prototype uses only Day 10 `FERTILE` / `INFERTILE` model classes.
-Automatic conveyor sorting still requires cradle tracking and a verified
-station/actuation handshake. Local prototype records remain offline.
+Production conveyor sorting still requires cradle tracking and independently
+verified mechanical alignment. Local prototype records remain offline.
 
 ## Verification
 
 ```powershell
-python -m pytest edge/tests/test_firmware_prototype.py edge/tests/test_prototype_vision.py -v
+python -m pytest edge/tests/test_firmware_prototype.py edge/tests/test_prototype_vision.py edge/tests/test_prototype_cycle.py -v
 ```
 
 These tests exercise command validation, board routing, partial serial
 messages, worker-only I/O, shutdown, connection failures, and simulation.
 Detection tests also cover empty/invalid frames, duplicate suppression,
 optical debounce, camera failure, WAL persistence, storage failure, and stale
-or repeated sorting guards. They do not verify physical motor travel or servo alignment.
+or repeated sorting guards. Cycle tests cover both modes, motion feedback,
+station capture rearming, servo settling, repeat/stop behavior, and failures.
+They do not verify physical motor travel or servo alignment.

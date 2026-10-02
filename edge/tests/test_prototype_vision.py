@@ -183,3 +183,39 @@ def test_sorting_refuses_stale_or_mismatched_live_detection():
     worker.stop()
     with pytest.raises(ValueError, match="fresh"):
         worker.routable_scan()
+
+
+def test_cycle_inspection_suspends_travel_and_rearms_after_station_stop(tmp_path):
+    db = LocalDatabaseManager(str(tmp_path / "cycle.db"))
+    class Engine:
+        def predict(self, frame):
+            return {"detections": [candidate()], "inference_ms": 10, "engine": "ONNX test"}
+    worker = VisionWorker(queue.Queue(), engine_factory=Engine, store_factory=lambda: db,
+                          camera_factory=TestCamera)
+    try:
+        worker.start()
+        worker.suspend_inspection()
+        time.sleep(0.15)
+        assert worker.snapshot() is None and worker.last_scan is None
+        assert db.get_uncommitted_scans() == []
+        after = time.monotonic() + 0.15
+        inspection = worker.begin_inspection(after)
+        time.sleep(0.05)
+        assert worker.last_scan is None
+        wait_for(lambda: worker.last_scan is not None and worker.snapshot() is not None)
+        first = worker.routable_scan()
+        assert first["inspection_id"] == inspection and first["captured_at"] >= after
+        worker.suspend_inspection()
+        wait_for(lambda: worker.snapshot() is None)
+        time.sleep(0.15)
+        assert len(db.get_uncommitted_scans()) == 1
+        # The fixture remains in view: explicit stationary inspection, rather
+        # than old presence or a traveling frame, rearms the next cycle.
+        next_id = worker.begin_inspection(time.monotonic())
+        wait_for(lambda: worker.last_scan is not None and worker.snapshot() is not None)
+        assert worker.routable_scan()["inspection_id"] == next_id
+        assert worker.last_scan["scan_id"] != first["scan_id"]
+        assert len(db.get_uncommitted_scans()) == 2
+    finally:
+        worker.stop()
+        wait_for(lambda: not worker.active)

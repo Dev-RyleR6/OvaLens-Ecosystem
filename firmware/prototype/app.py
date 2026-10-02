@@ -14,6 +14,7 @@ from serial.tools import list_ports
 
 from .controller import EventInbox, OpticalCounter, PrototypeRig, choose_port, egg_status, integer
 from .vision import VisionEvent, VisionWorker
+from .cycle import AutomaticCycle, CycleSettings
 
 
 BG = "#0F172A"
@@ -36,6 +37,9 @@ class PrototypeApp(ctk.CTk):
         self.events = EventInbox()
         self.rig = PrototypeRig(self.events)
         self.vision = VisionWorker(self.events)
+        self.cycle = AutomaticCycle(self.rig, self.vision)
+        self._cycle_display = None
+        self._manual_buttons = []
         self.optical = OpticalCounter()
         self._widget_cache = {}
         self._pending_log = deque(maxlen=500)
@@ -108,7 +112,8 @@ class PrototypeApp(ctk.CTk):
             frame = ctk.CTkFrame(row, fg_color=CARD, border_width=1, border_color=BORDER)
             frame.grid(row=0, column=column, sticky="ew", padx=6)
             frame.grid_columnconfigure(0, weight=1)
-            self.label(frame, f"{role.title()} ESP32  /  115200 baud", 16).grid(
+            title = "Stepper" if role == "egg" else "Servo"
+            self.label(frame, f"{title} ESP32  /  115200 baud", 16).grid(
                 row=0, column=0, columnspan=3, sticky="w", padx=12, pady=8)
             preferred = self.preferred_ports[role]
             port = ctk.CTkComboBox(frame, values=[preferred or "No ports"], state="readonly", width=140)
@@ -134,10 +139,10 @@ class PrototypeApp(ctk.CTk):
     def _build_shared_controls(self):
         frame = ctk.CTkFrame(self, fg_color="transparent")
         frame.grid(row=2, column=0, sticky="ew", padx=24, pady=(0, 8))
-        self.start_button = self.button(frame, "START CONVEYOR", self.rig.start,
+        self.start_button = self.button(frame, "START AUTO CYCLE", self.start_cycle,
                                          color=MAROON, width=190)
         self.start_button.pack(side="left", padx=(0, 8))
-        self.button(frame, "STOP & HOME + NEUTRAL", self.rig.stop, color=RED,
+        self.button(frame, "STOP & HOME + NEUTRAL", self.stop_cycle, color=RED,
                     width=240).pack(side="left", padx=8)
         self.button(frame, "Status: both boards", self.status_all, width=160).pack(
             side="left", padx=8)
@@ -168,7 +173,7 @@ class PrototypeApp(ctk.CTk):
         self.notice = self.label(self, "Hardware mode. Select each board's COM port and connect both controllers.",
                                  color=MUTED, wraplength=950, anchor="w")
         self.notice.grid(row=4, column=0, sticky="ew", padx=24, pady=(0, 4))
-        self.label(self, "Detected eggs are saved locally. Sorting requires an operator click. "
+        self.label(self, "Auto cycle: move → detect → move → servo → clear → repeat. "
                    "STOP returns home; use a physical E-stop to cut power.",
                    color=MUTED, wraplength=950).grid(row=5, column=0, sticky="ew", padx=24, pady=(0, 12))
 
@@ -210,13 +215,19 @@ class PrototypeApp(ctk.CTk):
         self.detection_counts.pack(anchor="w", padx=16, pady=(0, 12))
         right = ctk.CTkScrollableFrame(parent, fg_color=BG)
         right.grid(row=0, column=1, sticky="nsew", padx=4, pady=4)
+        cycle_card = self.card(right, "Automatic integration cycle")
+        self.cycle_status = self.label(cycle_card, "Ready · 0 cycles completed", color=MUTED,
+                                       wraplength=360, anchor="w", justify="left")
+        self.cycle_status.pack(fill="x", padx=16, pady=(0, 8))
+        self.label(cycle_card, "Travel distances and gate mode are editable in Calibration.",
+                   color=MUTED, wraplength=360, justify="left").pack(anchor="w", padx=16, pady=(0, 10))
         board_status = ctk.CTkFrame(right, fg_color="transparent")
         board_status.pack(fill="x")
         egg_status_panel = ctk.CTkFrame(board_status, fg_color="transparent")
         egg_status_panel.pack(side="left", fill="both", expand=True)
         servo_status_panel = ctk.CTkFrame(board_status, fg_color="transparent")
         servo_status_panel.pack(side="left", fill="both", expand=True)
-        self.telemetry_card(egg_status_panel, "egg", "Egg controller", [
+        self.telemetry_card(egg_status_panel, "egg", "Stepper controller", [
             ("STATE", "State"), ("POSITION", "Position (steps)")])
         self.telemetry_card(servo_status_panel, "servo", "Servo controller", [
             ("STATE", "State"), ("ANGLE", "Angle (°)")])
@@ -234,6 +245,8 @@ class PrototypeApp(ctk.CTk):
 
     def toggle_camera(self):
         if self.vision.active:
+            if self.cycle.active:
+                self.stop_cycle()
             self.vision.stop()
         else:
             index = integer(self.entries["camera_index"].get(), 0, 9, "Camera index")
@@ -242,7 +255,31 @@ class PrototypeApp(ctk.CTk):
             self.vision.start(index)
             self._video_number = -1
 
+    def start_cycle(self):
+        if self.closing:
+            return
+        values = {key: integer(self.entries[f"cycle_{key}"].get(), low, high, caption)
+                  for key, caption, _, low, high in self.cycle_fields}
+        values["fertile_angle"] = integer(self.entries["fertile_angle"].get(), 0, 180, "Fertile angle")
+        values["infertile_angle"] = integer(self.entries["infertile_angle"].get(), 0, 180, "Infertile angle")
+        settings = CycleSettings(**values, mode=self.cycle_mode.get()).validate()
+        if not all(link.ready and not link.simulated for link in self.rig.links.values()):
+            raise ValueError("Connect both real controllers before starting the cycle.")
+        if not self.vision.active:
+            self.toggle_camera()
+        self.cycle.start(settings)
+        self.notice.configure(text="Automatic cycle started. Distances use motor steps; no home return between eggs.",
+                              text_color=MUTED)
+
+    def stop_cycle(self):
+        self.cycle.stop()
+
+    def require_manual(self):
+        if self.cycle.active:
+            raise ValueError("Stop the automatic cycle before using manual motion or calibration controls.")
+
     def sort_recorded(self):
+        self.require_manual()
         if not all(link.ready and not link.simulated for link in self.rig.links.values()):
             raise ValueError("Connect both real controllers before sorting a recorded egg.")
         scan = self.vision.routable_scan()
@@ -283,10 +320,14 @@ class PrototypeApp(ctk.CTk):
         row.pack(fill="x", padx=12, pady=8)
         for column, (text, callback, color) in enumerate(actions):
             row.grid_columnconfigure(column, weight=1)
-            self.button(row, text, callback, color=color, width=50).grid(
-                row=0, column=column, sticky="ew", padx=4)
+            button = self.button(row, text, callback, color=color, width=50)
+            button.grid(row=0, column=column, sticky="ew", padx=4)
+            if not text.lower().startswith(("stop", "status")):
+                self._manual_buttons.append(button)
 
     def send(self, role, command):
+        if command != "STATUS":
+            self.require_manual()
         self.rig.links[role].send(command)
 
     def number_command(self, role, prefix, key, low, high):
@@ -294,6 +335,26 @@ class PrototypeApp(ctk.CTk):
         self.send(role, f"{prefix}:{value}")
 
     def _build_egg(self, panel):
+        frame = self.card(panel, "Automatic cycle settings · steps")
+        self.cycle_mode = ctk.CTkOptionMenu(frame, values=["Classify & sort", "Detect & block"],
+                                           fg_color=MAROON, button_color=MAROON)
+        self.cycle_mode.pack(fill="x", padx=16, pady=8)
+        self.cycle_fields = [
+            ("camera_steps", "Move to camera (steps)", "120", 1, 100000),
+            ("gate_steps", "Camera → servo (steps)", "40", 1, 100000),
+            ("clearance_steps", "Travel with servo held (steps)", "40", 1, 100000),
+            ("step_delay", "Step delay (µs)", "1800", 200, 5000),
+            ("neutral_angle", "Neutral angle (°)", "90", 0, 180),
+            ("block_angle", "Detection blocking angle (°)", "30", 0, 180),
+            ("settle_ms", "Camera settling (ms)", "300", 0, 5000),
+            ("servo_settle_ms", "Servo settling (ms)", "300", 0, 5000),
+            ("detection_timeout", "Wait for egg (seconds)", "15", 1, 120),
+        ]
+        for key, caption, initial, _, _ in self.cycle_fields:
+            self.field(frame, f"cycle_{key}", caption, initial)
+        self.label(frame, "Classification uses the fertile/infertile angles in the servo panel. "
+                   "Start snapshots these settings. Finite moves stop at each station.",
+                   color=MUTED, wraplength=420, justify="left").pack(anchor="w", padx=16, pady=10)
         self.telemetry_card(panel, "egg", "Reported conveyor settings", [
             ("CHAMBER", "Chamber (steps)"), ("OUTPUT", "Output (steps)"), ("SPEED", "Step delay (µs)")])
         frame = self.card(panel, "Transport & calibration")
@@ -316,11 +377,12 @@ class PrototypeApp(ctk.CTk):
         self.field(frame, "test_distance", "Distance (1–100000 steps)", "500")
         self.field(frame, "test_delay", "Step delay (200–5000 µs)", "800")
         self.actions(frame, [("Run once", self.motion_test, MAROON),
-                             ("Stop & home", lambda: self.rig.links["egg"].send("STOP", priority=True), RED)])
+                             ("Stop & home", self.stop_cycle, RED)])
         self.label(frame, "Return HOME before repeating a distance test.", color=MUTED).pack(
             anchor="w", padx=16, pady=(0, 10))
 
     def motion_test(self):
+        self.require_manual()
         # Validate both before enqueueing either command.
         distance = integer(self.entries["test_distance"].get(), 1, 100000, "Distance")
         speed = integer(self.entries["test_delay"].get(), 200, 5000, "Step delay")
@@ -393,6 +455,8 @@ class PrototypeApp(ctk.CTk):
     def toggle_connection(self, role):
         link = self.rig.links[role]
         if link.active:
+            if self.cycle.active:
+                self.perform(self.stop_cycle)
             link.disconnect()
             self.connection_states[role] = "DISCONNECTING"
             self.connection_widgets[role][4].configure(text="DISCONNECTING…", text_color=MUTED)
@@ -480,6 +544,8 @@ class PrototypeApp(ctk.CTk):
                     text = f"Saved scan {scan['sequence_number']}: {scan['state'].replace('_', ' ')}"
                     self.configure_changed(self.scan_status, text=text)
                 elif event.kind == "error":
+                    if self.cycle.active:
+                        self.cycle.fail(f"Detection: {event.value}")
                     self._vision_error = True
                     self.vision.stop()
                     self.notice.configure(text=f"Detection: {event.value}", text_color="#FCA5A5")
@@ -502,6 +568,7 @@ class PrototypeApp(ctk.CTk):
                 else:
                     self.notice.configure(text=f"Port discovery failed: {value}", text_color="#FCA5A5")
                 continue
+            self.cycle.event(event)
             self.add_log(event.role, event.kind, event.value)
             if event.kind == "connection":
                 self.connection_states[event.role] = event.value
@@ -529,6 +596,8 @@ class PrototypeApp(ctk.CTk):
                 self.notice.configure(text=f"{event.role.title()} controller: {event.value}",
                                        text_color="#FCA5A5")
         if self.events.dropped > self._dropped_seen:
+            if self.cycle.active:
+                self.cycle.fail("Event backlog overflow · inspect manually")
             self._dropped_seen = self.events.dropped
             self._vision_error = True
             self.vision.stop()
@@ -552,9 +621,34 @@ class PrototypeApp(ctk.CTk):
             port, _, _, switch, _ = self.connection_widgets[role]
             self.configure_changed(port, state="disabled" if link.active else "readonly")
             self.configure_changed(switch, state="disabled" if link.active else "normal")
+        if not self.closing:
+            self.cycle.tick()
+        display = (self.cycle.state, self.cycle.message, self.cycle.completed)
+        if display != self._cycle_display:
+            self._cycle_display = display
+            self.configure_changed(self.cycle_status,
+                                   text=f"{self.cycle.state.replace('_', ' ')} · {self.cycle.completed} cycles completed\n{self.cycle.message}",
+                                   text_color="#FBBF24" if self.cycle.state == "MANUAL_REVIEW" else MUTED)
+            self.add_log("CYCLE", self.cycle.state, self.cycle.message)
+            if self.cycle.state == "MANUAL_REVIEW":
+                self.notice.configure(text=self.cycle.message, text_color="#FCA5A5")
+                self.configure_changed(self.detection_label, text="MANUAL REVIEW", text_color="#FBBF24")
+            elif self.cycle.state == "INSPECTING":
+                self.configure_changed(self.detection_label, text="WAITING FOR EGG", text_color=MUTED)
+            elif self.cycle.active:
+                self.configure_changed(self.detection_label, text="TRAVEL · DETECTION PAUSED", text_color=MUTED)
+            elif self.cycle.state == "STOPPED":
+                self.configure_changed(self.detection_label, text="CYCLE STOPPED", text_color=MUTED)
         ready = all(link.ready for link in self.rig.links.values())
         same_mode = len({link.simulated for link in self.rig.links.values()}) == 1
-        self.configure_changed(self.start_button, state="normal" if ready and same_mode and not self.closing else "disabled")
+        hardware = ready and all(not link.simulated for link in self.rig.links.values())
+        self.configure_changed(self.start_button, state="normal" if hardware and not self.cycle.active and not self.closing else "disabled")
+        self.configure_changed(self.cycle_mode, state="disabled" if self.cycle.active else "normal")
+        for button in self._manual_buttons:
+            self.configure_changed(button, state="disabled" if self.cycle.active or self.closing else "normal")
+        self.configure_changed(self.slider, state="disabled" if self.cycle.active or self.closing else "normal")
+        for key, *_ in self.cycle_fields:
+            self.configure_changed(self.entries[f"cycle_{key}"], state="disabled" if self.cycle.active else "normal")
         self.configure_changed(self.camera_button, text="Stop camera" if self.vision.active else "Start camera",
                                state="disabled" if self.closing else "normal")
         self.configure_changed(self.entries["camera_index"], state="disabled" if self.vision.active else "normal")
@@ -565,7 +659,7 @@ class PrototypeApp(ctk.CTk):
                 routable = True
             except ValueError:
                 pass
-        self.configure_changed(self.sort_scan_button, state="normal" if routable and not self.closing else "disabled")
+        self.configure_changed(self.sort_scan_button, state="normal" if routable and not self.cycle.active and not self.closing else "disabled")
         self.render_vision()
         stopped = not any(link.active for link in self.rig.links.values()) and not self.vision.active
         if self.closing and (stopped or time.monotonic() - self._closing_at > 4):
@@ -628,6 +722,7 @@ class PrototypeApp(ctk.CTk):
             return
         self.closing = True
         self._closing_at = time.monotonic()
+        self.cycle.state = "STOPPED"
         self.notice.configure(text="Closing controller connections…", text_color=MUTED)
         self.rig.close()
         self.vision.stop()

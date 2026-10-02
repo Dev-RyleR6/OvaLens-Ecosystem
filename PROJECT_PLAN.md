@@ -218,6 +218,7 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 These features can be claimed by any agent using `python scripts/verify_and_commit.py --task <ID>`:
 
+- [x] **TASK-NEW-FW-CYCLE-01**: Add a repeatable COM5 stepper / COM7 servo integration cycle with configurable travel, stopped camera capture, persisted classification or detection blocking, feedback-driven movement, and timeout/manual-review recovery
 - [x] **TASK-NEW-FW-DET-01**: Optimize the hardware prototype workspace and integrate real camera egg detection, Day 10 classification, local WAL scan recording, and optical trigger visibility
 - [x] **TASK-NEW-FW-APP-01**: Unified CustomTkinter edge prototype for the egg conveyor and servo controllers, with independent serial workers, calibration, shared controls, and explicit hardware-free simulation
 - [ ] **TASK-NEW-WS-01**: Edge-to-Dashboard WebSocket Live Stream (`ws://localhost:8000/ws/live-feed` for real-time remote candling monitor)
