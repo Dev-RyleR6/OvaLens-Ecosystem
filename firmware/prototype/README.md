@@ -59,6 +59,9 @@ the second half contains the remaining steps. These are editable prototype
 values, not measured rig dimensions. Camera index defaults to 0 and starts
 automatically if needed.
 
+The default step delay is **1000 µs** for automatic cycles and manual motion
+tests. A smaller delay requests faster stepping.
+
 1. Query stepper status, require it to be idle, apply the selected speed,
    configure fertility presets, and move the servo to neutral.
 2. Move forward **1000 steps** by default using `JOG`. Wait for the actual

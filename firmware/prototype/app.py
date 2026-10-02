@@ -343,7 +343,7 @@ class PrototypeApp(ctk.CTk):
         self.cycle_fields = [
             ("camera_steps", "Move to camera (steps)", "1000", 1, 100000),
             ("resume_steps", "Total travel after detection (steps)", "1000", 2, 100000),
-            ("step_delay", "Step delay (µs)", "1800", 200, 5000),
+            ("step_delay", "Step delay (µs)", "1000", 200, 5000),
             ("neutral_angle", "Neutral angle (°)", "90", 0, 180),
             ("block_angle", "Detection blocking angle (°)", "30", 0, 180),
             ("settle_ms", "Camera settling (ms)", "300", 0, 5000),
@@ -371,12 +371,12 @@ class PrototypeApp(ctk.CTk):
             self.actions(frame, [
                 (f"Save {name.lower()}", lambda n=name: self.send("egg", f"SET{n}"), BORDER),
                 (f"Go to {name.lower()}", lambda n=name: self.send("egg", f"GOTO:{n}"), BORDER)])
-        self.field(frame, "step_delay", "Step delay (200–5000 µs)", "800")
+        self.field(frame, "step_delay", "Step delay (200–5000 µs)", "1000")
         self.actions(frame, [("Apply speed", lambda: self.number_command(
             "egg", "SPEED", "step_delay", 200, 5000), MAROON)])
         frame = self.card(panel, "Single distance test")
         self.field(frame, "test_distance", "Distance (1–100000 steps)", "500")
-        self.field(frame, "test_delay", "Step delay (200–5000 µs)", "800")
+        self.field(frame, "test_delay", "Step delay (200–5000 µs)", "1000")
         self.actions(frame, [("Run once", self.motion_test, MAROON),
                              ("Stop & home", self.stop_cycle, RED)])
         self.label(frame, "Return HOME before repeating a distance test.", color=MUTED).pack(

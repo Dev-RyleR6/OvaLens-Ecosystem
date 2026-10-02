@@ -10,7 +10,7 @@ from .controller import integer
 class CycleSettings:
     camera_steps: int = 1000
     resume_steps: int = 1000
-    step_delay: int = 1800
+    step_delay: int = 1000
     neutral_angle: int = 90
     block_angle: int = 30
     fertile_angle: int = 30

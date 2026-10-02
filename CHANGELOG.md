@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Firmware**: [TASK-NEW-FW-CYCLE-01] set default stepper delay to 1000 microseconds (2026-10-02)
 - **Firmware**: [TASK-NEW-FW-CYCLE-01] use 1000-step travel with midpoint servo blocking (2026-10-02)
 - **Firmware**: [TASK-NEW-FW-CYCLE-01] wait for detection readiness and servo settling (2026-10-02)
 - **Firmware**: [TASK-NEW-FW-APP-01] preserve explicit egg/servo port assignments, add the COM5/COM7 hardware launcher, and display deployed controller status replies (2026-10-02).
