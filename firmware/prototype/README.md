@@ -1,10 +1,49 @@
 # OvaLens edge hardware prototype
 
-One CustomTkinter desktop app combines the controls from
+One CustomTkinter desktop app combines real camera egg detection with the controls from
 `firmware/esp32_actuator/egg_controller.py` and `servo_controller.py`.
 It uses two independently connected ESP32 boards at **115200 baud**.
 Each board has its own background worker; USB connection, boot wait, reads,
 writes, and disconnection run outside the GUI thread.
+
+## Operator workspace and detection
+
+- **Operate & detect** shows the real camera, Day 10 result, confidence,
+  inference latency, detection counts, optical events, and quick hardware controls.
+- **Calibration** holds conveyor positions, motor tests, and servo presets.
+- **Serial monitor** appends logs while visible and retains the most recent
+  500 entries. Numeric telemetry is coalesced so bursts do not build a stale UI backlog.
+
+Click **Start camera** using camera index 0, or choose the connected candling
+camera's index. Camera initialization, continuous frame draining, ONNX loading,
+three warmup passes, inference, and SQLite writes run outside the GUI thread.
+The preview targets 30 FPS; inference is capped at 10 passes per second and
+uses the newest frame. The existing `edge/models/weights/best.onnx` must load;
+missing cameras/models report an error and do not generate simulated detection results.
+
+Hold one egg in the central camera zone. Three consistent detections record
+one scan; five clear frames rearm detection for the next egg. Empty frames
+are shown as **No egg**. Geometry, illuminated area, and centering are checked
+before classification. Confidence below 0.75 is **Manual review**. Camera,
+storage, or UI backlog errors pause detection and prevent scan-based sorting.
+
+Scans are committed with SQLite WAL to `edge/db/prototype_scans.db` before the
+**Sort recorded egg** button becomes available. This button requests the saved
+Fertile/Infertile preset on the real servo board. It requires both real boards,
+a fresh matching detection, confidence at least 0.75, and a scan under 10 seconds
+old. One sort request is permitted per saved scan. The monitor confirms USB
+write, not physical delivery; this firmware does not provide a shared ACK protocol.
+
+Sorting is operator-controlled. This prototype does not track conveyor cradles,
+schedule an automatic diverter stroke, or sync its prototype sessions to the
+backend. Align the tested egg with the sorting station before requesting its
+preset. Low-confidence eggs require operator inspection. Preview classification
+and manual hardware test buttons do not imply a verified physical routing result.
+
+An optical counter recognizes `EVENT:EGG_DETECTED` from the egg board with a
+600 ms debounce. Camera presence and optical triggers are separate counts.
+It does not infer optical events from conveyor position. The current board must
+emit this event for the counter to advance; no firmware is flashed by the app.
 
 ## Launch
 
@@ -104,18 +143,18 @@ Simulation exercises calibration, one-step distance tests, presets, and an
 automatic chamber/output/home position loop. Its moves are synthetic and
 do not model motor timing, loads, sensors, or real sorting accuracy.
 
-This is a mechanical prototype of the edge app: it does not capture images,
-run inference, record scans, or connect to the backend. It uses only the
-Day 10 `FERTILE` / `INFERTILE` sorting presets. Future automatic sorting must
-add cradle tracking, SQLite WAL scan persistence, and manual review for
-confidence below 0.75 or synchronization errors before driving the rig.
+The prototype uses only Day 10 `FERTILE` / `INFERTILE` model classes.
+Automatic conveyor sorting still requires cradle tracking and a verified
+station/actuation handshake. Local prototype records remain offline.
 
 ## Verification
 
 ```powershell
-python -m pytest edge/tests/test_firmware_prototype.py -v
+python -m pytest edge/tests/test_firmware_prototype.py edge/tests/test_prototype_vision.py -v
 ```
 
 These tests exercise command validation, board routing, partial serial
 messages, worker-only I/O, shutdown, connection failures, and simulation.
-They do not verify physical motor travel or servo alignment.
+Detection tests also cover empty/invalid frames, duplicate suppression,
+optical debounce, camera failure, WAL persistence, storage failure, and stale
+or repeated sorting guards. They do not verify physical motor travel or servo alignment.

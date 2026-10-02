@@ -1,6 +1,7 @@
 """Two-board prototype protocol, isolated from the GUI and production driver."""
 
 from dataclasses import dataclass
+from collections import OrderedDict
 import queue
 import threading
 import time
@@ -144,6 +145,56 @@ class SimulatedBoard:
         self.phase = (self.phase + 1) % 3
         self.next_step = time.monotonic() + 1
         return [f"POSITION:{self.position}", f"STATE:{self.state}"]
+
+
+class EventInbox:
+    """Bound UI backlog and collapse superseded numeric serial telemetry."""
+
+    TELEMETRY = {"POSITION", "CHAMBER", "OUTPUT", "SPEED", "ANGLE", "FERTILE",
+                 "INFERTILE", "BUSY", "AUTO", "NEUTRAL"}
+
+    def __init__(self, capacity=2000):
+        self.capacity = capacity
+        self._items = OrderedDict()
+        self._lock = threading.Lock()
+        self._sequence = 0
+        self.dropped = 0
+
+    def put(self, event):
+        with self._lock:
+            self._sequence += 1
+            key = ("event", self._sequence)
+            if isinstance(event, ControllerEvent) and event.kind == "rx":
+                prefix = event.value.partition(":")[0]
+                if prefix in self.TELEMETRY:
+                    key = (event.role, prefix)
+            self._items[key] = event
+            self._items.move_to_end(key)
+            if len(self._items) > self.capacity:
+                self._items.popitem(last=False)
+                self.dropped += 1
+
+    def get_nowait(self):
+        with self._lock:
+            if not self._items:
+                raise queue.Empty
+            return self._items.popitem(last=False)[1]
+
+
+class OpticalCounter:
+    """Count actual optical events using the firmware's 600 ms lockout."""
+
+    def __init__(self):
+        self.count = 0
+        self.last = float("-inf")
+
+    def feed(self, line, now=None):
+        now = time.monotonic() if now is None else now
+        if line != "EVENT:EGG_DETECTED" or now - self.last < 0.6:
+            return False
+        self.count += 1
+        self.last = now
+        return True
 
 
 class SerialLink:
