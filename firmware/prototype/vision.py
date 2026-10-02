@@ -11,6 +11,9 @@ import uuid
 import cv2
 import numpy as np
 
+CONFIRM_SECONDS = 1.5
+ACCEPT_CONFIDENCE = 0.85
+
 
 @dataclass(frozen=True)
 class VisionEvent:
@@ -35,9 +38,12 @@ def primary_egg(result, frame):
         if not (0 < bw <= 1 and 0 < bh <= 1 and 0 <= confidence <= 1):
             continue
         ratio = bw * width / (bh * height)
-        if not (0.65 <= ratio <= 1.45 and bw * width * bh * height >= 4000):
+        if not (0.65 <= ratio <= 1.45 and 0.01 <= bw * bh <= 0.35):
             continue
-        if not (0.2 <= xc <= 0.8 and 0.2 <= yc <= 0.8):
+        if not (0.3 <= xc <= 0.7 and 0.3 <= yc <= 0.7):
+            continue
+        if not (xc - bw / 2 >= 0 and yc - bh / 2 >= 0 and
+                xc + bw / 2 <= 1 and yc + bh / 2 <= 1):
             continue
         x1, y1 = max(0, int((xc - bw / 2) * width)), max(0, int((yc - bh / 2) * height))
         x2, y2 = min(width, int((xc + bw / 2) * width)), min(height, int((yc + bh / 2) * height))
@@ -46,32 +52,67 @@ def primary_egg(result, frame):
             continue
         candidates.append({**detection, "bbox": [xc, yc, bw, bh], "confidence": confidence,
                            "pixels": (x1, y1, x2, y2)})
-    return max(candidates, key=lambda d: d["confidence"] -
-               0.2 * ((d["bbox"][0] - 0.5) ** 2 + (d["bbox"][1] - 0.5) ** 2), default=None)
+    # A stationary inspection must contain one unambiguous egg, not whichever
+    # of several central model hits happens to score highest in this frame.
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def box_overlap(first, second):
+    """Intersection-over-union of normalized center/size boxes."""
+    ax, ay, aw, ah = first
+    bx, by, bw, bh = second
+    width = max(0, min(ax + aw / 2, bx + bw / 2) - max(ax - aw / 2, bx - bw / 2))
+    height = max(0, min(ay + ah / 2, by + bh / 2) - max(ay - ah / 2, by - bh / 2))
+    intersection = width * height
+    return intersection / (aw * ah + bw * bh - intersection)
 
 
 class PresenceLatch:
-    """Record once per stable egg presence; require clear frames before rearming."""
+    """Require sustained, spatially consistent classification on distinct frames."""
 
-    def __init__(self, stable_frames=3, clear_frames=5):
+    def __init__(self, stable_frames=8, clear_frames=5, stable_seconds=CONFIRM_SECONDS):
         self.stable_frames, self.clear_frames = stable_frames, clear_frames
+        self.stable_seconds = stable_seconds
         self.hits = self.misses = 0
         self.recorded = False
-        self.last_class = None
+        self._reset_evidence()
 
-    def observe(self, candidate):
+    def _reset_evidence(self):
+        self.hits = 0
+        self.last_class = self.last_quality = self.anchor = None
+        self.started_at = self.last_at = None
+        self.duration = 0.0
+        self.minimum_confidence = 1.0
+        self.confirmed = False
+
+    def observe(self, candidate, stamp=None):
+        stamp = time.monotonic() if stamp is None else stamp
         if candidate is None:
             self.misses += 1
-            self.hits = 0
+            self._reset_evidence()
             if self.misses >= self.clear_frames:
-                self.recorded, self.last_class = False, None
+                self.recorded = False
             return False
         self.misses = 0
-        if candidate["class"] != self.last_class:
-            self.hits = 0
-            self.last_class = candidate["class"]
+        quality = candidate["confidence"] >= ACCEPT_CONFIDENCE
+        if (self.last_at is not None and stamp <= self.last_at):
+            # A duplicate timestamp/frame cannot add evidence or bridge a gap.
+            self._reset_evidence()
+            return False
+        if (self.last_at is None or stamp - self.last_at > 0.5 or
+                (not self.confirmed and stamp - self.started_at > 2.0) or
+                candidate["class"] != self.last_class or quality != self.last_quality or
+                box_overlap(candidate["bbox"], self.anchor) < 0.6):
+            self._reset_evidence()
+            self.last_class, self.last_quality = candidate["class"], quality
+            self.anchor = list(candidate["bbox"])
+            self.started_at = stamp
+        self.last_at = stamp
         self.hits += 1
-        if not self.recorded and self.hits >= self.stable_frames:
+        self.duration = stamp - self.started_at
+        self.minimum_confidence = min(self.minimum_confidence, candidate["confidence"])
+        self.confirmed = self.hits >= self.stable_frames and self.duration + 1e-9 >= self.stable_seconds
+        if not self.recorded and self.confirmed:
             self.recorded = True
             return True
         return False
@@ -260,28 +301,36 @@ class VisionWorker:
                 started = time.perf_counter()
                 last_frame = number
                 result = engine.predict(frame)
+                if not str(result.get("engine", "")).startswith("ONNX"):
+                    raise RuntimeError("Real ONNX detection is required; fallback results cannot control the stepper.")
                 with self._lock:
                     if inspection_id != self._inspection_id:
                         continue
                 candidate = primary_egg(result, frame)
+                record = latch.observe(candidate, stamp)
                 state = "NO_EGG" if candidate is None else (
-                    "MANUAL_REVIEW" if candidate["confidence"] < 0.75 else candidate["class"])
-                if latch.observe(candidate):
+                    "VERIFYING" if not latch.confirmed else (
+                        "MANUAL_REVIEW" if latch.minimum_confidence < ACCEPT_CONFIDENCE else candidate["class"]))
+                if record:
                     sequence += 1
                     action = "MANUAL_REVIEW" if state == "MANUAL_REVIEW" else (
                         "ACCEPT" if state == "FERTILE" else "REJECT")
+                    evidence = {"seconds": latch.duration, "frames": latch.hits,
+                                "minimum_confidence": latch.minimum_confidence}
                     scan = store.record_scan(str(uuid.uuid4()), self.session_id, batch, sequence,
-                                             candidate["class"], candidate["confidence"],
-                                             result["inference_ms"], action, result["detections"])
+                                             candidate["class"], latch.minimum_confidence,
+                                             result["inference_ms"], action,
+                                             [{**candidate, "verification": evidence}])
                     scan = {**scan, "recorded_at": time.monotonic(), "state": state,
-                            "captured_at": stamp, "inspection_id": inspection_id}
+                            "captured_at": stamp, "inspection_id": inspection_id,
+                            "verification": evidence, "confirmed_bbox": list(candidate["bbox"])}
                     with self._lock:
                         if inspection_id != self._inspection_id:
                             continue
                         self.last_scan = scan
                         self.counts[state] += 1
                     self.events.put(VisionEvent("scan", scan))
-                elif not latch.recorded:
+                elif not latch.confirmed:
                     with self._lock:
                         self.last_scan = None
                 with self._lock:
@@ -290,6 +339,8 @@ class VisionWorker:
                     self.latest = {"frame_number": number, "frame": frame, "timestamp": stamp,
                                    "inspection_id": inspection_id,
                                    "candidate": candidate, "state": state, "fps": fps,
+                                   "verification_seconds": latch.duration,
+                                   "verification_frames": latch.hits,
                                    "inference_ms": result["inference_ms"], "engine": result["engine"],
                                    "counts": dict(self.counts), "last_scan": self.last_scan}
                 # Bound inference to 10 Hz; camera continuously drains independently.
@@ -317,6 +368,14 @@ class VisionWorker:
                 raise ValueError("A fresh camera detection must be recorded before sorting.")
             if latest["state"] != scan["state"] or scan["state"] == "MANUAL_REVIEW":
                 raise ValueError("Inspect this egg manually; the current detection is not ready to sort.")
+            proof = scan.get("verification", {})
+            if (scan.get("confidence", 0) < ACCEPT_CONFIDENCE or
+                    proof.get("seconds", 0) + 1e-9 < CONFIRM_SECONDS or proof.get("frames", 0) < 8):
+                raise ValueError("A confirmed 1.5-second egg classification is required before sorting.")
+            candidate = latest.get("candidate")
+            if (candidate is None or candidate["confidence"] < ACCEPT_CONFIDENCE or
+                    box_overlap(candidate["bbox"], scan.get("confirmed_bbox", [0, 0, 0, 0])) < 0.6):
+                raise ValueError("The confirmed egg must still be visible in the same camera position.")
             if time.monotonic() - scan["recorded_at"] > 10:
                 raise ValueError("The saved scan is stale. Clear the camera zone and detect the next egg.")
             if scan["scan_id"] == self.routed_id:

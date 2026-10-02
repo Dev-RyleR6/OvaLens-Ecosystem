@@ -174,6 +174,9 @@ def test_only_fresh_persisted_station_capture_resumes_stepper(setup_cycle):
     cycle, rig, vision, now = setup_cycle
     initialize(cycle)
     complete_move(cycle)
+    record(vision, cycle, "VERIFYING")
+    cycle.tick()
+    assert cycle.state == "INSPECTING"
     record(vision, cycle, inspection_id=cycle.inspection_id - 1)
     cycle.tick()
     assert cycle.state == "INSPECTING"

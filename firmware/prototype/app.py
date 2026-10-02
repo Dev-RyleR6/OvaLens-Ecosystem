@@ -13,7 +13,7 @@ from PIL import Image, ImageTk
 from serial.tools import list_ports
 
 from .controller import EventInbox, OpticalCounter, PrototypeRig, choose_port, egg_status, integer
-from .vision import VisionEvent, VisionWorker
+from .vision import ACCEPT_CONFIDENCE, CONFIRM_SECONDS, VisionEvent, VisionWorker
 from .cycle import AutomaticCycle, CycleSettings
 
 
@@ -209,7 +209,9 @@ class PrototypeApp(ctk.CTk):
         self.video_item = self.video.create_image(0, 0, anchor="nw")
         self.detection_label = self.label(left, "NO CAMERA", 24)
         self.detection_label.pack(anchor="w", padx=16, pady=(4, 0))
-        self.detection_metrics = self.label(left, "Confidence —  •  Inference —  •  Camera — FPS", color=MUTED)
+        self.detection_metrics = self.label(left, "Confidence —  •  Inference —  •  Camera — FPS\n"
+                                            "Confirmation: 1.5 seconds · minimum confidence 85%", color=MUTED,
+                                            justify="left", anchor="w")
         self.detection_metrics.pack(anchor="w", padx=16, pady=4)
         self.detection_counts = self.label(left, "Fertile 0  |  Infertile 0  |  Review 0  |  Optical triggers 0", color=MUTED)
         self.detection_counts.pack(anchor="w", padx=16, pady=(0, 12))
@@ -679,11 +681,17 @@ class PrototypeApp(ctk.CTk):
             self.configure_changed(self.detection_counts, text=text)
             if latest and not self._vision_error and now - latest["timestamp"] < 0.5:
                 state = latest["state"]
-                color = {"FERTILE": GREEN, "INFERTILE": RED, "MANUAL_REVIEW": "#FBBF24"}.get(state, MUTED)
-                self.configure_changed(self.detection_label, text=state.replace("_", " "), text_color=color)
+                color = {"FERTILE": GREEN, "INFERTILE": RED, "MANUAL_REVIEW": "#FBBF24",
+                         "VERIFYING": "#FBBF24"}.get(state, MUTED)
+                self.configure_changed(self.detection_label,
+                                       text="VERIFYING EGG" if state == "VERIFYING" else state.replace("_", " "),
+                                       text_color=color)
                 confidence = f"{latest['candidate']['confidence']:.0%}" if latest["candidate"] else "—"
                 text = (f"Confidence {confidence}  •  Inference {latest['inference_ms']} ms  •  "
-                        f"Camera {latest['fps']:.0f} FPS")
+                        f"Camera {latest['fps']:.0f} FPS\n"
+                        f"Confirmation {min(latest.get('verification_seconds', 0), CONFIRM_SECONDS):.1f} / "
+                        f"{CONFIRM_SECONDS:.1f} s · {latest.get('verification_frames', 0)} observations · "
+                        f"minimum {ACCEPT_CONFIDENCE:.0%}")
                 self.configure_changed(self.detection_metrics, text=text)
             elif latest and not self._vision_error:
                 self.configure_changed(self.detection_label, text="WAITING FOR DETECTION", text_color=MUTED)
@@ -712,10 +720,13 @@ class PrototypeApp(ctk.CTk):
         self.video.itemconfigure(self.video_item, image=self._video_image)
         self.video.itemconfigure("placeholder", text="")
         self.video.delete("overlay")
+        self.video.create_rectangle(ox + image.width * 0.3, oy + image.height * 0.3,
+                                    ox + image.width * 0.7, oy + image.height * 0.7,
+                                    outline=BORDER, dash=(5, 4), tags="overlay")
         if latest and latest["candidate"] and now - latest["timestamp"] < 0.3:
             x1, y1, x2, y2 = latest["candidate"]["pixels"]
             self.video.create_rectangle(ox+x1*scale, oy+y1*scale, ox+x2*scale, oy+y2*scale,
-                                        outline="#FBBF24" if latest["state"] == "MANUAL_REVIEW" else "#FFFFFF",
+                                        outline="#FBBF24" if latest["state"] in {"MANUAL_REVIEW", "VERIFYING"} else "#FFFFFF",
                                         width=2, tags="overlay")
 
     def close(self):

@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import queue
+import json
 import sys
 import threading
 import time
@@ -38,17 +39,53 @@ def test_empty_or_invalid_frame_never_becomes_an_infertile_egg():
         assert primary_egg({"detections": [item]}, bright) is None
     assert primary_egg({"detections": [candidate()]}, np.zeros_like(bright)) is None
     assert primary_egg({"detections": [candidate()]}, bright)["class"] == "FERTILE"
+    for bbox in ([0.25, 0.5, 0.2, 0.3], [0.5, 0.5, 0.8, 0.9], [0.7, 0.5, 0.65, 0.9]):
+        assert primary_egg({"detections": [candidate(bbox=bbox)]}, bright) is None
+    assert primary_egg({"detections": [candidate(), candidate(bbox=[0.65, 0.5, 0.2, 0.3])]}, bright) is None
 
 
 def test_presence_latch_records_once_and_rearms_only_after_clear_frames():
     latch = PresenceLatch()
-    assert [latch.observe(candidate()) for _ in range(30)].count(True) == 1
+    assert [latch.observe(candidate(), n / 10) for n in range(30)].count(True) == 1
     for _ in range(4):
         assert not latch.observe(None)
-    assert not latch.observe(candidate())
+    assert not latch.observe(candidate(), 4)
     for _ in range(5):
         latch.observe(None)
-    assert [latch.observe(candidate()) for _ in range(3)] == [False, False, True]
+    assert [latch.observe(candidate(), 5 + n / 10) for n in range(16)] == [False] * 15 + [True]
+
+
+def test_confirmation_needs_real_elapsed_time_and_fresh_observations():
+    latch = PresenceLatch()
+    # Many rapid hits must not substitute for elapsed camera observation time.
+    assert not any(latch.observe(candidate(), n / 100) for n in range(100))
+    assert not latch.confirmed
+    assert not any(latch.observe(candidate(), 0.99) for _ in range(100))
+    assert not latch.confirmed
+    assert not any(latch.observe(candidate(), 2 + n / 10) for n in range(15))
+    assert latch.observe(candidate(), 3.5)
+    assert latch.hits == 16 and latch.duration == pytest.approx(1.5)
+
+
+@pytest.mark.parametrize("interruption", [None, candidate(cls="INFERTILE"),
+    candidate(confidence=0.8), candidate(bbox=[0.65, 0.5, 0.2, 0.3])])
+def test_confirmation_restarts_for_missing_unstable_or_uncertain_egg(interruption):
+    latch = PresenceLatch()
+    for n in range(10):
+        assert not latch.observe(candidate(), n / 10)
+    assert not latch.observe(interruption, 1)
+    assert not any(latch.observe(candidate(), 1.1 + n / 10) for n in range(15))
+    assert latch.observe(candidate(), 2.6)
+
+
+def test_sparse_or_stale_frames_cannot_confirm_a_short_inspection():
+    latch = PresenceLatch()
+    assert not any(latch.observe(candidate(), n * 0.6) for n in range(30))
+    assert not latch.confirmed
+    # Even without a single large gap, fewer than eight observations in two
+    # seconds must not turn into confirmation by simply waiting longer.
+    latch = PresenceLatch()
+    assert not any(latch.observe(candidate(), n * 0.4) for n in range(30))
 
 
 def test_telemetry_flood_is_coalesced_without_losing_optical_events():
@@ -105,7 +142,7 @@ class TestCamera:
 
 
 @pytest.mark.parametrize("confidence,action,state", [
-    (0.95, "ACCEPT", "FERTILE"), (0.7, "MANUAL_REVIEW", "MANUAL_REVIEW")])
+    (0.95, "ACCEPT", "FERTILE"), (0.8, "MANUAL_REVIEW", "MANUAL_REVIEW")])
 def test_detection_is_committed_to_wal_before_sorting(tmp_path, confidence, action, state):
     db = LocalDatabaseManager(str(tmp_path / "scans.db"))
     calls = []
@@ -121,11 +158,17 @@ def test_detection_is_committed_to_wal_before_sorting(tmp_path, confidence, acti
                           camera_factory=TestCamera)
     try:
         worker.start()
+        wait_for(lambda: worker.snapshot() is not None)
+        assert worker.snapshot()["state"] == "VERIFYING" and worker.last_scan is None
+        time.sleep(0.3)
+        assert db.get_uncommitted_scans() == []
         wait_for(lambda: worker.last_scan is not None and worker.snapshot() is not None)
         saved = db.get_uncommitted_scans()
         assert len(saved) == 1 and saved[0]["routing_action"] == action
         assert worker.counts[state] == 1
         assert calls == ["OvaLens-Prototype-Vision"]
+        proof = json.loads(saved[0]["detections_json"])[0]["verification"]
+        assert 1.5 <= proof["seconds"] <= 2 and proof["frames"] >= 8
         with db._get_connection() as connection:
             assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
         if action == "MANUAL_REVIEW":
@@ -164,18 +207,35 @@ def test_storage_failure_holds_detection_for_manual_review():
         worker.routable_scan()
 
 
+@pytest.mark.parametrize("engine_name", ["MOCK", "HEURISTIC_SIMULATION", "PyTorch YOLOv8"])
+def test_fallback_predictions_cannot_create_a_record_or_resume_motion(tmp_path, engine_name):
+    events = queue.Queue()
+    db = LocalDatabaseManager(str(tmp_path / "fallback.db"))
+    class Engine:
+        def predict(self, frame):
+            return {"detections": [candidate()], "inference_ms": 10, "engine": engine_name}
+    worker = VisionWorker(events, engine_factory=Engine, store_factory=lambda: db,
+                          camera_factory=TestCamera)
+    worker.start()
+    wait_for(lambda: not worker.active)
+    assert worker.last_scan is None and db.get_uncommitted_scans() == []
+    assert any(event.kind == "error" and "Real ONNX" in str(event.value) for event in list(events.queue))
+
+
 def test_sorting_refuses_stale_or_mismatched_live_detection():
     worker = VisionWorker(queue.Queue())
     now = time.monotonic()
     worker.last_scan = {"scan_id": "stored", "state": "FERTILE", "final_class": "FERTILE",
-                        "recorded_at": now, "sequence_number": 1}
+                        "recorded_at": now, "sequence_number": 1, "confidence": 0.95,
+                        "verification": {"seconds": 1.5, "frames": 16},
+                        "confirmed_bbox": candidate()["bbox"]}
     worker.latest = {"timestamp": now - 1, "state": "FERTILE"}
     with pytest.raises(ValueError, match="fresh"):
         worker.routable_scan()
     worker.latest = {"timestamp": now, "state": "NO_EGG"}
     with pytest.raises(ValueError, match="manually"):
         worker.routable_scan()
-    worker.latest = {"timestamp": now, "state": "FERTILE"}
+    worker.latest = {"timestamp": now, "state": "FERTILE", "candidate": candidate()}
     worker.last_scan["recorded_at"] = now - 11
     with pytest.raises(ValueError, match="stale"):
         worker.routable_scan()
@@ -219,3 +279,14 @@ def test_cycle_inspection_suspends_travel_and_rearms_after_station_stop(tmp_path
     finally:
         worker.stop()
         wait_for(lambda: not worker.active)
+
+
+@pytest.mark.parametrize("seconds,frames,confidence", [(0.2, 3, 0.95), (1.5, 7, 0.95), (1.5, 16, 0.8)])
+def test_routing_rejects_unconfirmed_or_low_confidence_records(seconds, frames, confidence):
+    worker = VisionWorker(queue.Queue())
+    now = time.monotonic()
+    worker.last_scan = {"scan_id": "stored", "state": "FERTILE", "recorded_at": now,
+                        "confidence": confidence, "verification": {"seconds": seconds, "frames": frames}}
+    worker.latest = {"timestamp": now, "state": "FERTILE", "candidate": candidate()}
+    with pytest.raises(ValueError, match="confirmed"):
+        worker.routable_scan()

@@ -196,13 +196,15 @@ class AutomaticCycle:
             elif self.state == "TO_CAMERA" and self._idle_at(self.target):
                 self.inspection_after = now + self.settings.settle_ms / 1000
                 self.inspection_id = self.vision.begin_inspection(self.inspection_after)
-                self._phase("INSPECTING", "Stopped at camera · waiting for a recorded egg",
+                self._phase("INSPECTING", "Stopped at camera · confirming egg for 1.5 seconds",
                             self.settings.detection_timeout + self.settings.settle_ms / 1000)
             elif self.state == "INSPECTING":
                 latest = self.vision.snapshot()
                 if latest and latest.get("inspection_id") == self.inspection_id and latest["timestamp"] >= self.inspection_after:
                     if latest["state"] == "MANUAL_REVIEW":
                         self.fail("Low confidence egg · inspect manually")
+                        return
+                    if latest["state"] not in {"FERTILE", "INFERTILE"}:
                         return
                     try:
                         scan = self.vision.routable_scan()

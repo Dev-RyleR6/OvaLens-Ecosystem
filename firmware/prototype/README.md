@@ -21,16 +21,33 @@ The preview targets 30 FPS; inference is capped at 10 passes per second and
 uses the newest frame. The existing `edge/models/weights/best.onnx` must load;
 missing cameras/models report an error and do not generate simulated detection results.
 
-Hold one egg in the central camera zone. Three consistent detections record
-one scan; five clear frames rearm detection for the next egg. Empty frames
-are shown as **No egg**. Geometry, illuminated area, and centering are checked
-before classification. Confidence below 0.75 is **Manual review**. Camera,
-storage, or UI backlog errors pause detection and prevent scan-based sorting.
+Hold one egg in the marked central camera zone. Confirmation requires the
+same class and a stable box for **1.5 seconds**, with at least **8 fresh
+observations** within a maximum two-second confirmation window. Frame gaps
+over 0.5 seconds, missing detections, class changes, a confidence crossing of
+the 85% threshold, or box overlap below 60% restart confirmation. Repeated
+timestamps cannot accumulate confirmation time. The preview shows **Verifying
+egg** and elapsed observation time until confirmation completes.
+
+Only one candidate centered within 30–70% of the frame is accepted. Its box
+must fit inside the frame, cover 1–35% of the image, have the specified egg
+aspect ratio, and meet the existing illumination check. Empty, ambiguous,
+clipped, or invalid detections show **No egg**. Five clear frames rearm manual
+detection for another egg; an automatic station stop explicitly rearms it.
+
+Routing requires at least **85% confidence throughout confirmation**; weaker
+consistent results are recorded as **Manual review**. The stored confidence
+is the minimum across the window, and its duration/frame count are saved with
+the scan. This stricter prototype threshold also covers the domain's below
+75% manual-review requirement. Camera, storage, or UI backlog errors pause
+detection. Heuristic/mock fallback predictions are rejected. These filters
+reduce false positives but do not establish accuracy on real eggs without
+validation using the candling camera and representative negative scenes.
 
 Scans are committed with SQLite WAL to `edge/db/prototype_scans.db` before the
 **Sort recorded egg** button becomes available. This button requests the saved
 Fertile/Infertile preset on the real servo board. It requires both real boards,
-a fresh matching detection, confidence at least 0.75, and a scan under 10 seconds
+a fresh matching confirmed detection, confidence at least 0.85, and a scan under 10 seconds
 old. One sort request is permitted per saved scan. The monitor confirms USB
 write, not physical delivery; this firmware does not provide a shared ACK protocol.
 
@@ -47,7 +64,7 @@ sessions remain local; they do not sync to the backend.
 - **Classify & sort**: wait for a stable, recorded fertility result and use
   the Fertile/Infertile angles in the servo panel.
 
-Both modes require real camera/model results, confidence at least 0.75,
+Both modes require real camera/model results, confidence at least 0.85,
 and successful SQLite persistence. No imaginary egg or simulated detection
 is injected. An empty view waits for an egg until the timeout.
 
@@ -66,8 +83,8 @@ tests. A smaller delay requests faster stepping.
    configure fertility presets, and move the servo to neutral.
 2. Move forward **1000 steps** by default using `JOG`. Wait for the actual
    target `POSITION`, `BUSY:0`, and `AUTO:0` after the command is written.
-3. Keep the stepper stopped, allow camera settling, then collect three
-   stable detections from fresh stationary frames and commit the scan.
+3. Keep the stepper stopped, allow camera settling, then confirm a stable
+   classification for 1.5 seconds on fresh stationary frames and commit the scan.
 4. Resume for the first **500 steps** of the 1000-step resumed travel and
    wait for target/idle feedback.
 5. At the halfway point, activate the sorting/blocking angle (default blocking
