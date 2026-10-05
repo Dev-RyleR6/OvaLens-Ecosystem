@@ -218,6 +218,11 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 These features can be claimed by any agent using `python scripts/verify_and_commit.py --task <ID>`:
 
+- [x] **TASK-NEW-EDGE-FLOW-01**: Improve manual diagnostic flow with visible operator states, single-click fresh-frame capture, correlated dedicated inference and deadlines, retryable session finalization, diagnostic target completion, strict batch validation, and session/batch write guards. Automatic hardware sorting remains a separate integration task.
+- [x] **TASK-NEW-EDGE-AUDIT-01**: Audit the main edge operator flow; harden camera/model failures, background UI dispatch, durable scan counters, cancellation, shutdown, CSV exports, and sync acknowledgements; disable incompatible legacy motion. Software regression checks recorded in docs/OVALENS_EDGE_OPERATION_AUDIT.md; automatic sorting remains pending dual-board integration and physical validation.
+- [x] **TASK-NEW-EDGE-START-01**: Fix startup configuration window unsupported Tk color; real startup and operator GUI regression tests passed without hardware.
+- [ ] **TASK-NEW-EDGE-POS-SPEC-01**: Revise the two-ESP32 spaced-holder position-based operation specification and audit database migration requirements; software/hardware implementation remains separate
+
 - [x] **TASK-NEW-FW-CYCLE-01**: Add a repeatable COM5 stepper / COM7 servo integration cycle with configurable travel, stopped camera capture, persisted classification or detection blocking, feedback-driven movement, and timeout/manual-review recovery
 - [x] **TASK-NEW-FW-DET-01**: Optimize the hardware prototype workspace and integrate real camera egg detection, Day 10 classification, local WAL scan recording, and optical trigger visibility
 - [x] **TASK-NEW-FW-APP-01**: Unified CustomTkinter edge prototype for the egg conveyor and servo controllers, with independent serial workers, calibration, shared controls, and explicit hardware-free simulation

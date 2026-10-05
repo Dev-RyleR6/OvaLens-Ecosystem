@@ -140,7 +140,9 @@ class InferenceEngine:
                 conf = float(box.conf[0])
                 cls_id = int(box.cls[0])
                 cls_raw = self.yolo_model.names.get(cls_id, str(cls_id)).lower()
-                cls_norm = CLASS_MAP.get(cls_raw, "FERTILE")
+                cls_norm = CLASS_MAP.get(cls_raw)
+                if cls_norm is None:
+                    continue
 
                 detections.append({
                     "bbox": [round(v, 4) for v in xywhn],
@@ -155,10 +157,12 @@ class InferenceEngine:
             final_cls = primary["class"]
             conf = primary["confidence"]
         else:
-            final_cls = "INFERTILE"
-            conf = 0.85
+            return {"final_class": None, "confidence": 0.0,
+                    "routing_action": "MANUAL_REVIEW", "detections": [],
+                    "error_code": "EGG_NOT_CONFIRMED"}
 
-        action = "ACCEPT" if final_cls == "FERTILE" else "REJECT"
+        action = ("MANUAL_REVIEW" if conf < 0.75 else
+                  "ACCEPT" if final_cls == "FERTILE" else "REJECT")
 
         return {
             "final_class": final_cls,
@@ -172,7 +176,8 @@ class InferenceEngine:
         # Preprocessing: Resize & Normalize with contiguous memory buffer
         img = cv2.resize(frame, (self.imgsz, self.imgsz), interpolation=cv2.INTER_LINEAR)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = np.ascontiguousarray(img, dtype=np.float32) / 255.0
+        dtype = np.float16 if self.onnx_session.get_inputs()[0].type == "tensor(float16)" else np.float32
+        img = np.ascontiguousarray(img, dtype=dtype) / dtype(255.0)
         img = np.transpose(img, (2, 0, 1))  # HWC -> CHW
         img = np.expand_dims(img, axis=0)   # BCHW
 
@@ -181,6 +186,8 @@ class InferenceEngine:
 
         # Parse YOLOv8 output: shape (1, num_classes + 4, num_boxes) -> (1, 6, 8400)
         output = outputs[0][0]  # (6, 8400)
+        if output.ndim != 2 or output.shape[0] != 6:
+            raise ValueError("Expected a two-class YOLO detection output (1, 6, N).")
         output = np.transpose(output, (1, 0))  # (8400, 6)
 
         boxes = output[:, :4]       # xc, yc, w, h
@@ -204,7 +211,9 @@ class InferenceEngine:
             h_n = float(h) / self.imgsz
 
             cls_raw = str(cls_id)
-            cls_norm = CLASS_MAP.get(cls_raw, "FERTILE")
+            cls_norm = CLASS_MAP.get(cls_raw)
+            if cls_norm is None:
+                continue
 
             detections.append({
                 "bbox": [round(xc_n, 4), round(yc_n, 4), round(w_n, 4), round(h_n, 4)],
@@ -218,10 +227,12 @@ class InferenceEngine:
             final_cls = primary["class"]
             conf = primary["confidence"]
         else:
-            final_cls = "INFERTILE"
-            conf = 0.85
+            return {"final_class": None, "confidence": 0.0,
+                    "routing_action": "MANUAL_REVIEW", "detections": [],
+                    "error_code": "EGG_NOT_CONFIRMED"}
 
-        action = "ACCEPT" if final_cls == "FERTILE" else "REJECT"
+        action = ("MANUAL_REVIEW" if conf < 0.75 else
+                  "ACCEPT" if final_cls == "FERTILE" else "REJECT")
 
         return {
             "final_class": final_cls,

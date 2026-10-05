@@ -6,6 +6,8 @@ Ensures non-blocking, zero-latency local scan recording on the conveyor edge mac
 import os
 import sqlite3
 import json
+import math
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
@@ -27,6 +29,7 @@ class LocalDatabaseManager:
         # Enable WAL mode and memory cache pragmas for zero-lag high-throughput recording
         conn.execute("PRAGMA journal_mode = WAL;")
         conn.execute("PRAGMA synchronous = NORMAL;")
+        conn.execute("PRAGMA foreign_keys = ON;")
         conn.execute("PRAGMA cache_size = -8000;")       # 8MB memory cache
         conn.execute("PRAGMA mmap_size = 268435456;")     # 256MB memory map
         conn.execute("PRAGMA temp_store = MEMORY;")
@@ -46,6 +49,7 @@ class LocalDatabaseManager:
                     total_scanned INTEGER DEFAULT 0,
                     fertile_count INTEGER DEFAULT 0,
                     infertile_count INTEGER DEFAULT 0,
+                    manual_review_count INTEGER DEFAULT 0,
                     avg_inference_ms REAL DEFAULT 0.0
                 );
             """)
@@ -69,6 +73,9 @@ class LocalDatabaseManager:
                 );
             """)
 
+            session_columns = {r[1] for r in conn.execute("PRAGMA table_info(local_sessions);")}
+            if "manual_review_count" not in session_columns:
+                conn.execute("ALTER TABLE local_sessions ADD COLUMN manual_review_count INTEGER DEFAULT 0;")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_sync ON local_scans(is_synced);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_session ON local_scans(session_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_batch_seq ON local_scans(batch_id, sequence_number);")
@@ -79,6 +86,10 @@ class LocalDatabaseManager:
     @staticmethod
     def _migrate_legacy_contract(conn: sqlite3.Connection) -> None:
         """Normalize records from the retired domain contract before operation."""
+        conn.execute("CREATE TABLE IF NOT EXISTS local_schema_migrations (version TEXT PRIMARY KEY);")
+        if conn.execute("SELECT 1 FROM local_schema_migrations WHERE version = ?;",
+                        ("two_class_v1",)).fetchone():
+            return
         session_columns = {
             row[1] for row in conn.execute("PRAGMA table_info(local_sessions);").fetchall()
         }
@@ -96,6 +107,7 @@ class LocalDatabaseManager:
         else:
             conn.execute("UPDATE local_sessions SET stage = 'DAY_10' WHERE stage <> 'DAY_10';")
         conn.execute("UPDATE local_scans SET final_class = 'INFERTILE' WHERE final_class = 'ABNORMAL';")
+        conn.execute("INSERT INTO local_schema_migrations (version) VALUES (?);", ("two_class_v1",))
 
     def get_distinct_batches(self) -> List[Dict[str, Any]]:
         """Fetch all unique batches stored in local SQLite with scan counts and latest timestamp."""
@@ -113,7 +125,7 @@ class LocalDatabaseManager:
             """)
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_scans_by_batch(self, batch_id: str, limit: int = 300, class_filter: Optional[str] = None, search_query: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_scans_by_batch(self, batch_id: str, limit: Optional[int] = 300, class_filter: Optional[str] = None, search_query: Optional[str] = None) -> List[Dict[str, Any]]:
         """Fetch scans for a batch or ALL batches with optional class and text filtering."""
         with self._get_connection() as conn:
             query = """
@@ -140,8 +152,10 @@ class LocalDatabaseManager:
                     query += " AND (scan_id LIKE ? OR final_class LIKE ?)"
                     params.extend([f"%{clean_query}%", f"%{clean_query}%"])
 
-            query += " ORDER BY sequence_number DESC LIMIT ?"
-            params.append(limit)
+            query += " ORDER BY sequence_number DESC"
+            if limit is not None:
+                query += " LIMIT ?"
+                params.append(limit)
 
             cursor = conn.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
@@ -155,12 +169,12 @@ class LocalDatabaseManager:
         os.makedirs(output_dir, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        batch_tag = "ALL_BATCHES" if batch_id == "ALL" else batch_id
-        filter_tag = f"_{class_filter.lower()}" if class_filter and class_filter != "ALL" else ""
+        batch_tag = self._filename_tag("ALL_BATCHES" if batch_id == "ALL" else batch_id)
+        filter_tag = f"_{self._filename_tag(class_filter.lower())}" if class_filter and class_filter != "ALL" else ""
         filename = f"OvaLens_{batch_tag}{filter_tag}_{timestamp}.csv"
         filepath = os.path.join(output_dir, filename)
 
-        scans = self.get_scans_by_batch(batch_id, limit=10000, class_filter=class_filter)
+        scans = self.get_scans_by_batch(batch_id, limit=None, class_filter=class_filter)
         with open(filepath, mode="w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(["#", "Scan ID", "Batch Code", "Classification", "Confidence", "Action", "Latency (ms)", "Timestamp (UTC)", "Server Synced"])
@@ -203,10 +217,25 @@ class LocalDatabaseManager:
                     detections: list, image_path: Optional[str] = None) -> Dict[str, Any]:
         if final_class not in {"FERTILE", "INFERTILE"}:
             raise ValueError("final_class must be FERTILE or INFERTILE.")
+        if (not isinstance(confidence, (int, float)) or not math.isfinite(confidence)
+                or not 0 <= confidence <= 1):
+            raise ValueError("confidence must be finite and between 0 and 1.")
+        expected = "ACCEPT" if final_class == "FERTILE" else "REJECT"
+        if routing_action not in {expected, "MANUAL_REVIEW"}:
+            raise ValueError("routing action contradicts classification.")
+        if confidence < 0.75 and routing_action != "MANUAL_REVIEW":
+            raise ValueError("Low confidence requires MANUAL_REVIEW.")
+        if type(sequence_number) is not int or sequence_number < 1 or type(inference_ms) is not int or inference_ms < 0:
+            raise ValueError("Sequence and latency must be nonnegative integers (sequence >= 1).")
         scanned_at = datetime.now(timezone.utc).isoformat()
         det_json = json.dumps(detections)
 
         with self._get_connection() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
+            session = conn.execute("SELECT batch_id, ended_at FROM local_sessions WHERE session_id = ?;",
+                                   (session_id,)).fetchone()
+            if session is None or session["batch_id"] != batch_id or session["ended_at"]:
+                raise ValueError("Scan requires an open session with the same batch ID.")
             conn.execute("""
                 INSERT INTO local_scans (
                     scan_id, session_id, batch_id, sequence_number,
@@ -220,7 +249,8 @@ class LocalDatabaseManager:
             ))
 
             # Update session rollup counters
-            col = "fertile_count" if final_class == "FERTILE" else "infertile_count"
+            col = ("manual_review_count" if routing_action == "MANUAL_REVIEW" else
+                   "fertile_count" if final_class == "FERTILE" else "infertile_count")
             conn.execute(f"""
                 UPDATE local_sessions
                 SET total_scanned = total_scanned + 1,
@@ -320,7 +350,7 @@ class LocalDatabaseManager:
         session_stats = self.get_session_stats(session_id)
         batch_id = session_stats.get("batch_id", "BATCH-UNKNOWN")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"OvaLens_Report_{batch_id}_{timestamp}.csv"
+        filename = f"OvaLens_Report_{self._filename_tag(batch_id)}_{timestamp}.csv"
         filepath = os.path.join(output_dir, filename)
 
         with self._get_connection() as conn:
@@ -349,3 +379,8 @@ class LocalDatabaseManager:
                 ])
 
         return filepath
+
+    @staticmethod
+    def _filename_tag(value: str) -> str:
+        """Keep identifiers in filenames from introducing directories."""
+        return re.sub(r"[^A-Za-z0-9_-]", "_", str(value))[:100] or "UNKNOWN"

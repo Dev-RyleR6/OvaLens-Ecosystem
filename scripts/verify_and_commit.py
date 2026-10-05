@@ -144,6 +144,10 @@ def main():
     parser.add_argument("--skip-tests", action="store_true", help="Skip running test suites (not recommended)")
     parser.add_argument("--skip-frontend", action="store_true", help="Skip frontend build check")
     parser.add_argument("--no-changelog", action="store_true", help="Skip updating CHANGELOG.md")
+    parser.add_argument("--verify-only", action="store_true",
+                        help="Run checks without modifying checklists, changelog, staging, or committing")
+    parser.add_argument("--staged-only", action="store_true",
+                        help="Commit the prepared index without staging unrelated workspace changes")
     args = parser.parse_args()
 
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -170,6 +174,10 @@ def main():
     else:
         print("\n⚠️ Skipping automated test suites as requested.")
 
+    if args.verify_only:
+        print("\nSUCCESS: Verification complete; no files staged or committed.")
+        return
+
     # 2. Update Checklist (PROJECT_PLAN.md & Excel)
     if args.task:
         print(f"\n📋 Updating Task Checklist for [{args.task.upper()}]...")
@@ -181,7 +189,8 @@ def main():
 
     # 4. Git stage and commit
     print("\n📦 Staging files and creating Git commit...")
-    run_command("git add .", cwd=repo_root)
+    if not args.staged_only:
+        run_command("git add .", cwd=repo_root)
     run_command(f'git commit -m "{full_message}"', cwd=repo_root)
 
     print("\n" + "=" * 70)

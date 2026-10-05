@@ -11,6 +11,8 @@ import serial.tools.list_ports
 
 
 class ESP32SerialDriver:
+    # This legacy single-board driver cannot coordinate the sensorless rig.
+    supports_position_cycle = False
     def __init__(self, port: Optional[str] = None, baudrate: int = 115200, timeout: float = 0.1):
         self.port = port
         self.baudrate = baudrate
@@ -79,6 +81,8 @@ class ESP32SerialDriver:
                 self._on_egg_detected_callback()
         elif line.startswith("RESP:PONG"):
             self._last_heartbeat = time.time()
+        elif line == "EVENT:MOTOR_STEP_DONE":
+            pass  # Motor step complete — handled by state machine timing
         elif line.startswith("RESP:"):
             pass
 
@@ -130,3 +134,7 @@ class ESP32SerialDriver:
             except Exception:
                 pass
             self.ser = None
+
+    def set_on_egg_detected(self, callback: Optional[Callable[[], None]]):
+        """Register callback invoked when ESP32 fires EVENT:EGG_DETECTED."""
+        self._on_egg_detected_callback = callback

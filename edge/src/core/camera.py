@@ -6,13 +6,15 @@ Supports clean session on-demand start/stop lifecycle.
 
 import time
 import threading
+import sys
 from typing import Optional, Tuple
 import cv2
 import numpy as np
 
 
 class CameraGrabber:
-    def __init__(self, camera_index: int = 0, width: int = 1280, height: int = 720, fps: int = 30):
+    def __init__(self, camera_index: int = 0, width: int = 1280, height: int = 720, fps: int = 30,
+                 allow_mock: bool = False):
         self.camera_index = camera_index
         self.width = width
         self.height = height
@@ -28,6 +30,9 @@ class CameraGrabber:
         self._current_fps = 0.0
         self._last_fps_time = time.time()
         self._static_bg: Optional[np.ndarray] = None
+        self.allow_mock = allow_mock
+        self.last_error = None
+        self._last_frame_at = 0.0
 
     def _init_static_bg(self):
         """Pre-render darkroom candling aperture background once to minimize CPU cycles."""
@@ -37,57 +42,60 @@ class CameraGrabber:
         self._static_bg = bg
 
     def start(self):
-        """Initialize camera hardware and start continuous frame grabber thread."""
+        """Open/read the camera on its worker; never silently substitute mock frames."""
         if self._is_running:
             return
-
-        if self._static_bg is None:
-            self._init_static_bg()
-
-        self._open_camera()
+        if self._thread and self._thread.is_alive():
+            raise RuntimeError("Previous camera worker is still stopping")
+        self.last_error = None
         self._is_running = True
-        self._thread = threading.Thread(target=self._capture_loop, daemon=True, name="OvaLens-CameraThread")
+        self._thread = threading.Thread(target=self._capture_loop, daemon=True,
+                                        name="OvaLens-CameraThread")
         self._thread.start()
 
     def _open_camera(self):
-        # Try DirectShow on Windows, default on Linux
-        try:
-            self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
-            if not self.cap.isOpened():
-                self.cap = cv2.VideoCapture(self.camera_index)
-        except Exception:
-            self.cap = cv2.VideoCapture(self.camera_index)
-
-        if self.cap and self.cap.isOpened():
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-            self.cap.set(cv2.CAP_PROP_FPS, self.fps)
-            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimum buffer to prevent lag
-            self._is_mock_mode = False
-        else:
+        if self.allow_mock:
             self._is_mock_mode = True
+            self._init_static_bg()
+            return
+        backend = cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_V4L2
+        self.cap = cv2.VideoCapture(self.camera_index, backend)
+        if not self.cap.isOpened():
+            self.cap.release()
+            self.cap = cv2.VideoCapture(self.camera_index)
+        if not self.cap.isOpened():
+            raise RuntimeError("Camera unavailable; check its index and USB connection")
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+        self.cap.set(cv2.CAP_PROP_FPS, self.fps)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self._is_mock_mode = False
 
     def _capture_loop(self):
-        frame_interval = 1.0 / max(1, self.fps)
-        while self._is_running:
-            t_start = time.time()
-            if not self._is_mock_mode and self.cap and self.cap.isOpened():
-                ret, frame = self.cap.read()
-                if ret and frame is not None:
-                    with self._lock:
-                        self._latest_frame = frame
-                    self._update_fps()
+        try:
+            self._open_camera()
+            while self._is_running:
+                if self._is_mock_mode:
+                    frame = self._generate_mock_candling_frame()
+                    time.sleep(1 / max(1, self.fps))
                 else:
-                    time.sleep(0.005)
-            else:
-                # Generate synthetic candling frame with a moving egg silhouette
-                frame = self._generate_mock_candling_frame()
+                    ret, frame = self.cap.read()
+                    if not ret or frame is None:
+                        raise RuntimeError("Camera frame acquisition failed; reconnect before restarting")
                 with self._lock:
                     self._latest_frame = frame
+                    self._last_frame_at = time.monotonic()
                 self._update_fps()
-                elapsed = time.time() - t_start
-                sleep_time = max(0.001, frame_interval - elapsed)
-                time.sleep(sleep_time)
+        except Exception as exc:
+            self.last_error = str(exc)
+        finally:
+            self._is_running = False
+            if self.cap:
+                self.cap.release()
+                self.cap = None
+            with self._lock:
+                self._latest_frame = None
+                self._last_frame_at = 0.0
 
     def _update_fps(self):
         self._fps_count += 1
@@ -127,7 +135,7 @@ class CameraGrabber:
         if not self._is_running:
             return None
         with self._lock:
-            if self._latest_frame is not None:
+            if self._latest_frame is not None and time.monotonic() - self._last_frame_at <= 0.5:
                 return self._latest_frame.copy() if copy else self._latest_frame
             return None
 
@@ -190,14 +198,15 @@ class CameraGrabber:
         }
 
     def stop(self):
-        """Safely release camera resources and stop thread."""
+        """The capture worker owns its camera handle, including release."""
         self._is_running = False
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1.0)
+        if self._thread and self._thread.is_alive():
+            self.last_error = "Camera worker did not stop within one second"
+        else:
             self._thread = None
-        if self.cap and self.cap.isOpened():
-            self.cap.release()
-            self.cap = None
         with self._lock:
             self._latest_frame = None
+            self._last_frame_at = 0.0
         self._current_fps = 0.0

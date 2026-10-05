@@ -6,6 +6,10 @@
 
 **OvaLens Edge** is an offline-first, real-time computer vision application designed to inspect duck eggs on a motorized conveyor, classify embryonic development using YOLOv8 ONNX FP16, and command millisecond-accurate mechanical sorting via an ESP32 microcontroller.
 
+**Current main launcher status:** manual camera diagnostics and explicit simulation preview are available. Automatic sorting and manual ejection are disabled because the legacy single-board controller does not match the dual-ESP32 spaced-holder rig. Simulation and model fallback results are never saved as scans. See [the operation audit](../docs/OVALENS_EDGE_OPERATION_AUDIT.md) for validation results and remaining integration work.
+
+Press **Single Scan** once to wait for a fresh frame and classify it. The interface shows camera, inference, and storage progress; timeouts discard late results. **End Session** cancels unfinished predictions and finalizes local records. If finalization fails, **Retry Finalization** preserves the original session. Reaching the diagnostic target stops additional scans until a new batch is configured.
+
 ---
 
 ## 🌟 Key Subsystem Features
@@ -16,7 +20,7 @@
   - **Thread 3 (IoT Serial Driver)**: Non-blocking PySerial ESP32 driver with delayed ejection timer calculation ($\Delta t = D/v$).
   - **Thread 4 (Local Storage & Sync)**: SQLite WAL mode persistence with background HTTP REST sync worker (`POST /api/v1/scans/sync`).
 - **CustomTkinter 60 FPS Desktop GUI**: Operator interface with real-time HUD, live camera overlay, Day-10 Penoy counter, and manual override triggers (`[SPACEBAR]` and `[R]`).
-- **Graceful Hardware Fallbacks**: Automatically falls back to **Synthetic Candling Stream** and **Mock Actuator** if physical USB camera or ESP32 are disconnected.
+- **Explicit Simulation**: Synthetic camera preview requires selecting simulation at startup. Camera failure in normal mode reports an error and stops accepting frames.
 
 ---
 

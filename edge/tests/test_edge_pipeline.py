@@ -69,9 +69,12 @@ def test_inference_engine_and_latency_benchmark():
         latencies.append(lat)
 
         assert "final_class" in result
-        assert result["final_class"] in ["FERTILE", "INFERTILE"]
+        assert result["final_class"] in ["FERTILE", "INFERTILE", None]
         assert "routing_action" in result
-        assert result["routing_action"] in ["ACCEPT", "REJECT"]
+        assert result["routing_action"] in ["ACCEPT", "REJECT", "MANUAL_REVIEW"]
+        if result["final_class"] is None:
+            assert result["routing_action"] == "MANUAL_REVIEW"
+            assert result["confidence"] == 0.0
         assert 0.0 <= result["confidence"] <= 1.0
         assert "detections" in result
 

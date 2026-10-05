@@ -6,6 +6,7 @@ Asynchronously synchronizes local SQLite egg scans to the central FastAPI / Post
 import time
 import json
 import threading
+import os
 from typing import Optional, List, Dict, Any
 import requests
 
@@ -14,10 +15,10 @@ from ..db.local_db import LocalDatabaseManager
 
 class BackgroundSyncWorker:
     def __init__(self, db_manager: LocalDatabaseManager, api_base_url: str = "http://localhost:8000",
-                 api_key: str = "dev-api-key-123", sync_interval_s: float = 3.0):
+                 api_key: Optional[str] = None, sync_interval_s: float = 3.0):
         self.db = db_manager
         self.api_base_url = api_base_url.rstrip("/")
-        self.api_key = api_key
+        self.api_key = api_key or os.getenv("API_KEY", "")
         self.sync_interval = sync_interval_s
 
         self._is_running = False
@@ -25,12 +26,16 @@ class BackgroundSyncWorker:
         self._is_online = False
         self._last_sync_time: Optional[float] = None
         self._total_synced = 0
+        self.last_error = None
+        self._stop_event = threading.Event()
+        self._registered_sessions = set()
 
     def start(self):
         """Start the background synchronization thread."""
         if self._is_running:
             return
         self._is_running = True
+        self._stop_event.clear()
         self._thread = threading.Thread(target=self._sync_loop, daemon=True, name="OvaLens-SyncThread")
         self._thread.start()
 
@@ -40,14 +45,34 @@ class BackgroundSyncWorker:
                 self._perform_sync()
             except Exception as e:
                 self._is_online = False
-            time.sleep(self.sync_interval)
+                self.last_error = f"Sync failed: {type(e).__name__}: {e}"
+            self._stop_event.wait(self.sync_interval)
 
     def _perform_sync(self):
+        if not self.api_key:
+            self.last_error = "API_KEY is not configured; scans remain local."
+            self._is_online = False
+            return
         uncommitted = self.db.get_uncommitted_scans(limit=50)
         if not uncommitted:
             # Still ping health to update online status
             self._check_health()
             return
+        session_id = uncommitted[0]["session_id"]
+        # Keep each ingestion packet in one session; the backend rollup uses
+        # the first session only. Preserve original batch/device/operator IDs.
+        uncommitted = [r for r in uncommitted if r["session_id"] == session_id]
+        if session_id not in self._registered_sessions:
+            session = self.db.get_session_stats(session_id)
+            if not session:
+                self.last_error = "Local scan references a missing session; sync stopped."
+                self._is_online = False
+                return
+            payload = {key: session[key] for key in (
+                "session_id", "batch_id", "device_id", "stage", "operator_name", "started_at")}
+            if not self.register_session(payload):
+                return
+            self._registered_sessions.add(session_id)
 
         headers = {
             "Content-Type": "application/json",
@@ -84,12 +109,24 @@ class BackgroundSyncWorker:
         resp = requests.post(url, json={"scans": payload_scans}, headers=headers, timeout=5.0)
 
         if resp.status_code == 200:
+            acknowledgement = resp.json()
+            received = acknowledgement.get("total_received")
+            synced = acknowledgement.get("synced_count")
+            duplicates = acknowledgement.get("duplicates_ignored")
+            if (acknowledgement.get("status") != "success" or type(received) is not int or received != len(scan_ids)
+                    or type(synced) is not int or type(duplicates) is not int
+                    or synced < 0 or duplicates < 0 or synced + duplicates != len(scan_ids)):
+                self.last_error = "Invalid sync acknowledgement; local scans retained."
+                self._is_online = False
+                return
             self.db.mark_scans_synced(scan_ids)
+            self.last_error = None
             self._is_online = True
             self._last_sync_time = time.time()
             self._total_synced += len(scan_ids)
         else:
             self._is_online = False
+            self.last_error = f"Scan sync rejected (HTTP {resp.status_code}); local scans retained."
 
     def _check_health(self):
         try:
@@ -120,8 +157,20 @@ class BackgroundSyncWorker:
                 "X-API-Key": self.api_key
             }
             resp = requests.post(url, json=session_data, headers=headers, timeout=4.0)
-            return resp.status_code == 201
-        except Exception:
+            if resp.status_code in (200, 201):
+                body = resp.json()
+                if all(str(body.get(key)) == str(session_data[key])
+                       for key in ("session_id", "batch_id", "device_id", "stage", "operator_name")):
+                    return True
+                self.last_error = "Session acknowledgement does not match local identity."
+                self._is_online = False
+                return False
+            self.last_error = f"Session registration rejected (HTTP {resp.status_code})."
+            self._is_online = False
+            return False
+        except Exception as exc:
+            self.last_error = f"Session registration failed: {type(exc).__name__}."
+            self._is_online = False
             return False
 
     @property
@@ -134,5 +183,6 @@ class BackgroundSyncWorker:
 
     def stop(self):
         self._is_running = False
+        self._stop_event.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1.0)
