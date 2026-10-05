@@ -336,7 +336,7 @@ export const ScanExplorerPage: React.FC = () => {
       ) : viewMode === 'TABLE' ? (
         <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden animate-slide-up stagger-1">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[680px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                   <th

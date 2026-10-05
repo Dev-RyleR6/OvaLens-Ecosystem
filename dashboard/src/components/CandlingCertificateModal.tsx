@@ -1,14 +1,6 @@
 import React from 'react';
-import {
-  FileText,
-  Printer,
-  Download,
-  X,
-  CheckCircle2,
-  ShieldCheck,
-  Building,
-  QrCode,
-} from 'lucide-react';
+import { Printer, ShieldCheck, Building } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { BatchSummary } from '../types';
 import { Dialog } from './ui/dialog';
 
@@ -23,6 +15,7 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
   onClose,
   batch,
 }) => {
+  const { user } = useAuth();
   const lastBatchRef = React.useRef(batch);
   if (batch) {
     lastBatchRef.current = batch;
@@ -146,8 +139,8 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
             </div>
 
             <div className="text-right space-y-1">
-              <div className="inline-block border-b border-slate-400 w-40 pb-0.5 text-center">
-                <span className="font-bold text-slate-900 block">Ryle Gabotero</span>
+              <div className="inline-block border-b border-slate-400 w-48 pb-0.5 text-center">
+                <span className="font-bold text-slate-900 block">{user?.full_name || 'Ryle Gabotero'}</span>
               </div>
               <span className="text-[10px] text-slate-500 block">Lead Candling System Operator</span>
             </div>

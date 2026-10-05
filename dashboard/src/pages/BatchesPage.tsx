@@ -408,7 +408,7 @@ export const BatchesPage: React.FC = () => {
       ) : viewMode === 'TABLE' ? (
         <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[720px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="py-3 px-4 w-10 text-center">
@@ -825,7 +825,7 @@ export const BatchesPage: React.FC = () => {
                         <span className="font-bold text-[#0F172A]">{s.stage} Candling Run</span>
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded">
                           <Zap className="w-3 h-3 text-emerald-600" />
-                          120 eggs/min (2.0 /sec)
+                          {s.total_scanned} eggs candled
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-[11px] text-slate-600">

@@ -48,8 +48,8 @@ export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, 
           <div>
             <h3 className="font-bold text-[#0F172A] text-sm flex items-center gap-2">
               Day 28 Hatch Yield & Revenue Forecast
-              <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                AI Biological Engine
+              <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                Viability Projection Model
               </span>
             </h3>
             <p className="text-[11px] text-slate-500">

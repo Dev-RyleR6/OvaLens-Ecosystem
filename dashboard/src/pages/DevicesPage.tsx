@@ -2,17 +2,13 @@ import React, { useState, useEffect } from 'react';
 import {
   Cpu,
   RefreshCw,
-  Activity,
   Sliders,
   CheckCircle2,
-  HardDrive,
   Radio,
   Save,
   Camera,
   Microscope,
   Zap,
-  Flame,
-  ShieldCheck,
   Play,
   Lightbulb,
 } from 'lucide-react';
@@ -173,7 +169,7 @@ export const DevicesPage: React.FC = () => {
                   Encapsulated Edge Subsystems
                 </span>
 
-                <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                   {/* 1. Camera */}
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
                     <div className="flex items-center gap-1.5 text-slate-700 font-bold">

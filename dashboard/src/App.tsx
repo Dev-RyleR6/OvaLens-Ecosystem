@@ -51,8 +51,8 @@ const ProtectedLayout: React.FC = () => {
     <div className="h-screen w-screen overflow-hidden bg-[#F8FAFC] text-[#0F172A] flex flex-col font-sans relative">
       {/* Top Route Navigation Loading Bar */}
       {isNavigating && (
-        <div className="fixed top-0 left-0 right-0 h-0.5 z-50 overflow-hidden pointer-events-none">
-          <div className="h-full bg-gradient-to-r from-[#800000] via-[#C00000] to-[#357a38] animate-top-loader" />
+        <div className="fixed top-0 left-0 right-0 h-0.5 z-50 overflow-hidden pointer-events-none bg-slate-100">
+          <div className="h-full bg-[#800000] animate-top-loader" />
         </div>
       )}
 

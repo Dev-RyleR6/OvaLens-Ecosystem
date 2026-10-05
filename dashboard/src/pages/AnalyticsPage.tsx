@@ -22,7 +22,7 @@ import { apiClient } from '../api/client';
 import { EconomicYield, MortalityTrends, BreedMetricItem, BatchSummary, BatchAnalyticsResponse, BatchForecastResponse } from '../types';
 import { DataUnavailableState } from '../components/ui/DataUnavailableState';
 import { BatchForecastCard } from '../components/BatchForecastCard';
-import { Filter, RotateCcw, Layers, Info, Bird, Activity, ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { Filter, RotateCcw, Layers, ChevronDown, SlidersHorizontal } from 'lucide-react';
 
 export const AnalyticsPage: React.FC = () => {
   const [economic, setEconomic] = useState<EconomicYield | null>(null);
@@ -132,13 +132,24 @@ export const AnalyticsPage: React.FC = () => {
 
   const isAnyFilterActive = breedFilter !== 'ALL' || statusFilter !== 'ALL' || selectedBatchId !== 'ALL';
   const selectedBatchInfo = batches.find((b) => b.batch_id === selectedBatchId);
+  const isBatchFiltered = selectedBatchId !== 'ALL' && batchAnalytics !== null;
 
-  // 28-day duck egg developmental viability curve
-  const cohortSurvivalData = [
-    { day: 'Day 0 (Set)', viablePct: 100 },
-    { day: 'Day 10 (Candling)', viablePct: 91.2 },
-    { day: 'Day 28 (Hatch)', viablePct: 86.8 },
-  ];
+  // Dynamic 28-day duck egg developmental viability curve
+  const cohortSurvivalData = useMemo(() => {
+    const day10Viable = isBatchFiltered && batchAnalytics
+      ? batchAnalytics.day_10_fertility_rate
+      : (100 - (mortality?.day_10_cull_rate ?? 8.8));
+
+    const day28Viable = isBatchFiltered && batchAnalytics
+      ? (batchAnalytics.actual_hatchability_rate > 0 ? batchAnalytics.actual_hatchability_rate : (batchForecast?.predicted_hatchability_rate ?? 86.8))
+      : 86.8;
+
+    return [
+      { day: 'Day 0 (Set)', viablePct: 100 },
+      { day: 'Day 10 (Candling)', viablePct: Number(day10Viable.toFixed(1)) },
+      { day: 'Day 28 (Hatch)', viablePct: Number(day28Viable.toFixed(1)) },
+    ];
+  }, [isBatchFiltered, batchAnalytics, batchForecast, mortality]);
 
   // Mortality Stages Data
   const mortalityBarData = [
@@ -149,8 +160,6 @@ export const AnalyticsPage: React.FC = () => {
       color: '#D97706',
     },
   ];
-
-  const isBatchFiltered = selectedBatchId !== 'ALL' && batchAnalytics !== null;
 
   const penoyCount = isBatchFiltered ? batchAnalytics.infertile_penoy_day_10 : (economic?.penoy_culled_day_10 ?? 168);
   const salvageRev = isBatchFiltered ? batchAnalytics.penoy_salvage_value_php : (economic?.salvage_revenue_php ?? economic?.estimated_penoy_salvage_value_php ?? 2352.00);
@@ -445,7 +454,7 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(100, Math.max(0, st.rate * 5))}%`, backgroundColor: st.color }}
+                        style={{ width: `${Math.min(100, Math.max(4, st.rate))}%`, backgroundColor: st.color }}
                       />
                     </div>
                     <p className="text-[11px] text-slate-500">{st.desc}</p>
