@@ -6,11 +6,8 @@ import {
   ScanLine,
   TrendingUp,
   Cpu,
-  Microscope,
   Users,
-  FileText,
   Settings,
-  Archive,
   HardDrive,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -34,10 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
   ];
 
   const adminNav = [
-    { to: '/records', label: 'Historical Records', icon: Archive, minRole: ['ADMIN', 'MANAGER', 'OPERATOR'] },
-    { to: '/models', label: 'Vision Model (ONNX)', icon: Microscope, minRole: ['ADMIN', 'MANAGER', 'OPERATOR'] },
     { to: '/users', label: 'User & Access', icon: Users, minRole: ['ADMIN'] },
-    { to: '/logs', label: 'Audit Trail Logs', icon: FileText, minRole: ['ADMIN', 'MANAGER'] },
     { to: '/settings', label: 'Hatchery Settings', icon: Settings, minRole: ['ADMIN', 'MANAGER'] },
   ].filter(item => item.minRole.includes(userRole));
 

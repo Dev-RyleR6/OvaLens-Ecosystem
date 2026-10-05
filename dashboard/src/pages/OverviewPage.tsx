@@ -19,7 +19,6 @@ import {
 } from 'recharts';
 
 import { Badge } from '../components/Badge';
-import { TrayMatrix } from '../components/TrayMatrix';
 import { BatchProgressTimeline } from '../components/BatchProgressTimeline';
 import { apiClient } from '../api/client';
 import { AnalyticsOverview, BatchSummary, EggScan, EconomicYield } from '../types';
@@ -467,11 +466,6 @@ export const OverviewPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 42-Egg Candling Tray Matrix */}
-      <TrayMatrix
-        batchCode={currentBatch?.batch_code || "BATCH-2026-08-KAY-01"}
-        trayNumber={1}
-      />
     </div>
   );
 };

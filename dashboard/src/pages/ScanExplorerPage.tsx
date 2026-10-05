@@ -11,8 +11,6 @@ import {
   LayoutGrid,
   ArrowUpDown,
   Zap,
-  Volume2,
-  VolumeX,
   RefreshCw,
   Layers,
 } from 'lucide-react';
@@ -28,30 +26,6 @@ import { EmptyState } from '../components/ui/EmptyState';
 type ViewMode = 'TABLE' | 'GRID';
 type SortField = 'sequence_number' | 'confidence' | 'inference_ms' | 'scanned_at';
 type SortOrder = 'asc' | 'desc';
-
-// Acoustic feedback synthesis via HTML5 Web Audio API
-const playAcousticFeedback = (isAccept: boolean) => {
-  try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const audioCtx = new AudioContextClass();
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = isAccept ? 'sine' : 'triangle';
-    osc.frequency.setValueAtTime(isAccept ? 880 : 330, audioCtx.currentTime); // High pitch for Fertile, low for Cull
-    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.08);
-  } catch (e) {
-    // Audio context may be restricted before user gesture
-  }
-};
 
 export const ScanExplorerPage: React.FC = () => {
   const [scans, setScans] = useState<EggScan[]>([]);
@@ -72,11 +46,10 @@ export const ScanExplorerPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Live Auto-Refresh & Audio Toggles
+  // Live Auto-Refresh
   const [selectedScan, setSelectedScan] = useState<EggScan | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isLiveAutoRefresh, setIsLiveAutoRefresh] = useState(false);
-  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
 
   // Human-in-the-Loop Override Prompt Modal State
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
@@ -145,9 +118,6 @@ export const ScanExplorerPage: React.FC = () => {
       const updated = await apiClient.overrideScanClassification(selectedScan.scan_id, targetClass, reason);
       setSelectedScan({ ...updated });
       fetchScans();
-      if (isSoundEnabled) {
-        playAcousticFeedback(targetClass === 'FERTILE');
-      }
       setOverrideToast(`Scan #${selectedScan.sequence_number ?? 0} reclassified to ${targetClass}. Logged in Audit Trail.`);
       setTimeout(() => setOverrideToast(null), 4000);
     } catch (err) {
@@ -248,17 +218,6 @@ export const ScanExplorerPage: React.FC = () => {
           >
             <span className={`w-2 h-2 rounded-full ${isLiveAutoRefresh ? 'bg-emerald-600 animate-pulse' : 'bg-slate-400'}`} />
             <span>{isLiveAutoRefresh ? 'Live Ingest (3s)' : 'Live Ingest: Off'}</span>
-          </button>
-
-          {/* Sound Toggle */}
-          <button
-            onClick={() => setIsSoundEnabled(prev => !prev)}
-            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-              isSoundEnabled ? 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-slate-100 border-slate-200 text-slate-400'
-            }`}
-            title={isSoundEnabled ? "Sound Enabled" : "Sound Muted"}
-          >
-            {isSoundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
 
           <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">

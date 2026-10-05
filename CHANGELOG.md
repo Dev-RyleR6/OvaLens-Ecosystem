@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Firmware**: [TASK-NEW-FW-APP-01] preserve explicit egg/servo port assignments, add the COM5/COM7 hardware launcher, and display deployed controller status replies (2026-10-02).
 
 ### Added
+- **Edge App & Firmware**: [TASK-EDGE-TRK-01 / TASK-FW-STP-01] engineered event-driven ChamberController FSM, dedicated InferenceWorker thread, StartupConfigWindow pre-operation batch dialog, and ESP32 motor commands (2026-10-05).
 - **Firmware**: [TASK-NEW-FW-CYCLE-01] add automatic stepper camera and servo cycle (2026-10-02)
 - **Firmware**: [TASK-NEW-FW-DET-01] optimize operator workspace and add egg detection (2026-10-02)
 - **Firmware**: [TASK-NEW-FW-APP-01] integrate egg and servo prototype controls (2026-10-02)
@@ -32,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Capstone Manuscript Chapters 1, 2, 3, and References in `docs/manuscript/` with authentic proposal text and 15 APA 7th academic citations.
 
 ### Changed
+- **Dashboard**: streamline web app into defense-ready 5-page portal; consolidate historical records into Batches and Analytics, prune mock MLOps ModelsPage and redundant AuditLogsPage, remove synthetic 42-slot tray matrix in favor of linear conveyor velocity telemetry, eliminate audio beeps, and convert financial simulator into data-driven Day 10 economic recovery model (2026-10-06).
 - **System scope**: [TASK-NEW-SCOPE-01] standardize OvaLens on Day 10 candling with the strict `FERTILE`/`INFERTILE` class contract across backend, edge, dashboard, firmware, tests, and documentation (2026-09-30).
 - **Data compatibility**: add one-way PostgreSQL and automatic edge SQLite migration paths that merge legacy `ABNORMAL` outcomes into `INFERTILE` before removing obsolete stages and counters (2026-09-30).
 

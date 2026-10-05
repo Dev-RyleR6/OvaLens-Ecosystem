@@ -4,7 +4,6 @@ import {
   TrendingUp,
   Zap,
   Award,
-  Calculator,
   ShieldAlert,
   Percent,
   CheckCircle2,
@@ -39,11 +38,6 @@ export const AnalyticsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
 
-  // Dynamic Financial Simulator sliders
-  const [customEggs, setCustomEggs] = useState(168);
-  const [customPrice, setCustomPrice] = useState(14.00);
-  const [electricityRate, setElectricityRate] = useState(12.50); // PHP per kWh
-
   const fetchData = async () => {
     setIsLoading(true);
     setIsError(false);
@@ -58,9 +52,6 @@ export const AnalyticsPage: React.FC = () => {
       setMortality(mData);
       setBreedMetrics(Array.isArray(bData) ? bData : []);
       setBatches(Array.isArray(batchList) ? batchList : []);
-      if (eData?.penoy_culled_day_10) {
-        setCustomEggs(eData.penoy_culled_day_10);
-      }
     } catch (err) {
       console.error("Error fetching analytics data:", err);
       setIsError(true);
@@ -78,9 +69,6 @@ export const AnalyticsPage: React.FC = () => {
     if (batchId === 'ALL') {
       setBatchAnalytics(null);
       setBatchForecast(null);
-      if (economic?.penoy_culled_day_10) {
-        setCustomEggs(economic.penoy_culled_day_10);
-      }
       return;
     }
 
@@ -92,9 +80,6 @@ export const AnalyticsPage: React.FC = () => {
       ]);
       setBatchAnalytics(data);
       setBatchForecast(forecast);
-      if (data && typeof data.infertile_penoy_day_10 === 'number') {
-        setCustomEggs(data.infertile_penoy_day_10);
-      }
     } catch (err) {
       console.error('Failed to load batch analytics/forecast:', err);
     } finally {
@@ -164,16 +149,6 @@ export const AnalyticsPage: React.FC = () => {
       color: '#D97706',
     },
   ];
-
-  // Dynamic calculations
-  const safeCustomEggs = Number(customEggs) || 0;
-  const safeCustomPrice = Number(customPrice) || 14.00;
-  const safeElectricityRate = Number(electricityRate) || 12.50;
-
-  const dynamicPenoySales = safeCustomEggs * safeCustomPrice;
-  const dynamicKwhSaved = safeCustomEggs * 18 * 0.015; // 0.015 kWh/egg/day across 18 days
-  const dynamicPowerSavings = dynamicKwhSaved * safeElectricityRate;
-  const dynamicTotalBenefit = dynamicPenoySales + dynamicPowerSavings;
 
   const isBatchFiltered = selectedBatchId !== 'ALL' && batchAnalytics !== null;
 
@@ -378,69 +353,66 @@ export const AnalyticsPage: React.FC = () => {
         />
       </div>
 
-      {/* Interactive Day-10 Penoy Economic Calculator Card */}
+      {/* Day-10 Penoy Economic Recovery Model */}
       <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs">
         <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-          <Calculator className="w-4 h-4 text-[#800000]" />
+          <Coins className="w-4 h-4 text-[#800000]" />
           <div>
             <h3 className="text-base font-bold text-[#0F172A]">
-              Day-10 Penoy Economic Yield Simulator
+              Day-10 Penoy Economic Recovery Model
             </h3>
             <p className="text-xs text-slate-500">
-              Estimate commercial revenue recovered by early culling unfertilized eggs on Day 10 instead of waiting until Day 28.
+              Commercial value recovered by early-diverting unfertilized eggs on Day 10 into the local food market instead of incubating to Day 28.
             </p>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Slider 1: Eggs Culled */}
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-            <div className="flex justify-between text-xs">
-              <label className="font-bold text-slate-700">Day 10 Infertile Eggs:</label>
-              <span className="font-extrabold text-[#800000]">{safeCustomEggs} eggs</span>
+          {/* Recovery Metric 1: Food Salvage */}
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+            <span className="text-xs font-bold text-slate-600 block">Direct Penoy Food Salvage</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-black text-amber-800 font-mono">
+                ₱{salvageRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </span>
             </div>
-            <input
-              type="range"
-              min="0"
-              max="500"
-              step="5"
-              value={safeCustomEggs}
-              onChange={(e) => setCustomEggs(Number(e.target.value))}
-              className="w-full accent-[#800000] cursor-pointer"
-            />
-            <span className="text-[11px] text-slate-500 block">Simulate 0 to 500 tray capacity</span>
+            <p className="text-[11px] text-slate-500">
+              <strong className="text-slate-800">{penoyCount} eggs</strong> @ fixed farmgate rate of ₱14.00/egg
+            </p>
           </div>
 
-          {/* Slider 2: Penoy Market Price */}
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-            <div className="flex justify-between text-xs">
-              <label className="font-bold text-slate-700">Penoy Selling Price:</label>
-              <span className="font-extrabold text-amber-700">₱{safeCustomPrice.toFixed(2)} / egg</span>
+          {/* Recovery Metric 2: Incubator Power Avoided */}
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+            <span className="text-xs font-bold text-slate-600 block">Incubator Power Avoided</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-black text-emerald-800 font-mono">
+                ₱{powerSaved.toFixed(2)}
+              </span>
             </div>
-            <input
-              type="range"
-              min="10"
-              max="22"
-              step="0.5"
-              value={safeCustomPrice}
-              onChange={(e) => setCustomPrice(Number(e.target.value))}
-              className="w-full accent-[#800000] cursor-pointer"
-            />
-            <span className="text-[11px] text-slate-500 block">Local commercial market: ₱12–₱18 / egg</span>
+            <p className="text-[11px] text-slate-500">
+              <strong className="text-slate-800">{kwhSaved.toFixed(1)} kWh</strong> avoided across 18 unincubated days
+            </p>
           </div>
 
-          {/* Calculated Output Box */}
-          <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 flex flex-col justify-center text-center">
-            <span className="text-xs text-amber-800 font-bold uppercase tracking-wider">
-              Total Economic Value Recovered
+          {/* Recovery Metric 3: Total Realized Value */}
+          <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 flex flex-col justify-center space-y-1">
+            <span className="text-xs text-amber-900 font-bold uppercase tracking-wider block">
+              Total Realized Recovery
             </span>
-            <span className="text-2xl font-black text-amber-900 mt-1">
-              ₱{dynamicTotalBenefit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            <span className="text-2xl font-black text-[#800000] font-mono">
+              ₱{totalBenefit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </span>
-            <span className="text-[11px] text-amber-700 font-medium mt-0.5">
-              ₱{dynamicPenoySales.toFixed(2)} food salvage + ₱{dynamicPowerSavings.toFixed(2)} power saved
+            <span className="text-[11px] text-amber-800 font-medium">
+              Dual dividend: edible salvage + thermal load reduction
             </span>
           </div>
+        </div>
+
+        <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-slate-600">
+          <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+          <span>
+            Eliminates rotten/exploding egg hazards in incubator trays while salvaging Grade-A Penoy table eggs for immediate market sale.
+          </span>
         </div>
       </div>
 

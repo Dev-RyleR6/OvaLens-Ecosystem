@@ -69,3 +69,6 @@ Thumbs.db
 backups/
 *.json.gz
 
+
+edge/db/prototype-test-temp/
+.flow_tests/
