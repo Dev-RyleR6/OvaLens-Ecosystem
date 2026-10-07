@@ -392,6 +392,7 @@ export const ScanExplorerPage: React.FC = () => {
                       <td className="py-3 px-4">
                         <Badge type="fertility" value={scan.final_class} />
                         {scan.confidence < 0.75 && <span className="block text-amber-800 mt-1">Needs inspection</span>}
+                        {scan.is_overridden && <span className="block text-purple-700 text-xs font-semibold mt-0.5">Overridden</span>}
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-900">
                         {((scan.confidence ?? 0) * 100).toFixed(1)}%
@@ -402,10 +403,10 @@ export const ScanExplorerPage: React.FC = () => {
                       <td className="py-3 px-4">
                         <span
                           className={`font-bold ${
-                            scan.routing_action === 'ACCEPT' ? 'text-emerald-800' : 'text-rose-800'
+                            scan.routing_action === 'MANUAL_REVIEW' ? 'text-amber-800' : scan.routing_action === 'ACCEPT' ? 'text-emerald-800' : 'text-rose-800'
                           }`}
                         >
-                          {scan.routing_action || (scan.final_class === 'FERTILE' ? 'ACCEPT' : 'REJECT')}
+                          {scan.routing_action === 'MANUAL_REVIEW' ? 'REVIEW' : (scan.routing_action || (scan.final_class === 'FERTILE' ? 'ACCEPT' : 'REJECT'))}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-slate-500 font-medium">
@@ -550,7 +551,7 @@ export const ScanExplorerPage: React.FC = () => {
               inferenceMs={selectedScan.inference_ms ?? 0}
               sequenceNumber={selectedScan.sequence_number ?? 0}
               batchId={selectedScan.batch_id}
-              aspectRatio={0.78}
+              aspectRatio={selectedScan.aspect_ratio ?? 0.78}
             />
 
             {/* Decision card */}
@@ -559,17 +560,24 @@ export const ScanExplorerPage: React.FC = () => {
                 <span className="font-bold text-slate-800">Conveyor Routing Action:</span>
                 <span
                   className={`font-bold ${
-                    (selectedScan.routing_action === 'ACCEPT' || selectedScan.final_class === 'FERTILE') ? 'text-emerald-800' : 'text-rose-800'
+                    selectedScan.routing_action === 'MANUAL_REVIEW' ? 'text-amber-800' : (selectedScan.routing_action === 'ACCEPT' || selectedScan.final_class === 'FERTILE') ? 'text-emerald-800' : 'text-rose-800'
                   }`}
                 >
-                  {(selectedScan.routing_action === 'ACCEPT' || selectedScan.final_class === 'FERTILE') ? 'ACCEPT (Incubation Tray)' : 'REJECT (Diverter Eject)'}
+                  {selectedScan.routing_action === 'MANUAL_REVIEW' ? 'MANUAL REVIEW (Operator Inspection)' : (selectedScan.routing_action === 'ACCEPT' || selectedScan.final_class === 'FERTILE') ? 'ACCEPT (Incubation Tray)' : 'REJECT (Diverter Eject)'}
                 </span>
               </div>
               <p className="text-slate-600 text-[11px]">
-                {selectedScan.final_class === 'FERTILE'
+                {selectedScan.routing_action === 'MANUAL_REVIEW'
+                  ? 'Flagged for operator review (confidence below 75% or centering boundary).'
+                  : selectedScan.final_class === 'FERTILE'
                   ? 'Viable Day 10 embryo verified. Retained for incubation.'
                   : 'Non-fertile Day 10 result. Diverted to Penoy food salvage tray @ ₱14.00.'}
               </p>
+              {selectedScan.is_overridden && (
+                <div className="mt-2 pt-2 border-t border-slate-200 text-[11px] text-purple-900 font-medium">
+                  <span className="font-bold">Human Override:</span> {selectedScan.override_reason || 'Verified by operator'}
+                </div>
+              )}
             </div>
 
             {/* Human-in-the-Loop Override Section */}

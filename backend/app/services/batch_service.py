@@ -183,12 +183,14 @@ class BatchService:
         totals = db.query(
             func.coalesce(func.sum(CandlingSessionModel.total_scanned), 0).label("scanned"),
             func.coalesce(func.sum(CandlingSessionModel.fertile_count), 0).label("fertile"),
-            func.coalesce(func.sum(CandlingSessionModel.infertile_count), 0).label("infertile")
+            func.coalesce(func.sum(CandlingSessionModel.infertile_count), 0).label("infertile"),
+            func.coalesce(func.sum(CandlingSessionModel.manual_review_count), 0).label("manual_review")
         ).filter(CandlingSessionModel.batch_id == batch_id).first()
 
         total_scanned = totals.scanned or 0
         fertile = totals.fertile or 0
         infertile = totals.infertile or 0
+        manual_review = totals.manual_review or 0
 
         fertility_rate = (fertile / total_scanned * 100.0) if total_scanned > 0 else 0.0
         hatchability_rate = (batch.hatched_count / batch.initial_egg_count * 100.0) if batch.initial_egg_count > 0 else 0.0
@@ -210,6 +212,7 @@ class BatchService:
             total_scanned=total_scanned,
             fertile_count=fertile,
             infertile_count=infertile,
+            manual_review_count=manual_review,
             fertility_rate=round(fertility_rate, 2),
             hatchability_rate=round(hatchability_rate, 2),
             notes=batch.notes,
@@ -230,12 +233,14 @@ class BatchService:
         d10_stats = db.query(
             func.coalesce(func.sum(CandlingSessionModel.total_scanned), 0).label("scanned"),
             func.coalesce(func.sum(CandlingSessionModel.fertile_count), 0).label("fertile"),
-            func.coalesce(func.sum(CandlingSessionModel.infertile_count), 0).label("infertile")
+            func.coalesce(func.sum(CandlingSessionModel.infertile_count), 0).label("infertile"),
+            func.coalesce(func.sum(CandlingSessionModel.manual_review_count), 0).label("manual_review")
         ).filter(CandlingSessionModel.batch_id == batch_id, CandlingSessionModel.stage == CandlingStage.DAY_10).first()
 
         d10_tot = d10_stats.scanned or 0
         d10_fer = d10_stats.fertile or 0
         d10_inf = d10_stats.infertile or 0
+        d10_rev = d10_stats.manual_review or 0
         d10_rate = (d10_fer / d10_tot * 100.0) if d10_tot > 0 else 0.0
 
         # Financial values
@@ -257,6 +262,7 @@ class BatchService:
                 total_scanned=s.total_scanned,
                 fertile_count=s.fertile_count,
                 infertile_count=s.infertile_count,
+                manual_review_count=getattr(s, "manual_review_count", 0),
                 fertility_rate=round(f_rate, 2),
                 avg_inference_ms=float(s.avg_inference_ms)
             ))
@@ -277,6 +283,7 @@ class BatchService:
             total_scanned_day_10=d10_tot,
             fertile_day_10=d10_fer,
             infertile_penoy_day_10=d10_inf,
+            manual_review_day_10=d10_rev,
             day_10_fertility_rate=round(d10_rate, 2),
             penoy_salvage_value_php=round(penoy_val, 2),
             electricity_saved_php=round(power_saved, 2),

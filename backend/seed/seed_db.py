@@ -253,24 +253,32 @@ def seed_database(reset: bool = False):
 
             print("  + Generating 500 conveyor scans for BATCH-2026-08-KAY-01 (Day 10)...")
             scans_to_add = []
-            f_cnt, inf_cnt = 0, 0
+            f_cnt, inf_cnt, rev_cnt = 0, 0, 0
 
             for seq in range(1, 501):
                 # Day 10 binary outcome: fertile or infertile.
                 rand = random.random()
                 if rand < 0.886:
                     cls = FertilityClass.FERTILE
-                    action = RoutingAction.ACCEPT
                     conf = round(random.uniform(0.88, 0.98), 4)
+                    action = RoutingAction.ACCEPT
                     f_cnt += 1
                 else:
                     cls = FertilityClass.INFERTILE
-                    action = RoutingAction.REJECT
                     conf = round(random.uniform(0.85, 0.96), 4)
+                    action = RoutingAction.REJECT
                     inf_cnt += 1
+
+                # Occasional borderline scan requiring manual review
+                if seq in (42, 108, 256):
+                    conf = 0.7200
+                    action = RoutingAction.MANUAL_REVIEW
+                    rev_cnt += 1
 
                 lat = random.randint(22, 38)
                 scan_time = sess_1.started_at + timedelta(seconds=seq * 6)
+                ar = round(random.uniform(0.72, 0.84), 2)
+                vasc = round(random.uniform(0.65, 0.92), 3) if cls == FertilityClass.FERTILE else round(random.uniform(0.05, 0.28), 3)
 
                 scans_to_add.append(EggScanModel(
                     scan_id=uuid.uuid4(),
@@ -281,6 +289,9 @@ def seed_database(reset: bool = False):
                     confidence=conf,
                     inference_ms=lat,
                     routing_action=action,
+                    cradle_index=seq,
+                    aspect_ratio=ar,
+                    vascular_index=vasc,
                     detections=[{
                         "bbox": [0.50, 0.50, 0.42, 0.58],
                         "class": cls.value,
@@ -293,6 +304,7 @@ def seed_database(reset: bool = False):
             sess_1.total_scanned = 500
             sess_1.fertile_count = f_cnt
             sess_1.infertile_count = inf_cnt
+            sess_1.manual_review_count = rev_cnt
             sess_1.avg_inference_ms = 28.50
             db.commit()
             print(f"    [OK] 500 scans recorded: {f_cnt} Fertile, {inf_cnt} Infertile.")

@@ -23,6 +23,7 @@ class CandlingSessionModel(Base):
     total_scanned = Column(Integer, nullable=False, default=0)
     fertile_count = Column(Integer, nullable=False, default=0)
     infertile_count = Column(Integer, nullable=False, default=0)
+    manual_review_count = Column(Integer, nullable=False, default=0)
     avg_inference_ms = Column(Numeric(6, 2), nullable=False, default=0.00)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

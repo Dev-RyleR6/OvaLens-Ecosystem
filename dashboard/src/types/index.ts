@@ -2,7 +2,7 @@ export type DuckBreed = 'KAYUMANGGI' | 'ITIM' | 'KHAKI';
 export type BatchStage = 'SETTING' | 'DAY_10' | 'HATCHED' | 'COMPLETED';
 export type BatchStatus = 'INCUBATING' | 'COMPLETED' | 'CANCELLED';
 export type FertilityClass = 'FERTILE' | 'INFERTILE';
-export type RoutingAction = 'ACCEPT' | 'REJECT';
+export type RoutingAction = 'ACCEPT' | 'REJECT' | 'MANUAL_REVIEW';
 export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'SCANNING' | 'ERROR';
 export type UserRole = 'ADMIN' | 'MANAGER' | 'OPERATOR';
 
@@ -47,6 +47,7 @@ export interface BatchSummary extends Batch {
   total_scanned: number;
   fertile_count: number;
   infertile_count: number;
+  manual_review_count?: number;
   fertility_rate: number;
   hatchability_rate: number;
   elapsed_days?: number;
@@ -61,6 +62,7 @@ export interface SessionSummaryItem {
   total_scanned: number;
   fertile_count: number;
   infertile_count: number;
+  manual_review_count?: number;
   fertility_rate: number;
   avg_inference_ms: number;
 }
@@ -79,6 +81,7 @@ export interface BatchAnalyticsResponse {
   total_scanned_day_10: number;
   fertile_day_10: number;
   infertile_penoy_day_10: number;
+  manual_review_day_10?: number;
   day_10_fertility_rate: number;
   penoy_salvage_value_php: number;
   electricity_saved_php: number;
@@ -161,6 +164,7 @@ export interface CandlingSession {
   total_scanned: number;
   fertile_count: number;
   infertile_count: number;
+  manual_review_count?: number;
   avg_inference_ms: number;
   created_at: string;
 }
@@ -174,6 +178,12 @@ export interface EggScan {
   confidence: number;
   inference_ms: number;
   routing_action: RoutingAction;
+  cradle_index?: number;
+  aspect_ratio?: number;
+  vascular_index?: number;
+  is_overridden?: boolean;
+  override_reason?: string;
+  overridden_at?: string;
   thumbnail_url?: string;
   image_url?: string;
   detections: Array<{

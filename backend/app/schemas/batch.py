@@ -63,6 +63,7 @@ class BatchSummaryResponse(BaseModel):
     total_scanned: int = 0
     fertile_count: int = 0
     infertile_count: int = 0
+    manual_review_count: int = 0
     fertility_rate: float = 0.0
     hatchability_rate: float = 0.0
     notes: Optional[str] = None
@@ -84,6 +85,7 @@ class SessionSummaryItem(BaseModel):
     total_scanned: int
     fertile_count: int
     infertile_count: int
+    manual_review_count: int = 0
     fertility_rate: float
     avg_inference_ms: float
 
@@ -104,6 +106,7 @@ class BatchAnalyticsResponse(BaseModel):
     total_scanned_day_10: int
     fertile_day_10: int
     infertile_penoy_day_10: int
+    manual_review_day_10: int = 0
     day_10_fertility_rate: float
     
     # Financial Salvage

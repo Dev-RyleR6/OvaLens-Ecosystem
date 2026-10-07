@@ -1,5 +1,6 @@
 from typing import List
 from uuid import UUID
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 from sqlalchemy.dialects.postgresql import insert
@@ -46,6 +47,9 @@ class ScanService:
                 "routing_action": item.routing_action,
                 "image_url": item.image_url,
                 "detections": item.detections,
+                "cradle_index": getattr(item, "cradle_index", None),
+                "aspect_ratio": getattr(item, "aspect_ratio", None),
+                "vascular_index": getattr(item, "vascular_index", None),
                 "scanned_at": item.scanned_at
             }
             for item in payload.scans
@@ -63,12 +67,14 @@ class ScanService:
             func.count(EggScanModel.scan_id).label("total"),
             func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.FERTILE, 1), else_=0)), 0).label("fertile"),
             func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.INFERTILE, 1), else_=0)), 0).label("infertile"),
+            func.coalesce(func.sum(case((EggScanModel.routing_action == RoutingAction.MANUAL_REVIEW, 1), else_=0)), 0).label("manual_review"),
             func.coalesce(func.avg(EggScanModel.inference_ms), 0.0).label("avg_lat")
         ).filter(EggScanModel.session_id == session_id).first()
 
         session.total_scanned = aggregates.total or 0
         session.fertile_count = aggregates.fertile or 0
         session.infertile_count = aggregates.infertile or 0
+        session.manual_review_count = aggregates.manual_review or 0
         session.avg_inference_ms = round(float(aggregates.avg_lat or 0.0), 2)
 
         db.commit()
@@ -99,6 +105,9 @@ class ScanService:
         previous_class = scan.final_class
         scan.final_class = final_class
         scan.routing_action = RoutingAction.ACCEPT if final_class == FertilityClass.FERTILE else RoutingAction.REJECT
+        scan.is_overridden = True
+        scan.override_reason = reason or "Operator visual review"
+        scan.overridden_at = datetime.now(timezone.utc)
         db.flush()
 
         # Record immutable audit log
@@ -123,6 +132,7 @@ class ScanService:
             func.count(EggScanModel.scan_id).label("total"),
             func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.FERTILE, 1), else_=0)), 0).label("fertile"),
             func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.INFERTILE, 1), else_=0)), 0).label("infertile"),
+            func.coalesce(func.sum(case((EggScanModel.routing_action == RoutingAction.MANUAL_REVIEW, 1), else_=0)), 0).label("manual_review"),
             func.coalesce(func.avg(EggScanModel.inference_ms), 0.0).label("avg_lat")
         ).filter(EggScanModel.session_id == scan.session_id).first()
 
@@ -131,6 +141,7 @@ class ScanService:
             session.total_scanned = aggregates.total or 0
             session.fertile_count = aggregates.fertile or 0
             session.infertile_count = aggregates.infertile or 0
+            session.manual_review_count = aggregates.manual_review or 0
             session.avg_inference_ms = round(float(aggregates.avg_lat or 0.0), 2)
 
         db.commit()

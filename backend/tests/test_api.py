@@ -387,3 +387,147 @@ def test_user_profile_and_password_change_flow():
     assert "access_token" in new_login.json()
 
 
+def test_manual_review_routing_action_sync_and_metrics():
+    from uuid import uuid4
+    from datetime import datetime, timezone
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.models.scan import EggScanModel, RoutingAction
+    from app.models.session import CandlingSessionModel
+
+    headers = {"X-API-Key": settings.API_KEY}
+    test_session_id = str(uuid4())
+    scan_id_1 = str(uuid4())
+    scan_id_2 = str(uuid4())
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Ingest 2 scans: one normal ACCEPT, one low-confidence MANUAL_REVIEW
+    payload = {
+        "scans": [
+            {
+                "scan_id": scan_id_1,
+                "session_id": test_session_id,
+                "batch_id": "BATCH-2026-08-KAY-01",
+                "sequence_number": 901,
+                "final_class": "FERTILE",
+                "confidence": 0.9450,
+                "inference_ms": 28,
+                "routing_action": "ACCEPT",
+                "cradle_index": 1,
+                "aspect_ratio": 0.78,
+                "vascular_index": 0.812,
+                "detections": [],
+                "scanned_at": now_iso
+            },
+            {
+                "scan_id": scan_id_2,
+                "session_id": test_session_id,
+                "batch_id": "BATCH-2026-08-KAY-01",
+                "sequence_number": 902,
+                "final_class": "FERTILE",
+                "confidence": 0.7100,
+                "inference_ms": 32,
+                "routing_action": "MANUAL_REVIEW",
+                "cradle_index": 2,
+                "aspect_ratio": 0.81,
+                "vascular_index": 0.450,
+                "detections": [],
+                "scanned_at": now_iso
+            }
+        ]
+    }
+
+    try:
+        sync_resp = client.post("/api/v1/scans/sync", json=payload, headers=headers)
+        assert sync_resp.status_code == 200
+        sync_data = sync_resp.json()
+        assert sync_data["status"] == "success"
+        assert sync_data["synced_count"] == 2
+
+        # Verify session rolled up manual_review_count
+        with SessionLocal() as db:
+            session_record = db.get(CandlingSessionModel, test_session_id)
+            assert session_record is not None
+            assert session_record.total_scanned == 2
+            assert session_record.manual_review_count == 1
+            assert session_record.fertile_count == 2
+
+        # Verify individual scan attributes
+        scan_detail = client.get(f"/api/v1/scans/{scan_id_2}").json()
+        assert scan_detail["routing_action"] == "MANUAL_REVIEW"
+        assert scan_detail["cradle_index"] == 2
+        assert scan_detail["aspect_ratio"] == 0.81
+        assert scan_detail["vascular_index"] == 0.45
+        assert scan_detail["is_overridden"] is False
+
+    finally:
+        with SessionLocal() as db:
+            db.query(EggScanModel).filter(EggScanModel.session_id == test_session_id).delete()
+            db.query(CandlingSessionModel).filter(CandlingSessionModel.session_id == test_session_id).delete()
+            db.commit()
+
+
+def test_scan_override_persists_is_overridden_and_reason():
+    from uuid import uuid4
+    from datetime import datetime, timezone
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.models.scan import EggScanModel
+    from app.models.session import CandlingSessionModel
+
+    # 1. Login to get token
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@ovalens.fu.edu.ph", "password": "Admin@123"}
+    )
+    auth_headers = {"Authorization": f"Bearer {login_resp.json()['access_token']}"}
+    api_headers = {"X-API-Key": settings.API_KEY}
+
+    test_session_id = str(uuid4())
+    scan_id = str(uuid4())
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    try:
+        # Ingest test scan
+        client.post("/api/v1/scans/sync", headers=api_headers, json={
+            "scans": [{
+                "scan_id": scan_id,
+                "session_id": test_session_id,
+                "batch_id": "BATCH-2026-08-KAY-01",
+                "sequence_number": 999,
+                "final_class": "INFERTILE",
+                "confidence": 0.8200,
+                "inference_ms": 25,
+                "routing_action": "REJECT",
+                "scanned_at": now_iso
+            }]
+        })
+
+        # Override scan
+        override_resp = client.patch(
+            f"/api/v1/scans/{scan_id}/override",
+            headers=auth_headers,
+            json={"final_class": "FERTILE", "reason": "Operator confirmed viable spider veins"}
+        )
+        assert override_resp.status_code == 200
+        data = override_resp.json()
+        assert data["final_class"] == "FERTILE"
+        assert data["routing_action"] == "ACCEPT"
+        assert data["is_overridden"] is True
+        assert data["override_reason"] == "Operator confirmed viable spider veins"
+        assert data["overridden_at"] is not None
+
+        # Verify get_scan returns is_overridden
+        detail_resp = client.get(f"/api/v1/scans/{scan_id}")
+        assert detail_resp.status_code == 200
+        detail = detail_resp.json()
+        assert detail["is_overridden"] is True
+        assert detail["override_reason"] == "Operator confirmed viable spider veins"
+
+    finally:
+        with SessionLocal() as db:
+            db.query(EggScanModel).filter(EggScanModel.scan_id == scan_id).delete()
+            db.query(CandlingSessionModel).filter(CandlingSessionModel.session_id == test_session_id).delete()
+            db.commit()
+
+

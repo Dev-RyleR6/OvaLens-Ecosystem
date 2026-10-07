@@ -31,5 +31,6 @@ class SessionResponse(BaseModel):
     total_scanned: int
     fertile_count: int
     infertile_count: int
+    manual_review_count: int = 0
     avg_inference_ms: float
     created_at: datetime
