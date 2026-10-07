@@ -218,6 +218,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 These features can be claimed by any agent using `python scripts/verify_and_commit.py --task <ID>`:
 
+- [x] **TASK-NEW-AGENTS-IGNORE-01**: Ignore local Codex and Impeccable installations/integration files and the unused raster logo copy while preserving shared repository skills and CI workflows.
+
 - [x] **TASK-NEW-DASH-LIVE-01**: Restore operational analytics charts and discoverable Analytics navigation; wire independent edge device heartbeats and continuous dashboard availability checks.
 
 - [x] **TASK-NEW-DASH-UX-01**: Correct dashboard telemetry and scan-history filtering/pagination, harden keyboard access and save feedback, connect display preferences, and refine the hatchery interface for readable daily operations.

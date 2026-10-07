@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Capstone Manuscript Chapters 1, 2, 3, and References in `docs/manuscript/` with authentic proposal text and 15 APA 7th academic citations.
 
 ### Changed
+- **Agents**: [TASK-NEW-AGENTS-IGNORE-01] ignore local AI tooling and unused logo copy (2026-10-07)
 - **Dashboard**: improve ui/ux responsiveness and eliminate ai slop (2026-10-06)
 - **Dashboard**: streamline web app into defense-ready 5-page portal; consolidate historical records into Batches and Analytics, prune mock MLOps ModelsPage and redundant AuditLogsPage, remove synthetic 42-slot tray matrix in favor of linear conveyor velocity telemetry, eliminate audio beeps, and convert financial simulator into data-driven Day 10 economic recovery model (2026-10-06).
 - **System scope**: [TASK-NEW-SCOPE-01] standardize OvaLens on Day 10 candling with the strict `FERTILE`/`INFERTILE` class contract across backend, edge, dashboard, firmware, tests, and documentation (2026-09-30).
