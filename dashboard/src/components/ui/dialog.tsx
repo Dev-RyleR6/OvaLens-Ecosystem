@@ -62,7 +62,7 @@ export const Dialog: React.FC<DialogProps> = ({
         </button>
 
         {(title || description) && (
-          <div className="flex flex-col space-y-1.5 text-left mb-4 pr-6">
+          <div className="flex flex-col space-y-1.5 text-left mb-4 pr-12">
             {title && (
               <h2 className="text-base sm:text-lg font-bold leading-snug tracking-tight text-slate-900">
                 {title}

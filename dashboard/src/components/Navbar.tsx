@@ -65,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, sidebarOpen = f
 
   return (
     <>
-      <header className="h-16 border-b border-border bg-card px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40 ">
+      <header className="h-16 shrink-0 border-b border-border bg-card px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40 ">
         {/* Left: Mobile Toggle & University Brand */}
         <div className="flex items-center gap-3">
           {/* Mobile Hamburger Toggle */}
@@ -124,6 +124,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, sidebarOpen = f
               }`}
               aria-expanded={isDropdownOpen}
               aria-haspopup="true"
+              aria-label="Open account menu"
             >
               <div className="w-8 h-8 rounded-full bg-slate-100 text-brand border border-slate-200 flex items-center justify-center text-xs font-bold  shrink-0">
                 {getInitials(user?.full_name)}
@@ -146,7 +147,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, sidebarOpen = f
 
             {/* Dropdown Popover Menu */}
             {isDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-card border border-slate-200 rounded-xl shadow-xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-2rem)] bg-card border border-slate-200 rounded-xl shadow-xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
                 {/* User Identity Header */}
                 <div className="px-3 py-2.5 bg-slate-50/80 rounded-lg border border-slate-100 mb-1">
                   <div className="flex items-center justify-between mb-1">

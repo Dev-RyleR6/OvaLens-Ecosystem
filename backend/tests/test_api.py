@@ -133,6 +133,71 @@ def test_analytics_overview():
     assert data["overall_fertility_rate"] > 0.0
 
 
+def test_graph_counts_ignore_drifted_session_counters():
+    from sqlalchemy import func
+    from app.core.database import SessionLocal
+    from app.models.session import CandlingSessionModel
+    from app.models.scan import EggScanModel, FertilityClass
+    from app.models.settings import HatcherySettingsModel
+    from app.services.batch_service import BatchService
+    from app.services.analytics_service import AnalyticsService
+
+    with SessionLocal() as db:
+        session = db.query(CandlingSessionModel).filter(CandlingSessionModel.total_scanned > 0).first()
+        batch_id = session.batch_id
+        actual = db.query(func.count(EggScanModel.scan_id)).filter(EggScanModel.batch_id == batch_id).scalar()
+        infertile = db.query(func.count(EggScanModel.scan_id)).filter(EggScanModel.batch_id == batch_id, EggScanModel.final_class == FertilityClass.INFERTILE).scalar()
+        # Deliberately corrupt only this uncommitted counter cache; rollback on exit.
+        session.total_scanned += 999
+        session.infertile_count += 999
+        db.flush()
+        summary = BatchService.get_batch_summary(db, batch_id)
+        detailed = BatchService.get_batch_deep_analytics(db, batch_id)
+        economics = AnalyticsService.get_economic_yield(db, batch_id=batch_id)
+        assert summary.total_scanned == actual
+        assert summary.fertile_count + summary.infertile_count == actual
+        assert detailed.total_scanned_day_10 == actual
+        assert sum(item.total_scanned for item in detailed.sessions) == actual
+        assert detailed.infertile_penoy_day_10 == infertile
+        assert economics.penoy_culled_day_10 == infertile
+        price = float(db.query(HatcherySettingsModel).first().penoy_unit_price_php)
+        assert economics.estimated_penoy_salvage_value_php == round(infertile * price, 2)
+        assert AnalyticsService.get_economic_yield(db, batch_id='TEST-NONEXISTENT').total_economic_benefit_php == 0
+        db.rollback()
+
+
+def test_analytics_scopes_and_chart_totals_reconcile():
+    batches = client.get('/api/v1/batches', params={'limit': 200}).json()
+    overview = client.get('/api/v1/analytics/overview').json()
+    assert sum(batch['total_scanned'] for batch in batches) == overview['total_eggs_scanned']
+    assert sum(batch['fertile_count'] for batch in batches) == overview['total_fertile']
+    assert sum(batch['infertile_count'] for batch in batches) == overview['total_infertile']
+    for breed in ('KAYUMANGGI', 'ITIM', 'KHAKI'):
+        for status in ('INCUBATING', 'CANDLING_DUE', 'COMPLETED'):
+            selected = [batch for batch in batches if batch['breed'] == breed and batch['status'] == status]
+            response = client.get('/api/v1/analytics/economic-yield', params={'breed': breed, 'status': status})
+            assert response.status_code == 200
+            economics = response.json()
+            expected = sum(batch['infertile_count'] for batch in selected)
+            assert economics['penoy_culled_day_10'] == expected
+            assert economics['estimated_penoy_salvage_value_php'] == round(expected * economics['penoy_unit_price_php'], 2)
+    assert client.get('/api/v1/analytics/economic-yield', params={'status': 'INVALID'}).status_code == 422
+
+
+def test_forecast_with_scans_and_zero_fertile_never_uses_breed_baseline():
+    from app.core.database import SessionLocal
+    from app.models.scan import EggScanModel, FertilityClass
+    from app.services.forecast_service import ForecastService
+
+    with SessionLocal() as db:
+        batch_id = db.query(EggScanModel.batch_id).first()[0]
+        db.query(EggScanModel).filter(EggScanModel.batch_id == batch_id).update({'final_class': FertilityClass.INFERTILE})
+        prediction = ForecastService.get_batch_forecast(db, batch_id)
+        assert prediction.detected_fertility_rate == 0
+        assert prediction.predicted_hatched_count == 0
+        db.rollback()
+
+
 def test_analytics_economic_yield():
     response = client.get("/api/v1/analytics/economic-yield")
     assert response.status_code == 200
@@ -529,5 +594,3 @@ def test_scan_override_persists_is_overridden_and_reason():
             db.query(EggScanModel).filter(EggScanModel.scan_id == scan_id).delete()
             db.query(CandlingSessionModel).filter(CandlingSessionModel.session_id == test_session_id).delete()
             db.commit()
-
-

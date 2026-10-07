@@ -6,6 +6,7 @@ from app.schemas.analytics import (
     EconomicYieldResponse, MortalityProgressionResponse
 )
 from app.services.analytics_service import AnalyticsService
+from app.models.batch import DuckBreed, BatchStatus
 
 router = APIRouter(prefix="/analytics", tags=["Hatchery Analytics"])
 
@@ -31,5 +32,6 @@ def get_mortality_progression(db: Session = Depends(get_db)):
 
 
 @router.get("/economic-yield", response_model=EconomicYieldResponse, summary="Get Day-10 Penoy salvage revenue & financial ROI")
-def get_economic_yield(db: Session = Depends(get_db)):
-    return AnalyticsService.get_economic_yield(db)
+def get_economic_yield(batch_id: str | None = None, breed: DuckBreed | None = None,
+                       status: BatchStatus | None = None, db: Session = Depends(get_db)):
+    return AnalyticsService.get_economic_yield(db, batch_id=batch_id, breed=breed, status=status)

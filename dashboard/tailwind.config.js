@@ -42,15 +42,15 @@ export default {
           hover: "#6B0000",
         },
         secondary: {
-          DEFAULT: "#F1F5F9",
+          DEFAULT: "rgb(var(--slate-100) / <alpha-value>)",
           foreground: "var(--foreground)",
         },
         muted: {
-          DEFAULT: "#F1F5F9",
-          foreground: "#64748B",
+          DEFAULT: "rgb(var(--slate-100) / <alpha-value>)",
+          foreground: "rgb(var(--slate-500) / <alpha-value>)",
         },
         card: {
-          DEFAULT: "#FFFFFF",
+          DEFAULT: "var(--card)",
           foreground: "var(--foreground)",
         },
         // Agricultural biological classification colors

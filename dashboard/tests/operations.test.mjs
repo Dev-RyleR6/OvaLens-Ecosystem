@@ -13,6 +13,15 @@ async function loadHelper(path) {
 }
 const { deviceAvailability } = await loadHelper('../src/lib/deviceStatus.ts');
 const { readPreferences, savePreferences } = await loadHelper('../src/lib/preferences.ts');
+const { batchLabelLines } = await loadHelper('../src/lib/chartData.ts');
+
+test('chart labels preserve complete identifiers within bounded lines', () => {
+  for (const label of ['BATCH-2026-08-KAY-01', 'BATCH-2026-07-KHK-01', 'X'.repeat(64), 'A-B-C-D-E-F-G-H-I-J-K-L-M-N-O-P']) {
+    const lines = batchLabelLines(label);
+    assert.equal(lines.join(''), label);
+    assert.ok(lines.every(line => line.length <= 17));
+  }
+});
 
 test('a stored online flag requires a recent, valid heartbeat', () => {
   const now = Date.parse('2026-10-07T04:00:00Z');

@@ -9,3 +9,6 @@ The dashboard is an operational record system. Retain the FU identity and replac
 - Use at least 44px touch targets, visible keyboard focus, associated labels, live error feedback, and keyboard-contained overlays with focus restoration.
 - Prefer explicit empty, loading, offline, and stale states over example values. Diagnostic success requires a real acknowledgement.
 - Preserve table scrolling within the content region on small screens. The mobile sidebar must be dismissible and inaccessible while closed.
+- Use horizontal bars with complete wrapped batch identifiers, numeric axes starting at zero, and expandable exact-count tables. Keep charts in one column until the content region can fit two readable panels.
+- Treat scan events as records, not unique eggs. Show repeated scans without clamping them to the initial egg count. Classification and financial figures must use the same filter scope and persisted scan records.
+- Keep stage and status badges on one line, use the same semantic styles across pages, and allow wide operational tables to scroll rather than compressing columns.

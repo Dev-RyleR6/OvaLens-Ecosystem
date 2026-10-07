@@ -1,6 +1,6 @@
 export type DuckBreed = 'KAYUMANGGI' | 'ITIM' | 'KHAKI';
 export type BatchStage = 'SETTING' | 'DAY_10' | 'HATCHED' | 'COMPLETED';
-export type BatchStatus = 'INCUBATING' | 'COMPLETED' | 'CANCELLED';
+export type BatchStatus = 'INCUBATING' | 'CANDLING_DUE' | 'COMPLETED' | 'ARCHIVED';
 export type FertilityClass = 'FERTILE' | 'INFERTILE';
 export type RoutingAction = 'ACCEPT' | 'REJECT' | 'MANUAL_REVIEW';
 export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'SCANNING' | 'ERROR';

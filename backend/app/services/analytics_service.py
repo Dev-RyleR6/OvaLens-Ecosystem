@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.models.batch import BatchModel, BatchStatus, DuckBreed
 from app.models.scan import EggScanModel, FertilityClass
 from app.models.session import CandlingSessionModel, CandlingStage
+from app.services.scan_metrics import scan_totals
 from app.schemas.analytics import (
     BreedComparisonResponse,
     BreedDay10Outcome,
@@ -74,7 +75,7 @@ class AnalyticsService:
             fertile = scan_stats.fertile or 0
             items.append(BreedMetricItem(
                 breed=breed.value,
-                total_eggs=total if total else initial,
+                total_eggs=total,
                 fertile_count=fertile,
                 infertile_count=scan_stats.infertile or 0,
                 fertility_rate=round(fertile / total * 100, 2) if total else 0.0,
@@ -85,15 +86,12 @@ class AnalyticsService:
 
     @staticmethod
     def _day_10_totals(db: Session):
-        return db.query(
-            func.coalesce(func.sum(CandlingSessionModel.total_scanned), 0).label("total"),
-            func.coalesce(func.sum(CandlingSessionModel.infertile_count), 0).label("infertile"),
-        ).filter(CandlingSessionModel.stage == CandlingStage.DAY_10).first()
+        return scan_totals(db)
 
     @staticmethod
     def get_mortality_trends(db: Session) -> MortalityTrendsResponse:
         stats = AnalyticsService._day_10_totals(db)
-        total = stats.total or 0
+        total = stats.scanned or 0
         infertile = stats.infertile or 0
         return MortalityTrendsResponse(
             day_10_cull_rate=round(infertile / total * 100, 2) if total else 0.0,
@@ -101,7 +99,7 @@ class AnalyticsService:
         )
 
     @staticmethod
-    def get_economic_yield(db: Session) -> EconomicYieldResponse:
+    def get_economic_yield(db: Session, batch_id=None, breed=None, status=None) -> EconomicYieldResponse:
         from app.models.settings import HatcherySettingsModel
 
         settings = db.query(HatcherySettingsModel).first()
@@ -111,8 +109,15 @@ class AnalyticsService:
             float(settings.electricity_kwh_rate_php) * float(settings.kwh_saved_per_culled_egg)
             if settings else 2.5
         )
-        infertile = AnalyticsService._day_10_totals(db).infertile or 0
-        hatched = db.query(func.coalesce(func.sum(BatchModel.hatched_count), 0)).scalar() or 0
+        infertile = scan_totals(db, batch_id=batch_id, breed=breed, status=status).infertile
+        hatch_query = db.query(func.coalesce(func.sum(BatchModel.hatched_count), 0))
+        if batch_id:
+            hatch_query = hatch_query.filter(BatchModel.batch_id == batch_id)
+        if breed:
+            hatch_query = hatch_query.filter(BatchModel.breed == breed)
+        if status:
+            hatch_query = hatch_query.filter(BatchModel.status == status)
+        hatched = hatch_query.scalar() or 0
         penoy_value = infertile * penoy_price
         duckling_revenue = hatched * duckling_price
         electricity_saved = infertile * savings_per_egg
@@ -128,7 +133,7 @@ class AnalyticsService:
     @staticmethod
     def get_mortality_progression(db: Session) -> MortalityProgressionResponse:
         stats = AnalyticsService._day_10_totals(db)
-        total = stats.total or 0
+        total = stats.scanned or 0
         infertile = stats.infertile or 0
         breed_breakdown = []
         for breed in DuckBreed:
@@ -136,14 +141,8 @@ class AnalyticsService:
                 func.coalesce(func.sum(BatchModel.initial_egg_count), 0).label("initial"),
                 func.coalesce(func.sum(BatchModel.hatched_count), 0).label("hatched"),
             ).filter(BatchModel.breed == breed).first()
-            breed_stats = db.query(
-                func.coalesce(func.sum(CandlingSessionModel.total_scanned), 0).label("total"),
-                func.coalesce(func.sum(CandlingSessionModel.infertile_count), 0).label("infertile"),
-            ).join(BatchModel, CandlingSessionModel.batch_id == BatchModel.batch_id).filter(
-                BatchModel.breed == breed,
-                CandlingSessionModel.stage == CandlingStage.DAY_10,
-            ).first()
-            breed_total = breed_stats.total or 0
+            breed_stats = scan_totals(db, breed=breed)
+            breed_total = breed_stats.scanned or 0
             breed_infertile = breed_stats.infertile or 0
             initial = batch_data.initial or 0
             hatched = batch_data.hatched or 0

@@ -422,7 +422,7 @@ export const BatchesPage: React.FC = () => {
       ) : viewMode === 'TABLE' ? (
         <div className="bg-card border border-border rounded-xl  overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs min-w-[720px]">
+            <table className="w-full text-left text-xs min-w-[1080px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="py-3 px-4 w-10 text-center">
@@ -506,17 +506,15 @@ export const BatchesPage: React.FC = () => {
                       <td className="py-3 px-4 text-slate-600 font-medium">{b.incubator_id}</td>
                       <td className="py-3 px-4 text-slate-800 font-bold">{b.initial_egg_count} eggs</td>
                       <td className="py-3 px-4">
-                        <div className="space-y-1">
+                        <div className="flex flex-col items-start gap-1.5 min-w-[170px]">
                           <Badge type="stage" value={b.current_stage} />
                           {b.milestone_alert && (
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
-                              {b.milestone_alert.split(':')[0]}
-                            </span>
+                            <Badge type="status" value={b.milestone_alert.split(':')[0]} size="sm" />
                           )}
                         </div>
                       </td>
                       <td className="py-3 px-4 font-bold text-slate-900">
-                        {b.fertility_rate > 0 ? `${b.fertility_rate}%` : 'Pending Day 10'}
+                        {b.total_scanned > 0 ? `${b.fertility_rate}%` : 'Pending Day 10'}
                       </td>
                       <td className="py-3 px-4">
                         <Badge type="status" value={b.status} />
@@ -611,7 +609,7 @@ export const BatchesPage: React.FC = () => {
 
                 <div className="flex items-center justify-between text-xs pt-3 text-slate-600">
                   <span>Initial Egg Set: <strong>{b.initial_egg_count}</strong></span>
-                  <span className="font-bold text-emerald-700">{b.fertility_rate > 0 ? `${b.fertility_rate}% Fertile` : 'Pending'}</span>
+                  <span className="font-bold text-emerald-700">{b.total_scanned > 0 ? `${b.fertility_rate}% Fertile` : 'Pending'}</span>
                 </div>
               </div>
 

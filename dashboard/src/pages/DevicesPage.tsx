@@ -134,7 +134,7 @@ export const DevicesPage: React.FC = () => {
           description="No edge sorting machines (ESP32 / Raspberry Pi) have registered with the central backend yet."
         />
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
         {devices.map((device) => {
           const cal = calibration[device.device_id] || {
             speed: device.conveyor_speed_cm_s || 12.5,
@@ -150,8 +150,8 @@ export const DevicesPage: React.FC = () => {
               className="bg-card border border-border rounded-xl p-5  space-y-4  transition-all"
             >
               {/* Device Header with Live Radar Beacon */}
-              <div className="flex items-start justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-3 min-w-0">
                   <div className="relative">
                     <div className="w-10 h-10 rounded-lg bg-maroon-50 text-brand border border-maroon-200 flex items-center justify-center font-bold">
                       <Cpu className="w-5 h-5" />

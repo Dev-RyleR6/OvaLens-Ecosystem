@@ -208,7 +208,9 @@ python -m pytest tests/test_edge_pipeline.py -v
 
 ## Edge app availability and dashboard charts
 
-The dashboard Overview includes recorded Day 10 classification and candling coverage charts. **Analytics & graphs** provides breed/status/batch filters, economic estimates, and batch forecasts. Economic figures identify their scope; the facility breed table remains a facility total. Missing records do not generate example results.
+The dashboard Overview includes recorded Day 10 classification and scans-versus-eggs-set charts. **Analytics & graphs** provides breed/status/batch filters, economic estimates, and batch forecasts. Charts, tables, and economic figures on Analytics share the selected scope. Overview Penoy estimates follow the selected batch. Missing records do not generate example results.
+
+Classification totals are computed from persisted scan records, including their current manual overrides, rather than cached session counters. A scan event is not a unique egg: repeated scans can exceed the initial set count and can overstate Penoy quantity/value estimates. Awaiting-review counts are a subset of the two biological classifications. Forecasts use fixed breed assumptions and are estimates, not measured hatch outcomes or confirmed sales. Expand the exact-count tables below charts to inspect every value.
 
 When launched through `edge/launcher.py` in normal operation, the edge app sends an authenticated device heartbeat every 15 seconds on a separate background thread. Configure `API_BASE_URL`, `API_KEY`, and a unique `DEVICE_ID` in `edge/.env`; the API key must match the backend configuration. Unknown stations register automatically; existing station calibration is preserved. Explicit simulation does not report a production station online.
 

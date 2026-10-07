@@ -90,8 +90,8 @@ export const apiClient = {
     return res.data;
   },
 
-  getEconomicYield: async (): Promise<EconomicYield> => {
-    const res = await api.get<EconomicYield>('/analytics/economic-yield');
+  getEconomicYield: async (params?: { batch_id?: string; breed?: string; status?: string }): Promise<EconomicYield> => {
+    const res = await api.get<EconomicYield>('/analytics/economic-yield', { params });
     return res.data;
   },
 

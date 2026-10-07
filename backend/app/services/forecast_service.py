@@ -73,7 +73,7 @@ class ForecastService:
             confidence_level = "LOW"
 
         # Predicted Day 28 Hatched Count
-        if total_scanned > 0 and fertile_scanned > 0:
+        if total_scanned > 0:
             # If partially scanned, scale up proportionally to total set egg count
             projected_fertile_total = (fertile_scanned / total_scanned) * batch.initial_egg_count
             predicted_hatched = math.floor(projected_fertile_total * (viability_rate / 100.0))

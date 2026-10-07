@@ -20,7 +20,7 @@ interface BatchForecastCardProps {
 export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, isLoading = false }) => {
   if (isLoading) {
     return (
-      <div className="bg-card border border-border rounded-xl p-5  animate-pulse space-y-4">
+      <div className="bg-card border border-border rounded-xl p-5  space-y-4">
         <div className="h-5 bg-slate-100 rounded w-1/3" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="h-20 bg-slate-50 rounded-lg" />
@@ -46,14 +46,14 @@ export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, 
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="font-bold text-foreground text-sm flex items-center gap-2">
+            <h3 className="font-bold text-foreground text-sm flex flex-wrap items-center gap-2">
               Day 28 Hatch Yield & Revenue Forecast
               <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                Viability Projection Model
+                Estimate
               </span>
             </h3>
             <p className="text-[11px] text-slate-500">
-              Predictive embryonic viability retention model based on Day 10 candling metrics.
+              Model estimate using saved scans and fixed breed assumptions; not a measured hatch outcome.
             </p>
           </div>
         </div>
@@ -61,19 +61,19 @@ export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, 
         {/* Anomaly Badge */}
         <div className="flex items-center gap-2 flex-wrap">
           {isOptimal && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-800">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-800">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
               Optimal Progression
             </span>
           )}
           {isWarning && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 border border-amber-200 text-amber-800">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-amber-50 border border-amber-200 text-amber-800">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
               Incubation Warning
             </span>
           )}
           {isCritical && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 border border-red-200 text-red-800 animate-pulse">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-red-50 border border-red-200 text-red-800">
               <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
               Critical Anomaly Detected
             </span>
@@ -82,14 +82,14 @@ export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, 
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-3.5">
         {/* Metric 1: Predicted Ducklings */}
         <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-1">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
             <span>Projected Hatched</span>
             <Egg className="w-3.5 h-3.5 text-slate-400" />
           </div>
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex flex-wrap items-baseline gap-1.5">
             <span className="text-xl font-semibold text-foreground tracking-tight">
               {forecast.predicted_hatched_count.toLocaleString()}
             </span>
@@ -107,7 +107,7 @@ export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, 
             <span>Detected Fertility</span>
             <Activity className="w-3.5 h-3.5 text-slate-400" />
           </div>
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex flex-wrap items-baseline gap-1.5">
             <span className="text-xl font-semibold text-foreground tracking-tight">
               {forecast.detected_fertility_rate}%
             </span>
@@ -123,16 +123,16 @@ export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, 
         {/* Metric 3: Penoy Realized Revenue */}
         <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-1">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Penoy Salvaged (Day 10)</span>
+            <span>Estimated Penoy value</span>
             <Coins className="w-3.5 h-3.5 text-amber-500" />
           </div>
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex flex-wrap items-baseline gap-1.5">
             <span className="text-xl font-semibold text-amber-800 tracking-tight">
               ₱{forecast.penoy_realized_revenue_php.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
           </div>
           <div className="text-[11px] text-slate-500">
-            Immediate cash recovery
+            Estimate from classifications or breed assumptions
           </div>
         </div>
 
@@ -142,7 +142,7 @@ export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, 
             <span>Total Forecasted Revenue</span>
             <TrendingUp className="w-3.5 h-3.5 text-emerald-700" />
           </div>
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex flex-wrap items-baseline gap-1.5">
             <span className="text-xl font-semibold text-emerald-950 tracking-tight">
               ₱{forecast.projected_total_revenue_php.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>

@@ -8,6 +8,7 @@ from app.models.batch import BatchModel, BatchStage, BatchStatus, DuckBreed
 from app.models.session import CandlingSessionModel, CandlingStage
 from app.models.scan import EggScanModel, FertilityClass
 from app.models.settings import HatcherySettingsModel
+from app.services.scan_metrics import scan_totals
 from app.schemas.batch import (
     BatchCreate, BatchUpdate, BatchSummaryResponse,
     BatchAnalyticsResponse, SessionSummaryItem, MilestoneCheckResponse, FinalizeHatchPayload
@@ -179,13 +180,7 @@ class BatchService:
     def get_batch_summary(db: Session, batch_id: str) -> BatchSummaryResponse:
         batch = BatchService.get_batch(db, batch_id)
 
-        # Aggregate metrics across all sessions for this batch
-        totals = db.query(
-            func.coalesce(func.sum(CandlingSessionModel.total_scanned), 0).label("scanned"),
-            func.coalesce(func.sum(CandlingSessionModel.fertile_count), 0).label("fertile"),
-            func.coalesce(func.sum(CandlingSessionModel.infertile_count), 0).label("infertile"),
-            func.coalesce(func.sum(CandlingSessionModel.manual_review_count), 0).label("manual_review")
-        ).filter(CandlingSessionModel.batch_id == batch_id).first()
+        totals = scan_totals(db, batch_id=batch_id)
 
         total_scanned = totals.scanned or 0
         fertile = totals.fertile or 0
@@ -230,12 +225,7 @@ class BatchService:
         kwh_per_egg = float(settings.kwh_saved_per_culled_egg) if settings else 0.2000
 
         # Day 10 primary stats
-        d10_stats = db.query(
-            func.coalesce(func.sum(CandlingSessionModel.total_scanned), 0).label("scanned"),
-            func.coalesce(func.sum(CandlingSessionModel.fertile_count), 0).label("fertile"),
-            func.coalesce(func.sum(CandlingSessionModel.infertile_count), 0).label("infertile"),
-            func.coalesce(func.sum(CandlingSessionModel.manual_review_count), 0).label("manual_review")
-        ).filter(CandlingSessionModel.batch_id == batch_id, CandlingSessionModel.stage == CandlingStage.DAY_10).first()
+        d10_stats = scan_totals(db, batch_id=batch_id)
 
         d10_tot = d10_stats.scanned or 0
         d10_fer = d10_stats.fertile or 0
@@ -253,18 +243,19 @@ class BatchService:
         sessions = db.query(CandlingSessionModel).filter(CandlingSessionModel.batch_id == batch_id).order_by(CandlingSessionModel.started_at.asc()).all()
         session_items = []
         for s in sessions:
-            f_rate = (s.fertile_count / s.total_scanned * 100.0) if s.total_scanned > 0 else 0.0
+            recorded = scan_totals(db, session_id=s.session_id)
+            f_rate = (recorded.fertile / recorded.scanned * 100.0) if recorded.scanned else 0.0
             session_items.append(SessionSummaryItem(
                 session_id=s.session_id,
                 stage=s.stage.value,
                 operator_name=s.operator_name,
                 started_at=s.started_at,
-                total_scanned=s.total_scanned,
-                fertile_count=s.fertile_count,
-                infertile_count=s.infertile_count,
-                manual_review_count=getattr(s, "manual_review_count", 0),
+                total_scanned=recorded.scanned,
+                fertile_count=recorded.fertile,
+                infertile_count=recorded.infertile,
+                manual_review_count=recorded.manual_review,
                 fertility_rate=round(f_rate, 2),
-                avg_inference_ms=float(s.avg_inference_ms)
+                avg_inference_ms=float(recorded.avg_inference_ms)
             ))
 
         elapsed, _ = BatchService._compute_milestone(batch.set_date, batch.current_stage)

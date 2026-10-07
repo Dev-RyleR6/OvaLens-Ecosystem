@@ -42,10 +42,10 @@ const ProtectedLayout: React.FC = () => {
     <div className="h-[100dvh] w-full overflow-hidden bg-background text-foreground flex flex-col font-sans relative">
       <a href="#main-content" className="skip-link">Skip to main content</a>
       <Navbar sidebarOpen={isMobileSidebarOpen} onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)} />
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
         <Sidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} />
-        <main ref={mainRef} id="main-content" tabIndex={-1} className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 w-full custom-scrollbar">
-          <div key={location.pathname} className="max-w-7xl mx-auto ">
+        <main ref={mainRef} id="main-content" tabIndex={-1} className="dashboard-content min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 w-full custom-scrollbar">
+          <div key={location.pathname} className="max-w-7xl mx-auto min-w-0 ">
             <React.Suspense fallback={<p role="status" className="py-8 text-slate-600">Loading page…</p>}>
             <Routes location={location}>
               <Route path="/" element={<OverviewPage />} />
