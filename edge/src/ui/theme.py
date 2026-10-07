@@ -29,7 +29,7 @@ class FUTheme:
     INFERTILE_AMBER_TEXT = "#FDE68A"  # High-contrast amber text
 
     REJECT_RED = "#DC2626"
-    REJECT_RED_HOVER = "#EF4444"
+    REJECT_RED_HOVER = "#B91C1C"
     REJECT_RED_BG = "#4C1D24"
     REJECT_RED_CARD = "#33161A"
     REJECT_RED_BORDER = "#6E222C"
@@ -47,10 +47,15 @@ class FUTheme:
     # Typography (High-Contrast Off-White on Industrial Gray)
     TEXT_PRIMARY = "#F1F3F7"          # Crisp Slate-50 Off-White (High contrast)
     TEXT_SECONDARY = "#CBD2E0"        # Soft Silver Slate
-    TEXT_MUTED = "#8F96A6"            # Muted Cool Gray
-    TEXT_DIM = "#6B7280"              # Dim Gray
+    TEXT_MUTED = "#A8B4C8"            # Readable secondary metadata on slate
+    TEXT_DIM = "#94A3B8"              # Quiet text with accessible contrast
     TEXT_WHITE = "#FFFFFF"            # Pure White for dark buttons
     TEXT_ACCENT = "#FDE047"           # Gold / Amber highlight
 
     # Standard Typography
-    FONT_FAMILY = "Plus Jakarta Sans"
+    # Native Windows face: available offline, with real regular/bold weights.
+    FONT_FAMILY = "Segoe UI"
+    FONT_BODY = 14
+    FONT_LABEL = 12
+    FONT_HEADING = 20
+    FONT_METRIC = 24

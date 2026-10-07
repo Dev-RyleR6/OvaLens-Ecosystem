@@ -59,7 +59,7 @@ class StartupConfigWindow(ctk.CTk):
 
         ctk.CTkLabel(
             header_inner,
-            text="🥚  OvaLens",
+            text="OvaLens",
             font=(FUTheme.FONT_FAMILY, 22, "bold"),
             text_color="#FFFFFF",
         ).pack(side="left", padx=(0, 16))
@@ -77,7 +77,7 @@ class StartupConfigWindow(ctk.CTk):
         ctk.CTkLabel(
             header_inner,
             text="Foundation University",
-            font=(FUTheme.FONT_FAMILY, 11),
+            font=(FUTheme.FONT_FAMILY, 12),
             text_color="#FFB0B0",
         ).pack(side="left", padx=(8, 0))
 
@@ -109,7 +109,7 @@ class StartupConfigWindow(ctk.CTk):
 
         self._status_label = ctk.CTkLabel(
             footer, text="",
-            font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
+            font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED
         )
         self._status_label.pack(side="left")
 
@@ -149,8 +149,8 @@ class StartupConfigWindow(ctk.CTk):
         ).pack(anchor="w", padx=20, pady=(18, 4))
         ctk.CTkLabel(
             parent,
-            text="Set up the candling batch before starting the conveyor.",
-            font=(FUTheme.FONT_FAMILY, 11),
+            text="Set up the candling batch before starting the conveyor.", wraplength=300, justify="left",
+            font=(FUTheme.FONT_FAMILY, 12),
             text_color=FUTheme.TEXT_MUTED,
         ).pack(anchor="w", padx=20, pady=(0, 16))
 
@@ -162,8 +162,7 @@ class StartupConfigWindow(ctk.CTk):
         }
         self._add_label(parent, "Duck Breed / Genetic Line:")
         self._breed_var = ctk.StringVar(value=list(self._breed_map.keys())[0])
-        self._breed_menu = ctk.CTkOptionMenu(
-            parent,
+        self._breed_menu = ctk.CTkOptionMenu(parent, font=(FUTheme.FONT_FAMILY, 14),
             values=list(self._breed_map.keys()),
             variable=self._breed_var,
             fg_color=FUTheme.PANEL_LIGHT_ALT,
@@ -203,7 +202,7 @@ class StartupConfigWindow(ctk.CTk):
             ctk.CTkButton(
                 presets_frame,
                 text=label,
-                font=(FUTheme.FONT_FAMILY, 10, "bold"),
+                font=(FUTheme.FONT_FAMILY, 12, "bold"),
                 fg_color=FUTheme.PANEL_LIGHT_ALT,
                 hover_color=FUTheme.PANEL_ACCENT,
                 text_color=FUTheme.TEXT_SECONDARY,
@@ -217,8 +216,7 @@ class StartupConfigWindow(ctk.CTk):
 
         # ── Operator Name ────────────────────────────────────────────────────
         self._add_label(parent, "Operator Name:")
-        self._operator_entry = ctk.CTkEntry(
-            parent,
+        self._operator_entry = ctk.CTkEntry(parent, font=(FUTheme.FONT_FAMILY, 14),
             fg_color=FUTheme.PANEL_LIGHT_ALT,
             text_color=FUTheme.TEXT_PRIMARY,
             height=36,
@@ -262,11 +260,10 @@ class StartupConfigWindow(ctk.CTk):
         batch_num_row.pack(fill="x", padx=20, pady=(0, 4))
         ctk.CTkLabel(
             batch_num_row, text="Batch # in this month:",
-            font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_MUTED
+            font=(FUTheme.FONT_FAMILY, 12, "bold"), text_color=FUTheme.TEXT_MUTED
         ).pack(side="left", padx=(0, 8))
         self._batch_num_var = ctk.StringVar(value="01")
-        self._batch_num_menu = ctk.CTkOptionMenu(
-            batch_num_row,
+        self._batch_num_menu = ctk.CTkOptionMenu(batch_num_row, font=(FUTheme.FONT_FAMILY, 14),
             values=[f"{i:02d}" for i in range(1, 13)],
             variable=self._batch_num_var,
             fg_color=FUTheme.PANEL_LIGHT_ALT,
@@ -285,26 +282,25 @@ class StartupConfigWindow(ctk.CTk):
     def _build_hardware_panel(self, parent):
         ctk.CTkLabel(parent, text="Station setup", font=(FUTheme.FONT_FAMILY, 14, "bold"),
                      text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=20, pady=(18, 12))
-        ctk.CTkLabel(parent, text="Configure the station from Config after opening the operator app.\n\n"
+        ctk.CTkLabel(parent, font=(FUTheme.FONT_FAMILY, 14), text="Configure the station from Settings after opening the operator app.\n\n"
                      "Connections: select and identify both ESP32 boards.\n\n"
                      "Camera: tune exposure, focus and white balance; save defaults.\n\n"
                      "Detection: set confidence and IoU thresholds.\n\n"
                      "Calibration: measure holder spacing and gate travel, then validate the inspected setup.\n\n"
                      "Opening the app starts no conveyor movement.",
                      wraplength=250, justify="left", text_color=FUTheme.TEXT_SECONDARY).pack(anchor="w", padx=20, pady=12)
-        ctk.CTkCheckBox(parent, text="Simulation preview only", variable=self._simulation_var,
+        ctk.CTkCheckBox(parent, font=(FUTheme.FONT_FAMILY, 14), text="Simulation preview only", variable=self._simulation_var,
                        text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=20, pady=16)
 
     def _add_label(self, parent, text: str):
         ctk.CTkLabel(
             parent, text=text,
-            font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            font=(FUTheme.FONT_FAMILY, 12, "bold"),
             text_color=FUTheme.TEXT_PRIMARY,
         ).pack(anchor="w", padx=20, pady=(4, 2))
 
     def _make_entry(self, parent, default: str) -> ctk.CTkEntry:
-        e = ctk.CTkEntry(
-            parent,
+        e = ctk.CTkEntry(parent, font=(FUTheme.FONT_FAMILY, 14),
             fg_color=FUTheme.PANEL_LIGHT_ALT,
             text_color=FUTheme.TEXT_PRIMARY,
             height=32,

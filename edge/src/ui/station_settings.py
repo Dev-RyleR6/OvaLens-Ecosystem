@@ -19,27 +19,33 @@ class StationSettingsWindow(ctk.CTkToplevel):
         self.entries = {}
         self.buttons = []
         ctk.CTkLabel(self, text="Station settings", font=(FUTheme.FONT_FAMILY, 22, "bold")).pack(anchor="w", padx=24, pady=(18, 4))
-        ctk.CTkLabel(self, text="Tune while idle. Readback confirms a driver value; position and passage remain estimated.", wraplength=850).pack(anchor="w", padx=24)
-        tabs = ctk.CTkTabview(self, fg_color=FUTheme.PANEL_LIGHT)
+        ctk.CTkLabel(self, font=(FUTheme.FONT_FAMILY, 14), text="Tune while idle. Readback confirms a driver value; position and passage remain estimated.", wraplength=850).pack(anchor="w", padx=24)
+        tabs = ctk.CTkTabview(self, fg_color=FUTheme.PANEL_LIGHT,
+                            segmented_button_selected_color=FUTheme.PRIMARY_MAROON,
+                            segmented_button_selected_hover_color=FUTheme.HOVER_MAROON,
+                            text_color=FUTheme.TEXT_PRIMARY)
+        tabs._segmented_button.configure(font=(FUTheme.FONT_FAMILY, 14, "bold"))
         tabs.pack(fill="both", expand=True, padx=20, pady=12)
         for name in ("Connections", "Camera", "Detection", "Calibration"):
             tabs.add(name)
-        self.notice = ctk.CTkLabel(self, text=self.station.settings_error or "Apply affects this run. Save as Default also persists settings.",
+        self.notice = ctk.CTkLabel(self, font=(FUTheme.FONT_FAMILY, 14), text=self.station.settings_error or "Apply affects this run. Save as Default also persists settings.",
                                   wraplength=850, justify="left")
         self.notice.pack(fill="x", padx=24, pady=6)
-        self.report = ctk.CTkTextbox(tabs.tab("Camera"), height=150)
+        self.report = ctk.CTkTextbox(tabs.tab("Camera"), height=150,
+                                    font=(FUTheme.FONT_FAMILY, 13),
+                                    fg_color=FUTheme.BG_LIGHT, text_color=FUTheme.TEXT_SECONDARY)
         self.confirm_camera = ctk.BooleanVar(value=False)
         self.inspected = ctk.BooleanVar(value=False)
 
         connection = tabs.tab("Connections")
         self._entry(connection, "conveyor_port", "Stepper / IR ESP32 serial port", "")
         self._entry(connection, "servo_port", "Servo ESP32 serial port", "")
-        self.port_label = ctk.CTkLabel(connection, text="Refresh to list connected serial ports", wraplength=820, justify="left")
+        self.port_label = ctk.CTkLabel(connection, font=(FUTheme.FONT_FAMILY, 14), text="Refresh to list connected serial ports", wraplength=820, justify="left")
         self.port_label.pack(anchor="w", padx=8, pady=10)
         self._button(connection, "Refresh ports", lambda: self._job(lambda: "\n".join(f"{p.device}: {p.description}" for p in list_ports.comports()) or "No ports found", self._ports))
         self._button(connection, "Connect and identify boards", lambda: self._job(self.station.connect))
         self._button(connection, "Acknowledge inspected board faults", self._acknowledge)
-        ctk.CTkLabel(connection, text="Connect after applying the selected ports. Acknowledgement clears faults; it does not establish conveyor position.", wraplength=820).pack(anchor="w", padx=8, pady=12)
+        ctk.CTkLabel(connection, font=(FUTheme.FONT_FAMILY, 14), text="Connect after applying the selected ports. Acknowledgement clears faults; it does not establish conveyor position.", wraplength=820).pack(anchor="w", padx=8, pady=12)
 
         camera = ctk.CTkScrollableFrame(tabs.tab("Camera"), height=200)
         camera.pack(fill="both", expand=True)
@@ -49,8 +55,8 @@ class StationSettingsWindow(ctk.CTkToplevel):
                          "gain": "Gain", "focus": "Focus", "white_balance": "White balance temperature"}
         for name in camera_labels:
             self._entry(camera, "camera." + name, camera_labels[name], "")
-        ctk.CTkLabel(camera, text="Blank optional fields leave the driver unchanged. DirectShow commonly uses 0.25 for manual exposure and 0.75 for automatic; verify the readback on your camera.", wraplength=760, justify="left").pack(anchor="w", padx=8, pady=10)
-        ctk.CTkCheckBox(camera, text="Confirm selected camera / changed device identity", variable=self.confirm_camera).pack(anchor="w", padx=8, pady=6)
+        ctk.CTkLabel(camera, font=(FUTheme.FONT_FAMILY, 14), text="Blank optional fields leave the driver unchanged. DirectShow commonly uses 0.25 for manual exposure and 0.75 for automatic; verify the readback on your camera.", wraplength=760, justify="left").pack(anchor="w", padx=8, pady=10)
+        ctk.CTkCheckBox(camera, font=(FUTheme.FONT_FAMILY, 14), text="Confirm selected camera / changed device identity", variable=self.confirm_camera).pack(anchor="w", padx=8, pady=6)
         self.report.pack(fill="x", pady=(8, 0))
         self.report.insert("1.0", "No camera property report yet. Apply settings to start idle preview and inspect readback.")
         self.report.configure(state="disabled")
@@ -59,7 +65,7 @@ class StationSettingsWindow(ctk.CTkToplevel):
         for name, label in (("confidence", "Detection confidence (0.01–0.99)"), ("iou", "NMS IoU (0.01–0.99)"),
                             ("sort_confidence", "Automatic-sort confidence (0.75–0.99)")):
             self._entry(detection, "detection." + name, label, "")
-        ctk.CTkLabel(detection, text="Sorting requires three agreeing fresh frames over at least 300 ms, within two seconds. Low confidence or conflicting evidence holds the conveyor for review.", wraplength=800, justify="left").pack(anchor="w", padx=8, pady=20)
+        ctk.CTkLabel(detection, font=(FUTheme.FONT_FAMILY, 14), text="Sorting requires three agreeing fresh frames over at least 300 ms, within two seconds. Low confidence or conflicting evidence holds the conveyor for review.", wraplength=800, justify="left").pack(anchor="w", padx=8, pady=20)
 
         calibration = ctk.CTkScrollableFrame(tabs.tab("Calibration"))
         calibration.pack(fill="both", expand=True)
@@ -76,8 +82,8 @@ class StationSettingsWindow(ctk.CTkToplevel):
         self._button(calibration, "Set aligned position as software home", lambda: self._job(lambda: self.station.command("CONVEYOR", "SETHOME")))
         for label, text in (("Test fertile route", "SORT:FERTILE"), ("Test infertile route", "SORT:INFERTILE"), ("Return servo to neutral", "RESET")):
             self._button(calibration, label, lambda text=text: self._job(lambda: self.station.command("SERVO", text)))
-        ctk.CTkLabel(calibration, text="Validate with the next holder one pitch before the chamber and all downstream holders empty. Bench-test IR stopping and both gate directions first.", wraplength=760, justify="left").pack(anchor="w", padx=8, pady=8)
-        ctk.CTkCheckBox(calibration, text="IR / gate bench-tested, geometry measured, holders aligned and cleared",
+        ctk.CTkLabel(calibration, font=(FUTheme.FONT_FAMILY, 14), text="Validate with the next holder one pitch before the chamber and all downstream holders empty. Bench-test IR stopping and both gate directions first.", wraplength=760, justify="left").pack(anchor="w", padx=8, pady=8)
+        ctk.CTkCheckBox(calibration, font=(FUTheme.FONT_FAMILY, 14), text="IR / gate bench-tested, geometry measured, holders aligned and cleared",
                         variable=self.inspected).pack(anchor="w", padx=8, pady=14)
         self._button(calibration, "Load calibration and validate inspected setup", self._validate)
 
@@ -93,15 +99,20 @@ class StationSettingsWindow(ctk.CTkToplevel):
     def _entry(self, parent, key, label, value):
         row = ctk.CTkFrame(parent, fg_color="transparent")
         row.pack(fill="x", padx=8, pady=4)
-        ctk.CTkLabel(row, text=label, anchor="w", width=370).pack(side="left")
-        entry = ctk.CTkEntry(row, height=34, width=200)
-        entry.pack(side="left", padx=8)
+        ctk.CTkLabel(row, text=label, anchor="w", width=370,
+                     font=(FUTheme.FONT_FAMILY, 14), text_color=FUTheme.TEXT_SECONDARY).pack(side="left")
+        entry = ctk.CTkEntry(row, height=38, width=200, font=(FUTheme.FONT_FAMILY, 14),
+                            fg_color=FUTheme.BG_LIGHT, border_color=FUTheme.BORDER_DARK,
+                            text_color=FUTheme.TEXT_PRIMARY)
+        entry.pack(side="right", padx=8)
         entry.insert(0, value)
         self.entries[key] = entry
         return entry
 
     def _button(self, parent, label, command, side=None):
-        button = ctk.CTkButton(parent, text=label, command=command, height=38,
+        button = ctk.CTkButton(parent, text=label, command=command, height=40,
+                              width=max(140, len(label) * 8 + 24),
+                              font=(FUTheme.FONT_FAMILY, 14, "bold"),
                               fg_color=FUTheme.PRIMARY_MAROON, hover_color=FUTheme.HOVER_MAROON)
         button.pack(side=side or "top", anchor="w", padx=6, pady=4)
         self.buttons.append(button)

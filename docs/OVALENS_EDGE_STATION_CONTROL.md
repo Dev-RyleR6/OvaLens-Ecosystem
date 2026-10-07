@@ -4,14 +4,14 @@ Task: `TASK-NEW-EDGE-CONTROL-01`; extends `TASK-NEW-FW-SAFE-01` and replaces the
 
 ## Run and configure
 
-Install `edge/requirements.txt` in a dedicated Python environment and run `python edge/launcher.py` from the repository root. Use **Config** in the operator window. Opening the application never starts the conveyor.
+Install `edge/requirements.txt` in a dedicated Python environment and run `python edge/launcher.py` from the repository root. Use **Settings** in the operator window. Opening the application never starts the conveyor.
 
 1. In **Camera**, choose the camera index and requested resolution/FPS. Apply settings to start idle preview. Disable automatic exposure, focus and white balance before tuning their manual values, where the driver supports these controls. Blank optional fields leave the driver unchanged. Exposure and auto-exposure values use the camera backend's native units; DirectShow commonly uses 0.25 for manual and 0.75 for automatic exposure. Check the displayed readback on your camera.
 2. In **Connections**, enter separate conveyor and servo COM ports, Apply, and then **Connect and identify boards**. Port descriptions do not prove board identity: the serial protocol checks each board's role. The app will reject old firmware and conveyor firmware without IR capability.
 3. Inspect the mechanisms, then **Acknowledge inspected board faults**. This does not home or move the conveyor. Jog slowly for alignment and use **Set aligned position as software home** deliberately.
 4. In **Calibration**, enter measured holder spacing, chamber-to-gate distance, gate approach/exit clearance, direction, STEP half-period, IR capture offset, arrival tolerance, settling time, passage time and servo angles. Apply before validation. Gate clearance must be less than half a holder pitch, tolerance less than clearance, and travel between holders at least 600 ms. These checks do not establish physical accuracy.
 5. Bench-test the unloaded IR stop and both gate directions. Align the **next holder one pitch before the camera station**, clear every downstream holder, and leave the IR beam clear. Confirm the inspection checkbox and load/validate calibration. This restores approved board presets and moves the empty gate to neutral; it does not move the conveyor.
-6. Close Config and choose **Start sorting**. The batch target counts recorded eggs; empty holders do not count. Stop feeding after the configured number of eggs. Additional eggs encountered during draining require recovery.
+6. Close Settings and choose **Start sorting**. The batch target counts recorded eggs; empty holders do not count. Stop feeding after the configured number of eggs. Additional eggs encountered during draining require recovery.
 
 **Apply** changes the current run. **Save as Default** also writes `edge/db/edge_settings.json` atomically. **Restore Saved Defaults** loads the form; Apply is still required. The file contains settings, never permission to move. Camera identity currently consists of OpenCV index/backend, not a hardware serial number: confirm the selected device after USB changes, including replacement at the same index. Reapply settings after a backend/identity mismatch. A driver accepting a write and returning the value is labelled verified readback; this does not independently prove the camera disabled its automatic algorithms.
 
@@ -57,3 +57,23 @@ Run `python -m pytest edge/tests -v` and the repository verification utility. `t
 Run `python edge/benchmark.py --output <path>` for a 50-frame synthetic model timing measurement, and optionally `--threads <n>` or `--baseline <previous-json>`. Use the same machine, model and frame size for comparisons. The cycle exposes capture age and cycle duration; the inference scheduler exposes inference latency and queue depth. The UI tracks dispatch intervals. Synthetic timing excludes actual camera exposure, physical travel and hatchery accuracy. No throughput or latency SLA is claimed before rig validation.
 
 If importing `serial` does not expose `Serial`, the unrelated `serial` package is shadowing PySerial. Use a clean virtual environment with the edge requirements; do not use the serialization package for hardware control.
+## Operator interface refinement
+
+`TASK-NEW-EDGE-UI-POLISH-01` uses native Segoe UI on the Windows station. The main
+operator surface uses 12 px metadata, 14 px controls, a 20 px application heading,
+and 24 px scan counts. FU maroon, green, red and slate remain the theme. Device
+telemetry occupies a separate header row, STOP remains visible during sessions,
+and holder decisions appear when the cycle requests manual review. Recent history
+remains available through the History control and S shortcut.
+
+Control and cycle-HUD refreshes now compare complete presentation signatures
+before touching Tk widgets. Busy inference, session identity, completion, shutdown
+and failed finalization invalidate the control signature. Camera, inference,
+storage and physical movement behavior are unchanged by this refinement.
+
+On the Windows development PC, 500 repeated unchanged control/HUD refresh pairs
+using real CustomTkinter widgets took 7,245.55 ms before this change (0556e6b),
+and 7.92–23.68 ms afterward. This isolated benchmark excludes event-loop waiting,
+camera rendering and inference; it establishes reduced redundant Tk work, not
+an end-to-end frame rate or sorting throughput. Native GUI verification covers
+1280×860 and 1024×720 layouts, active/review controls, startup and settings.

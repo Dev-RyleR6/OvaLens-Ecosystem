@@ -106,6 +106,8 @@ def test_station_settings_builds_without_camera_or_board_access(hidden_ui, tmp_p
     window = StationSettingsWindow(app)
     window.withdraw()
     window.update_idletasks()
+    from src.ui.theme import FUTheme
+    assert window.entries["detection.iou"].cget("font")[0] == FUTheme.FONT_FAMILY
     assert window._values().snapshot() == station.settings.snapshot()
     assert "camera.auto_exposure" in window.entries
     assert "detection.iou" in window.entries
@@ -116,3 +118,35 @@ def test_station_settings_builds_without_camera_or_board_access(hidden_ui, tmp_p
     app.after(50, app.shutdown)
     app.mainloop()
     assert not errors
+
+
+def test_minimum_window_keeps_stop_and_session_controls_visible(hidden_ui):
+    import queue
+    camera = SimpleNamespace(is_running=False, current_fps=0., last_error=None,
+                             is_mock_mode=False, stop=Mock())
+    sync = SimpleNamespace(last_error=None, heartbeat_error=None, is_online=False, stop=Mock())
+    db = Mock()
+    db.get_unsynced_count.return_value = 0
+    worker = SimpleNamespace(busy=False, result_queue=queue.Queue(), stop=Mock())
+    app = OvaLensOperatorApp(camera, Mock(), None, db, sync, fullscreen=False,
+                             inference_worker=worker)
+    try:
+        app.geometry("1024x720")
+        app.deiconify()
+        app.update()
+        app.current_session_id = "inspection"
+        app.is_auto_cycle_running = True
+        app._set_session_active_state(True)
+        app.review_row.pack(fill="x", padx=12, pady=(0, 8))
+        app.update_idletasks()
+        for button in (app.eject_btn, app.cancel_btn, app.session_btn, app.settings_btn,
+                       app.kiosk_btn, *app.review_buttons):
+            assert button.winfo_ismapped()
+            assert button.winfo_rootx() >= app.winfo_rootx()
+            assert button.winfo_rootx() + button.winfo_width() <= app.winfo_rootx() + app.winfo_width()
+        assert app.video_container.winfo_height() > 200
+    finally:
+        app.current_session_id = None
+        app.is_auto_cycle_running = False
+        app.shutdown()
+        app.mainloop()

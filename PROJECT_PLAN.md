@@ -258,3 +258,5 @@ These features can be claimed by any agent using `python scripts/verify_and_comm
 - [ ] **TASK-NEW-LANE-01**: Multi-Lane Conveyor Scaling Support (Extend firmware and edge tracker from 1 lane to 4 parallel candling lanes)
 - [x] **TASK-NEW-SCOPE-01**: Refactor OvaLens to the single Day 10 checkpoint and strict two-class (`FERTILE`, `INFERTILE`) domain contract
 - [x] **TASK-NEW-BE-SCHEMA-01**: Align database schema contracts across Edge, Backend, and Dashboard: add MANUAL_REVIEW routing action, session manual review counts, scan override tracking, physical cradle indexing, and optical research metrics
+
+- [x] **TASK-NEW-EDGE-UI-POLISH-01**: Improve native edge typography, operator visibility and minimum-size layouts; eliminate redundant Tk status/control updates. Verify with simulated GUI, measured before/after updates and repository gates.
