@@ -7,6 +7,7 @@ import ts from 'typescript';
 const pages = ['BatchesPage', 'ScanExplorerPage', 'AnalyticsPage', 'DevicesPage'];
 const sources = Object.fromEntries(await Promise.all(pages.map(async page => [page, await readFile(new URL(`../src/pages/${page}.tsx`, import.meta.url), 'utf8')])));
 const hatch = await readFile(new URL('../src/components/FinalizeHatchModal.tsx', import.meta.url), 'utf8');
+const css = await readFile(new URL('../src/index.css', import.meta.url), 'utf8');
 
 function openingTags(source) {
   const file = ts.createSourceFile('page.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -44,7 +45,7 @@ test('table and grid selectors expose their current pressed state', () => {
   for (const page of ['BatchesPage', 'ScanExplorerPage']) {
     assert.match(sources[page], /aria-pressed=\{viewMode === 'TABLE'\}/);
     assert.match(sources[page], /aria-pressed=\{viewMode === 'GRID'\}/);
-    assert.match(sources[page], /className="scan-grid"/);
+    assert.match(sources[page], /className="(?:scan-grid|batch-card-grid)"/);
   }
 });
 
@@ -57,7 +58,11 @@ test('operational tables retain named keyboard-focusable internal scroll regions
       assert.equal(attribute(region, 'tabIndex')?.initializer?.getText(), '{0}', page);
       assert.match(attribute(region, 'className')?.initializer?.text ?? '', /table-scroll/);
     }
-    assert.match(sources[page], /min-w-\[\d+px\]/);
+    if (page === 'BatchesPage') {
+      assert.match(css, /\.batch-table\s*\{[^}]*min-width:\s*\d+px/);
+    } else {
+      assert.match(sources[page], /min-w-\[\d+px\]/);
+    }
   }
 });
 

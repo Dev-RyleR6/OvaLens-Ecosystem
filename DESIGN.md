@@ -3,6 +3,8 @@
 The dashboard is an operational record system. Retain the FU identity and replace decorative styling with clear hierarchy, visible data provenance, and consistent controls.
 
 - Use the supplied logo, maroon #800000 for primary actions and selection, #357a38 for fertile results, #DC2626 for reject/error states, and amber for review states.
+- Use `ovalens_logo_final.svg` with a trimmed canvas. The navigation rail stays FU maroon in both themes, with warm white active links, tinted secondary text, and a darker connection-status footer. Keep operational content on slate and white surfaces.
+- Group batch breed, incubator, and dates beneath the identifier; keep numeric columns readable and secondary row actions in a native disclosure. Batch cards adapt to available content width.
 - Use self-hosted IBM Plex Sans in Latin weights 400, 500, 600, and 700, with system sans fallbacks and swap loading. Use 14px default UI text, 12px metadata, 18px section headings, and 24px page headings; mobile form controls use 16px. Use tabular numerals for measurements and amounts.
 - Use shared `page-header`, `page-actions`, `primary-action`, `secondary-action`, `filter-panel`, and `status-badge` patterns. Use Lucide icons with consistent 16–18px strokes, paired with action labels where space permits; hide decorative icons from assistive technology. Do not add generic decorative icon tiles.
 - Size card grids from available content width, not viewport width. Let identifiers and action groups wrap, and retain all primary tasks on narrow screens.

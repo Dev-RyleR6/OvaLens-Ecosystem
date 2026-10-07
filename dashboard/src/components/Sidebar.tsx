@@ -46,14 +46,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
     { to: user?.role === 'OPERATOR' ? '/settings?tab=account' : '/settings', label: user?.role === 'OPERATOR' ? 'My account' : 'Settings', icon: Settings },
   ];
   return (
-    <div ref={dialogRef} className={`mobile-navigation ${isOpen ? 'is-open' : ''} lg:visible lg:relative lg:w-60 lg:shrink-0`} id="dashboard-navigation">
+    <div ref={dialogRef} className={`mobile-navigation ${isOpen ? 'is-open' : ''} lg:visible lg:relative lg:w-64 lg:shrink-0`} id="dashboard-navigation">
       {isOpen && mobile && <div className="fixed inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />}
-      <aside className="relative w-60 h-full border-r border-border bg-card flex flex-col">
-        <div className="lg:hidden flex items-center justify-between p-4 border-b border-border"><span className="font-semibold">Navigation</span><button onClick={onClose} aria-label="Close navigation"><X className="w-5 h-5" /></button></div>
-        <nav aria-label="Main navigation" className="p-3 space-y-1 flex-1 overflow-y-auto">
+      <aside className="hatchery-sidebar relative w-64 h-full flex flex-col">
+        <div className="lg:hidden sidebar-mobile-header flex items-center justify-between p-4"><span className="font-semibold">Navigation</span><button onClick={onClose} aria-label="Close navigation"><X className="w-5 h-5" /></button></div>
+        <div className="sidebar-identity"><span>OvaLens</span><p>Hatchery operations</p></div>
+        <nav aria-label="Main navigation" className="px-3 pb-4 space-y-1 flex-1 overflow-y-auto">
           {links.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} onClick={onClose} className="nav-link"><Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />{label}</NavLink>)}
         </nav>
-        <div className="p-4 border-t border-border space-y-2"><NavLink to="/devices" onClick={onClose} className="action-link w-full text-sm"><Radio className="w-4 h-4" aria-hidden="true" />Edge app connections<ChevronRight className="w-4 h-4 ml-auto" aria-hidden="true" /></NavLink><p className="text-sm text-slate-600" role="status">{unavailable ? 'Edge status unavailable' : devices === null ? 'Checking edge apps…' : devices.length === 0 ? 'No edge apps registered' : `${reporting} of ${devices.length} edge apps online`}</p><p className="text-xs text-slate-500 leading-relaxed">Checked every 15 seconds. Offline after 90 seconds without a heartbeat. Hardware readiness is checked at the edge.</p></div>
+        <div className="sidebar-connections p-4 space-y-2"><NavLink to="/devices" onClick={onClose} className="sidebar-connection-link action-link w-full text-sm"><Radio className="w-4 h-4" aria-hidden="true" />Edge app connections<ChevronRight className="w-4 h-4 ml-auto" aria-hidden="true" /></NavLink><p className="sidebar-status text-sm" role="status">{unavailable ? 'Edge status unavailable' : devices === null ? 'Checking edge apps…' : devices.length === 0 ? 'No edge apps registered' : `${reporting} of ${devices.length} edge apps online`}</p><p className="sidebar-note text-xs leading-relaxed">Checked every 15 seconds. Offline after 90 seconds without a heartbeat. Hardware readiness is checked at the edge.</p></div>
       </aside>
     </div>
   );

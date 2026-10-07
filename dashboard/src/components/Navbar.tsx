@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { LogoutModal } from './LogoutModal';
 import { apiClient } from '../api/client';
 import { Badge } from './Badge';
-import ovalensLogo from '../assets/logos/ovalens_logo.svg';
+import ovalensLogo from '../assets/logos/ovalens_logo_final.svg';
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -78,7 +78,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, sidebarOpen = f
           <Menu className="w-5 h-5" aria-hidden="true" />
         </button>
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center shrink-0"><img src={ovalensLogo} alt="OvaLens logo" className="w-8 h-8 object-contain" width={32} height={32} /></div>
+          <div className="w-10 h-10 rounded-lg bg-[#F8FAFC] flex items-center justify-center shrink-0"><img src={ovalensLogo} alt="OvaLens logo" className="w-9 h-9 object-contain" width={36} height={36} /></div>
           <div className="min-w-0"><span className="font-semibold text-base text-foreground">OvaLens</span><p className="text-xs text-slate-500 hidden sm:block">Foundation University · Hatchery management</p></div>
         </div>
       </div>
