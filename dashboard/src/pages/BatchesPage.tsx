@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { BatchSummary, DuckBreed, BatchStage, CandlingSession } from '../types';
-import { Badge } from '../components/Badge';
+import { ActionsMenu } from '../components/ActionsMenu';
+import { BatchIncubationStatus } from '../components/BatchIncubationStatus';
 import { BatchProgressTimeline } from '../components/BatchProgressTimeline';
 import { Dialog } from '../components/ui/dialog';
 import { Sheet } from '../components/ui/sheet';
@@ -294,7 +295,7 @@ export const BatchesPage: React.FC = () => {
             title="Evaluate elapsed incubation days and flag due candling/transfer milestones"
           >
             <RefreshCw aria-hidden="true" className={`w-4 h-4 ${isCheckingMilestones ? 'animate-spin' : ''}`} />
-            <span>{isCheckingMilestones ? 'Checkingâ€¦' : 'Check milestones'}</span>
+            <span>{isCheckingMilestones ? 'Checking…' : 'Check milestones'}</span>
           </button>
 
           <button
@@ -359,7 +360,7 @@ export const BatchesPage: React.FC = () => {
         </div>
 
         <details className="batch-filter-disclosure" open={filtersExpanded} onToggle={event => setFiltersExpanded(event.currentTarget.open)}>
-          <summary>Filters<ChevronDown aria-hidden="true" className="w-4 h-4" />{[breedFilter, stageFilter, statusFilter].filter(value => value !== 'ALL').length > 0 && <span> Â· {[breedFilter, stageFilter, statusFilter].filter(value => value !== 'ALL').length} applied</span>}</summary>
+          <summary>Filters<ChevronDown aria-hidden="true" className="w-4 h-4" />{[breedFilter, stageFilter, statusFilter].filter(value => value !== 'ALL').length > 0 && <span> · {[breedFilter, stageFilter, statusFilter].filter(value => value !== 'ALL').length} applied</span>}</summary>
           <div className="batch-filter-fields grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
           <div><label className="batch-filter-label" htmlFor="batch-filter-breed">Breed</label><div className="relative">
             <select id="batch-filter-breed"
@@ -419,7 +420,7 @@ export const BatchesPage: React.FC = () => {
 
       <div className="batch-results-heading">
         <p role="status"><strong>{processedBatches.length}</strong> {processedBatches.length === 1 ? 'batch' : 'batches'}
-          {selectedBatchIds.length > 0 && <span> Â· {selectedBatchIds.length} selected</span>}
+          {selectedBatchIds.length > 0 && <span> · {selectedBatchIds.length} selected</span>}
         </p>
         {(searchQuery || breedFilter !== 'ALL' || stageFilter !== 'ALL' || statusFilter !== 'ALL') &&
           <button className="action-link" onClick={() => {setSearchQuery(''); setBreedFilter('ALL'); setStageFilter('ALL'); setStatusFilter('ALL'); setCurrentPage(1);}}>Clear filters</button>}
@@ -434,7 +435,7 @@ export const BatchesPage: React.FC = () => {
           isRetrying={isLoading}
         />
       ) : isLoading && batches.length === 0 ? (
-        <div role="status" className="py-12 text-center text-slate-600">Loading batchesâ€¦</div>
+        <div role="status" className="py-12 text-center text-slate-600">Loading batches…</div>
       ) : !isLoading && batches.length === 0 ? (
         <EmptyState
           title="No Incubation Batches Found"
@@ -497,13 +498,12 @@ export const BatchesPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 batch-identity">
                         <button className="action-link text-left" onClick={() => { void handleSelectBatch(b); }} aria-label={`Open batch details for ${b.batch_code}`}>{b.batch_code}</button>
-                        <p>{b.breed === 'KAYUMANGGI' ? 'IP-Kayumanggi' : b.breed === 'ITIM' ? 'IP-Itim' : 'IP-Khaki'} Â· {b.incubator_id}</p>
-                        <p>Set {new Date(b.set_date).toLocaleDateString()}{b.elapsed_days !== undefined ? ` Â· Day ${b.elapsed_days}` : ''}</p>
+                        <p>{b.breed === 'KAYUMANGGI' ? 'IP-Kayumanggi' : b.breed === 'ITIM' ? 'IP-Itim' : 'IP-Khaki'} · {b.incubator_id}</p>
+                        <p>Set {new Date(b.set_date).toLocaleDateString()}{b.elapsed_days !== undefined ? ` · Day ${b.elapsed_days}` : ''}</p>
                       </td>
                       <td className="py-3 px-4 batch-numbers"><strong>{b.initial_egg_count.toLocaleString()}</strong><p>{b.total_scanned.toLocaleString()} scans</p></td>
                       <td className="py-3 px-4">
-                        <div className="batch-stage"><Badge type="stage" value={b.current_stage} /><Badge type="status" value={b.status} size="sm" /></div>
-                        {b.milestone_alert && <p className="batch-milestone">{b.milestone_alert.replace(/_/g, ' ').replace(':', ' Â·')}</p>}
+                        <BatchIncubationStatus batch={b} />
                       </td>
                       <td className="py-3 px-4 batch-numbers">
                         {b.total_scanned > 0 ? <><strong>{b.fertility_rate}%</strong><p>{b.fertile_count.toLocaleString()} fertile</p></> : <span className="text-slate-500">Awaiting scans</span>}
@@ -511,15 +511,12 @@ export const BatchesPage: React.FC = () => {
                       <td className="py-3 px-4 text-right">
                         <div className="batch-row-actions">
                           <button onClick={e => handleOpenAnalytics(b, e)} className="secondary-action" aria-label={`Analytics for ${b.batch_code}`}><Activity aria-hidden="true" className="w-4 h-4" />Analytics</button>
-                          <details className="batch-more">
-                            <summary className="secondary-action" aria-label={`More actions for ${b.batch_code}`}>More<ChevronDown aria-hidden="true" className="w-4 h-4" /></summary>
-                            <div className="batch-more-actions">
-                              <button className="action-link" onClick={() => { void handleSelectBatch(b); }}>Batch details</button>
-                              <button className="action-link" onClick={e => handleOpenCertificate(b, e)}><FileText aria-hidden="true" className="w-4 h-4" />Candling record</button>
-                              {(b.current_stage === 'HATCHED' || b.current_stage === 'COMPLETED') && <button className="action-link" onClick={e => handleOpenFinalize(b, e)}><CheckCircle2 aria-hidden="true" className="w-4 h-4" />Record hatch</button>}
-                              <button className="action-link text-red-700" onClick={e => handleDeleteBatch(b.batch_id, e)}><Trash2 aria-hidden="true" className="w-4 h-4" />Delete batch</button>
-                            </div>
-                          </details>
+                          <ActionsMenu label={`More actions for ${b.batch_code}`} actions={[
+                            { label: 'Batch details', icon: <Layers aria-hidden="true" className="w-4 h-4" />, onSelect: () => { void handleSelectBatch(b); } },
+                            { label: 'Candling record', icon: <FileText aria-hidden="true" className="w-4 h-4" />, onSelect: () => handleOpenCertificate(b) },
+                            ...((b.current_stage === 'HATCHED' || b.current_stage === 'COMPLETED') ? [{ label: 'Record hatch', icon: <CheckCircle2 aria-hidden="true" className="w-4 h-4" />, onSelect: () => handleOpenFinalize(b) }] : []),
+                            { label: 'Delete batch', icon: <Trash2 aria-hidden="true" className="w-4 h-4" />, destructive: true, onSelect: () => { void handleDeleteBatch(b.batch_id); } },
+                          ]} />
                         </div>
                       </td>
                     </tr>
@@ -545,15 +542,14 @@ export const BatchesPage: React.FC = () => {
                       <h3 className="font-semibold text-foreground text-base break-words">{b.batch_code}</h3>
                     </div>
                     <span className="text-sm text-slate-600 mt-1 block">
-                      Breed: <strong>{b.breed === 'KAYUMANGGI' ? 'IP-Kayumanggi' : b.breed === 'ITIM' ? 'IP-Itim' : 'IP-Khaki'}</strong> â€¢ Incubator: <strong>{b.incubator_id}</strong>
+                      Breed: <strong>{b.breed === 'KAYUMANGGI' ? 'IP-Kayumanggi' : b.breed === 'ITIM' ? 'IP-Itim' : 'IP-Khaki'}</strong> • Incubator: <strong>{b.incubator_id}</strong>
                     </span>
                   </div>
-                  <div className="batch-stage"><Badge type="stage" value={b.current_stage} /><Badge type="status" value={b.status} size="sm" /></div>
+                  <BatchIncubationStatus batch={b} />
                 </div>
 
                 {/* Classification Breakdown */}
-                <p className="text-sm text-slate-600 mt-3">Set {new Date(b.set_date).toLocaleDateString()}{b.elapsed_days !== undefined ? ` Â· Day ${b.elapsed_days}` : ''}</p>
-                {b.milestone_alert && <p className="batch-milestone">{b.milestone_alert.replace(/_/g, ' ').replace(':', ' Â·')}</p>}
+                <p className="text-sm text-slate-600 mt-3">Set {new Date(b.set_date).toLocaleDateString()}{b.elapsed_days !== undefined ? ` · Day ${b.elapsed_days}` : ''}</p>
                 <div className="batch-classification grid grid-cols-2 gap-4 mt-4">
                   <div className="text-agri-green">
                     <span className="text-sm text-slate-600 block">Fertile</span>
@@ -572,7 +568,7 @@ export const BatchesPage: React.FC = () => {
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span className="text-slate-500">Day 10 Salvage: <strong>â‚±{(b.infertile_count * 14.0).toFixed(2)}</strong></span>
+                <span className="text-slate-500">Day 10 Salvage: <strong>₱{(b.infertile_count * 14.0).toFixed(2)}</strong></span>
                 <button
                   onClick={(e) => handleOpenCertificate(b, e)}
                   className="action-link"
@@ -595,7 +591,7 @@ export const BatchesPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 pt-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span>Showing {paginatedBatches.length} of {processedBatches.length} batches</span>
-          <span>â€¢</span>
+          <span>•</span>
           <span>Rows per page:</span>
           <select
             aria-label="Rows per page" value={rowsPerPage}
@@ -718,7 +714,7 @@ export const BatchesPage: React.FC = () => {
               type="submit" disabled={isCreating}
               className="primary-action"
             >
-              {isCreating ? 'Savingâ€¦' : 'Create batch'}
+              {isCreating ? 'Saving…' : 'Create batch'}
             </button>
           </div>
         </form>
@@ -815,7 +811,7 @@ export const BatchesPage: React.FC = () => {
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
                         <span className="flex items-center gap-1">
                           <User aria-hidden="true" className="w-3 h-3 text-slate-400" />
-                          {s.operator_name} â€¢ {s.device_id}
+                          {s.operator_name} • {s.device_id}
                         </span>
                         <span className="font-bold text-emerald-700">
                           {s.fertile_count} / {s.total_scanned} Fertile ({s.avg_inference_ms.toFixed(1)}ms)

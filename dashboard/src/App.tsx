@@ -45,7 +45,7 @@ const ProtectedLayout: React.FC = () => {
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
         <Sidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} />
         <main ref={mainRef} id="main-content" tabIndex={-1} className="dashboard-content min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 w-full custom-scrollbar">
-          <div key={location.pathname} className="max-w-7xl mx-auto min-w-0 ">
+          <div key={location.pathname} className={location.pathname === '/batches' ? 'batch-page-shell min-w-0' : 'max-w-7xl mx-auto min-w-0'}>
             <React.Suspense fallback={<p role="status" className="py-8 text-slate-600">Loading page…</p>}>
             <Routes location={location}>
               <Route path="/" element={<OverviewPage />} />

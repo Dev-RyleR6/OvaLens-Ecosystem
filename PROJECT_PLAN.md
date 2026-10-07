@@ -218,6 +218,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 - [x] **TASK-NEW-DASH-BRAND-02**: Use the final OvaLens SVG, introduce FU maroon navigation, and improve incubation batch layout, readable sizing, filters, and responsive cards.
 
+- [x] **TASK-NEW-DASH-TABLE-03**: Fix batch action menu row expansion, text encoding, duplicate status labels, and wide-screen workspace alignment; verify keyboard and responsive behavior.
+
 These features can be claimed by any agent using `python scripts/verify_and_commit.py --task <ID>`:
 
 - [x] **TASK-NEW-DASH-DESIGN-01**: Unify dashboard typography with self-hosted IBM Plex Sans, normalize shared controls and meaningful iconography, and improve responsive operational pages, navigation, and dialogs. Dashboard regression tests/build and the monorepo verify-only gate pass; browser checks cover 320/768/1280px layouts, view switching, keyboard menus, theme persistence, and short-screen dialogs. Screenshot-based visual and print acceptance remain unverified because the selected provider cannot read images. Unrelated workspace changes preserved.

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Dashboard**: [TASK-NEW-DASH-TABLE-03] correct batch table layout and floating actions (2026-10-07)
 - **Dashboard**: [TASK-NEW-DASH-RESP-01] improve responsive layouts and reconcile analytics (2026-10-07)
 - **Dashboard**: [TASK-NEW-DASH-LIVE-01] restore analytics charts and edge app heartbeats (2026-10-07)
 - **Dashboard**: [TASK-NEW-DASH-UX-01] improve operational UX and truthful telemetry (2026-10-07)
