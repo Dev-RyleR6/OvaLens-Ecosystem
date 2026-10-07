@@ -4,6 +4,7 @@ import { Database, LogOut, ShieldCheck, Server, Settings, User, ChevronDown, Sli
 import { useAuth } from '../context/AuthContext';
 import { LogoutModal } from './LogoutModal';
 import { apiClient } from '../api/client';
+import ovalensLogo from '../assets/logos/ovalens_logo.svg';
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -87,8 +88,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
           </button>
 
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#800000] text-white flex items-center justify-center font-black text-sm tracking-tight shadow-xs flex-shrink-0">
-              FU
+            <div className="w-9 h-9 rounded-lg bg-[#800000] flex items-center justify-center shadow-xs flex-shrink-0">
+              <img src={ovalensLogo} alt="OvaLens logo" className="w-8 h-8 object-contain" width={32} height={32} />
             </div>
             <div>
               <div className="flex items-center gap-2">

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, Check, Loader2, Shield, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import ovalensLogo from '../assets/logos/ovalens_logo.svg';
 
 const sanitize = (val: string): string => {
   return val.replace(/<[^>]*>?/gm, '').trim();
@@ -154,8 +155,8 @@ export const LoginPage: React.FC = () => {
       >
         {/* University Header */}
         <div className="text-center mb-7">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#800000] text-white font-bold text-lg mb-3 shadow-sm ring-1 ring-[#800000]/10 transition-transform duration-200 hover:scale-105">
-            FU
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-[#800000] mb-3 shadow-sm ring-1 ring-[#800000]/10 transition-transform duration-200 hover:scale-105">
+            <img src={ovalensLogo} alt="OvaLens logo" className="w-14 h-14 object-contain" width={56} height={56} />
           </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
             OvaLens Hatchery System
