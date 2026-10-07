@@ -5,6 +5,40 @@ from app.main import app
 client = TestClient(app)
 
 
+def test_edge_heartbeat_authentication_and_persistence():
+    from uuid import uuid4
+    from datetime import datetime
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.models.device import DeviceModel
+
+    device_id = f"TEST-{uuid4()}"
+    headers = {"X-API-Key": settings.API_KEY}
+    url = f"/api/v1/devices/{device_id}/heartbeat"
+    assert client.post(url, json={"status": "ONLINE"}).status_code == 401
+    assert client.post(url, json={"status": "ONLINE"}, headers=headers).status_code == 404
+    try:
+        registered = client.post('/api/v1/devices/register', headers=headers, json={
+            'device_id': device_id, 'device_name': 'Heartbeat integration test', 'servo_pulse_ms': 321,
+        })
+        assert registered.status_code == 200
+        for state in ('ONLINE', 'SCANNING'):
+            result = client.post(url, headers=headers, json={'status': state})
+            assert result.status_code == 200
+            data = result.json()
+            assert data['status'] == state
+            assert data['servo_pulse_ms'] == 321
+            assert datetime.fromisoformat(data['last_heartbeat']).tzinfo is not None
+        with SessionLocal() as db:
+            saved = db.get(DeviceModel, device_id)
+            assert saved.status.value == 'SCANNING'
+            assert saved.last_heartbeat is not None
+    finally:
+        with SessionLocal() as db:
+            db.query(DeviceModel).filter(DeviceModel.device_id == device_id).delete()
+            db.commit()
+
+
 def test_scan_history_pagination_search_and_confidence_bands():
     first = client.get("/api/v1/scans/search", params={"limit": 2, "sort": "scanned_at", "order": "asc"})
     assert first.status_code == 200
@@ -93,6 +127,9 @@ def test_analytics_overview():
     assert response.status_code == 200
     data = response.json()
     assert data["total_eggs_scanned"] >= 500
+    assert data["total_fertile"] + data["total_infertile"] == data["total_eggs_scanned"]
+    assert data["total_fertile"] >= 0
+    assert data["total_infertile"] >= 0
     assert data["overall_fertility_rate"] > 0.0
 
 
@@ -348,7 +385,5 @@ def test_user_profile_and_password_change_flow():
     )
     assert new_login.status_code == 200
     assert "access_token" in new_login.json()
-
-
 
 

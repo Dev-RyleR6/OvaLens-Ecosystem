@@ -1,6 +1,7 @@
 """OvaLens desktop launcher: explicit preview, no unvalidated hardware motion."""
 import os
 import sys
+import platform
 from contextlib import ExitStack
 from dotenv import load_dotenv
 
@@ -58,7 +59,10 @@ def main():
         chamber = ChamberController(iot, camera, worker.frame_queue, worker.result_queue)
         resources.callback(_stop_resource, chamber)
         sync = BackgroundSyncWorker(db, os.getenv("API_BASE_URL", "http://localhost:8000"),
-                                    os.getenv("API_KEY", ""))
+                                    os.getenv("API_KEY", ""), device_id=device_id,
+                                    device_name=os.getenv("DEVICE_NAME", device_id),
+                                    hardware_platform=f"{platform.system()} {platform.machine()}",
+                                    model_version=engine.engine_type)
         resources.callback(_stop_resource, sync)
         if not config.get("simulation", False):
             sync.start()

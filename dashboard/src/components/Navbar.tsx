@@ -107,7 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, sidebarOpen = f
           {/* Live Backend Connection Indicator */}
           <div className="hidden sm:flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
             <span className={`w-2 h-2 rounded-full ${isApiOnline ? 'bg-emerald-600' : 'bg-amber-500'}`} />
-            <span className="font-medium text-slate-600 hidden md:inline">Connection:</span>
+            <span className="font-medium text-slate-600 hidden md:inline">Backend API:</span>
             <span className={`font-bold ${isApiOnline ? 'text-emerald-700' : 'text-amber-700'}`}>
               {isApiOnline === null ? 'Checking…' : isApiOnline ? 'Connected' : 'Unavailable'}
             </span>

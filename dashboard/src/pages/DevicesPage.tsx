@@ -34,12 +34,13 @@ export const DevicesPage: React.FC = () => {
   // Calibration state per device
   const [calibration, setCalibration] = useState<Record<string, { speed: number; dist: number; pulse: number }>>({});
 
-  const fetchDevices = async () => {
+  const fetchDevices = async (background = false) => {
     setIsRefreshing(true);
     setIsError(false);
     try {
       const data = await apiClient.getDevices();
       setDevices(data || []);
+      setNow(Date.now());
 
       const calMap: Record<string, { speed: number; dist: number; pulse: number }> = {};
       (data || []).forEach(d => {
@@ -49,7 +50,7 @@ export const DevicesPage: React.FC = () => {
           pulse: d.servo_pulse_ms || 250,
         };
       });
-      setCalibration(calMap);
+      setCalibration(previous => background ? { ...calMap, ...previous } : calMap);
     } catch (err) {
       console.error('Error fetching devices:', err);
       setIsError(true);
@@ -59,9 +60,10 @@ export const DevicesPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchDevices();
+    void fetchDevices();
+    const poll = setInterval(() => { void fetchDevices(true); }, 15_000);
     const timer = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(timer);
+    return () => { clearInterval(timer); clearInterval(poll); };
   }, []);
 
   const handleSaveCalibration = async (deviceId: string) => {
@@ -100,7 +102,7 @@ export const DevicesPage: React.FC = () => {
         </div>
 
         <button
-          onClick={fetchDevices}
+          onClick={() => { void fetchDevices(); }}
           disabled={isRefreshing}
           className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-card border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold  transition-colors cursor-pointer"
         >

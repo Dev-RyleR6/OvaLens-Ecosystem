@@ -222,7 +222,10 @@ export interface AnalyticsOverview {
   total_infertile: number;
   overall_fertility_rate: number;
   active_batches_count: number;
-  avg_inference_ms: number;
+  day_10_cull_rate: number;
+  total_hatched_ducklings: number;
+  overall_hatchability_rate: number;
+  average_inference_latency_ms: number;
 }
 
 export interface EconomicYield {

@@ -1387,6 +1387,7 @@ class OvaLensOperatorApp(ctk.CTk):
     def _update_status_loop(self):
         if self._closing:
             return
+        self.sync_worker.device_status = "SCANNING" if self._scan_busy or self.is_auto_cycle_running else "ONLINE"
         self._set_session_active_state(self.is_session_active or self._scan_busy or self._stopping)
         self.fps_label.configure(text=f"FPS: {self.camera.current_fps:.1f}")
         if not getattr(self, "_queue_count_pending", False):
@@ -1403,7 +1404,7 @@ class OvaLensOperatorApp(ctk.CTk):
             except (queue.Full, RuntimeError):
                 self._queue_count_pending = False
         count = getattr(self, "_unsynced_count", None)
-        error = self.sync_worker.last_error
+        error = self.sync_worker.last_error or self.sync_worker.heartbeat_error
         if error:
             text, color = "SYNC: ATTENTION", FUTheme.INFERTILE_AMBER
             if error != getattr(self, "_last_sync_error", None):

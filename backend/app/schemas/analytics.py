@@ -1,10 +1,14 @@
 from typing import List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class HatcheryOverviewKPIs(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     total_eggs_scanned: int
+    total_fertile: int
+    total_infertile: int
     overall_fertility_rate: float
     day_10_cull_rate: float
     total_hatched_ducklings: int

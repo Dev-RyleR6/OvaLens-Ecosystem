@@ -206,6 +206,14 @@ python -m pytest tests/test_edge_pipeline.py -v
 
 ---
 
+## Edge app availability and dashboard charts
+
+The dashboard Overview includes recorded Day 10 classification and candling coverage charts. **Analytics & graphs** provides breed/status/batch filters, economic estimates, and batch forecasts. Economic figures identify their scope; the facility breed table remains a facility total. Missing records do not generate example results.
+
+When launched through `edge/launcher.py` in normal operation, the edge app sends an authenticated device heartbeat every 15 seconds on a separate background thread. Configure `API_BASE_URL`, `API_KEY`, and a unique `DEVICE_ID` in `edge/.env`; the API key must match the backend configuration. Unknown stations register automatically; existing station calibration is preserved. Explicit simulation does not report a production station online.
+
+The dashboard checks device records every 15 seconds, independently of the data refresh preference, and expires online status after 90 seconds without a heartbeat. Closing the app or losing connectivity therefore changes its status after the expiry period. “Backend API” indicates server connectivity; “Edge app connections” indicates recent app heartbeats. Neither confirms physical camera, serial controller, or conveyor readiness. Device heartbeat failures appear as sync attention in the edge app and leave locally saved scans intact.
+
 ## ❓ Troubleshooting FAQ
 
 1. **Camera Feed is Black / Blank**:

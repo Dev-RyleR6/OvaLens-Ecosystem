@@ -48,7 +48,7 @@ export const Badge: React.FC<BadgeProps> = ({ type = 'status', value }) => {
   }
 
   if (type === 'device') {
-    const labels: Record<string, string> = { ONLINE: 'Online', SCANNING: 'Scanning', OFFLINE: 'Offline', ERROR: 'Error', STALE: 'Heartbeat stale', UNKNOWN: 'Status unknown' };
+    const labels: Record<string, string> = { ONLINE: 'App online', SCANNING: 'Scanning', OFFLINE: 'Offline', ERROR: 'Error', STALE: 'Offline · heartbeat expired', UNKNOWN: 'Status unknown' };
     const classes = value === 'ONLINE' || value === 'SCANNING'
       ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
       : value === 'ERROR' ? 'bg-red-50 text-red-800 border-red-200' : 'bg-slate-50 text-slate-700 border-slate-200';

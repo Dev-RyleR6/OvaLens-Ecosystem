@@ -7,6 +7,7 @@ import time
 import json
 import threading
 import os
+from urllib.parse import quote
 from typing import Optional, List, Dict, Any
 import requests
 
@@ -15,7 +16,9 @@ from ..db.local_db import LocalDatabaseManager
 
 class BackgroundSyncWorker:
     def __init__(self, db_manager: LocalDatabaseManager, api_base_url: str = "http://localhost:8000",
-                 api_key: Optional[str] = None, sync_interval_s: float = 3.0):
+                 api_key: Optional[str] = None, sync_interval_s: float = 3.0,
+                 device_id: Optional[str] = None, device_name: Optional[str] = None,
+                 hardware_platform: str = "Edge workstation", model_version: str = "unknown"):
         self.db = db_manager
         self.api_base_url = api_base_url.rstrip("/")
         self.api_key = api_key or os.getenv("API_KEY", "")
@@ -29,6 +32,13 @@ class BackgroundSyncWorker:
         self.last_error = None
         self._stop_event = threading.Event()
         self._registered_sessions = set()
+        self.device_id = device_id
+        self.device_name = device_name or device_id
+        self.hardware_platform = hardware_platform
+        self.model_version = model_version
+        self.device_status = "ONLINE"
+        self.heartbeat_error = None
+        self._heartbeat_thread: Optional[threading.Thread] = None
 
     def start(self):
         """Start the background synchronization thread."""
@@ -38,6 +48,37 @@ class BackgroundSyncWorker:
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._sync_loop, daemon=True, name="OvaLens-SyncThread")
         self._thread.start()
+        if self.device_id:
+            self._heartbeat_thread = threading.Thread(
+                target=self._heartbeat_loop, daemon=True, name="OvaLens-HeartbeatThread")
+            self._heartbeat_thread.start()
+
+    def _heartbeat_loop(self):
+        # Independent of scan replay: a large offline backlog cannot starve liveness.
+        while not self._stop_event.is_set():
+            self._send_heartbeat()
+            self._stop_event.wait(15.0)
+
+    def _send_heartbeat(self):
+        if not self.api_key or not self.device_id:
+            self.heartbeat_error = "Device heartbeat requires API_KEY and DEVICE_ID."
+            return
+        headers = {"X-API-Key": self.api_key}
+        url = f"{self.api_base_url}/api/v1/devices/{quote(self.device_id, safe='')}/heartbeat"
+        try:
+            response = requests.post(url, json={"status": self.device_status}, headers=headers, timeout=3.0)
+            if response.status_code == 404:
+                # Register only unknown devices; never overwrite saved calibration on restart.
+                registration = requests.post(f"{self.api_base_url}/api/v1/devices/register", json={
+                    "device_id": self.device_id, "device_name": self.device_name,
+                    "hardware_platform": self.hardware_platform, "model_version": self.model_version,
+                }, headers=headers, timeout=3.0)
+                registration.raise_for_status()
+                response = requests.post(url, json={"status": self.device_status}, headers=headers, timeout=3.0)
+            response.raise_for_status()
+            self.heartbeat_error = None
+        except requests.RequestException as exc:
+            self.heartbeat_error = f"Device heartbeat failed: {type(exc).__name__}."
 
     def _sync_loop(self):
         while self._is_running:
@@ -186,3 +227,5 @@ class BackgroundSyncWorker:
         self._stop_event.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1.0)
+        if self._heartbeat_thread and self._heartbeat_thread.is_alive():
+            self._heartbeat_thread.join(timeout=1.0)

@@ -42,6 +42,8 @@ class AnalyticsService:
 
         return HatcheryOverviewKPIs(
             total_eggs_scanned=total_scans,
+            total_fertile=fertile_count,
+            total_infertile=infertile_count,
             overall_fertility_rate=round(fertile_count / total_scans * 100, 2) if total_scans else 0.0,
             day_10_cull_rate=round(infertile_count / total_scans * 100, 2) if total_scans else 0.0,
             total_hatched_ducklings=hatched,

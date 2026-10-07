@@ -23,7 +23,10 @@ export const mockOverview: AnalyticsOverview = {
   total_infertile: 238,
   overall_fertility_rate: 88.39,
   active_batches_count: 3,
-  avg_inference_ms: 27.4,
+  average_inference_latency_ms: 27.4,
+  day_10_cull_rate: 11.61,
+  total_hatched_ducklings: 532,
+  overall_hatchability_rate: 86.8,
 };
 
 export const mockEconomicYield: EconomicYield = {

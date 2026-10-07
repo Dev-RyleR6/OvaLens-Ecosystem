@@ -6,6 +6,7 @@ import { AnalyticsOverview, BatchSummary, EconomicYield } from '../types';
 import { Badge } from '../components/Badge';
 import { DataUnavailableState } from '../components/ui/DataUnavailableState';
 import { usePreferences } from '../hooks/usePreferences';
+import { OperationalCharts } from '../components/OperationalCharts';
 
 export const OverviewPage: React.FC = () => {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
@@ -23,7 +24,7 @@ export const OverviewPage: React.FC = () => {
     setLoading(true);
     try {
       const [summary, batchList, yieldSummary] = await Promise.all([
-        apiClient.getOverview(), apiClient.getBatches(), apiClient.getEconomicYield(),
+        apiClient.getOverview(), apiClient.getAllBatches(), apiClient.getEconomicYield(),
       ]);
       if (request !== generation.current) return;
       setOverview(summary); setBatches(batchList); setEconomic(yieldSummary);
@@ -64,6 +65,8 @@ export const OverviewPage: React.FC = () => {
       {error && (overview ? <div role="alert" className="border border-amber-300 bg-amber-50 text-amber-900 p-4 rounded-xl">Refresh failed. These are previously loaded records. Use Refresh to try again.</div> : <DataUnavailableState title="Hatchery records unavailable" description="We could not load the hatchery records. Check your connection and try again." onRetry={refresh} isRetrying={loading} />)}
       <div className="flex flex-wrap items-center gap-3"><label htmlFor="overview-batch" className="font-medium">Show results for</label><select id="overview-batch" className="border border-slate-300 rounded-lg px-3 py-2 max-w-full bg-card" value={selectedBatchId} onChange={event => setSelectedBatchId(event.target.value)}><option value="ALL">All batches</option>{batches.map(batch => <option key={batch.batch_id} value={batch.batch_id}>{batch.batch_code}</option>)}</select><Link to="/scans?review=1" className="text-brand underline underline-offset-4">Inspect low-confidence scans</Link></div>
       <dl className="summary-strip grid grid-cols-2 lg:grid-cols-4 border-y border-slate-300 bg-card">{metrics.map(metric => <div key={metric.label} className="px-4 py-5 sm:px-6"><dt className="text-slate-600">{metric.label}</dt><dd className="text-3xl font-semibold tabular-nums mt-2 text-foreground">{metric.value}</dd><dd className="text-xs text-slate-500 mt-2">{metric.detail}</dd></div>)}</dl>
+      <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold">Operational analytics</h2><Link to="/analytics" className="text-brand underline underline-offset-4">Open analytics &amp; reports</Link></div>
+      <OperationalCharts batches={displayBatches} />
       <section className="space-y-3" aria-labelledby="schedule-heading">
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 id="schedule-heading" className="text-lg font-semibold">Incubation schedule</h2><span className="text-sm text-slate-600">{displayBatches.length} {displayBatches.length === 1 ? 'batch' : 'batches'}</span></div>
         <div className="overflow-x-auto border border-slate-200 rounded-xl bg-card"><table className="w-full text-left min-w-[700px]">

@@ -91,29 +91,8 @@ export const apiClient = {
   },
 
   getEconomicYield: async (): Promise<EconomicYield> => {
-    const res = await api.get<any>('/analytics/economic-yield');
-    const d = res.data;
-    if (!d) throw new Error('No economic yield telemetry returned');
-    
-    const penoyCount = d.penoy_culled_day_10 ?? 0;
-    const penoyVal = d.salvage_revenue_php ?? d.estimated_penoy_salvage_value_php ?? (penoyCount * 14.00);
-    const kwhSaved = d.incubator_energy_saved_kwh ?? (penoyCount * 18 * 0.015);
-    const powerSaved = d.energy_savings_php ?? d.electricity_saved_estimated_php ?? (kwhSaved * 12.50);
-    const ducklingRev = d.duckling_sales_projected_php ?? d.projected_duckling_revenue_php ?? 0;
-    const totalBenefit = d.total_economic_benefit_php ?? (penoyVal + powerSaved + ducklingRev);
-
-    return {
-      penoy_culled_day_10: penoyCount,
-      penoy_unit_price_php: d.penoy_unit_price_php ?? 14.00,
-      salvage_revenue_php: penoyVal,
-      estimated_penoy_salvage_value_php: penoyVal,
-      incubator_energy_saved_kwh: kwhSaved,
-      energy_savings_php: powerSaved,
-      electricity_saved_estimated_php: powerSaved,
-      total_economic_benefit_php: totalBenefit,
-      duckling_sales_projected_php: ducklingRev,
-      projected_duckling_revenue_php: ducklingRev,
-    };
+    const res = await api.get<EconomicYield>('/analytics/economic-yield');
+    return res.data;
   },
 
   getMortalityTrends: async (): Promise<MortalityTrends> => {
@@ -127,6 +106,15 @@ export const apiClient = {
   },
 
   // Batches
+  getAllBatches: async (): Promise<BatchSummary[]> => {
+    const batches: BatchSummary[] = [];
+    for (let offset = 0; ; offset += 200) {
+      const res = await api.get<BatchSummary[]>('/batches', { params: { limit: 200, offset } });
+      batches.push(...res.data);
+      if (res.data.length < 200) return batches;
+    }
+  },
+
   getBatches: async (): Promise<BatchSummary[]> => {
     const res = await api.get<BatchSummary[]>('/batches');
     return res.data;

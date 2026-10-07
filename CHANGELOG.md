@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Dashboard**: [TASK-NEW-DASH-LIVE-01] restore analytics charts and edge app heartbeats (2026-10-07)
 - **Dashboard**: [TASK-NEW-DASH-UX-01] improve operational UX and truthful telemetry (2026-10-07)
 - **Edge**: [TASK-NEW-EDGE-FLOW-01] add single-click diagnostic flow, isolated correlated inference with deadlines, retryable finalization, target completion, consistent controls, and strict session/batch validation (2026-10-06).
 - **Firmware**: [TASK-NEW-FW-DET-01] require sustained confident egg classification (2026-10-02)

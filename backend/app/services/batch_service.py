@@ -80,7 +80,7 @@ class BatchService:
             query = query.filter(BatchModel.status == status)
         if breed:
             query = query.filter(BatchModel.breed == breed)
-        return query.order_by(desc(BatchModel.set_date)).offset(offset).limit(limit).all()
+        return query.order_by(desc(BatchModel.set_date), BatchModel.batch_id).offset(offset).limit(limit).all()
 
     @staticmethod
     def update_batch(db: Session, batch_id: str, payload: BatchUpdate) -> BatchModel:

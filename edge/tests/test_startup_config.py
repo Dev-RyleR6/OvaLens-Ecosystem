@@ -46,7 +46,7 @@ def test_startup_window_builds_and_cancels_without_hardware(hidden_ui):
 def test_operator_window_and_shutdown_without_hardware(hidden_ui):
     camera = SimpleNamespace(is_running=False, current_fps=0.0, last_error=None,
                              is_mock_mode=False, stop=Mock())
-    sync = SimpleNamespace(last_error=None, is_online=False, stop=Mock())
+    sync = SimpleNamespace(last_error=None, heartbeat_error=None, is_online=False, stop=Mock())
     db = Mock()
     db.get_unsynced_count.return_value = 0
     db.get_distinct_batches.return_value = []

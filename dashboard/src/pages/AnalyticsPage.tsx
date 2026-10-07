@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { OperationalCharts } from '../components/OperationalCharts';
+import { usePreferences } from '../hooks/usePreferences';
 import {
   Coins,
   TrendingUp,
@@ -8,14 +10,7 @@ import {
   Percent,
   CheckCircle2,
 } from 'lucide-react';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+
 
 import { StatCard } from '../components/StatCard';
 import { apiClient } from '../api/client';
@@ -38,7 +33,13 @@ export const AnalyticsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
 
+  const { pollingInterval } = usePreferences();
+  const generation = useRef(0);
+  const batchGeneration = useRef(0);
+  const [batchError, setBatchError] = useState(false);
+
   const fetchData = async () => {
+    const request = ++generation.current;
     setIsLoading(true);
     setIsError(false);
     try {
@@ -46,27 +47,33 @@ export const AnalyticsPage: React.FC = () => {
         apiClient.getEconomicYield(),
         apiClient.getMortalityTrends(),
         apiClient.getBreedComparison(),
-        apiClient.getBatches(),
+        apiClient.getAllBatches(),
       ]);
+      if (request !== generation.current) return;
       setEconomic(eData);
       setMortality(mData);
       setBreedMetrics(Array.isArray(bData) ? bData : []);
       setBatches(Array.isArray(batchList) ? batchList : []);
     } catch (err) {
       console.error("Error fetching analytics data:", err);
-      setIsError(true);
+      if (request === generation.current) setIsError(true);
     } finally {
-      setIsLoading(false);
+      if (request === generation.current) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    void fetchData();
+    const timer = pollingInterval > 0 ? setInterval(() => { void fetchData(); }, pollingInterval * 1000) : undefined;
+    return () => { clearInterval(timer); generation.current++; batchGeneration.current++; };
+  }, [pollingInterval]);
 
   const handleBatchChange = async (batchId: string) => {
+    const request = ++batchGeneration.current;
     setSelectedBatchId(batchId);
+    setBatchAnalytics(null); setBatchForecast(null); setBatchError(false);
     if (batchId === 'ALL') {
+      setIsLoadingBatch(false);
       setBatchAnalytics(null);
       setBatchForecast(null);
       return;
@@ -78,12 +85,13 @@ export const AnalyticsPage: React.FC = () => {
         apiClient.getBatchAnalytics(batchId),
         apiClient.getBatchForecast(batchId)
       ]);
+      if (request !== batchGeneration.current) return;
       setBatchAnalytics(data);
       setBatchForecast(forecast);
     } catch (err) {
-      console.error('Failed to load batch analytics/forecast:', err);
+      if (request === batchGeneration.current) setBatchError(true);
     } finally {
-      setIsLoadingBatch(false);
+      if (request === batchGeneration.current) setIsLoadingBatch(false);
     }
   };
 
@@ -134,38 +142,10 @@ export const AnalyticsPage: React.FC = () => {
   const selectedBatchInfo = batches.find((b) => b.batch_id === selectedBatchId);
   const isBatchFiltered = selectedBatchId !== 'ALL' && batchAnalytics !== null;
 
-  // Dynamic 28-day duck egg developmental viability curve
-  const cohortSurvivalData = useMemo(() => {
-    const day10Viable = isBatchFiltered && batchAnalytics
-      ? batchAnalytics.day_10_fertility_rate
-      : (100 - (mortality?.day_10_cull_rate ?? 8.8));
-
-    const day28Viable = isBatchFiltered && batchAnalytics
-      ? (batchAnalytics.actual_hatchability_rate > 0 ? batchAnalytics.actual_hatchability_rate : (batchForecast?.predicted_hatchability_rate ?? 86.8))
-      : 86.8;
-
-    return [
-      { day: 'Day 0 (Set)', viablePct: 100 },
-      { day: 'Day 10 (Candling)', viablePct: Number(day10Viable.toFixed(1)) },
-      { day: 'Day 28 (Hatch)', viablePct: Number(day28Viable.toFixed(1)) },
-    ];
-  }, [isBatchFiltered, batchAnalytics, batchForecast, mortality]);
-
-  // Mortality Stages Data
-  const mortalityBarData = [
-    {
-      stage: 'Day 10 (Early / Penoy)',
-      rate: mortality?.day_10_cull_rate ?? 8.8,
-      desc: 'Unfertilized yolk / dead germinal disc (100% salvaged @ ₱14)',
-      color: '#D97706',
-    },
-  ];
-
-  const penoyCount = isBatchFiltered ? batchAnalytics.infertile_penoy_day_10 : (economic?.penoy_culled_day_10 ?? 168);
-  const salvageRev = isBatchFiltered ? batchAnalytics.penoy_salvage_value_php : (economic?.salvage_revenue_php ?? economic?.estimated_penoy_salvage_value_php ?? 2352.00);
-  const kwhSaved = isBatchFiltered ? (batchAnalytics.infertile_penoy_day_10 * 18 * 0.015) : (economic?.incubator_energy_saved_kwh ?? 45.4);
-  const powerSaved = isBatchFiltered ? batchAnalytics.electricity_saved_php : (economic?.energy_savings_php ?? economic?.electricity_saved_estimated_php ?? 544.32);
-  const totalBenefit = isBatchFiltered ? (salvageRev + powerSaved) : (economic?.total_economic_benefit_php ?? 24176.32);
+  const penoyCount = isBatchFiltered ? batchAnalytics.infertile_penoy_day_10 : (economic?.penoy_culled_day_10 ?? 0);
+  const salvageRev = isBatchFiltered ? batchAnalytics.penoy_salvage_value_php : (economic?.salvage_revenue_php ?? economic?.estimated_penoy_salvage_value_php ?? 0);
+  const powerSaved = isBatchFiltered ? batchAnalytics.electricity_saved_php : (economic?.energy_savings_php ?? economic?.electricity_saved_estimated_php ?? 0);
+  const totalBenefit = isBatchFiltered ? (salvageRev + powerSaved) : (economic?.total_economic_benefit_php ?? 0);
 
   if (isError && !economic && !mortality) {
     return (
@@ -173,10 +153,10 @@ export const AnalyticsPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
           <div>
             <h1 className="text-xl font-bold text-foreground tracking-tight">
-              Hatchery Economics & Salvage Analytics
+              Analytics & graphs
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Commercial recovery from Day 10 Penoy culling, incubator thermal energy savings, and duck breed yield benchmarks.
+              Recorded Day 10 results, candling coverage, and estimated economic recovery.
             </p>
           </div>
         </div>
@@ -196,10 +176,10 @@ export const AnalyticsPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
           <h1 className="text-xl font-bold text-foreground tracking-tight">
-            Hatchery Economics & Salvage Analytics
+            Analytics & graphs
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Commercial recovery from Day 10 Penoy culling, incubator thermal energy savings, and duck breed yield benchmarks.
+            Recorded Day 10 results, candling coverage, and estimated economic recovery.
           </p>
         </div>
 
@@ -225,10 +205,10 @@ export const AnalyticsPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100 text-xs">
           <div className="flex items-center gap-2 font-bold text-slate-800">
             <SlidersHorizontal className="w-4 h-4 text-brand" />
-            <span>Economic Scope & Cohort Filters</span>
+            <span>Chart and batch filters</span>
           </div>
           <span className="text-[11px] text-slate-400">
-            Select specific breed or batch to recalibrate financial yield & salvage recovery
+            Breed and status filter charts; select a batch for its economics and forecast
           </span>
         </div>
 
@@ -236,14 +216,15 @@ export const AnalyticsPage: React.FC = () => {
           {/* 1. Duck Breed Filter */}
           <div className="relative">
             <select
+              aria-label="Filter charts by breed"
               value={breedFilter}
               onChange={(e) => handleBreedFilterChange(e.target.value)}
               className="w-full h-9 pl-3 pr-8 text-xs font-semibold bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none"
             >
               <option value="ALL">All Duck Breeds</option>
-              <option value="KAYUMANGGI">Kayumanggi (Pateros)</option>
-              <option value="ITIM">Native Itim</option>
-              <option value="KHAKI">Khaki Campbell</option>
+              <option value="KAYUMANGGI">IP-Kayumanggi</option>
+              <option value="ITIM">IP-Itim</option>
+              <option value="KHAKI">IP-Khaki</option>
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -251,6 +232,7 @@ export const AnalyticsPage: React.FC = () => {
           {/* 2. Incubation Status Filter */}
           <div className="relative">
             <select
+              aria-label="Filter charts by batch status"
               value={statusFilter}
               onChange={(e) => handleStatusFilterChange(e.target.value)}
               className="w-full h-9 pl-3 pr-8 text-xs font-semibold bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none"
@@ -266,6 +248,7 @@ export const AnalyticsPage: React.FC = () => {
           <div className="relative">
             <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <select
+              aria-label="Select analytics batch"
               value={selectedBatchId}
               onChange={(e) => handleBatchChange(e.target.value)}
               disabled={isLoadingBatch}
@@ -287,6 +270,12 @@ export const AnalyticsPage: React.FC = () => {
         </div>
       </div>
 
+      <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold">Operational analytics</h2><button className="border border-border rounded-lg px-3 py-2" disabled={isLoading || isLoadingBatch} onClick={() => { void fetchData(); void handleBatchChange(selectedBatchId); }}>Refresh analytics</button></div>
+      {isError && <p role="alert" className="text-amber-900 bg-amber-50 border border-amber-300 rounded-xl p-4">Refresh failed. Showing previously loaded analytics; use Refresh analytics to try again.</p>}
+      <OperationalCharts batches={selectedBatchId === 'ALL' ? filteredBatches : filteredBatches.filter(batch => batch.batch_id === selectedBatchId)} />
+      <details className="text-sm"><summary className="cursor-pointer text-brand py-2">View candling coverage counts</summary><div className="overflow-x-auto"><table className="w-full text-left"><thead><tr><th>Batch</th><th>Scanned</th><th>Eggs set</th></tr></thead><tbody>{(selectedBatchId === 'ALL' ? filteredBatches : filteredBatches.filter(batch => batch.batch_id === selectedBatchId)).map(batch => <tr key={batch.batch_id}><td>{batch.batch_code}</td><td>{batch.total_scanned}</td><td>{batch.initial_egg_count}</td></tr>)}</tbody></table></div></details>
+      <p className="text-slate-600">{selectedBatchId === 'ALL' ? 'Economic figures below are facility totals across all batches. Breed and status filters apply to the charts above. Select one batch for its economic estimates and forecast.' : 'Economic figures and forecast below apply to the selected batch.'} Figures are estimates, not confirmed sales.</p>
+      {batchError && <p role="alert" className="text-red-700">Batch analytics could not be loaded. Use Refresh analytics to retry.</p>}
       {/* Contextual Active Batch Banner (if filtered) */}
       {isBatchFiltered && selectedBatchInfo && (
         <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs  animate-in fade-in duration-200">
@@ -328,7 +317,8 @@ export const AnalyticsPage: React.FC = () => {
         <BatchForecastCard forecast={batchForecast} isLoading={isLoadingBatch} />
       )}
 
-      {/* 4 Clean Metric Cards */}
+      {((selectedBatchId === 'ALL' && economic) || isBatchFiltered) && <>
+      {/* Economic metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Penoy Eggs Salvaged"
@@ -346,17 +336,16 @@ export const AnalyticsPage: React.FC = () => {
           highlightColor="amber"
         />
         <StatCard
-          title="Incubator Energy Saved"
-          value={`${kwhSaved.toFixed(1)}`}
-          unit="kWh"
-          subtitle={`₱${powerSaved.toFixed(2)} thermal electricity avoided`}
+          title="Estimated Electricity Savings"
+          value={`₱${powerSaved.toFixed(2)}`}
+          subtitle="Calculated using backend energy settings"
           icon={Zap}
           highlightColor="blue"
         />
         <StatCard
           title="Total Economic Benefit"
           value={`₱${totalBenefit.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          subtitle={isBatchFiltered ? "Direct Penoy sales + power saved" : "Facility-wide direct sales + power saved"}
+          subtitle={isBatchFiltered ? "Estimated salvage + power saved" : "Salvage + power saved + projected duckling revenue"}
           icon={Award}
           highlightColor="green"
         />
@@ -386,7 +375,7 @@ export const AnalyticsPage: React.FC = () => {
               </span>
             </div>
             <p className="text-[11px] text-slate-500">
-              <strong className="text-slate-800">{penoyCount} eggs</strong> @ fixed farmgate rate of ₱14.00/egg
+              <strong className="text-slate-800">{penoyCount} eggs</strong> valued using the backend Penoy price
             </p>
           </div>
 
@@ -399,20 +388,20 @@ export const AnalyticsPage: React.FC = () => {
               </span>
             </div>
             <p className="text-[11px] text-slate-500">
-              <strong className="text-slate-800">{kwhSaved.toFixed(1)} kWh</strong> avoided across 18 unincubated days
+              Estimated savings from early removal, using configured energy costs
             </p>
           </div>
 
           {/* Recovery Metric 3: Total Realized Value */}
           <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 flex flex-col justify-center space-y-1">
             <span className="text-xs text-amber-900 font-bold uppercase tracking-wider block">
-              Total Realized Recovery
+              Total Estimated Benefit
             </span>
             <span className="text-2xl font-semibold text-brand font-mono">
               ₱{totalBenefit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </span>
             <span className="text-[11px] text-amber-800 font-medium">
-              Dual dividend: edible salvage + thermal load reduction
+              Includes projected duckling revenue in facility totals
             </span>
           </div>
         </div>
@@ -420,109 +409,21 @@ export const AnalyticsPage: React.FC = () => {
         <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-slate-600">
           <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
           <span>
-            Eliminates rotten/exploding egg hazards in incubator trays while salvaging Grade-A Penoy table eggs for immediate market sale.
+            Day 10 infertile results identify Penoy recovery candidates for operator assessment.
           </span>
         </div>
       </div>
 
-      {/* Split: Embryonic Mortality Breakdown + Cohort Survival Curve */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left 6 Cols: 3-Stage Incubation Mortality Breakdown */}
-        <div className="lg:col-span-6">
-          <div className="bg-card border border-border rounded-xl p-5  h-full flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">
-                    Embryonic Mortality by Stage
-                  </h3>
-                  <p className="text-xs text-slate-500">Early arrest vs Mid-term vs Late pipping failure</p>
-                </div>
-                <span className="text-xs font-semibold text-rose-800 bg-rose-50 px-2.5 py-0.5 rounded-md border border-rose-200">
-                  {mortality?.total_culled_eggs ?? 238} Culled Eggs Total
-                </span>
-              </div>
-
-              {/* Stage Breakdown Bars */}
-              <div className="space-y-3.5 mt-4">
-                {mortalityBarData.map((st) => (
-                  <div key={st.stage} className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-800">{st.stage}</span>
-                      <span className="font-semibold text-slate-900">{st.rate}% mortality</span>
-                    </div>
-                    <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(100, Math.max(4, st.rate))}%`, backgroundColor: st.color }}
-                      />
-                    </div>
-                    <p className="text-[11px] text-slate-500">{st.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-600 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
-              <span>Day 10 candling eliminates <strong>65% of all potential hatchery losses</strong> early.</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Right 6 Cols: 28-Day Embryonic Viability Area Curve */}
-        <div className="lg:col-span-6">
-          <div className="bg-card border border-border rounded-xl p-5  h-full flex flex-col justify-between">
-            <div>
-              <div className="pb-3 border-b border-slate-100">
-                <h3 className="text-sm font-bold text-foreground">
-                  28-Day Embryonic Viability Retention
-                </h3>
-                <p className="text-xs text-slate-500">Live embryo retention curve across incubation milestones</p>
-              </div>
-
-              <div className="h-60 mt-3 w-full">
-                <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
-                  <AreaChart data={cohortSurvivalData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="viabilityGradientFU" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#15803D" stopOpacity={0.35}/>
-                        <stop offset="95%" stopColor="#15803D" stopOpacity={0.0}/>
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="day" stroke="#64748B" fontSize={11} tickLine={false} />
-                    <YAxis domain={[75, 100]} stroke="#64748B" fontSize={11} tickLine={false} unit="%" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'var(--card)',
-                        borderColor: 'var(--border)',
-                        borderRadius: '0.5rem',
-                        fontSize: '12px',
-                        color: '#0F172A',
-                      }}
-                      formatter={(val: any) => [`${val}%`, 'Viable Embryos']}
-                    />
-                    <Area type="monotone" dataKey="viablePct" stroke="#15803D" strokeWidth={2.5} fillOpacity={1} fill="url(#viabilityGradientFU)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100 text-xs text-slate-500 text-right">
-              Overall Hatch Harvest Rate: <strong className="text-emerald-800">86.8%</strong>
-            </div>
-          </div>
-        </div>
-      </div>
+      </>}
 
       {/* Duck Breed Performance Comparison Matrix */}
       <div className="bg-card border border-border rounded-xl p-5 ">
         <div className="pb-3 border-b border-slate-100">
           <h3 className="text-base font-bold text-foreground">
-            Duck Breed Biological & Commercial Benchmarks
+            Facility breed results
           </h3>
           <p className="text-xs text-slate-500">
-            Comparative performance across Kayumanggi, Native Itim, and Khaki Campbell flocks
+            Recorded facility totals by Itik Pinas breed. Batch status and batch selection do not filter this table.
           </p>
         </div>
 
@@ -540,7 +441,7 @@ export const AnalyticsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {breedMetrics.map((b) => {
+              {breedMetrics.filter(b => breedFilter === 'ALL' || b.breed === breedFilter).map((b) => {
                 const isSelected = breedFilter !== 'ALL' && b.breed === breedFilter;
                 return (
                   <tr
