@@ -1,6 +1,6 @@
+import { CloseButton } from './ui/CloseButton';
 import { useDialogAccessibility } from '@/hooks/useDialogAccessibility';
 import React, { useEffect } from 'react';
-import { X } from 'lucide-react';
 import { useModalAnimation } from '@/hooks/useModalAnimation';
 import { cn } from '@/lib/utils';
 
@@ -50,13 +50,7 @@ export const Modal: React.FC<ModalProps> = ({
             <span className="w-2 h-2 rounded-full bg-[#800000]" />
             {title}
           </h3>
-          <button
-            aria-label="Close dialog"
-            onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <CloseButton aria-label="Close dialog" onClick={onClose} />
         </div>
 
         {/* Content Body */}

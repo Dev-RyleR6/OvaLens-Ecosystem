@@ -224,6 +224,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 - [x] **TASK-NEW-DASH-STATUS-05**: Use the shared incubation status display in the overview schedule and batches workspace, including matching column labels and due/checkpoint presentation.
 
+- [x] **TASK-NEW-DASH-CLOSE-06**: Standardize icon close buttons across dialogs, drawers, custom modals, and mobile navigation while preserving pending-action guards and accessible labels.
+
 These features can be claimed by any agent using `python scripts/verify_and_commit.py --task <ID>`:
 
 - [x] **TASK-NEW-DASH-DESIGN-01**: Unify dashboard typography with self-hosted IBM Plex Sans, normalize shared controls and meaningful iconography, and improve responsive operational pages, navigation, and dialogs. Dashboard regression tests/build and the monorepo verify-only gate pass; browser checks cover 320/768/1280px layouts, view switching, keyboard menus, theme persistence, and short-screen dialogs. Screenshot-based visual and print acceptance remain unverified because the selected provider cannot read images. Unrelated workspace changes preserved.

@@ -1,8 +1,8 @@
+import { CloseButton } from './ui/CloseButton';
 import { useDialogAccessibility } from '@/hooks/useDialogAccessibility';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  X,
   ShieldCheck,
   AlertTriangle,
   ArrowRight,
@@ -127,14 +127,7 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
             </div>
           </div>
 
-          <button
-            aria-label="Close classification correction"
-            disabled={isSubmitting}
-            onClick={() => { if (!isSubmitting) onClose(); }}
-            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <CloseButton aria-label="Close classification correction" disabled={isSubmitting} onClick={() => { if (!isSubmitting) onClose(); }} />
         </div>
 
         {/* Modal Body */}

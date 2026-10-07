@@ -286,6 +286,10 @@
 .page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
 .action-link { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; color: var(--brand-ink); font-weight: 500; text-underline-offset: 4px; }
 .action-link:hover { text-decoration: underline; }
+.close-button { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; border: 0; border-radius: .5rem; background: rgb(var(--slate-100)); color: rgb(var(--slate-600)); cursor: pointer; transition: background-color 150ms ease-out, color 150ms ease-out; }
+.close-button:hover:not(:disabled) { background: rgb(var(--slate-200)); color: var(--foreground); }
+.close-button:disabled { opacity: .45; cursor: not-allowed; }
+.close-button > svg { width: 18px; height: 18px; }
 .primary-action > svg, .secondary-action > svg, .action-link > svg { width: 16px; height: 16px; flex-shrink: 0; }
 .nav-link { display: flex; align-items: center; gap: .75rem; min-height: 44px; padding: .75rem; border-radius: .5rem; color: rgb(var(--slate-600)); transition: background-color 150ms ease, color 150ms ease; }
 .nav-link:hover { background: rgb(var(--slate-50)); color: var(--foreground); }

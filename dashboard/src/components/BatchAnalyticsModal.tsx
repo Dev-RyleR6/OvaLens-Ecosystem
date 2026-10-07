@@ -1,8 +1,8 @@
+import { CloseButton } from './ui/CloseButton';
 import { useDialogAccessibility } from '@/hooks/useDialogAccessibility';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  X,
   TrendingUp,
   Coins,
   Zap,
@@ -119,12 +119,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
             </div>
           </div>
 
-          <button aria-label="Close batch details"
-            onClick={onClose}
-            className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer flex-shrink-0"
-          >
-            <X className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
+          <CloseButton aria-label="Close batch details" onClick={onClose} />
         </div>
 
         {/* Modal Content */}

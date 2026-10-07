@@ -1,7 +1,7 @@
+import { CloseButton } from './CloseButton';
 import { useDialogAccessibility } from '@/hooks/useDialogAccessibility';
 import * as React from "react"
 import { createPortal } from "react-dom"
-import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useModalAnimation } from "@/hooks/useModalAnimation"
 
@@ -64,13 +64,7 @@ export const Sheet: React.FC<SheetProps> = ({
                 </p>
               )}
             </div>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer flex-shrink-0"
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </button>
+            <CloseButton onClick={onClose} />
           </div>
 
           {/* Primary Scrollable Content Area */}

@@ -1,6 +1,7 @@
+import { CloseButton } from './ui/CloseButton';
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Layers, ScanLine, ChartNoAxesCombined, Cpu, Users, Settings, X, Radio, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Layers, ScanLine, ChartNoAxesCombined, Cpu, Users, Settings, Radio, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { Device } from '../types';
@@ -49,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
     <div ref={dialogRef} className={`mobile-navigation ${isOpen ? 'is-open' : ''} lg:visible lg:relative lg:w-64 lg:shrink-0`} id="dashboard-navigation">
       {isOpen && mobile && <div className="fixed inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />}
       <aside className="hatchery-sidebar relative w-64 h-full flex flex-col">
-        <div className="lg:hidden sidebar-mobile-header flex items-center justify-between p-4"><span className="font-semibold">Navigation</span><button onClick={onClose} aria-label="Close navigation"><X className="w-5 h-5" /></button></div>
+        <div className="lg:hidden sidebar-mobile-header flex items-center justify-between p-4"><span className="font-semibold">Navigation</span><CloseButton onClick={onClose} aria-label="Close navigation" /></div>
         <div className="sidebar-identity">Hatchery operations</div>
         <nav aria-label="Main navigation" className="px-3 pb-4 space-y-1 flex-1 overflow-y-auto">
           {links.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} onClick={onClose} className="nav-link"><Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />{label}</NavLink>)}

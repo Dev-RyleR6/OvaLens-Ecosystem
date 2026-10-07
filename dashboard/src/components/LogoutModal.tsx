@@ -1,7 +1,8 @@
+import { CloseButton } from './ui/CloseButton';
 import { useDialogAccessibility } from '@/hooks/useDialogAccessibility';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { LogOut, Loader2, X, CheckCircle2, Shield, User as UserIcon } from 'lucide-react';
+import { LogOut, Loader2, CheckCircle2, Shield, User as UserIcon } from 'lucide-react';
 import { User } from '../types';
 import { useModalAnimation } from '@/hooks/useModalAnimation';
 import { cn } from '@/lib/utils';
@@ -75,18 +76,10 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
       >
         
         {/* Top Close Button */}
-        <button
-          type="button"
-          disabled={isLoggingOut}
-          onClick={onClose}
-          className="absolute right-4 top-4 text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-40"
-          aria-label="Close dialog" title="Close dialog"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <CloseButton type="button" disabled={isLoggingOut} onClick={onClose} aria-label="Close dialog" title="Close dialog" className="absolute right-4 top-4" />
 
         {/* Dialog Header */}
-        <div className="flex items-start gap-4 mb-5">
+        <div className="flex items-start gap-4 mb-5 pr-12">
           <div className="w-11 h-11 rounded-2xl bg-red-50 text-red-700 border border-red-100 flex items-center justify-center shrink-0 ">
             <LogOut className="w-5 h-5" />
           </div>

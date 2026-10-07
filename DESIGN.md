@@ -11,6 +11,7 @@ The dashboard is an operational record system. Retain the FU identity and replac
 - Use grouped sections, bordered data tables, and a compact summary strip. Avoid gradients, glow, animated entrances, nested cards, and decorative status badges.
 - Provide light and dark slate themes through shared CSS variables. Themes change neutrals and semantic state surfaces; brand colors retain their identity.
 - Use at least 44px touch targets, visible keyboard focus, associated labels, live error feedback, and keyboard-contained overlays with focus restoration.
+- Use the shared `CloseButton` for icon-only dismissal: 44px square, 18px Lucide X, a neutral filled background, 8px corners, and consistent hover/focus/disabled states. Keep labeled Cancel and Close footer actions as regular secondary buttons.
 - Prefer explicit empty, loading, offline, and stale states over example values. Diagnostic success requires a real acknowledgement.
 - Preserve table scrolling within the content region on small screens. The mobile sidebar must be dismissible and inaccessible while closed.
 - Use horizontal bars with complete wrapped batch identifiers, numeric axes starting at zero, and expandable exact-count tables. Keep charts in one column until the content region can fit two readable panels.

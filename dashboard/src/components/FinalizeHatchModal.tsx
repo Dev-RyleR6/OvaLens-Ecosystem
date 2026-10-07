@@ -1,7 +1,8 @@
+import { CloseButton } from './ui/CloseButton';
 import { useDialogAccessibility } from '@/hooks/useDialogAccessibility';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Award, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Award, CheckCircle2, AlertCircle } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { BatchSummary } from '../types';
 import { useModalAnimation } from '@/hooks/useModalAnimation';
@@ -102,13 +103,7 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
             </div>
           </div>
 
-          <button
-            type="button" aria-label="Close hatch results dialog" disabled={isSubmitting}
-            onClick={() => { if (!isSubmitting) onClose(); }}
-            className="secondary-action shrink-0"
-          >
-            <X aria-hidden="true" className="w-4 h-4" />
-          </button>
+          <CloseButton type="button" aria-label="Close hatch results dialog" disabled={isSubmitting} onClick={() => { if (!isSubmitting) onClose(); }} />
         </div>
 
         {/* Modal Form */}

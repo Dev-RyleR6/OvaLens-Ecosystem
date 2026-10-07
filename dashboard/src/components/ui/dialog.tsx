@@ -1,7 +1,7 @@
+import { CloseButton } from './CloseButton';
 import { useDialogAccessibility } from '@/hooks/useDialogAccessibility';
 import * as React from "react"
 import { createPortal } from "react-dom"
-import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useModalAnimation } from "@/hooks/useModalAnimation"
 
@@ -53,13 +53,7 @@ export const Dialog: React.FC<DialogProps> = ({
           className
         )}
       >
-        <button
-          onClick={onClose}
-          className="absolute right-2 top-2 h-11 w-11 flex items-center justify-center rounded-lg text-slate-500 hover:text-foreground hover:bg-slate-100 transition-colors cursor-pointer z-20 print:hidden"
-        >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </button>
+        <CloseButton onClick={onClose} className="absolute right-2 top-2 z-20 print:hidden" />
 
         {(title || description) && (
           <div className="flex flex-col space-y-1.5 text-left mb-4 pr-12">
