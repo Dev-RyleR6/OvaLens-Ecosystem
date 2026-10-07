@@ -26,10 +26,12 @@ from ..core.inference import InferenceEngine
 from ..core.chamber_controller import ChamberController, ChamberState
 from ..core.background_jobs import BackgroundJobs
 from ..core.inference_worker import InferenceWorker
+from ..core.realtime_detector import RealtimeDetectionWorker
 from ..core.operator_flow import OperatorState, validate_batch_config
 from ..iot.serial_driver import ESP32SerialDriver
 from ..db.local_db import LocalDatabaseManager
 from ..sync.sync_worker import BackgroundSyncWorker
+from .station_settings import StationSettingsWindow
 
 
 def _building_dialog(method):
@@ -54,10 +56,11 @@ class OvaLensOperatorApp(ctk.CTk):
                  inference_worker: Optional[Any] = None,
                  device_id: str = "STATION-01-RP5",
                  startup_config: Optional[Dict[str, Any]] = None,
-                 fullscreen: bool = True):
+                 fullscreen: bool = True, station=None):
         super().__init__()
 
         self.camera = camera
+        self.station = station
         self.engine = engine
         self.iot = iot
         self.db = db
@@ -107,6 +110,7 @@ class OvaLensOperatorApp(ctk.CTk):
         # Live Real-time Inference Cache
         self._latest_detections: List[Dict[str, Any]] = []
         self._last_live_infer_time = 0.0
+        self._last_scan_result_time = 0.0
 
         # Performance & Ergonomics State
         self.is_fullscreen = bool((startup_config or {}).get("fullscreen", fullscreen))
@@ -154,11 +158,13 @@ class OvaLensOperatorApp(ctk.CTk):
         if self.inference_worker is None:
             self.inference_worker = InferenceWorker(self.engine)
             self.inference_worker.start()
+        self.realtime_detector = RealtimeDetectionWorker(self.camera, self.inference_worker)
+        self.realtime_detector.start()
 
         # Keyboard Accelerators & Operator Hotkeys
         self.bind("<space>", self._scan_shortcut)
-        self.bind("r", lambda event: self.trigger_manual_eject())
-        self.bind("R", lambda event: self.trigger_manual_eject())
+        self.bind("r", self._stop_shortcut)
+        self.bind("R", self._stop_shortcut)
         self.bind("b", lambda event: self.open_batch_setup_dialog())
         self.bind("B", lambda event: self.open_batch_setup_dialog())
         self.bind("<F1>", lambda event: self.open_onboarding_guide())
@@ -176,7 +182,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self._update_video_frame()
         self._update_status_loop()
         self._drain_operation_events()
-        self._set_operation_state(OperatorState.READY, "READY — MANUAL DIAGNOSTICS; SORTING UNAVAILABLE")
+        self._set_operation_state(OperatorState.READY, "READY — USE CONFIG TO PREPARE THE SORTING STATION")
 
         # Auto-start operation if invoked with startup configuration
         if startup_config is not None:
@@ -189,6 +195,7 @@ class OvaLensOperatorApp(ctk.CTk):
         try:
             self._jobs.drain()
             self._drain_predictions()
+            self._poll_station()
             for _ in range(16):
                 try:
                     callback = self._ui_events.get_nowait()
@@ -215,8 +222,8 @@ class OvaLensOperatorApp(ctk.CTk):
         deadline = time.monotonic() + 5.0
         def cleanup():
             try:
-                for resource in (self.inference_worker, self.chamber, self.iot,
-                                 self.sync_worker, self.camera):
+                for resource in (getattr(self, "station", None), getattr(self, "realtime_detector", None), self.inference_worker,
+                                 self.chamber, self.iot, self.sync_worker, self.camera):
                     if resource:
                         try:
                             resource.stop()
@@ -270,6 +277,12 @@ class OvaLensOperatorApp(ctk.CTk):
         self.trigger_candling_scan()
         return "break"
 
+    def _stop_shortcut(self, event):
+        if event.widget.winfo_toplevel() is not self or isinstance(event.widget, (tk.Entry, tk.Text, tk.Spinbox)):
+            return
+        self.trigger_manual_eject()
+        return "break"
+
     def _set_operation_state(self, state, message):
         self._operator_state = state
         color = (FUTheme.INFERTILE_AMBER if state in
@@ -298,6 +311,9 @@ class OvaLensOperatorApp(ctk.CTk):
     def _scan_failed(self, message, state=OperatorState.ERROR):
         self._scan_busy = False
         self._latest_detections = []
+        detector = getattr(self, "realtime_detector", None)
+        if detector:
+            detector.resume()
         self.result_title.configure(text="No scan recorded")
         self.result_badge.configure(text=state.value)
         self.result_subtitle.configure(text=message)
@@ -482,7 +498,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.cycle_status_dot.pack(side="left", padx=(12, 6))
 
         self.cycle_status_label = ctk.CTkLabel(
-            self.cycle_hud, text="CONVEYOR STANDBY — CLICK 'START AUTO SORTING' TO ACTIVATE",
+            self.cycle_hud, text="CONVEYOR STANDBY — VALIDATE STATION IN CONFIG BEFORE STARTING",
             font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY
         )
         self.cycle_status_label.pack(side="left")
@@ -551,7 +567,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.result_title.pack(anchor="w", padx=16, pady=(2, 1))
 
         self.result_subtitle = ctk.CTkLabel(
-            self.result_banner, text="Single Scan checks the camera; automatic sorting is unavailable",
+            self.result_banner, text="Single Scan checks the camera; Config prepares automatic sorting",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
         )
         self.result_subtitle.pack(anchor="w", padx=16)
@@ -692,6 +708,16 @@ class OvaLensOperatorApp(ctk.CTk):
         return val
 
     def _build_footer(self):
+        self.station_strip = ctk.CTkFrame(self, fg_color=FUTheme.PANEL_LIGHT, corner_radius=0)
+        self.station_strip.pack(side="bottom", fill="x")
+        self.station_status = ctk.CTkLabel(self.station_strip, text="Boards disconnected | Camera idle", anchor="w", wraplength=680)
+        self.station_status.pack(side="left", padx=14, pady=4)
+        self.review_buttons = []
+        for label, classification in (("Confirm fertile", "FERTILE"), ("Confirm infertile", "INFERTILE"), ("Confirm empty", "EMPTY")):
+            button = ctk.CTkButton(self.station_strip, text=label, width=125, state="disabled",
+                fg_color=FUTheme.PRIMARY_MAROON, command=lambda c=classification: self._resolve_station_review(c))
+            button.pack(side="right", padx=4, pady=4)
+            self.review_buttons.append(button)
         self.footer_frame = ctk.CTkFrame(
             self, fg_color=FUTheme.PANEL_LIGHT, corner_radius=0, height=68,
             border_width=1, border_color=FUTheme.BORDER
@@ -700,9 +726,9 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Automated Cycle Button (Starts Camera & Sorting Loop)
         self.session_btn = ctk.CTkButton(
-            self.footer_frame, text="Sorting unavailable", font=(FUTheme.FONT_FAMILY, 13, "bold"),
+            self.footer_frame, text="Start sorting", font=(FUTheme.FONT_FAMILY, 13, "bold"),
             fg_color=FUTheme.PRIMARY_MAROON, hover_color=FUTheme.HOVER_MAROON,
-            text_color=FUTheme.TEXT_WHITE, command=self.toggle_auto_session, state="disabled",
+            text_color=FUTheme.TEXT_WHITE, command=self.toggle_auto_session,
             width=190, height=42, corner_radius=8
         )
         self.session_btn.pack(side="left", padx=(14, 6), pady=13)
@@ -729,10 +755,10 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Manual Eject Button with High-Contrast Luminous Text
         self.eject_btn = ctk.CTkButton(
-            self.footer_frame, text="⏏ Manual Eject [R]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
+            self.footer_frame, text="STOP [R]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.REJECT_RED_BG, hover_color=FUTheme.REJECT_RED_HOVER,
             border_width=1, border_color=FUTheme.REJECT_RED_BORDER,
-            text_color=FUTheme.REJECT_RED_TEXT, command=self.trigger_manual_eject, state="disabled",
+            text_color=FUTheme.REJECT_RED_TEXT, command=self.trigger_manual_eject,
             width=145, height=42, corner_radius=8
         )
         self.eject_btn.pack(side="left", padx=6, pady=13)
@@ -773,14 +799,17 @@ class OvaLensOperatorApp(ctk.CTk):
             self.cancel_btn.pack_forget()
             self.hud_cancel_btn.pack_forget()
             self.session_btn.configure(
-                text="Sorting unavailable", fg_color=FUTheme.PRIMARY_MAROON,
+                text="Start sorting", fg_color=FUTheme.PRIMARY_MAROON,
                 hover_color=FUTheme.HOVER_MAROON
             )
         blocked = self._pending_finalization_id is not None or self._finalization_failed
         state = "disabled" if is_active or self._scan_busy or self._stopping or blocked else "normal"
         self.batch_setup_btn.configure(state=state)
         self.settings_btn.configure(state=state)
-        busy = self._scan_busy or self._stopping or self._closing or self.inference_worker.busy
+        station = getattr(self, "station", None)
+        automatic_session = station is not None and station.cycle is not None and self.current_session_id == station.cycle.session_id
+        busy = self._scan_busy or self._stopping or self._closing or self.inference_worker.busy or self.is_auto_cycle_running or automatic_session
+        self.session_btn.configure(state="disabled" if self._scan_busy or self._stopping or blocked or (is_active and not self.is_auto_cycle_running) else "normal")
         self.scan_btn.configure(state="disabled" if busy or blocked or self._diagnostics_complete else "normal",
                                 text="Working…" if self._scan_busy else "Single Scan [SPACE]")
         self.cancel_btn.configure(state="disabled" if self._stopping else "normal",
@@ -932,6 +961,9 @@ class OvaLensOperatorApp(ctk.CTk):
         """Keep failed finalization retryable; cancel predictions independently of storage."""
         if self._stopping:
             return
+        station = getattr(self, "station", None)
+        if station and station.active:
+            station.halt()
         self._operation_generation += 1
         self._pending_prediction = self._inference_request_id = None
         self._scan_busy = False
@@ -941,12 +973,48 @@ class OvaLensOperatorApp(ctk.CTk):
             self.chamber.stop()
         self.is_auto_cycle_running = False
         self.is_session_active = False
+
+        # 1. Immediately turn off camera capture to stop preview stream
+        try:
+            request_stop = getattr(self.camera, "request_stop", None)
+            if callable(request_stop):
+                request_stop()
+            else:
+                self.camera.stop()
+        except Exception:
+            pass
+
+        # 2. Immediately pause & clear real-time detector and tracker
+        detector = getattr(self, "realtime_detector", None)
+        if detector:
+            detector.pause()
+            if hasattr(detector, "clear"):
+                detector.clear()
+
+        # 3. Immediately clear all detections and blank out the camera preview
+        self._latest_detections = []
+        self._last_scan_result_time = 0.0
+        self._current_photo = None
+        try:
+            self.video_label.configure(image="")
+        except Exception:
+            pass
+
+        # 4. Display the Standby HUD cleanly over the dark viewport
+        self._render_standby_hud()
+        self.standby_frame.place(relx=0.5, rely=0.5, anchor="center")
+
         session_id = self._pending_finalization_id or self.current_session_id
         self._pending_finalization_id = session_id
         self._set_operation_state(OperatorState.STOPPING, "STOPPING - FINALIZING LOCAL RECORDS")
 
         def finish():
-            self.camera.stop()
+            if callable(getattr(self.camera, "request_stop", None)):
+                self.camera.stop()
+            if station and station.cycle and station.cycle.active:
+                station.cycle._thread.join(timeout=5)
+                if station.cycle.active:
+                    raise RuntimeError("Sorting worker is still stopping; retry finalization")
             # Cancellation before the first queued write can legitimately leave
             # no local session. A database read error still enters recovery.
             if session_id and self.db.get_session_stats(session_id):
@@ -969,8 +1037,9 @@ class OvaLensOperatorApp(ctk.CTk):
             self._session_start_time = None
             self._set_operation_state(OperatorState.COMPLETE if self._diagnostics_complete else OperatorState.READY,
                                       "DIAGNOSTIC TARGET REACHED" if self._diagnostics_complete else "STOPPED - LOCAL RECORDS FINALIZED")
+            automatic = station is not None and station.cycle is not None and station.cycle.session_id == session_id
             self._log("[STOPPED] " + ("Local session finalized." if stats else "No pending local session.")
-                      + " Physical sorting was not performed.")
+                      + (" Gate passage is timed; inspect the output trays." if automatic else " Physical sorting was not performed."))
             if self._diagnostics_complete and not self._closing and self.grab_current() is None:
                 self.after(0, self.open_batch_completion_modal)
 
@@ -984,24 +1053,114 @@ class OvaLensOperatorApp(ctk.CTk):
             self._jobs.submit(finish, finished, failed)
         except (queue.Full, RuntimeError) as exc:
             failed(str(exc))
-        self._latest_detections = []
-        self.video_label.configure(image=None)
-        self._render_standby_hud()
-        self.standby_frame.place(relx=0.5, rely=0.5, anchor="center")
 
     def _stop_auto_cycle(self):
         """Helper to cleanly stop automated cycle loop."""
         self.stop_or_cancel_session()
 
+    def _resolve_station_review(self, classification):
+        if self.station and self.station.cycle:
+            try:
+                self.station.cycle.resolve_review(classification)
+                for button in self.review_buttons:
+                    button.configure(state="disabled")
+            except ValueError as exc:
+                self._log("[REVIEW] " + str(exc))
+
+    def _poll_station(self):
+        station = getattr(self, "station", None)
+        if station is None:
+            return
+        now = time.monotonic()
+        self._ui_tick_ms = (now - getattr(self, "_last_station_poll", now)) * 1000
+        self._last_station_poll = now
+        boards = station.boards
+        parts = []
+        if boards:
+            for link in (boards.conveyor, boards.servo):
+                state = link.snapshot()
+                status = state.error or state.telemetry.get("FAULT", "identifying")
+                parts.append(f"{link.role}: {status if state.connected else 'disconnected'}")
+            parts.append("IR: " + boards.conveyor.snapshot().telemetry.get("IR_ACTIVE", "unknown"))
+        else:
+            parts.append("Boards disconnected")
+        parts.append("Camera: " + (self.camera.last_error or ("ready" if self.camera.is_running else "idle")))
+        label = " | ".join(parts)
+        if label != getattr(self, "_last_station_label", None):
+            self.station_status.configure(text=label)
+            self._last_station_label = label
+        cycle = station.cycle
+        if cycle is None:
+            return
+        status = cycle.status
+        result = cycle.latest_result
+        if result and result["scan_id"] != getattr(self, "_last_station_scan", None):
+            self._last_station_scan = result["scan_id"]
+            self._update_result_banner(result["final_class"], result["confidence"], result["routing_action"], result.get("inference_ms", 0))
+            self.result_subtitle.configure(text=f"Holder {result['holder']} saved locally; routing is tracked and gate passage is timed.")
+        key = (cycle.session_id, status["state"], status.get("holder"), status.get("reason"))
+        if key != getattr(self, "_last_cycle_status", None):
+            self._last_cycle_status = key
+            message = f"{status['state']} | Holder {status.get('holder', 0)} | {status.get('reason', '')}"
+            self._update_cycle_hud("●", FUTheme.INFERTILE_AMBER if status["state"] in {"MANUAL_REVIEW", "RECOVERY_REQUIRED"} else FUTheme.TEXT_PRIMARY, message)
+            for button in self.review_buttons:
+                button.configure(state="normal" if status["state"] == "MANUAL_REVIEW" else "disabled")
+            self._log("[CYCLE] " + message)
+        if self.current_session_id == cycle.session_id and not getattr(self, "_station_stats_pending", False) and now - getattr(self, "_station_stats_at", 0) >= .5:
+            self._station_stats_at = now
+            self._station_stats_pending = True
+            session_id = cycle.session_id
+            def updated(stats):
+                self._station_stats_pending = False
+                if self.current_session_id != session_id or not stats:
+                    return
+                self.total_count = self.scan_sequence = stats["total_scanned"]
+                self.fertile_count, self.infertile_count, self.review_count = stats["fertile_count"], stats["infertile_count"], stats["manual_review_count"]
+                self._update_counters_ui()
+            def failed(message):
+                self._station_stats_pending = False
+                self._log("[STORAGE] " + message)
+            try:
+                self._jobs.submit(lambda: self.db.get_session_stats(session_id), updated, failed)
+            except (queue.Full, RuntimeError) as exc:
+                failed(str(exc))
+        if status["state"] in {"COMPLETE", "RECOVERY_REQUIRED"} and not getattr(self, "_station_terminal_seen", False):
+            self._station_terminal_seen = True
+            self.is_auto_cycle_running = False
+            if status["state"] == "COMPLETE":
+                # Let End Session reconcile the final counters and release local identity.
+                self._log(f"[COMPLETE] {cycle.count} saved scans; {cycle.routed} timed gate passages. End session to review totals.")
+            else:
+                self._log("[RECOVERY] Stop/finalize this session, inspect holders, then reconnect and validate setup.")
+            self._set_session_active_state(True)
+
     def toggle_auto_session(self):
-        """Do not start an unvalidated legacy controller on the sensorless rig."""
+        """Only the inspected dual-board service can initiate physical motion."""
         if self.is_session_active or self.is_auto_cycle_running:
             self.stop_or_cancel_session()
             return
-        self._update_cycle_hud("●", FUTheme.INFERTILE_AMBER,
-                               "AUTOMATIC SORTING UNAVAILABLE — STATION SETUP NEEDS VALIDATION")
-        self._log("[BLOCKED] The dual-board position controller and holder geometry must "
-                  "be validated before sorting. Manual camera scans remain available.")
+        if not self.station or self.simulation:
+            self._log("[BLOCKED] Real camera and validated dual-board station required.")
+            return
+        if self.grab_current() is not None or self._scan_busy or self._stopping or self.current_session_id:
+            self._log("[BLOCKED] Close settings and finish the current session first.")
+            return
+        try:
+            validate_batch_config(self.current_batch_id, self.operator_name, self.target_egg_count, self.current_stage)
+            cycle = self.station.start_cycle(self.current_batch_id, self.target_egg_count, self.operator_name)
+        except Exception as exc:
+            self._log("[BLOCKED] " + str(exc))
+            return
+        self.current_session_id = cycle.session_id
+        self.is_session_active = self.is_auto_cycle_running = True
+        self._station_terminal_seen = False
+        self.realtime_detector.pause()
+        self.total_count = self.fertile_count = self.infertile_count = self.review_count = self.scan_sequence = 0
+        self._session_start_time = time.time()
+        self._diagnostics_complete = False
+        self.standby_frame.place_forget()
+        self._log("[STARTED] Automatic holder tracking; scans are committed locally before advance.")
+        self._set_session_active_state(True)
 
     def _auto_conveyor_cycle_loop(self):
         raise RuntimeError("The legacy timed conveyor cycle is disabled.")
@@ -1019,7 +1178,7 @@ class OvaLensOperatorApp(ctk.CTk):
             self._log("[SIMULATION] Preview only: no hardware commands or saved scans.")
         else:
             self._log("[READY] Use a manual camera scan to check classification. "
-                      "Automatic sorting requires station validation.")
+                      "Open Config for both boards, camera defaults and station validation.")
 
     def _on_chamber_state_change(self, state: str, current: int, total: int):
         """ChamberController state callback — updates the cycle HUD (runs on main thread via after())."""
@@ -1108,6 +1267,14 @@ class OvaLensOperatorApp(ctk.CTk):
         if not isinstance(latency, int) or latency < 0:
             self._scan_failed("Invalid inference latency; scan was not saved.")
             return
+
+        # Immediate real-time visual feedback
+        self._latest_detections = result.get("detections", [])
+        self._last_scan_result_time = time.monotonic()
+        detector = getattr(self, "realtime_detector", None)
+        if detector:
+            detector.resume()
+
         if self.simulation or self.camera.is_mock_mode or not str(result.get("engine", "")).startswith("ONNX"):
             self._scan_busy = False
             self._update_result_banner(final_cls, conf, "PREVIEW_ONLY", latency)
@@ -1150,6 +1317,7 @@ class OvaLensOperatorApp(ctk.CTk):
             else:
                 self.infertile_count += 1
             self._latest_detections = result["detections"]
+            self._last_scan_result_time = time.monotonic()
             self._set_session_active_state(True)
             self._update_counters_ui()
             self._update_result_banner(final_cls, conf, action, latency)
@@ -1173,7 +1341,11 @@ class OvaLensOperatorApp(ctk.CTk):
 
     def trigger_candling_scan(self):
         """One click waits for a fresh camera frame, then starts bounded inference."""
-        if self._closing or self._scan_busy or self._stopping:
+        if self._closing or self._scan_busy or self._stopping or self.is_auto_cycle_running:
+            return
+        station = getattr(self, "station", None)
+        if station and station.cycle and self.current_session_id == station.cycle.session_id:
+            self._log("[BLOCKED] End the automatic session before starting manual diagnostics.")
             return
         if self._pending_finalization_id or self._finalization_failed:
             self._log("[BLOCKED] Retry session finalization before another scan.")
@@ -1188,7 +1360,12 @@ class OvaLensOperatorApp(ctk.CTk):
             self._log("[BLOCKED] Close the dialog before scanning.")
             return
         self._scan_busy = True
-        self._latest_detections = []
+        detector = getattr(self, "realtime_detector", None)
+        if detector and detector.latest_detection:
+            self._latest_detections = [detector.latest_detection]
+            detector.pause()
+        else:
+            self._latest_detections = []
         self.result_title.configure(text="Waiting for a fresh camera frame")
         self.result_badge.configure(text="PENDING")
         self.result_subtitle.configure(text="No result recorded yet")
@@ -1239,8 +1416,10 @@ class OvaLensOperatorApp(ctk.CTk):
                           OperatorState.REVIEW)
 
     def trigger_manual_eject(self):
-        self._log("[BLOCKED] Manual actuation requires a validated dual-board connection. "
-                  "No ejection command was sent.")
+        station = getattr(self, "station", None)
+        if station:
+            station.halt()
+        self._log("[STOP] Stop requested on both boards. Inspect the rig before recovery.")
 
     def _update_result_banner(self, final_cls: str, conf: float, action: str, lat_ms: int):
         if final_cls == "FERTILE":
@@ -1301,61 +1480,58 @@ class OvaLensOperatorApp(ctk.CTk):
         self.box_infertile.configure(text=str(self.infertile_count))
         self.box_review.configure(text=str(self.review_count))
 
+    def _get_active_display_detections(self) -> List[Dict[str, Any]]:
+        """
+        Returns active detections for real-time viewport visualization.
+        Priority:
+        1. Actively scanning / locked target during single scan.
+        2. Recent single scan result (within 1.5s).
+        3. Real-time background detection & tracking on live video.
+        """
+        if getattr(self, "_stopping", False) or not getattr(self.camera, "is_running", False):
+            return []
+
+        if getattr(self, "_scan_busy", False):
+            if getattr(self, "_latest_detections", None):
+                return [{**d, "is_scanning": True} for d in self._latest_detections]
+            detector = getattr(self, "realtime_detector", None)
+            if detector and detector.latest_detection:
+                return [{**detector.latest_detection, "is_scanning": True}]
+            return []
+
+        # Fresh completed single scan: display result briefly (1.5s)
+        last_scan_time = getattr(self, "_last_scan_result_time", 0.0)
+        if getattr(self, "_latest_detections", None) and (time.monotonic() - last_scan_time < 1.5):
+            return self._latest_detections
+
+        # Active real-time background detection & tracking
+        detector = getattr(self, "realtime_detector", None)
+        if detector and detector.latest_detection:
+            return [detector.latest_detection]
+
+        # No active detection: return empty list (prevents freezing/sticking)
+        return []
+
     def _update_video_frame(self):
         """
-        High-Performance Video Render Loop (~33 FPS).
-        Uses atomic frame buffer and native Tkinter PhotoImage for zero-overhead GUI rendering.
+        High-Performance Real-Time Video Render Loop (~33-60 FPS).
+        Uses direct BGR downsampling, hardware-scaled drawing, and native PhotoImage caching
+        to achieve < 2ms GUI overhead per frame.
         """
         if self._closing:
             return
         try:
-            if self.camera.is_running:
-                frame = self.camera.get_latest_frame(copy=False)
+            if getattr(self.camera, "is_running", False) and not getattr(self, "_stopping", False):
+                snapshot = self.camera.snapshot(copy=False)
+                frame = snapshot.image if snapshot else None
                 if frame is not None:
-                    # Copy only if drawing active annotations to avoid mutating grabber buffer
-                    if self.show_crosshairs or self._latest_detections:
-                        disp_frame = frame.copy()
-                    else:
-                        disp_frame = frame
+                    render_key = (snapshot.sequence, self._cached_container_w, self._cached_container_h)
+                    if render_key == getattr(self, "_last_render_key", None):
+                        return
+                    self._last_render_key = render_key
+                    h, w = frame.shape[:2]
 
-                    h, w = disp_frame.shape[:2]
-
-                    # 1. Draw Optical Candling Alignment Guide / Crosshairs (if enabled)
-                    if self.show_crosshairs:
-                        cv2.circle(disp_frame, (w // 2, h // 2), 6, (0, 255, 0), -1)
-                        cv2.line(disp_frame, (w // 2 - 25, h // 2), (w // 2 + 25, h // 2), (0, 255, 0), 1)
-                        cv2.line(disp_frame, (w // 2, h // 2 - 25), (w // 2, h // 2 + 25), (0, 255, 0), 1)
-                        cv2.ellipse(disp_frame, (w // 2, h // 2), (180, 240), 0, 0, 360, (0, 200, 255), 1)
-
-                    # 2. Draw Live AI Bounding Boxes & Classification Labels
-                    for det in self._latest_detections:
-                        bbox = det.get("bbox", [])
-                        cls_name = det.get("class", "FERTILE")
-                        conf = det.get("confidence", 0.90)
-
-                        if len(bbox) == 4:
-                            xc, yc, bw, bh = bbox
-                            x1 = int((xc - bw / 2) * w)
-                            y1 = int((yc - bh / 2) * h)
-                            x2 = int((xc + bw / 2) * w)
-                            y2 = int((yc + bh / 2) * h)
-
-                            if cls_name == "FERTILE":
-                                box_bgr = (56, 122, 53)     # Agri-Green
-                                label_str = f"FERTILE: {conf*100:.1f}%"
-                            else:
-                                box_bgr = (6, 119, 217)     # Penoy Amber
-                                label_str = f"INFERTILE (PENOY): {conf*100:.1f}%"
-
-                            cv2.rectangle(disp_frame, (x1, y1), (x2, y2), box_bgr, 2)
-                            (tw, th), _ = cv2.getTextSize(label_str, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
-                            cv2.rectangle(disp_frame, (x1, y1 - th - 8), (x1 + tw + 10, y1), box_bgr, -1)
-                            cv2.putText(disp_frame, label_str, (x1 + 5, y1 - 4),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA)
-
-                    # 3. High-Speed Aspect Ratio Scaling
-                    rgb_frame = cv2.cvtColor(disp_frame, cv2.COLOR_BGR2RGB)
-
+                    # 1. Compute optimal viewport dimensions with cached container
                     container_w = max(100, self._cached_container_w)
                     container_h = max(100, self._cached_container_h)
 
@@ -1372,17 +1548,87 @@ class OvaLensOperatorApp(ctk.CTk):
                     target_w = max(160, min(target_w, container_w))
                     target_h = max(120, min(target_h, container_h))
 
-                    resized = cv2.resize(rgb_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
-                    pil_img = Image.fromarray(resized)
+                    # 2. Optimized Downsampling: Resize BGR frame first (reduces pixel processing by 4x-6x)
+                    disp_frame = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+
+                    # 3. Draw Optical Candling Alignment Guide / Crosshairs (if enabled)
+                    if self.show_crosshairs:
+                        cx, cy = target_w // 2, target_h // 2
+                        cv2.circle(disp_frame, (cx, cy), 5, (0, 255, 0), -1, cv2.LINE_AA)
+                        cv2.line(disp_frame, (cx - 20, cy), (cx + 20, cy), (0, 255, 0), 1, cv2.LINE_AA)
+                        cv2.line(disp_frame, (cx, cy - 20), (cx, cy + 20), (0, 255, 0), 1, cv2.LINE_AA)
+
+                    # 4. Draw Real-time AI Bounding Boxes & Classification Labels
+                    active_detections = self._get_active_display_detections()
+                    for det in active_detections:
+                        bbox = det.get("bbox", [])
+                        cls_name = det.get("class", "FERTILE")
+                        conf = det.get("confidence", 0.90)
+                        is_scanning = det.get("is_scanning", False)
+
+                        if len(bbox) == 4:
+                            xc, yc, bw, bh = bbox
+                            x1 = max(0, int((xc - bw / 2.0) * target_w))
+                            y1 = max(0, int((yc - bh / 2.0) * target_h))
+                            x2 = min(target_w - 1, int((xc + bw / 2.0) * target_w))
+                            y2 = min(target_h - 1, int((yc + bh / 2.0) * target_h))
+
+                            if is_scanning:
+                                box_bgr = (0, 215, 255)       # Gold / Amber scan lock
+                                label_str = "SCANNING..."
+                            elif cls_name == "FERTILE":
+                                box_bgr = (56, 122, 53)       # Agri-Green
+                                label_str = f"FERTILE: {conf*100:.1f}%"
+                            else:
+                                box_bgr = (6, 119, 217)       # Penoy Amber
+                                label_str = f"INFERTILE: {conf*100:.1f}%"
+
+                            # High-visibility bounding box with industrial corner brackets
+                            cv2.rectangle(disp_frame, (x1, y1), (x2, y2), box_bgr, 1, cv2.LINE_AA)
+
+                            corner_len = max(6, min(16, int(min(x2 - x1, y2 - y1) * 0.2)))
+                            # Top-Left corner
+                            cv2.line(disp_frame, (x1, y1), (x1 + corner_len, y1), box_bgr, 2, cv2.LINE_AA)
+                            cv2.line(disp_frame, (x1, y1), (x1, y1 + corner_len), box_bgr, 2, cv2.LINE_AA)
+                            # Top-Right corner
+                            cv2.line(disp_frame, (x2, y1), (x2 - corner_len, y1), box_bgr, 2, cv2.LINE_AA)
+                            cv2.line(disp_frame, (x2, y1), (x2, y1 + corner_len), box_bgr, 2, cv2.LINE_AA)
+                            # Bottom-Left corner
+                            cv2.line(disp_frame, (x1, y2), (x1 + corner_len, y2), box_bgr, 2, cv2.LINE_AA)
+                            cv2.line(disp_frame, (x1, y2), (x1, y2 - corner_len), box_bgr, 2, cv2.LINE_AA)
+                            # Bottom-Right corner
+                            cv2.line(disp_frame, (x2, y2), (x2 - corner_len, y2), box_bgr, 2, cv2.LINE_AA)
+                            cv2.line(disp_frame, (x2, y2), (x2, y2 - corner_len), box_bgr, 2, cv2.LINE_AA)
+
+                            # Pill badge header
+                            (tw, th), _ = cv2.getTextSize(label_str, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)
+                            badge_y1 = max(0, y1 - th - 6)
+                            badge_y2 = y1
+                            badge_x2 = min(target_w, x1 + tw + 8)
+                            cv2.rectangle(disp_frame, (x1, badge_y1), (badge_x2, badge_y2), box_bgr, -1)
+                            cv2.putText(disp_frame, label_str, (x1 + 4, badge_y2 - 3),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1, cv2.LINE_AA)
+
+                    # 5. Fast color conversion on downscaled frame
+                    rgb_frame = cv2.cvtColor(disp_frame, cv2.COLOR_BGR2RGB)
+                    pil_img = Image.fromarray(rgb_frame)
                     photo = ImageTk.PhotoImage(image=pil_img)
                     self.video_label.configure(image=photo)
                     self._current_photo = photo
+            else:
+                # Camera turned off or session ending / on standby: clear viewport completely
+                if self._current_photo is not None:
+                    self._current_photo = None
+                    try:
+                        self.video_label.configure(image="")
+                    except Exception:
+                        pass
 
         except Exception as exc:
             self._log("[PREVIEW ERROR] " + str(exc))
         finally:
             if not self._closing:
-                self.after(30, self._update_video_frame)
+                self.after(16, self._update_video_frame)
 
     def _update_status_loop(self):
         if self._closing:
@@ -1418,9 +1664,11 @@ class OvaLensOperatorApp(ctk.CTk):
         self._last_sync_error = error
         self.net_status_badge.configure(text=text, fg_color=FUTheme.PANEL_LIGHT_ALT,
                                         text_color=color)
-        self.iot_status_badge.configure(text="SORTER: NOT VALIDATED",
-                                        fg_color=FUTheme.INFERTILE_AMBER_BG,
-                                        text_color=FUTheme.INFERTILE_AMBER)
+        station = getattr(self, "station", None)
+        ready = station is not None and (station.calibrated or station.active)
+        self.iot_status_badge.configure(text="SORTER: ACTIVE" if station and station.active else "SORTER: VALIDATED" if ready else "SORTER: NOT VALIDATED",
+                                        fg_color=FUTheme.PANEL_LIGHT_ALT,
+                                        text_color=FUTheme.FERTILE_GREEN_TEXT if ready else FUTheme.INFERTILE_AMBER)
         if self.camera.last_error and self.camera.last_error != getattr(self, "_last_camera_error", None):
             self._log("[CAMERA ERROR] " + self.camera.last_error)
         self._last_camera_error = self.camera.last_error
@@ -1852,7 +2100,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         s2_body = ctk.CTkLabel(
             s2,
-            text="• Click [START AUTO SORTING] in footer to activate camera & motor.\n• Sorter advances eggs into the dark candling chamber at 120 eggs/min.\n• High-speed YOLOv8 ONNX model classifies embryo vitality in < 25ms.\n• Machine automatically stops and chimes when all target eggs are sorted.",
+            text="• Apply camera settings, inspect calibration, then click Start sorting.\n• Use Config to identify both boards and validate measured holder geometry.\n• The conveyor stops for fresh, stable Day 10 classification.\n• After the target is recorded, tracked eggs drain through the timed sorting gate.",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s2_body.pack(anchor="w", padx=14, pady=(2, 10))
@@ -1880,7 +2128,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         s4_body = ctk.CTkLabel(
             s4,
-            text="• [SPACEBAR]: Trigger Single Test Scan (Manual Candling)\n• [ESC] key: End Session (Run Summary & Direct CSV Export)\n• [S] key: Scan Explorer & Candling History\n• [R] key: Emergency Manual Servo Eject\n• [F11] key: Toggle Kiosk / Fullscreen Mode\n• [C] key: Toggle Optical Alignment Crosshairs\n• [B] key: Open Batch Setup Modal\n• [F1] / [H]: Open this Operator Quick Guide",
+            text="• [SPACEBAR]: Trigger Single Test Scan (Manual Candling)\n• [ESC] key: End Session (Run Summary & Direct CSV Export)\n• [S] key: Scan Explorer & Candling History\n• [R] key: Stop both controllers\n• [F11] key: Toggle Kiosk / Fullscreen Mode\n• [C] key: Toggle Optical Alignment Crosshairs\n• [B] key: Open Batch Setup Modal\n• [F1] / [H]: Open this Operator Quick Guide",
             font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s4_body.pack(anchor="w", padx=14, pady=(2, 10))
@@ -1900,6 +2148,9 @@ class OvaLensOperatorApp(ctk.CTk):
     def open_calibration_dialog(self):
         if self.current_session_id or self.is_session_active or self._scan_busy or self._stopping or self._finalization_failed:
             self._log("[BLOCKED] Stop the session before editing calibration.")
+            return
+        if getattr(self, "station", None) is not None:
+            StationSettingsWindow(self)
             return
         dialog = ctk.CTkToplevel(self)
         dialog.title("Conveyor Calibration & Cycle Timing")

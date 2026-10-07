@@ -14,7 +14,7 @@ class FUTheme:
     PRIMARY_MAROON_BORDER = "#800000" # Institutional maroon border
 
     # Semantic Biological Classes (Luminous High Contrast for Gray Surfaces)
-    FERTILE_GREEN = "#22C55E"         # Agri-Green Luminous
+    FERTILE_GREEN = "#357a38"         # Foundation University Agri-Green
     FERTILE_GREEN_HOVER = "#16A34A"
     FERTILE_GREEN_BG = "#133E25"      # Deep forest green badge container
     FERTILE_GREEN_CARD = "#162D20"    # Subtle green card fill
@@ -28,7 +28,7 @@ class FUTheme:
     INFERTILE_AMBER_BORDER = "#6B3D10"
     INFERTILE_AMBER_TEXT = "#FDE68A"  # High-contrast amber text
 
-    REJECT_RED = "#F87171"
+    REJECT_RED = "#DC2626"
     REJECT_RED_HOVER = "#EF4444"
     REJECT_RED_BG = "#4C1D24"
     REJECT_RED_CARD = "#33161A"
@@ -36,11 +36,11 @@ class FUTheme:
     REJECT_RED_TEXT = "#FECACA"
 
     # Industrial Pro Gray Surfaces (Mid-Tone Charcoal & Slate)
-    BG_LIGHT = "#181A20"              # Canvas Background (Neutral Charcoal)
-    PANEL_LIGHT = "#262932"           # Elevated Card Surfaces (Industrial Pro Gray)
+    BG_LIGHT = "#0F172A"              # FU dark slate canvas
+    PANEL_LIGHT = "#1E293B"           # FU dark slate cards
     PANEL_LIGHT_ALT = "#1E2129"       # Inset Containers / Dropdown Surfaces (Deep Slate)
     PANEL_ACCENT = "#353A47"          # Hover / Interactive Surface (Mid Slate)
-    BORDER = "#3B4150"                # Crisp Slate-Gray Card Border
+    BORDER = "#334155"                # FU dark slate border
     BORDER_DARK = "#4F5768"           # Focus / Accent Border
     DARKROOM_VIEWPORT = "#111317"     # Studio Viewport for Candling Stream
 

@@ -6,7 +6,7 @@
 
 **OvaLens Edge** is an offline-first, real-time computer vision application designed to inspect duck eggs on a motorized conveyor, classify embryonic development using YOLOv8 ONNX FP16, and command millisecond-accurate mechanical sorting via an ESP32 microcontroller.
 
-**Current main launcher status:** manual camera diagnostics and explicit simulation preview are available. Automatic sorting and manual ejection are disabled because the legacy single-board controller does not match the dual-ESP32 spaced-holder rig. Simulation and model fallback results are never saved as scans. See [the operation audit](../docs/OVALENS_EDGE_OPERATION_AUDIT.md) for validation results and remaining integration work.
+**Current main launcher status:** Config integrates two v2 ESP32 boards, chamber IR stopping, idle camera/AI defaults, measured holder calibration and automatic holder tracking. Sorting requires explicit inspection and validation on each connection/batch. The sketches must be identified, uploaded and bench-tested on the actual rig before use. Simulation and fallback results remain preview-only. See [station setup and recovery](../docs/OVALENS_EDGE_STATION_CONTROL.md).
 
 Press **Single Scan** once to wait for a fresh frame and classify it. The interface shows camera, inference, and storage progress; timeouts discard late results. **End Session** cancels unfinished predictions and finalizes local records. If finalization fails, **Retry Finalization** preserves the original session. Reaching the diagnostic target stops additional scans until a new batch is configured.
 

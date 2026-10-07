@@ -1,9 +1,6 @@
-# Dual-ESP32 sensorless firmware, protocol v2
+# Dual-ESP32 firmware with chamber IR, protocol v2
 
-Task: `TASK-NEW-FW-SAFE-01`. These sketches implement the wired conveyor/servo
-protocol for the position-based design. They do not implement classification,
-egg presence detection, or autonomous sorting, and have not been flashed by
-this change.
+Tasks: `TASK-NEW-FW-SAFE-01`, `TASK-NEW-EDGE-CONTROL-01`. These sketches implement the wired conveyor/servo protocol, locally stopped IR indexes and reset notifications. Classification and multi-holder sorting coordination belong to the main edge app. These sketches have not been flashed by this change. See [station setup](../../docs/OVALENS_EDGE_STATION_CONTROL.md).
 
 ## Build and wiring
 
@@ -14,7 +11,7 @@ in Arduino IDE, select **ESP32 Dev Module**, and Verify using Arduino-ESP32
 
 | Board | Pins / assumptions |
 | --- | --- |
-| Conveyor | A4988 STEP GPIO2, DIR GPIO4; ENABLE physically LOW. Confirm these against the rig. |
+| Conveyor | A4988 STEP GPIO2, DIR GPIO4; ENABLE physically LOW; active-low chamber IR GPIO14. Confirm wiring and 3.3 V sensor compatibility against the rig. |
 | Servo | SG90 signal GPIO18, external regulated 5V supply, shared ground. |
 
 GPIO2 is a boot-strapping pin. A4988 motor power and current limiting must be
@@ -54,6 +51,7 @@ IDs/settings reset at boot. Startup acknowledgement and conveyor reference
 validation are mandatory; the host must discard queued commands on any reset.
 
 `HELLO`, `PING`, `STATUS`, `HALT`, `STOP`, and `ESTOP` may be untagged.
+Boot emits `BOOT:CONVEYOR_V2` or `BOOT:SERVO_V2`; a host must invalidate the cycle on these unsolicited reset notifications.
 Stops execute even with an old ID. Boot/unsolicited fault reports are untagged.
 HELLO identifies `CONVEYOR_V2` or `SERVO_V2` and `PROTOCOL=2`; check board role
 before sending commands. STATUS includes LAST_ID, ACTIVE_ID, FAULT and BUSY.
@@ -95,6 +93,8 @@ failure. Neither watchdog detects belt slip, motor stall, or mechanical jams.
 | ACK_FAULT | Acknowledge a latched fault while idle; does not restore reference |
 | SETHOME | Confirm aligned current holder as software zero; invalidate stations |
 | JOG:&lt;steps&gt; | Finite relative move, -100000..100000; idle only |
+| INDEX:&lt;steps&gt; | Referenced nonzero relative move; arm chamber IR stop with 600 ms lockout |
+| IR_OFFSET:&lt;steps&gt; | Configure 0..99999 steps from IR detection to stopped capture; never extend an index past its bound |
 | SPEED:&lt;us&gt; | STEP half-period, 200..5000 us; idle only |
 | HOME | Deliberate return to referenced software zero; idle only |
 | SETCHAMBER / SETOUTPUT | Save referenced station coordinates |
@@ -146,7 +146,7 @@ Servo, unloaded: HELLO, wait for startup BUSY:0, then tagged ACK_FAULT,
 SET_NEUTRAL, SERVO, and RESET with increasing IDs. Wait for completion before
 the next action. Test watchdog expiry and ESTOP with both mechanisms unloaded.
 
-The existing `firmware/prototype` host is **not compatible**: its actuator
+The main `edge/launcher.py` host supports this protocol with explicit station validation. The existing `firmware/prototype` host is **not compatible**: its actuator
 commands lack IDs, it does not implement this recovery handshake, and it
 expects unprefixed replies. Adapt and test the host before running real eggs.
 Never automatically send ACK_FAULT or SETHOME on reconnect.

@@ -4,6 +4,7 @@
 #include "../protocol.h"
 
 constexpr uint8_t STEP_PIN = 2, DIR_PIN = 4;
+constexpr uint8_t IR_PIN = 14; // Active-low beam break; confirm wiring before upload.
 constexpr int32_t POSITION_LIMIT = 10000000;
 hw_timer_t *pulseTimer = nullptr;
 portMUX_TYPE motionMux = portMUX_INITIALIZER_UNLOCKED;
@@ -11,6 +12,10 @@ volatile int32_t position = 0, target = 0;
 volatile bool moving = false, stepHigh = false, watchdogTrip = false;
 volatile uint32_t lastHeartbeat = 0;
 volatile bool linkArmed = false;
+volatile bool irArmed = false, irPending = false, irReport = false, irOverflow = false;
+volatile bool irSeen = false;
+volatile uint32_t lastIrAt = 0;
+volatile int32_t irPosition = 0, irOffset = 0;
 int32_t chamber = 0, output = 0;
 bool chamberSet = false, outputSet = false, referenced = false;
 bool faultLatched = true, awaitingCompletion = false;
@@ -22,8 +27,28 @@ ovalens::Reader reader;
 void prefix(uint32_t id) { if (id) Serial.printf("ID:%lu:", (unsigned long)id); }
 void reply(uint32_t id, const char *message) { prefix(id); Serial.println(message); }
 
+void ARDUINO_ISR_ATTR chamberIr() {
+  portENTER_CRITICAL_ISR(&motionMux);
+  uint32_t now = millis();
+  if (moving && irArmed && !irPending && !irReport &&
+      (!irSeen || uint32_t(now - lastIrAt) >= 600)) {
+    irSeen = true; lastIrAt = now; irPosition = position; irPending = true;
+  }
+  portEXIT_CRITICAL_ISR(&motionMux);
+}
+
 void ARDUINO_ISR_ATTR pulseTick() {
   portENTER_CRITICAL_ISR(&motionMux);
+  if (irPending) {
+    int32_t direction = target >= position ? 1 : -1;
+    int32_t stopAt = position + direction * irOffset;
+    if ((direction > 0 && stopAt > target) || (direction < 0 && stopAt < target)) {
+      irOverflow = true; target = position; moving = false;
+    } else {
+      target = stopAt; moving = target != position;
+    }
+    irPending = false; irReport = true; irArmed = false;
+  }
   if (stepHigh) {
     digitalWrite(STEP_PIN, LOW); stepHigh = false;
     if (position == target) moving = false;
@@ -46,6 +71,9 @@ void snapshot(int32_t &p, bool &busy) {
 
 void report(uint32_t id) {
   int32_t p; bool busy; snapshot(p, busy);
+  prefix(id); Serial.println("IR_CAPABLE:1");
+  prefix(id); Serial.printf("IR_ACTIVE:%d\n", digitalRead(IR_PIN) == LOW);
+  prefix(id); Serial.printf("IR_OFFSET:%ld\n", long(irOffset));
   prefix(id); Serial.printf("POSITION:%ld\n", long(p));
   prefix(id); Serial.printf("BUSY:%d\n", busy ? 1 : 0);
   prefix(id); Serial.printf("CHAMBER:%ld\n", long(chamber));
@@ -63,6 +91,7 @@ void report(uint32_t id) {
 void halt() {
   portENTER_CRITICAL(&motionMux);
   moving = false; target = position;
+  irArmed = irPending = irReport = false;
   portEXIT_CRITICAL(&motionMux);
   // Finish an already issued HIGH pulse; never start another pulse.
   if (awaitingCompletion) reply(activeId, "ERROR:MOVE_CANCELLED");
@@ -93,7 +122,7 @@ void heartbeat() {
   portEXIT_CRITICAL(&motionMux);
 }
 
-void moveTo(int32_t destination, uint32_t id) {
+void moveTo(int32_t destination, uint32_t id, bool watchIr = false) {
   int32_t p; bool busy; snapshot(p, busy);
   if (busy || awaitingCompletion) { reply(id, "ERROR:SYSTEM_BUSY"); return; }
   if (destination < -POSITION_LIMIT || destination > POSITION_LIMIT) {
@@ -103,6 +132,7 @@ void moveTo(int32_t destination, uint32_t id) {
   timerStop(pulseTimer); timerWrite(pulseTimer, 0);
   portENTER_CRITICAL(&motionMux);
   target = destination; moving = destination != position;
+  irArmed = watchIr; irPending = irReport = irOverflow = false;
   portEXIT_CRITICAL(&motionMux);
   activeId = id; awaitingCompletion = true; state = "MOVING";
   timerStart(pulseTimer);
@@ -147,6 +177,14 @@ void command(char *line) {
     state = "HOME"; reply(id, "OK:HOME_SET"); report(id); return;
   }
   long value;
+  if (!strncmp(cmd, "IR_OFFSET:", 10) && ovalens::integer(cmd + 10, 0, 99999, value)) {
+    irOffset = value; reply(id, "OK:IR_CONFIG"); report(id); return;
+  }
+  if (!strncmp(cmd, "INDEX:", 6) && ovalens::integer(cmd + 6, -100000, 100000, value)) {
+    if (!referenced) { reply(id, "ERROR:REFERENCE_REQUIRED"); return; }
+    if (value == 0) { reply(id, "ERROR:INVALID_COMMAND"); return; }
+    moveTo(p + value, id, true); return;
+  }
   if (!strncmp(cmd, "SPEED:", 6) && ovalens::integer(cmd + 6, 200, 5000, value)) {
     halfPeriodUs = value; timerAlarm(pulseTimer, halfPeriodUs, true, 0);
     reply(id, "OK:SPEED"); report(id); return;
@@ -180,7 +218,10 @@ void command(char *line) {
 void setup() {
   pinMode(STEP_PIN, OUTPUT); digitalWrite(STEP_PIN, LOW);
   pinMode(DIR_PIN, OUTPUT); digitalWrite(DIR_PIN, LOW);
+  pinMode(IR_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(IR_PIN), chamberIr, FALLING);
   Serial.begin(115200);
+  reply(0, "BOOT:CONVEYOR_V2");
   pulseTimer = timerBegin(1000000);
   if (!pulseTimer) { faultCode = "TIMER_INIT"; reply(0, "ERROR:TIMER_INIT"); return; }
   timerAttachInterrupt(pulseTimer, &pulseTick);
@@ -190,10 +231,20 @@ void setup() {
 
 void loop() {
   checkLink();
+  bool event, overflow; int32_t eventPosition;
+  portENTER_CRITICAL(&motionMux);
+  event = irReport; irReport = false;
+  overflow = irOverflow; irOverflow = false; eventPosition = irPosition;
+  portEXIT_CRITICAL(&motionMux);
+  if (event) {
+    prefix(activeId); Serial.printf("EVENT:IR:%ld\n", long(eventPosition));
+  }
+  if (overflow) latchFault("ERROR:IR_OFFSET_EXCEEDS_MOVE");
   int32_t p; bool busy; snapshot(p, busy);
   if (awaitingCompletion && !busy) {
     uint32_t id = activeId;
     awaitingCompletion = false; activeId = 0; state = "IDLE";
+    irArmed = false;
     reply(id, "OK:MOVE_DONE"); report(id);
   }
   for (int n = 0; n < 64 && Serial.available(); ++n) {

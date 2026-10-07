@@ -24,6 +24,14 @@ int main(int argc, char **argv) {
       if (pulseTimer && timer.running) pulseTick();
 #endif
       loop();
+    } else if (line == "IR") {
+#ifdef BOARD_CONVEYOR
+      pinValues[IR_PIN] = LOW; chamberIr();
+#endif
+    } else if (line == "IR_CLEAR") {
+#ifdef BOARD_CONVEYOR
+      pinValues[IR_PIN] = HIGH;
+#endif
     } else if (line.rfind("TICKS ", 0) == 0) {
 #ifdef BOARD_CONVEYOR
       int count = std::stoi(line.substr(6));

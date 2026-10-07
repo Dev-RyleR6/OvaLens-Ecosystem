@@ -4,13 +4,10 @@ Shown before the main operation window. Operator sets batch parameters
 then clicks 'Start OvaLens Operation' to launch the chamber cycle.
 """
 
-import threading
-import math
 from datetime import datetime
 from typing import Optional, Dict, Any
 
 import customtkinter as ctk
-import serial.tools.list_ports
 
 from .theme import FUTheme
 
@@ -46,7 +43,6 @@ class StartupConfigWindow(ctk.CTk):
             pass
 
         self._build_ui()
-        self._auto_detect_ports()
 
     # ─── UI Construction ──────────────────────────────────────────────────────
 
@@ -287,77 +283,17 @@ class StartupConfigWindow(ctk.CTk):
         self._batch_num_menu.pack(side="left")
 
     def _build_hardware_panel(self, parent):
-        ctk.CTkLabel(
-            parent,
-            text="Hardware & Timing",
-            font=(FUTheme.FONT_FAMILY, 14, "bold"),
-            text_color=FUTheme.TEXT_PRIMARY,
-        ).pack(anchor="w", padx=20, pady=(18, 4))
-        ctk.CTkLabel(
-            parent,
-            text="ESP32 wired via USB Serial.",
-            font=(FUTheme.FONT_FAMILY, 10),
-            text_color=FUTheme.TEXT_MUTED,
-        ).pack(anchor="w", padx=20, pady=(0, 14))
-
-        # ── Serial Port ──────────────────────────────────────────────────────
-        self._add_label(parent, "ESP32 Serial Port:")
-        port_row = ctk.CTkFrame(parent, fg_color="transparent")
-        port_row.pack(fill="x", padx=20, pady=(2, 10))
-
-        self._port_var = ctk.StringVar(value="Auto-Detect")
-        self._port_menu = ctk.CTkOptionMenu(
-            port_row,
-            values=["Auto-Detect"],
-            variable=self._port_var,
-            fg_color=FUTheme.PANEL_LIGHT_ALT,
-            text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON,
-            button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color=FUTheme.PANEL_LIGHT,
-            dropdown_text_color=FUTheme.TEXT_PRIMARY,
-            height=34,
-            corner_radius=8,
-        )
-        self._port_menu.pack(side="left", fill="x", expand=True, padx=(0, 6))
-
-        ctk.CTkButton(
-            port_row, text="↺",
-            font=(FUTheme.FONT_FAMILY, 14, "bold"),
-            fg_color=FUTheme.PANEL_LIGHT_ALT,
-            hover_color=FUTheme.PANEL_ACCENT,
-            text_color=FUTheme.TEXT_PRIMARY,
-            border_width=1, border_color=FUTheme.BORDER,
-            height=34, width=36, corner_radius=8,
-            command=self._auto_detect_ports,
-        ).pack(side="right")
-
-        # ── Conveyor Timing ──────────────────────────────────────────────────
-        self._add_label(parent, "Belt Speed (cm/s):")
-        self._speed_entry = self._make_entry(parent, "12.5")
-
-        self._add_label(parent, "Chamber → Gate Distance (cm):")
-        self._dist_entry = self._make_entry(parent, "25.0")
-
-        self._add_label(parent, "Result Display Time (ms):")
-        self._display_ms_entry = self._make_entry(parent, "1200")
-
-        self._add_label(parent, "Servo Pulse Duration (ms):")
-        self._pulse_entry = self._make_entry(parent, "250")
-
-        # ── ESP32 Connection Status ──────────────────────────────────────────
-        ctk.CTkCheckBox(parent, text="Simulation preview (no sorting or saved scans)",
-                       variable=self._simulation_var, font=(FUTheme.FONT_FAMILY, 10),
-                       text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=20, pady=6)
-        self._esp32_status = ctk.CTkLabel(
-            parent,
-            text="● ESP32: Detecting...",
-            font=(FUTheme.FONT_FAMILY, 10, "bold"),
-            text_color=FUTheme.TEXT_MUTED,
-        )
-        self._esp32_status.pack(anchor="w", padx=20, pady=(14, 4))
-
-    # ─── Helpers ──────────────────────────────────────────────────────────────
+        ctk.CTkLabel(parent, text="Station setup", font=(FUTheme.FONT_FAMILY, 14, "bold"),
+                     text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=20, pady=(18, 12))
+        ctk.CTkLabel(parent, text="Configure the station from Config after opening the operator app.\n\n"
+                     "Connections: select and identify both ESP32 boards.\n\n"
+                     "Camera: tune exposure, focus and white balance; save defaults.\n\n"
+                     "Detection: set confidence and IoU thresholds.\n\n"
+                     "Calibration: measure holder spacing and gate travel, then validate the inspected setup.\n\n"
+                     "Opening the app starts no conveyor movement.",
+                     wraplength=250, justify="left", text_color=FUTheme.TEXT_SECONDARY).pack(anchor="w", padx=20, pady=12)
+        ctk.CTkCheckBox(parent, text="Simulation preview only", variable=self._simulation_var,
+                       text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=20, pady=16)
 
     def _add_label(self, parent, text: str):
         ctk.CTkLabel(
@@ -393,36 +329,6 @@ class StartupConfigWindow(ctk.CTk):
     def _update_batch_preview(self, *_):
         self._batch_preview_label.configure(text=self._generate_batch_code())
 
-    def _auto_detect_ports(self):
-        """Scan available COM ports and populate the dropdown."""
-        ports = serial.tools.list_ports.comports()
-        esp_ports = []
-        for p in ports:
-            desc = (p.description or "").lower()
-            if any(k in desc for k in ("ch340", "cp210", "usb", "serial", "esp32", "ftdi")):
-                esp_ports.append(p.device)
-
-        all_opts = ["Auto-Detect"] + esp_ports + [p.device for p in ports if p.device not in esp_ports]
-        if not all_opts:
-            all_opts = ["Auto-Detect"]
-
-        self._port_menu.configure(values=all_opts)
-
-        if esp_ports:
-            self._port_var.set(esp_ports[0])
-            self._esp32_status.configure(
-                text=f"● ESP32: {esp_ports[0]} (detected)",
-                text_color=FUTheme.FERTILE_GREEN_TEXT,
-            )
-        else:
-            self._port_var.set("Auto-Detect")
-            self._esp32_status.configure(
-                text="● ESP32: Not found — automatic sorting unavailable",
-                text_color=FUTheme.INFERTILE_AMBER,
-            )
-
-    # ─── Actions ──────────────────────────────────────────────────────────────
-
     def _on_start(self):
         """Validate inputs and store config result."""
         try:
@@ -441,24 +347,6 @@ class StartupConfigWindow(ctk.CTk):
             self._status_label.configure(text="Enter an operator name (1 to 100 characters).",
                                          text_color=FUTheme.REJECT_RED_TEXT)
             return
-        port_val = self._port_var.get()
-        serial_port = None if port_val == "Auto-Detect" else port_val
-
-        try:
-            speed = float(self._speed_entry.get().strip())
-            dist = float(self._dist_entry.get().strip())
-            display_ms = int(self._display_ms_entry.get().strip())
-            pulse_ms = int(self._pulse_entry.get().strip())
-            if (not math.isfinite(speed) or not math.isfinite(dist) or speed <= 0 or dist <= 0
-                    or not 1 <= display_ms <= 10000 or not 1 <= pulse_ms <= 5000):
-                raise ValueError
-        except ValueError:
-            self._status_label.configure(
-                text="⚠ Check hardware/timing values.",
-                text_color=FUTheme.REJECT_RED_TEXT,
-            )
-            return
-
         breed_label = self._breed_var.get()
         breed_code = self._breed_map.get(breed_label, "KAY")
         batch_code = self._generate_batch_code()
@@ -470,11 +358,6 @@ class StartupConfigWindow(ctk.CTk):
             "egg_count": egg_count,
             "operator": operator,
             "stage": "DAY_10",
-            "serial_port": serial_port,
-            "conveyor_speed_cm_s": speed,
-            "conveyor_dist_cm": dist,
-            "display_result_ms": display_ms,
-            "servo_pulse_ms": pulse_ms,
             "simulation": self._simulation_var.get(),
             "fullscreen": True,
         }

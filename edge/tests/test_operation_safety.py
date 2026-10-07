@@ -225,15 +225,11 @@ def test_legacy_cycle_cannot_issue_motor_commands():
     assert motor.mock_calls == []
 
 
-@pytest.mark.parametrize("speed,distance,pulse", [("nan", "25", "250"), ("12", "-1", "250"),
-                                                 ("12", "25", "0")])
-def test_startup_rejects_unsafe_numeric_configuration(speed, distance, pulse):
-    app = SimpleNamespace(result=None, _status_label=Mock())
-    for field, value in (("_count_entry", "10"), ("_operator_entry", "Tester"),
-                         ("_speed_entry", speed), ("_dist_entry", distance),
-                         ("_display_ms_entry", "1200"), ("_pulse_entry", pulse)):
-        setattr(app, field, SimpleNamespace(get=lambda v=value: v))
-    app._port_var = SimpleNamespace(get=lambda: "Auto-Detect")
+@pytest.mark.parametrize("count,operator", [("0", "Tester"), ("100001", "Tester"), ("10", "")])
+def test_startup_rejects_invalid_batch_configuration(count, operator):
+    app = SimpleNamespace(result=None, _status_label=Mock(),
+        _count_entry=SimpleNamespace(get=lambda: count),
+        _operator_entry=SimpleNamespace(get=lambda: operator))
     StartupConfigWindow._on_start(app)
     assert app.result is None
     assert app._status_label.configure.called

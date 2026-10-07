@@ -9,6 +9,8 @@
 #define OUTPUT 1
 #define HIGH 1
 #define LOW 0
+#define INPUT_PULLUP 2
+#define FALLING 3
 using portMUX_TYPE = int;
 #define portMUX_INITIALIZER_UNLOCKED 0
 #define portENTER_CRITICAL(x) ((void)(x))
@@ -18,7 +20,10 @@ using portMUX_TYPE = int;
 inline uint32_t fakeMillis = 0;
 inline int pinValues[64] = {};
 inline uint32_t millis() { return fakeMillis; }
-inline void pinMode(int, int) {}
+inline void pinMode(int pin, int mode) { if (mode == INPUT_PULLUP) pinValues[pin] = HIGH; }
+inline int digitalRead(int pin) { return pinValues[pin]; }
+inline int digitalPinToInterrupt(int pin) { return pin; }
+inline void attachInterrupt(int, void (*)(), int) {}
 inline void digitalWrite(int pin, int value) { pinValues[pin] = value; }
 struct hw_timer_t { bool running = true; };
 inline hw_timer_t timer;

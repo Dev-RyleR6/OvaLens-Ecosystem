@@ -16,6 +16,7 @@ The system automates the inspection of duck eggs on a motorized conveyor belt, u
 
 ## 📚 Key Project Documentation
 
+* **[Edge Station Control](docs/OVALENS_EDGE_STATION_CONTROL.md)**: Dual-ESP32 setup, camera defaults, confidence/IoU controls, holder calibration, recovery and hardware validation.
 * 📖 **[Setup & Operations Manual](SETUP_AND_OPERATIONS.md)**: Full guide on prerequisites, installation, operating procedures, and troubleshooting.
 * 🚀 **[Complete Feature & Technical Specification](FEATURES.md)**: Exhaustive documentation of all Backend REST API services, mathematical models, and React Dashboard modules.
 * 🛡️ **[Code Review & Security Audit](CODE_REVIEW.md)**: Formal code review audit covering security, non-blocking edge concurrency, and test coverage.

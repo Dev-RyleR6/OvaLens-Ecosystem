@@ -12,11 +12,10 @@ from src.ui.startup_config import show_startup_config
 from src.core.camera import CameraGrabber
 from src.core.inference import InferenceEngine
 from src.core.inference_worker import InferenceWorker
-from src.core.chamber_controller import ChamberController
-from src.iot.serial_driver import ESP32SerialDriver
 from src.db.local_db import LocalDatabaseManager
 from src.sync.sync_worker import BackgroundSyncWorker
 from src.ui.app import OvaLensOperatorApp
+from src.core.station import EdgeStation
 
 
 def _stop_resource(resource):
@@ -52,12 +51,17 @@ def main():
         worker = InferenceWorker(engine)
         resources.callback(_stop_resource, worker)
         worker.start()
-        # Do not auto-open arbitrary COM ports or send this legacy vocabulary to
-        # sensorless boards. The dual-board adapter is a separate integration gate.
-        iot = ESP32SerialDriver(port=config.get("serial_port"))
-        resources.callback(_stop_resource, iot)
-        chamber = ChamberController(iot, camera, worker.frame_queue, worker.result_queue)
-        resources.callback(_stop_resource, chamber)
+        station = EdgeStation(camera, worker, db, device_id)
+        if not station.store.path.exists():
+            station.settings.camera.index = camera_index
+            station.settings.validate()
+        camera.initial_settings = station.settings.camera
+        camera.camera_index = station.settings.camera.index
+        camera.width, camera.height, camera.fps = (station.settings.camera.width,
+            station.settings.camera.height, station.settings.camera.fps)
+        engine.conf_threshold = station.settings.detection.confidence
+        engine.iou_threshold = station.settings.detection.iou
+        resources.callback(_stop_resource, station)
         sync = BackgroundSyncWorker(db, os.getenv("API_BASE_URL", "http://localhost:8000"),
                                     os.getenv("API_KEY", ""), device_id=device_id,
                                     device_name=os.getenv("DEVICE_NAME", device_id),
@@ -66,9 +70,10 @@ def main():
         resources.callback(_stop_resource, sync)
         if not config.get("simulation", False):
             sync.start()
-        app = OvaLensOperatorApp(camera=camera, engine=engine, iot=iot, db=db,
-                                 sync_worker=sync, chamber=chamber,
+        app = OvaLensOperatorApp(camera=camera, engine=engine, iot=None, db=db,
+                                 sync_worker=sync, chamber=None,
                                  inference_worker=worker, device_id=device_id,
+                                 station=station,
                                  startup_config=config)
         try:
             app.mainloop()

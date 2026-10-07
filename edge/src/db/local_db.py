@@ -74,6 +74,10 @@ class LocalDatabaseManager:
             """)
 
             session_columns = {r[1] for r in conn.execute("PRAGMA table_info(local_sessions);")}
+            scan_columns = {r[1] for r in conn.execute("PRAGMA table_info(local_scans);")}
+            if "evidence_json" not in scan_columns:
+                conn.execute("ALTER TABLE local_scans ADD COLUMN evidence_json TEXT;")
+            conn.execute("CREATE TABLE IF NOT EXISTS machine_journal (device_id TEXT PRIMARY KEY, state_json TEXT NOT NULL);")
             if "manual_review_count" not in session_columns:
                 conn.execute("ALTER TABLE local_sessions ADD COLUMN manual_review_count INTEGER DEFAULT 0;")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_sync ON local_scans(is_synced);")
@@ -214,7 +218,8 @@ class LocalDatabaseManager:
 
     def record_scan(self, scan_id: str, session_id: str, batch_id: str, sequence_number: int,
                     final_class: str, confidence: float, inference_ms: int, routing_action: str,
-                    detections: list, image_path: Optional[str] = None) -> Dict[str, Any]:
+                    detections: list, image_path: Optional[str] = None,
+                    evidence: Optional[dict] = None) -> Dict[str, Any]:
         if final_class not in {"FERTILE", "INFERTILE"}:
             raise ValueError("final_class must be FERTILE or INFERTILE.")
         if (not isinstance(confidence, (int, float)) or not math.isfinite(confidence)
@@ -249,6 +254,9 @@ class LocalDatabaseManager:
             ))
 
             # Update session rollup counters
+            if evidence is not None:
+                conn.execute("UPDATE local_scans SET evidence_json = ? WHERE scan_id = ?;",
+                             (json.dumps(evidence, allow_nan=False), scan_id))
             col = ("manual_review_count" if routing_action == "MANUAL_REVIEW" else
                    "fertile_count" if final_class == "FERTILE" else "infertile_count")
             conn.execute(f"""
@@ -268,6 +276,18 @@ class LocalDatabaseManager:
             "inference_ms": inference_ms,
             "scanned_at": scanned_at
         }
+
+    def save_machine_state(self, device_id: str, state: dict):
+        with self._get_connection() as conn:
+            conn.execute("INSERT INTO machine_journal(device_id, state_json) VALUES (?, ?) "
+                         "ON CONFLICT(device_id) DO UPDATE SET state_json=excluded.state_json;",
+                         (device_id, json.dumps(state, allow_nan=False)))
+            conn.commit()
+
+    def load_machine_state(self, device_id: str):
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT state_json FROM machine_journal WHERE device_id=?;", (device_id,)).fetchone()
+            return json.loads(row[0]) if row else None
 
     def get_uncommitted_scans(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Fetch pending unsynced scans for the background network worker."""

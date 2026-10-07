@@ -34,7 +34,7 @@ def test_startup_window_builds_and_cancels_without_hardware(hidden_ui):
     try:
         window.update_idletasks()
         assert window.result is None
-        assert window._port_var.get() == "Auto-Detect"
+        assert not hasattr(window, "_port_var")  # Board selection lives in station settings.
         window._on_cancel()
     finally:
         try:
@@ -87,3 +87,32 @@ def test_startup_window_confirms_fullscreen_config(hidden_ui):
             window.destroy()
         except tk.TclError:
             pass
+
+
+def test_station_settings_builds_without_camera_or_board_access(hidden_ui, tmp_path):
+    from src.core.settings import EdgeSettings, SettingsStore
+    from src.ui.station_settings import StationSettingsWindow
+    station = SimpleNamespace(settings=EdgeSettings(), settings_error="", boards=None, cycle=None,
+                              store=SettingsStore(tmp_path / "defaults.json"), active=False,
+                              calibrated=False,
+                              halt=Mock(), stop=Mock())
+    camera = SimpleNamespace(is_running=False, current_fps=0., last_error=None, is_mock_mode=False, stop=Mock())
+    sync = SimpleNamespace(last_error=None, heartbeat_error=None, is_online=False, stop=Mock())
+    db = Mock()
+    db.get_unsynced_count.return_value = 0
+    app = OvaLensOperatorApp(camera, Mock(), Mock(), db, sync, fullscreen=False, station=station)
+    errors = []
+    app.report_callback_exception = lambda *args: errors.append(args)
+    window = StationSettingsWindow(app)
+    window.withdraw()
+    window.update_idletasks()
+    assert window._values().snapshot() == station.settings.snapshot()
+    assert "camera.auto_exposure" in window.entries
+    assert "detection.iou" in window.entries
+    assert "calibration.ir_offset_steps" in window.entries
+    assert "conveyor_port" in window.entries and "servo_port" in window.entries
+    assert not station.halt.called
+    window._close()
+    app.after(50, app.shutdown)
+    app.mainloop()
+    assert not errors

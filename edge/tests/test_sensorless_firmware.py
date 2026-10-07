@@ -51,6 +51,34 @@ def test_finite_move_matches_id_and_rejects_duplicate(sketches):
     assert lines[-12] == "POSITION:2"
 
 
+def test_ir_index_stops_locally_and_reports_event_separately(sketches):
+    lines = run(sketches, "conveyor", ready("conveyor") + [
+        "SEND @2 SETHOME", "SEND @3 IR_OFFSET:2", "SEND @4 INDEX:100",
+        "TICKS 20", "IR", "TICKS 10", "SEND STATUS"])
+    assert "ID:4:EVENT:IR:10" in lines
+    assert "ID:4:OK:MOVE_DONE" in lines
+    assert lines[-12] == "POSITION:12"
+    assert "IR_CAPABLE:1" in lines
+
+
+def test_ir_lockout_prevents_retrigger_inside_600ms(sketches):
+    lines = run(sketches, "conveyor", ready("conveyor") + [
+        "SEND @2 SETHOME", "SEND @3 INDEX:100", "TICKS 20", "IR", "TICKS 2",
+        "IR_CLEAR", "SEND @4 INDEX:10", "CLOCK 1099", "IR", "TICKS 30", "SEND STATUS"])
+    assert "ID:3:EVENT:IR:10" in lines
+    assert not any(line.startswith("ID:4:EVENT:IR:") for line in lines)
+    assert lines[-12] == "POSITION:20"
+
+
+def test_ir_offset_cannot_extend_an_index_beyond_its_bound(sketches):
+    lines = run(sketches, "conveyor", ready("conveyor") + [
+        "SEND @2 SETHOME", "SEND @3 IR_OFFSET:100", "SEND @4 INDEX:10",
+        "TICKS 2", "IR", "TICKS 4", "SEND STATUS"])
+    assert "ERROR:IR_OFFSET_EXCEEDS_MOVE" in lines
+    assert "ID:4:OK:MOVE_DONE" not in lines
+    assert "REFERENCE_VALID:0" in lines[-12:]
+
+
 @pytest.mark.parametrize("stop", ["STOP", "HALT", "@1 STOP", "@1 HALT"])
 def test_stop_cancels_without_return_home_even_with_old_id(sketches, stop):
     lines = run(sketches, "conveyor", ready("conveyor") + [

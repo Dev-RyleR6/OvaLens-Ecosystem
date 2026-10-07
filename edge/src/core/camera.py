@@ -7,9 +7,20 @@ Supports clean session on-demand start/stop lifecycle.
 import time
 import threading
 import sys
+import queue
+from concurrent.futures import Future
+from dataclasses import dataclass
 from typing import Optional, Tuple
 import cv2
 import numpy as np
+
+
+@dataclass(frozen=True)
+class CameraFrame:
+    sequence: int
+    captured_at: float
+    settings_revision: int
+    image: np.ndarray
 
 
 class CameraGrabber:
@@ -33,6 +44,13 @@ class CameraGrabber:
         self.allow_mock = allow_mock
         self.last_error = None
         self._last_frame_at = 0.0
+        self._sequence = 0
+        self.settings_revision = 0
+        self._requests = queue.Queue(maxsize=4)
+        self.property_report = {}
+        self.identity = ""
+        self._discard_frames = 0
+        self.initial_settings = None
 
     def _init_static_bg(self):
         """Pre-render darkroom candling aperture background once to minimize CPU cycles."""
@@ -70,11 +88,79 @@ class CameraGrabber:
         self.cap.set(cv2.CAP_PROP_FPS, self.fps)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self._is_mock_mode = False
+        self.identity = f"opencv:{self.camera_index}:{self.cap.getBackendName()}"
+
+    def apply_settings(self, settings, timeout=10):
+        """Called from an operation worker; only the capture thread touches VideoCapture."""
+        future = Future()
+        self._requests.put_nowait((settings, future))
+        self.start()
+        return future.result(timeout=timeout)
+
+    def _apply_on_worker(self, settings):
+        from .settings import EdgeSettings
+        EdgeSettings(camera=settings).validate()
+        if self.allow_mock:
+            raise RuntimeError("Camera property tuning requires a real camera")
+        if settings.index != self.camera_index:
+            self.cap.release()
+            self.camera_index = settings.index
+            self.width, self.height, self.fps = settings.width, settings.height, settings.fps
+            self._open_camera()
+        if settings.identity and settings.identity != self.identity:
+            raise RuntimeError("Camera identity changed; confirm this device before applying defaults")
+        properties = {
+            "width": cv2.CAP_PROP_FRAME_WIDTH, "height": cv2.CAP_PROP_FRAME_HEIGHT,
+            "fps": cv2.CAP_PROP_FPS, "auto_exposure": cv2.CAP_PROP_AUTO_EXPOSURE,
+            "autofocus": cv2.CAP_PROP_AUTOFOCUS, "auto_white_balance": cv2.CAP_PROP_AUTO_WB,
+            "exposure": cv2.CAP_PROP_EXPOSURE, "gain": cv2.CAP_PROP_GAIN,
+            "focus": cv2.CAP_PROP_FOCUS, "white_balance": cv2.CAP_PROP_WB_TEMPERATURE,
+        }
+        report = {}
+        for name, prop in properties.items():
+            requested = getattr(settings, name)
+            try:
+                accepted = self.cap.set(prop, requested) if requested is not None else None
+                actual = self.cap.get(prop)
+                verified = (accepted is True and np.isfinite(actual)
+                            and abs(actual - requested) <= max(.01, abs(requested) * .01))
+                report[name] = {"requested": requested, "actual": actual if np.isfinite(actual) else None,
+                                "status": "verified readback" if verified else
+                                "rejected / unsupported" if accepted is False else "unverified"}
+            except (cv2.error, ValueError) as exc:
+                report[name] = {"requested": requested, "actual": None, "status": str(exc)}
+        self.width, self.height, self.fps = settings.width, settings.height, settings.fps
+        self.property_report = report
+        with self._lock:
+            self.settings_revision += 1
+            self._latest_frame = None
+            self._last_frame_at = 0.0
+        self._discard_frames = max(3, int(settings.fps * .3))
+        return {"identity": self.identity, "properties": report, "revision": self.settings_revision}
+
+    def snapshot(self, copy=True):
+        with self._lock:
+            if not self._is_running or self._latest_frame is None or time.monotonic() - self._last_frame_at > .5:
+                return None
+            return CameraFrame(self._sequence, self._last_frame_at, self.settings_revision,
+                               self._latest_frame.copy() if copy else self._latest_frame)
 
     def _capture_loop(self):
         try:
             self._open_camera()
+            if self.initial_settings is not None and self._requests.empty() and not self.allow_mock:
+                self._apply_on_worker(self.initial_settings)
             while self._is_running:
+                try:
+                    settings, future = self._requests.get_nowait()
+                except queue.Empty:
+                    pass
+                else:
+                    if future.set_running_or_notify_cancel():
+                        try:
+                            future.set_result(self._apply_on_worker(settings))
+                        except Exception as exc:
+                            future.set_exception(exc)
                 if self._is_mock_mode:
                     frame = self._generate_mock_candling_frame()
                     time.sleep(1 / max(1, self.fps))
@@ -82,9 +168,13 @@ class CameraGrabber:
                     ret, frame = self.cap.read()
                     if not ret or frame is None:
                         raise RuntimeError("Camera frame acquisition failed; reconnect before restarting")
+                if self._discard_frames:
+                    self._discard_frames -= 1
+                    continue
                 with self._lock:
                     self._latest_frame = frame
                     self._last_frame_at = time.monotonic()
+                    self._sequence += 1
                 self._update_fps()
         except Exception as exc:
             self.last_error = str(exc)
@@ -96,6 +186,12 @@ class CameraGrabber:
             with self._lock:
                 self._latest_frame = None
                 self._last_frame_at = 0.0
+            while not self._requests.empty():
+                try:
+                    _, future = self._requests.get_nowait()
+                    future.set_exception(RuntimeError(self.last_error or "Camera stopped"))
+                except queue.Empty:
+                    break
 
     def _update_fps(self):
         self._fps_count += 1
@@ -197,9 +293,13 @@ class CameraGrabber:
             "contrast_ratio": contrast_ratio,
         }
 
+    def request_stop(self):
+        """Immediate UI-safe cancellation; the worker owns handle release."""
+        self._is_running = False
+
     def stop(self):
         """The capture worker owns its camera handle, including release."""
-        self._is_running = False
+        self.request_stop()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1.0)
         if self._thread and self._thread.is_alive():

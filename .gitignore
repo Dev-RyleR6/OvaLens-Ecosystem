@@ -71,6 +71,8 @@ backups/
 
 
 edge/db/prototype-test-temp/
+edge/db/edge_settings.json
+edge/db/*.tmp
 .flow_tests/
 
 # Locally installed AI tooling and Impeccable integration files

@@ -90,6 +90,7 @@ void command(char *line) {
 
 void setup() {
   Serial.begin(115200); gate.setPeriodHertz(50);
+  reply(0, "BOOT:SERVO_V2");
   gate.attach(SERVO_PIN, MIN_PULSE_US, MAX_PULSE_US);
   if (!gate.attached()) { faultCode = "SERVO_ATTACH"; reply(0, "ERROR:SERVO_ATTACH"); return; }
   // Boot may physically move the gate. Calibrate with linkage unloaded.
