@@ -42,7 +42,7 @@ export const Sheet: React.FC<SheetProps> = ({
         onClick={onClose}
       />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10 pointer-events-none z-50">
+      <div className={cn("fixed inset-y-0 max-w-full flex pointer-events-none z-50", side === 'left' ? 'left-0 pr-0 sm:pr-10' : 'right-0 pl-0 sm:pl-10')}>
         <div
           className={cn(
             "relative w-screen max-w-[100vw] sm:max-w-md md:max-w-lg border-l border-slate-200 bg-card shadow-2xl flex flex-col pointer-events-auto z-50 h-screen max-h-screen h-[100dvh] max-h-[100dvh] overflow-hidden",
@@ -52,7 +52,7 @@ export const Sheet: React.FC<SheetProps> = ({
         >
           {/* Sticky Drawer Header */}
           <div className="px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0 bg-card z-10">
-            <div className="pr-4">
+            <div className="pr-4 min-w-0 break-words">
               {title && (
                 <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
                   {title}

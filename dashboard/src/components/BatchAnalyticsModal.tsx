@@ -39,7 +39,7 @@ interface BatchAnalyticsModalProps {
   onClose: () => void;
 }
 
-const COLORS = ['#357a38', '#d97706', '#dc2626'];
+const COLORS = ['var(--success-ink)', 'var(--chart-reject)', 'var(--brand-ink)'];
 
 export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
   batchId,
@@ -73,8 +73,8 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
 
   const pieData = data
     ? [
-        { name: 'Fertile (Active)', value: data.fertile_day_10, color: '#357a38' },
-        { name: 'Infertile (Penoy)', value: data.infertile_penoy_day_10, color: '#d97706' },
+        { name: 'Fertile', value: data.fertile_day_10, color: 'var(--success-ink)' },
+        { name: 'Infertile', value: data.infertile_penoy_day_10, color: 'var(--chart-reject)' },
       ]
     : [];
 
@@ -107,7 +107,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                   {data?.batch_code || displayBatchId} Analytics
                 </h2>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#800000]/10 text-brand border border-[#800000]/20">
-                  {data?.breed || 'KAYUMANGGI'}
+                  {data?.breed || 'Breed unavailable'}
                 </span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
                   {data?.incubator_id}
@@ -137,7 +137,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
           ) : data ? (
             <>
               {/* Top KPI Cards Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-1">
                   <div className="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
                     <span>Day 10 Fertility</span>
@@ -183,7 +183,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                     <Award className="w-4 h-4 text-brand" />
                   </div>
                   <div className="text-2xl font-semibold text-slate-900 tracking-tight">
-                    {data.actual_hatchability_rate > 0 ? `${data.actual_hatchability_rate}%` : 'Pending'}
+                    {data.current_stage === 'HATCHED' || data.status === 'COMPLETED' ? `${data.actual_hatchability_rate}%` : 'Pending'}
                   </div>
                   <p className="text-[10px] text-slate-500">
                     {data.hatched_count} hatched / {data.initial_egg_count} set
@@ -232,7 +232,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                       <div className="text-[10px] text-slate-500 font-medium">Fertile</div>
                     </div>
                     <div>
-                      <div className="text-amber-700 font-bold">{data.infertile_penoy_day_10}</div>
+                      <div className="text-red-700 font-semibold">{data.infertile_penoy_day_10}</div>
                       <div className="text-[10px] text-slate-500 font-medium">Infertile (Penoy)</div>
                     </div>
                   </div>

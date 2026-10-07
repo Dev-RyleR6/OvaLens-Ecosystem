@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, RefreshCw } from 'lucide-react';
+import { ArrowRight, RefreshCw, ScanSearch, ChartNoAxesCombined } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { AnalyticsOverview, BatchSummary, EconomicYield } from '../types';
 import { Badge } from '../components/Badge';
@@ -60,18 +60,18 @@ export const OverviewPage: React.FC = () => {
 
   return (
     <div className="space-y-7 pb-8" aria-busy={loading}>
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+      <div className="page-header">
         <div><h1>Hatchery overview</h1><p className="text-slate-600 mt-1">Day 10 results and the current incubation schedule.</p><p className="text-xs text-slate-500 mt-2" role="status">{updated ? `Last refreshed ${updated.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}` : loading ? 'Loading hatchery records…' : 'No records loaded'}</p></div>
-        <div className="flex items-center gap-2 flex-wrap"><button onClick={() => { void refresh(); }} disabled={loading} className="border border-slate-300 rounded-lg px-3 py-2 flex items-center gap-2"><RefreshCw className="w-4 h-4" />{loading ? 'Refreshing…' : 'Refresh'}</button><Link to="/batches" className="primary-action">Manage batches <ArrowRight className="w-4 h-4" /></Link></div>
+        <div className="page-actions"><button onClick={() => { void refresh(); }} disabled={loading} className="secondary-action"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />{loading ? 'Refreshing…' : 'Refresh'}</button><Link to="/batches" className="primary-action">Manage batches <ArrowRight className="w-4 h-4" aria-hidden="true" /></Link></div>
       </div>
       {error && (overview ? <div role="alert" className="border border-amber-300 bg-amber-50 text-amber-900 p-4 rounded-xl">Refresh failed. These are previously loaded records. Use Refresh to try again.</div> : <DataUnavailableState title="Hatchery records unavailable" description="We could not load the hatchery records. Check your connection and try again." onRetry={refresh} isRetrying={loading} />)}
-      <div className="flex flex-wrap items-center gap-3"><label htmlFor="overview-batch" className="font-medium">Show results for</label><select id="overview-batch" className="border border-slate-300 rounded-lg px-3 py-2 max-w-full bg-card" value={selectedBatchId} onChange={event => setSelectedBatchId(event.target.value)}><option value="ALL">All batches</option>{batches.map(batch => <option key={batch.batch_id} value={batch.batch_id}>{batch.batch_code}</option>)}</select><Link to="/scans?review=1" className="text-brand underline underline-offset-4">Inspect low-confidence scans</Link></div>
+      <div className="filter-panel flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-5"><div className="min-w-0 sm:flex-1 sm:max-w-sm"><label htmlFor="overview-batch" className="block font-medium mb-1.5">Show results for</label><select id="overview-batch" className="border border-input rounded-lg px-3 py-2.5 w-full bg-card" value={selectedBatchId} onChange={event => setSelectedBatchId(event.target.value)}><option value="ALL">All batches</option>{batches.map(batch => <option key={batch.batch_id} value={batch.batch_id}>{batch.batch_code}</option>)}</select></div><Link to="/scans?review=1" className="action-link"><ScanSearch aria-hidden="true" />Inspect low-confidence scans</Link></div>
       <dl className="summary-strip grid grid-cols-2 lg:grid-cols-4 border-y border-slate-300 bg-card">{metrics.map(metric => <div key={metric.label} className="px-4 py-5 sm:px-6"><dt className="text-slate-600">{metric.label}</dt><dd className="text-3xl font-semibold tabular-nums mt-2 text-foreground">{metric.value}</dd><dd className="text-xs text-slate-500 mt-2">{metric.detail}</dd></div>)}</dl>
-      <div className="section-header"><h2 className="section-heading">Operational analytics</h2><Link to="/analytics" className="text-link">Open analytics</Link></div>
+      <div className="section-header"><h2 className="section-heading">Operational analytics</h2><Link to="/analytics" className="action-link"><ChartNoAxesCombined aria-hidden="true" />Open analytics</Link></div>
       <OperationalCharts batches={displayBatches} loading={loading} />
       <section className="space-y-3" aria-labelledby="schedule-heading">
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 id="schedule-heading" className="text-lg font-semibold">Incubation schedule</h2><span className="text-sm text-slate-600">{displayBatches.length} {displayBatches.length === 1 ? 'batch' : 'batches'}</span></div>
-        <div className="overflow-x-auto border border-slate-200 rounded-xl bg-card"><table className="w-full text-left min-w-[820px]">
+        <div className="table-scroll bordered-table" tabIndex={0} role="region" aria-label="Incubation schedule. Scroll horizontally for all columns."><table className="min-w-[820px]">
           <caption className="sr-only">Batch stage, scanned eggs, fertility, and expected hatch date</caption>
           <thead className="bg-slate-50 text-slate-600"><tr><th>Batch</th><th>Breed</th><th>Stage</th><th className="text-right">Scans / eggs set</th><th className="text-right">Fertility</th><th>Expected hatch</th></tr></thead>
           <tbody className="divide-y divide-slate-200">{displayBatches.map(batch => <tr key={batch.batch_id}>

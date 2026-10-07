@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Capstone Manuscript Chapters 1, 2, 3, and References in `docs/manuscript/` with authentic proposal text and 15 APA 7th academic citations.
 
 ### Changed
+- **Dashboard**: [TASK-NEW-DASH-DESIGN-01] replace Plus Jakarta Sans with self-hosted IBM Plex Sans; unify controls, status badges, navigation and purposeful icons; adapt cards, tables and forms to available width; improve keyboard interactions, authenticated backup downloads and truthful candling records; preserve local batch-date instants and distinguish pending review from low confidence (2026-10-07).
 - **Agents**: [TASK-NEW-AGENTS-IGNORE-01] ignore local AI tooling and unused logo copy (2026-10-07)
 - **Dashboard**: improve ui/ux responsiveness and eliminate ai slop (2026-10-06)
 - **Dashboard**: streamline web app into defense-ready 5-page portal; consolidate historical records into Batches and Analytics, prune mock MLOps ModelsPage and redundant AuditLogsPage, remove synthetic 42-slot tray matrix in favor of linear conveyor velocity telemetry, eliminate audio beeps, and convert financial simulator into data-driven Day 10 economic recovery model (2026-10-06).

@@ -254,7 +254,12 @@ export const apiClient = {
     return res.data;
   },
 
-  downloadBackupUrl: (filename: string) => `/api/v1/settings/backups/${filename}/download`,
+  downloadBackup: async (filename: string): Promise<Blob> => {
+    const res = await api.get<Blob>(`/settings/backups/${encodeURIComponent(filename)}/download`, { responseType: 'blob' });
+    return res.data;
+  },
+
+  downloadBackupUrl: (filename: string) => `/api/v1/settings/backups/${encodeURIComponent(filename)}/download`,
 
   // Reports
   downloadCSVUrl: (batchId: string) => `/api/v1/reports/batch/${batchId}/csv`,

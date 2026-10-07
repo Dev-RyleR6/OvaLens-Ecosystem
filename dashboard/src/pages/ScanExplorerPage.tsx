@@ -5,16 +5,12 @@ import {
   Search,
   ChevronRight,
   ChevronLeft,
-  ScanLine,
   CheckCircle2,
-  AlertTriangle,
   Edit3,
   List,
   LayoutGrid,
   ArrowUpDown,
-  Zap,
   RefreshCw,
-  Layers,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { EggScan, FertilityClass, BatchSummary, ScanSearchParams } from '../types';
@@ -28,6 +24,10 @@ import { EmptyState } from '../components/ui/EmptyState';
 type ViewMode = 'TABLE' | 'GRID';
 type SortField = 'sequence_number' | 'confidence' | 'inference_ms' | 'scanned_at';
 type SortOrder = 'asc' | 'desc';
+
+const scanLabel = (scan: EggScan) => Number.isFinite(scan.sequence_number)
+  ? `Scan #${scan.sequence_number}`
+  : `Scan ${scan.scan_id}`;
 
 export const ScanExplorerPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -131,7 +131,7 @@ export const ScanExplorerPage: React.FC = () => {
       const updated = await apiClient.overrideScanClassification(selectedScan.scan_id, targetClass, reason);
       setSelectedScan({ ...updated });
       fetchScans();
-      setOverrideToast(`Scan #${selectedScan.sequence_number ?? 0} reclassified to ${targetClass}. Logged in Audit Trail.`);
+      setOverrideToast(`${scanLabel(selectedScan)} reclassified to ${targetClass}. Logged in Audit Trail.`);
       setTimeout(() => setOverrideToast(null), 4000);
     } catch (err) {
       console.error('Error overriding scan:', err);
@@ -154,26 +154,26 @@ export const ScanExplorerPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-8" aria-busy={isLoading}>
+    <div className="min-w-0 space-y-6 pb-8" aria-busy={isLoading}>
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-foreground tracking-tight">
+          <h1>
             Candling Scan Explorer
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="page-description">
             Find Day 10 egg scans, inspect confidence, and record classification corrections.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => { void fetchScans(); }} disabled={isLoading} className="inline-flex items-center gap-2 border border-slate-300 rounded-lg px-3 py-2">
-            <RefreshCw className="w-4 h-4" /> {isLoading ? 'Refreshing…' : 'Refresh'}
+        <div className="page-actions">
+          <button onClick={() => { void fetchScans(); }} disabled={isLoading} className="secondary-action">
+            <RefreshCw aria-hidden="true" className="w-4 h-4" /> {isLoading ? 'Refreshing…' : 'Refresh'}
           </button>
           {/* Live Auto-Refresh Button */}
           <button
             onClick={() => setIsLiveAutoRefresh(prev => !prev)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+            className={`secondary-action ${
               isLiveAutoRefresh
                 ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
                 : 'bg-card border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -182,28 +182,28 @@ export const ScanExplorerPage: React.FC = () => {
             disabled={pollingInterval === 0}
             aria-label="Refresh using the interval selected in Settings" title="Refresh using the interval selected in Settings"
           >
-            <span className={`w-2 h-2 rounded-full ${isLiveAutoRefresh ? 'bg-emerald-600 animate-pulse' : 'bg-slate-400'}`} />
+            <RefreshCw aria-hidden="true" className="w-4 h-4" />
             <span>{pollingInterval === 0 ? 'Manual refresh' : isLiveAutoRefresh ? `Auto-refresh: ${pollingInterval}s` : 'Auto-refresh: off'}</span>
           </button>
 
-          <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+          <span className="text-sm text-slate-600 tabular-nums">
             {totalScans.toLocaleString()} scans
           </span>
         </div>
       </div>
 
       {overrideToast && (
-        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs font-semibold text-amber-900 flex items-center gap-2.5  ">
-          <AlertTriangle className="w-4 h-4 text-amber-700 flex-shrink-0 animate-pulse" />
+        <div role="status" className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 flex items-center gap-2.5">
+          <CheckCircle2 aria-hidden="true" className="w-4 h-4 shrink-0" />
           <span>{overrideToast}</span>
         </div>
       )}
 
       {/* Enterprise Filter Toolbar */}
-      <div className="bg-card border border-border rounded-xl p-4  space-y-3 ">
+      <div className="filter-panel space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
           <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search aria-hidden="true" className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               aria-label="Search scan number, batch, or scan ID"
@@ -213,29 +213,29 @@ export const ScanExplorerPage: React.FC = () => {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full h-9 pl-9 pr-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  transition-all"
+              className="w-full min-w-0 h-11 pl-9 pr-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  transition-all"
             />
           </div>
 
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 self-end sm:self-auto">
             <button
               onClick={() => setViewMode('TABLE')}
-              className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-all btn-press ${
+              className={`secondary-action ${
                 viewMode === 'TABLE' ? 'bg-card text-brand ' : 'text-slate-600 hover:text-slate-900'
               }`}
-              aria-label="Table View" title="Table View"
+              aria-pressed={viewMode === 'TABLE'} aria-label="Table View" title="Table View"
             >
-              <List className="w-3.5 h-3.5" />
+              <List aria-hidden="true" className="w-3.5 h-3.5" />
               <span>Table</span>
             </button>
             <button
               onClick={() => setViewMode('GRID')}
-              className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-all btn-press ${
+              className={`secondary-action ${
                 viewMode === 'GRID' ? 'bg-card text-brand ' : 'text-slate-600 hover:text-slate-900'
               }`}
-              aria-label="Aperture Grid Cards View" title="Aperture Grid Cards View"
+              aria-pressed={viewMode === 'GRID'} aria-label="Aperture Grid Cards View" title="Aperture Grid Cards View"
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <LayoutGrid aria-hidden="true" className="w-3.5 h-3.5" />
               <span>Grid</span>
             </button>
           </div>
@@ -249,7 +249,7 @@ export const ScanExplorerPage: React.FC = () => {
               setClassFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000]  cursor-pointer hover:border-slate-300 transition-colors"
+            className="min-w-0 w-full h-11 px-3 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000]  cursor-pointer hover:border-slate-300 transition-colors"
           >
             <option value="ALL">All Classes</option>
             <option value="FERTILE">Fertile (Accept)</option>
@@ -263,7 +263,7 @@ export const ScanExplorerPage: React.FC = () => {
               setBatchFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000]  cursor-pointer hover:border-slate-300 transition-colors"
+            className="min-w-0 w-full h-11 px-3 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000]  cursor-pointer hover:border-slate-300 transition-colors"
           >
             <option value="ALL">All Batches</option>
             {batches.map((batch) => (
@@ -280,7 +280,7 @@ export const ScanExplorerPage: React.FC = () => {
               setConfidenceFilter(e.target.value as NonNullable<ScanSearchParams['confidence']>);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000]  cursor-pointer hover:border-slate-300 transition-colors"
+            className="min-w-0 w-full h-11 px-3 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000]  cursor-pointer hover:border-slate-300 transition-colors"
           >
             <option value="ALL">All Confidence Levels</option>
             <option value="HIGH">High Confidence (≥ 90%)</option>
@@ -310,62 +310,38 @@ export const ScanExplorerPage: React.FC = () => {
         />
       ) : viewMode === 'TABLE' ? (
         <div className="bg-card border border-border rounded-xl  overflow-hidden  ">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs min-w-[680px]">
+          <div className="table-scroll" tabIndex={0} role="region" aria-label="Candling scans, scroll horizontally on smaller screens">
+            <table className="w-full text-left text-xs min-w-[1080px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                  <th
-                    className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                    tabIndex={0}
-                    aria-sort={sortField === 'sequence_number' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort('sequence_number'); } }}
-                    onClick={() => toggleSort('sequence_number')}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span># Seq</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
+                  <th scope="col" className="py-3 px-4" aria-sort={sortField === 'sequence_number' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button className="action-link" onClick={() => toggleSort('sequence_number')}
+                      aria-label={`Sort sequence ${sortField === 'sequence_number' && sortOrder === 'desc' ? 'ascending' : 'descending'}`}>
+                      <span># Seq</span><ArrowUpDown aria-hidden="true" className="w-4 h-4" />
+                    </button>
                   </th>
-                  <th className="py-3 px-4">Batch ID</th>
-                  <th className="py-3 px-4">Classification</th>
-                  <th
-                    className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                    tabIndex={0}
-                    aria-sort={sortField === 'confidence' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort('confidence'); } }}
-                    onClick={() => toggleSort('confidence')}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Confidence</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
+                  <th scope="col" className="py-3 px-4">Batch ID</th>
+                  <th scope="col" className="py-3 px-4">Classification</th>
+                  <th scope="col" className="py-3 px-4" aria-sort={sortField === 'confidence' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button className="action-link" onClick={() => toggleSort('confidence')}
+                      aria-label={`Sort confidence ${sortField === 'confidence' && sortOrder === 'desc' ? 'ascending' : 'descending'}`}>
+                      <span>Confidence</span><ArrowUpDown aria-hidden="true" className="w-4 h-4" />
+                    </button>
                   </th>
-                  <th
-                    className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                    tabIndex={0}
-                    aria-sort={sortField === 'inference_ms' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort('inference_ms'); } }}
-                    onClick={() => toggleSort('inference_ms')}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Inference</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
+                  <th scope="col" className="py-3 px-4" aria-sort={sortField === 'inference_ms' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button className="action-link" onClick={() => toggleSort('inference_ms')}
+                      aria-label={`Sort inference ${sortField === 'inference_ms' && sortOrder === 'desc' ? 'ascending' : 'descending'}`}>
+                      <span>Inference</span><ArrowUpDown aria-hidden="true" className="w-4 h-4" />
+                    </button>
                   </th>
-                  <th className="py-3 px-4">Routing</th>
-                  <th
-                    className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                    tabIndex={0}
-                    aria-sort={sortField === 'scanned_at' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort('scanned_at'); } }}
-                    onClick={() => toggleSort('scanned_at')}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Timestamp</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
+                  <th scope="col" className="py-3 px-4">Routing</th>
+                  <th scope="col" className="py-3 px-4" aria-sort={sortField === 'scanned_at' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button className="action-link" onClick={() => toggleSort('scanned_at')}
+                      aria-label={`Sort timestamp ${sortField === 'scanned_at' && sortOrder === 'desc' ? 'ascending' : 'descending'}`}>
+                      <span>Timestamp</span><ArrowUpDown aria-hidden="true" className="w-4 h-4" />
+                    </button>
                   </th>
-                  <th className="py-3 px-4 text-right">Inspect</th>
+                  <th scope="col" className="py-3 px-4 text-right">Inspect</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -379,34 +355,33 @@ export const ScanExplorerPage: React.FC = () => {
                   paginatedScans.map((scan) => (
                     <tr
                       key={scan.scan_id}
-                      className="table-row-hover cursor-pointer group" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
+                      className="table-row-hover cursor-pointer group"
                       onClick={() => {
                         setSelectedScan(scan);
                         setIsSheetOpen(true);
                       }}
                     >
                       <td className="py-3 px-4 font-mono font-bold text-slate-700 group-hover:text-brand transition-colors">
-                        #{((scan.sequence_number ?? 0)).toString().padStart(3, '0')}
+                        {Number.isFinite(scan.sequence_number) ? `#${scan.sequence_number!.toString().padStart(3, '0')}` : '—'}
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-900">{scan.batch_id || 'N/A'}</td>
                       <td className="py-3 px-4">
-                        <Badge type="fertility" value={scan.final_class} />
-                        {scan.confidence < 0.75 && <span className="block text-amber-800 mt-1">Needs inspection</span>}
-                        {scan.is_overridden && <span className="block text-purple-700 text-xs font-semibold mt-0.5">Overridden</span>}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge type="fertility" value={scan.final_class} />
+                          {scan.routing_action === 'MANUAL_REVIEW' && <Badge value="MANUAL_REVIEW" size="sm" />}
+                          {Number.isFinite(scan.confidence) && scan.confidence < 0.75 && <span className="status-badge status-neutral">Low confidence</span>}
+                          {scan.is_overridden && <Badge value="OVERRIDDEN" size="sm" />}
+                        </div>
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-900">
-                        {((scan.confidence ?? 0) * 100).toFixed(1)}%
+                        {Number.isFinite(scan.confidence) ? `${(scan.confidence * 100).toFixed(1)}%` : '—'}
                       </td>
                       <td className="py-3 px-4 text-slate-700 font-mono">
-                        {(scan.inference_ms ?? 0).toFixed(1)} ms
+                        {Number.isFinite(scan.inference_ms) ? `${scan.inference_ms.toFixed(1)} ms` : '—'}
                       </td>
                       <td className="py-3 px-4">
-                        <span
-                          className={`font-bold ${
-                            scan.routing_action === 'MANUAL_REVIEW' ? 'text-amber-800' : scan.routing_action === 'ACCEPT' ? 'text-emerald-800' : 'text-rose-800'
-                          }`}
-                        >
-                          {scan.routing_action === 'MANUAL_REVIEW' ? 'REVIEW' : (scan.routing_action || (scan.final_class === 'FERTILE' ? 'ACCEPT' : 'REJECT'))}
+                        <span className={`status-badge ${scan.routing_action === 'MANUAL_REVIEW' ? 'status-warning' : scan.routing_action === 'ACCEPT' ? 'status-success' : scan.routing_action === 'REJECT' ? 'status-danger' : 'status-neutral'}`}>
+                          {scan.routing_action === 'MANUAL_REVIEW' ? 'REVIEW' : scan.routing_action || 'Unavailable'}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-slate-500 font-medium">
@@ -421,15 +396,15 @@ export const ScanExplorerPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-right">
                         <button
-                          aria-label={`Inspect scan ${scan.sequence_number}`}
+                          aria-label={`Inspect ${scanLabel(scan)}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedScan(scan);
                             setIsSheetOpen(true);
                           }}
-                          className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
+                          className="secondary-action"
                         >
-                          <ChevronRight className="w-4 h-4" />
+                          <ChevronRight aria-hidden="true" className="w-4 h-4" />
                         </button>
                       </td>
                     </tr>
@@ -441,7 +416,7 @@ export const ScanExplorerPage: React.FC = () => {
         </div>
       ) : (
         /* Grid / Aperture Cards View */
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="scan-grid">
           {paginatedScans.length === 0 ? (
             <div className="col-span-full py-12 text-center text-slate-400 bg-card rounded-xl border border-slate-200">
               No matching candling scans found.
@@ -452,36 +427,40 @@ export const ScanExplorerPage: React.FC = () => {
                 key={scan.scan_id}
                 role="button"
                 tabIndex={0}
-                aria-label={`Inspect scan ${scan.sequence_number}`}
-                onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.currentTarget.click(); } }}
+                aria-label={`Inspect ${scanLabel(scan)}`}
+                onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); event.currentTarget.click(); } }}
                 onClick={() => {
                   setSelectedScan(scan);
                   setIsSheetOpen(true);
                 }}
-                className="bg-card border border-border rounded-xl p-4  hover:border-[#800000]  transition-all cursor-pointer space-y-3 flex flex-col justify-between"
+                className="min-w-0 bg-card border border-border rounded-xl p-4 hover:border-[#800000] transition-colors cursor-pointer space-y-3 flex flex-col justify-between"
               >
                 <div>
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
                     <span className="font-mono font-bold text-xs text-slate-700">
-                      #{((scan.sequence_number ?? 0)).toString().padStart(3, '0')}
+                      {Number.isFinite(scan.sequence_number) ? `#${scan.sequence_number!.toString().padStart(3, '0')}` : '—'}
                     </span>
-                    <Badge type="fertility" value={scan.final_class} />
-                        {scan.confidence < 0.75 && <span className="block text-amber-800 mt-1">Needs inspection</span>}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge type="fertility" value={scan.final_class} />
+                      {scan.routing_action === 'MANUAL_REVIEW' && <Badge value="MANUAL_REVIEW" size="sm" />}
+                      {Number.isFinite(scan.confidence) && scan.confidence < 0.75 && <span className="status-badge status-neutral">Low confidence</span>}
+                      {scan.is_overridden && <Badge value="OVERRIDDEN" size="sm" />}
+                    </div>
                   </div>
 
                   <div className="mt-2">
                     <CandlingAperture
                       imageUrl={scan.thumbnail_url || scan.image_url}
                       finalClass={scan.final_class}
-                      confidence={scan.confidence ?? 0}
-                      inferenceMs={scan.inference_ms ?? 0}
+                      confidence={Number.isFinite(scan.confidence) ? scan.confidence : undefined}
+                      inferenceMs={Number.isFinite(scan.inference_ms) ? scan.inference_ms : undefined}
                     />
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-mono">{scan.batch_id || 'N/A'}</span>
-                  <span className="font-bold text-slate-700">{((scan.confidence ?? 0) * 100).toFixed(0)}% Conf</span>
+                <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                  <span className="min-w-0 break-all">{scan.batch_id || 'N/A'}</span>
+                  <span className="font-bold text-slate-700">Confidence: {Number.isFinite(scan.confidence) ? `${(scan.confidence * 100).toFixed(0)}%` : '—'}</span>
                 </div>
               </div>
             ))
@@ -516,9 +495,9 @@ export const ScanExplorerPage: React.FC = () => {
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             aria-label="Previous page"
             disabled={isLoading || currentPage === 1}
-            className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+            className="secondary-action"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft aria-hidden="true" className="w-4 h-4" />
           </button>
           <span className="px-2 font-bold text-slate-800">
             Page {currentPage} of {totalPages}
@@ -527,9 +506,9 @@ export const ScanExplorerPage: React.FC = () => {
             onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
             aria-label="Next page"
             disabled={isLoading || currentPage === totalPages}
-            className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+            className="secondary-action"
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight aria-hidden="true" className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -538,44 +517,46 @@ export const ScanExplorerPage: React.FC = () => {
       <Sheet
         isOpen={isSheetOpen}
         onClose={() => setIsSheetOpen(false)}
-        title={selectedScan ? `Candling Scan #${selectedScan.sequence_number ?? 0}` : ''}
+        title={selectedScan ? `Candling ${scanLabel(selectedScan)}` : ''}
         description={selectedScan ? `Batch: ${selectedScan.batch_id || 'N/A'} • UUID: ${selectedScan.scan_id}` : ''}
       >
         {selectedScan && (
-          <div className="space-y-4 text-xs">
+          <div className="min-w-0 space-y-4 text-sm break-words">
             {/* Visual Candling Aperture */}
             <CandlingAperture
               imageUrl={selectedScan.image_url || selectedScan.thumbnail_url}
               finalClass={selectedScan.final_class}
-              confidence={selectedScan.confidence ?? 0}
-              inferenceMs={selectedScan.inference_ms ?? 0}
-              sequenceNumber={selectedScan.sequence_number ?? 0}
+              confidence={Number.isFinite(selectedScan.confidence) ? selectedScan.confidence : undefined}
+              inferenceMs={Number.isFinite(selectedScan.inference_ms) ? selectedScan.inference_ms : undefined}
+              sequenceNumber={selectedScan.sequence_number}
               batchId={selectedScan.batch_id}
-              aspectRatio={selectedScan.aspect_ratio ?? 0.78}
+              aspectRatio={selectedScan.aspect_ratio}
             />
 
             {/* Decision card */}
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-bold text-slate-800">Conveyor Routing Action:</span>
                 <span
                   className={`font-bold ${
-                    selectedScan.routing_action === 'MANUAL_REVIEW' ? 'text-amber-800' : (selectedScan.routing_action === 'ACCEPT' || selectedScan.final_class === 'FERTILE') ? 'text-emerald-800' : 'text-rose-800'
+                    selectedScan.routing_action === 'MANUAL_REVIEW' ? 'text-amber-800' : selectedScan.routing_action === 'ACCEPT' ? 'text-emerald-800' : selectedScan.routing_action === 'REJECT' ? 'text-rose-800' : 'text-slate-600'
                   }`}
                 >
-                  {selectedScan.routing_action === 'MANUAL_REVIEW' ? 'MANUAL REVIEW (Operator Inspection)' : (selectedScan.routing_action === 'ACCEPT' || selectedScan.final_class === 'FERTILE') ? 'ACCEPT (Incubation Tray)' : 'REJECT (Diverter Eject)'}
+                  {selectedScan.routing_action === 'MANUAL_REVIEW' ? 'MANUAL REVIEW (Operator Inspection)' : selectedScan.routing_action === 'ACCEPT' ? 'ACCEPT (Incubation Tray)' : selectedScan.routing_action === 'REJECT' ? 'REJECT (Diverter Eject)' : 'Routing unavailable'}
                 </span>
               </div>
               <p className="text-slate-600 text-[11px]">
                 {selectedScan.routing_action === 'MANUAL_REVIEW'
-                  ? 'Flagged for operator review (confidence below 75% or centering boundary).'
-                  : selectedScan.final_class === 'FERTILE'
-                  ? 'Viable Day 10 embryo verified. Retained for incubation.'
-                  : 'Non-fertile Day 10 result. Diverted to Penoy food salvage tray @ ₱14.00.'}
+                  ? 'The saved routing action requests operator inspection.'
+                  : selectedScan.routing_action === 'ACCEPT'
+                  ? 'The saved routing action requests retention for incubation.'
+                  : selectedScan.routing_action === 'REJECT'
+                  ? 'The saved routing action requests diversion to the Penoy salvage tray.'
+                  : 'No conveyor routing action was recorded for this scan.'}
               </p>
               {selectedScan.is_overridden && (
                 <div className="mt-2 pt-2 border-t border-slate-200 text-[11px] text-purple-900 font-medium">
-                  <span className="font-bold">Human Override:</span> {selectedScan.override_reason || 'Verified by operator'}
+                  <span className="font-bold">Human Override:</span> {selectedScan.override_reason || 'Override reason unavailable'}
                 </div>
               )}
             </div>
@@ -583,7 +564,7 @@ export const ScanExplorerPage: React.FC = () => {
             {/* Human-in-the-Loop Override Section */}
             <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-lg space-y-2.5">
               <div className="flex items-center gap-1.5 font-bold text-amber-950">
-                <Edit3 className="w-4 h-4 text-amber-800" />
+                <Edit3 aria-hidden="true" className="w-4 h-4 text-amber-800" />
                 <span>Human-in-the-Loop Override:</span>
               </div>
 
@@ -595,7 +576,7 @@ export const ScanExplorerPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handlePromptOverride('FERTILE')}
-                  className={`px-2.5 py-1 text-xs font-bold rounded border transition-colors cursor-pointer ${
+                  className={`secondary-action ${
                     selectedScan.final_class === 'FERTILE'
                       ? 'bg-emerald-700 text-white border-emerald-800'
                       : 'bg-card text-emerald-800 border-emerald-300 hover:bg-emerald-50'
@@ -607,7 +588,7 @@ export const ScanExplorerPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handlePromptOverride('INFERTILE')}
-                  className={`px-2.5 py-1 text-xs font-bold rounded border transition-colors cursor-pointer ${
+                  className={`secondary-action ${
                     selectedScan.final_class === 'INFERTILE'
                       ? 'bg-amber-700 text-white border-amber-800'
                       : 'bg-card text-amber-900 border-amber-300 hover:bg-amber-50'
@@ -622,22 +603,13 @@ export const ScanExplorerPage: React.FC = () => {
             {/* Raw Detections Metadata */}
             <div className="space-y-1.5">
               <span className="font-bold text-slate-800 block">YOLOv8 Detection Telemetry</span>
-              <pre className="p-3 rounded-lg bg-slate-900 text-emerald-400 font-mono text-[11px] overflow-x-auto max-h-32">
-                {JSON.stringify(
-                  Array.isArray(selectedScan.detections) && selectedScan.detections.length > 0
-                    ? selectedScan.detections
-                    : [
-                        {
-                          bbox: [0.24, 0.18, 0.76, 0.88],
-                          class_name: selectedScan.final_class || 'FERTILE',
-                          confidence: selectedScan.confidence ?? 0.95,
-                          aspect_ratio: 0.78,
-                        }
-                      ],
-                  null,
-                  2
-                )}
-              </pre>
+              {Array.isArray(selectedScan.detections) && selectedScan.detections.length > 0 ? (
+                <pre className="p-3 rounded-lg bg-slate-900 text-emerald-400 font-mono text-[11px] overflow-x-auto max-h-32">
+                  {JSON.stringify(selectedScan.detections, null, 2)}
+                </pre>
+              ) : (
+                <p className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-600">Detection telemetry unavailable. No raw detections were recorded for this scan.</p>
+              )}
             </div>
           </div>
         )}

@@ -11,12 +11,10 @@ import {
   Clock,
   User,
   Zap,
-  Award,
+  FileText,
   List,
   LayoutGrid,
   ArrowUpDown,
-  CheckSquare,
-  Square,
   ChevronDown,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
@@ -30,7 +28,7 @@ import { BatchAnalyticsModal } from '../components/BatchAnalyticsModal';
 import { FinalizeHatchModal } from '../components/FinalizeHatchModal';
 import { DataUnavailableState } from '../components/ui/DataUnavailableState';
 import { EmptyState } from '../components/ui/EmptyState';
-import { Activity, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Activity, Trash2, CheckCircle2, RefreshCw } from 'lucide-react';
 
 type ViewMode = 'TABLE' | 'GRID';
 type SortField = 'batch_code' | 'set_date' | 'initial_egg_count' | 'fertility_rate';
@@ -79,6 +77,10 @@ export const BatchesPage: React.FC = () => {
   const [breed, setBreed] = useState<DuckBreed>('KAYUMANGGI');
   const [incubatorId, setIncubatorId] = useState('INCUBATOR-A1');
   const [initialCount, setInitialCount] = useState(500);
+  const [setDate, setSetDate] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  });
   const [notes, setNotes] = useState('');
 
   const fetchBatches = async () => {
@@ -119,7 +121,7 @@ export const BatchesPage: React.FC = () => {
     if (isCreating) return;
     setIsCreating(true); setActionError(null);
     try {
-      await apiClient.createBatch({ batch_code: batchCode, breed, incubator_id: incubatorId, initial_egg_count: Number(initialCount), notes });
+      await apiClient.createBatch({ batch_code: batchCode, breed, incubator_id: incubatorId, initial_egg_count: Number(initialCount), set_date: new Date(`${setDate}T00:00:00`).toISOString(), notes });
       setIsCreateOpen(false); setBatchCode(''); setNotes('');
       void fetchBatches();
     } catch { setActionError('The batch could not be created. Check that its code is unique and try again. Your entries are retained.'); }
@@ -250,68 +252,72 @@ export const BatchesPage: React.FC = () => {
     }
   };
 
+  const allPageSelected = paginatedBatches.length > 0 && paginatedBatches.every(batch => selectedBatchIds.includes(batch.batch_id));
+  const somePageSelected = paginatedBatches.some(batch => selectedBatchIds.includes(batch.batch_id));
   const toggleSelectAll = () => {
-    if (selectedBatchIds.length === paginatedBatches.length) {
-      setSelectedBatchIds([]);
-    } else {
-      setSelectedBatchIds(paginatedBatches.map((b) => b.batch_id));
-    }
+    const pageIds = paginatedBatches.map(batch => batch.batch_id);
+    setSelectedBatchIds(previous => allPageSelected
+      ? previous.filter(id => !pageIds.includes(id))
+      : [...new Set([...previous, ...pageIds])]);
   };
 
-  const toggleSelectBatch = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const toggleSelectBatch = (id: string) => {
     setSelectedBatchIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
 
+  useEffect(() => {
+    setCurrentPage(page => Math.min(page, totalPages));
+  }, [totalPages]);
+
   return (
-    <div className="space-y-6 pb-8">
+    <div className="min-w-0 space-y-6 pb-8" aria-busy={isLoading}>
       {actionError && !isCreateOpen && <p role="alert" className="p-4 bg-red-50 text-red-800 border border-red-300 rounded-xl">{actionError}</p>}
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+      <div className="page-header">
         <div>
-          <h1 className="text-xl font-bold text-foreground tracking-tight">
+          <h1>
             Incubation Batches & Candling Sessions
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Track 28-day duck egg incubation batches, automated stage milestones, operator candling throughput, and official quality certificates.
+          <p className="page-description">
+            Track incubation batches, Day 10 candling results, hatch outcomes, and printable records.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="page-actions">
           <button
             onClick={handleCheckMilestones}
             disabled={isCheckingMilestones}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-card border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold  transition-colors cursor-pointer disabled:opacity-50"
-            aria-label="Evaluate elapsed incubation days and flag due candling/transfer milestones" title="Evaluate elapsed incubation days and flag due candling/transfer milestones"
+            className="secondary-action"
+            title="Evaluate elapsed incubation days and flag due candling/transfer milestones"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isCheckingMilestones ? 'animate-spin text-brand' : 'text-slate-500'}`} />
-            <span>Check Milestones</span>
+            <RefreshCw aria-hidden="true" className={`w-4 h-4 ${isCheckingMilestones ? 'animate-spin' : ''}`} />
+            <span>{isCheckingMilestones ? 'Checking…' : 'Check Milestones'}</span>
           </button>
 
           <button
             onClick={() => { setActionError(null); setIsCreateOpen(true); }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-semibold  transition-colors cursor-pointer"
+            className="primary-action"
           >
-            <Plus className="w-4 h-4" />
+            <Plus aria-hidden="true" className="w-4 h-4" />
             <span>Add New Batch</span>
           </button>
         </div>
       </div>
 
       {milestoneMsg && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-800 flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+        <div role="status" className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800 flex items-center gap-2">
+          <CheckCircle2 aria-hidden="true" className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{milestoneMsg}</span>
         </div>
       )}
 
       {/* Enterprise Filter Toolbar */}
-      <div className="bg-card border border-border rounded-xl p-4  space-y-3">
+      <div className="filter-panel space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
           <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search aria-hidden="true" className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               aria-label="Search batches"
@@ -321,7 +327,7 @@ export const BatchesPage: React.FC = () => {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full h-9 pl-9 pr-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#800000] "
+              className="w-full min-w-0 h-11 pl-9 pr-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#800000] "
             />
           </div>
 
@@ -329,22 +335,22 @@ export const BatchesPage: React.FC = () => {
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
               <button
                 onClick={() => setViewMode('TABLE')}
-                className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+                className={`secondary-action ${
                   viewMode === 'TABLE' ? 'bg-card text-brand ' : 'text-slate-500 hover:text-slate-800'
                 }`}
-                aria-label="Table View" title="Table View"
+                aria-pressed={viewMode === 'TABLE'} aria-label="Table View" title="Table View"
               >
-                <List className="w-3.5 h-3.5" />
+                <List aria-hidden="true" className="w-3.5 h-3.5" />
                 <span>Table</span>
               </button>
               <button
                 onClick={() => setViewMode('GRID')}
-                className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+                className={`secondary-action ${
                   viewMode === 'GRID' ? 'bg-card text-brand ' : 'text-slate-500 hover:text-slate-800'
                 }`}
-                aria-label="Grid Cards View" title="Grid Cards View"
+                aria-pressed={viewMode === 'GRID'} aria-label="Grid Cards View" title="Grid Cards View"
               >
-                <LayoutGrid className="w-3.5 h-3.5" />
+                <LayoutGrid aria-hidden="true" className="w-3.5 h-3.5" />
                 <span>Grid</span>
               </button>
             </div>
@@ -359,14 +365,14 @@ export const BatchesPage: React.FC = () => {
                 setBreedFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full h-9 pl-3 pr-8 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none"
+              className="w-full min-w-0 h-11 pl-3 pr-8 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none"
             >
               <option value="ALL">All Duck Breeds</option>
               <option value="KAYUMANGGI">Kayumanggi</option>
               <option value="ITIM">Itim (Native)</option>
               <option value="KHAKI">Khaki Campbell</option>
             </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown aria-hidden="true" className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
           <div className="relative">
@@ -376,14 +382,14 @@ export const BatchesPage: React.FC = () => {
                 setStageFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full h-9 pl-3 pr-8 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none"
+              className="w-full min-w-0 h-11 pl-3 pr-8 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none"
             >
               <option value="ALL">All Incubation Stages</option>
               <option value="SETTING">Setting (Day 0-9)</option>
               <option value="DAY_10">Day 10 (Candling)</option>
               <option value="COMPLETED">Completed</option>
             </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown aria-hidden="true" className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
           <div className="relative">
@@ -393,13 +399,13 @@ export const BatchesPage: React.FC = () => {
                 setStatusFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full h-9 pl-3 pr-8 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none"
+              className="w-full min-w-0 h-11 pl-3 pr-8 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none"
             >
               <option value="ALL">All Statuses</option>
               <option value="INCUBATING">Incubating</option>
               <option value="COMPLETED">Completed</option>
             </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown aria-hidden="true" className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
       </div>
@@ -412,6 +418,8 @@ export const BatchesPage: React.FC = () => {
           onRetry={fetchBatches}
           isRetrying={isLoading}
         />
+      ) : isLoading && batches.length === 0 ? (
+        <div role="status" className="py-12 text-center text-slate-600">Loading batches…</div>
       ) : !isLoading && batches.length === 0 ? (
         <EmptyState
           title="No Incubation Batches Found"
@@ -419,53 +427,44 @@ export const BatchesPage: React.FC = () => {
           actionLabel="Initialize First Batch"
           onAction={() => setIsCreateOpen(true)}
         />
+      ) : processedBatches.length === 0 ? (
+        <EmptyState title="No matching batches" description="No batches match your search and filters. Clear or adjust the filters to see more records." />
       ) : viewMode === 'TABLE' ? (
         <div className="bg-card border border-border rounded-xl  overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="table-scroll" tabIndex={0} role="region" aria-label="Incubation batches, scroll horizontally on smaller screens">
             <table className="w-full text-left text-xs min-w-[1080px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-3 px-4 w-10 text-center">
-                    <button onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-700 cursor-pointer">
-                      {selectedBatchIds.length === paginatedBatches.length && paginatedBatches.length > 0 ? (
-                        <CheckSquare className="w-4 h-4 text-brand" />
-                      ) : (
-                        <Square className="w-4 h-4" />
-                      )}
+                  <th scope="col" className="py-3 px-4 w-10 text-center">
+                    <label className="inline-flex min-h-11 min-w-11 items-center justify-center">
+                      <input type="checkbox" aria-label="Select all batches on this page" checked={allPageSelected}
+                        ref={element => { if (element) element.indeterminate = somePageSelected && !allPageSelected; }}
+                        onChange={toggleSelectAll} />
+                    </label>
+                  </th>
+                  <th scope="col" className="py-3 px-4" aria-sort={sortField === 'batch_code' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button className="action-link" onClick={() => toggleSort('batch_code')}
+                      aria-label={`Sort batch code ${sortField === 'batch_code' && sortOrder === 'desc' ? 'ascending' : 'descending'}`}>
+                      <span>Batch Code</span><ArrowUpDown aria-hidden="true" className="w-4 h-4" />
                     </button>
                   </th>
-                  <th
-                    className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                    tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort('batch_code'); } }} onClick={() => toggleSort('batch_code')}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Batch Code</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
+                  <th scope="col" className="py-3 px-4">Duck Breed</th>
+                  <th scope="col" className="py-3 px-4">Incubator</th>
+                  <th scope="col" className="py-3 px-4" aria-sort={sortField === 'initial_egg_count' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button className="action-link" onClick={() => toggleSort('initial_egg_count')}
+                      aria-label={`Sort initial set ${sortField === 'initial_egg_count' && sortOrder === 'desc' ? 'ascending' : 'descending'}`}>
+                      <span>Initial Set</span><ArrowUpDown aria-hidden="true" className="w-4 h-4" />
+                    </button>
                   </th>
-                  <th className="py-3 px-4">Duck Breed</th>
-                  <th className="py-3 px-4">Incubator</th>
-                  <th
-                    className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                    tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort('initial_egg_count'); } }} onClick={() => toggleSort('initial_egg_count')}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Initial Set</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
+                  <th scope="col" className="py-3 px-4">Current Stage</th>
+                  <th scope="col" className="py-3 px-4" aria-sort={sortField === 'fertility_rate' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button className="action-link" onClick={() => toggleSort('fertility_rate')}
+                      aria-label={`Sort fertility rate ${sortField === 'fertility_rate' && sortOrder === 'desc' ? 'ascending' : 'descending'}`}>
+                      <span>Fertility Rate</span><ArrowUpDown aria-hidden="true" className="w-4 h-4" />
+                    </button>
                   </th>
-                  <th className="py-3 px-4">Current Stage</th>
-                  <th
-                    className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                    tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort('fertility_rate'); } }} onClick={() => toggleSort('fertility_rate')}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Fertility Rate</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th scope="col" className="py-3 px-4">Status</th>
+                  <th scope="col" className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -477,19 +476,16 @@ export const BatchesPage: React.FC = () => {
                       className={`hover:bg-slate-50 transition-colors cursor-pointer ${
                         isSelected ? 'bg-maroon-50/30' : ''
                       }`}
-                      aria-label={`Inspect batch ${b.batch_code}`} onClick={() => handleSelectBatch(b)}
-                    >
-                      <td className="py-3 px-4 text-center" onClick={(e) => toggleSelectBatch(b.batch_id, e)}>
-                        {isSelected ? (
-                          <CheckSquare className="w-4 h-4 text-brand" />
-                        ) : (
-                          <Square className="w-4 h-4 text-slate-300 hover:text-slate-500" />
-                        )}
+                            >
+                      <td className="py-3 px-4 text-center" onClick={e => e.stopPropagation()}>
+                        <label className="inline-flex min-h-11 min-w-11 items-center justify-center">
+                          <input type="checkbox" aria-label={`Select batch ${b.batch_code}`} checked={isSelected} onChange={() => toggleSelectBatch(b.batch_id)} />
+                        </label>
                       </td>
                       <td className="py-3 px-4 font-bold text-foreground">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Layers className="w-3.5 h-3.5 text-brand" />
-                          <span>{b.batch_code}</span>
+                          <Layers aria-hidden="true" className="w-3.5 h-3.5 text-brand" />
+                          <button className="action-link text-left" onClick={e => { e.stopPropagation(); void handleSelectBatch(b); }} aria-label={`Inspect batch ${b.batch_code}`}>{b.batch_code}</button>
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-[11px] text-slate-500 font-normal">
@@ -523,45 +519,46 @@ export const BatchesPage: React.FC = () => {
                         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={(e) => handleOpenAnalytics(b, e)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition-colors cursor-pointer"
+                            className="secondary-action"
                             aria-label="Deep Batch Analytics & Embryo Mortality" title="Deep Batch Analytics & Embryo Mortality"
                           >
-                            <Activity className="w-3.5 h-3.5 text-brand" />
+                            <Activity aria-hidden="true" className="w-3.5 h-3.5 text-brand" />
                             <span>Analytics</span>
                           </button>
 
                           {(b.current_stage === 'HATCHED' || b.current_stage === 'COMPLETED') && (
                             <button
                               onClick={(e) => handleOpenFinalize(b, e)}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-colors cursor-pointer"
+                              className="secondary-action"
                               aria-label="Finalize Day 28 Hatch Trial" title="Finalize Day 28 Hatch Trial"
                             >
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <CheckCircle2 aria-hidden="true" className="w-3.5 h-3.5 text-emerald-600" />
                               <span>Hatch</span>
                             </button>
                           )}
 
                           <button
                             onClick={(e) => handleOpenCertificate(b, e)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded bg-maroon-50 hover:bg-maroon-100 text-brand border border-maroon-200 transition-colors cursor-pointer"
-                            aria-label="View Official Candling Certificate" title="View Official Candling Certificate"
+                            className="secondary-action"
+                            aria-label={`View candling record for ${b.batch_code}`} title="View candling record"
                           >
-                            <Award className="w-3.5 h-3.5" />
+                            <FileText aria-hidden="true" className="w-3.5 h-3.5" />
                           </button>
 
                           <button
                             onClick={(e) => handleDeleteBatch(b.batch_id, e)}
-                            className="p-1.5 rounded-md hover:bg-red-50 text-red-700 hover:text-red-800 transition-colors cursor-pointer"
+                            className="secondary-action text-red-700"
                             aria-label="Delete / Archive Cohort" title="Delete / Archive Cohort"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 aria-hidden="true" className="w-3.5 h-3.5" />
                           </button>
 
                           <button
-                            className="p-1.5 text-slate-400 hover:text-slate-700 cursor-pointer"
-                            aria-label={`Inspect batch ${b.batch_code}`} onClick={() => handleSelectBatch(b)}
+                            onClick={() => { void handleSelectBatch(b); }}
+                            className="secondary-action"
+                            aria-label={`Open batch details for ${b.batch_code}`} title="Open batch details"
                           >
-                            <ChevronRight className="w-4 h-4" />
+                            <ChevronRight aria-hidden="true" className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -574,19 +571,18 @@ export const BatchesPage: React.FC = () => {
         </div>
       ) : (
         /* Grid / Card View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="scan-grid">
           {paginatedBatches.map((b) => (
             <div
               key={b.batch_id}
-              aria-label={`Inspect batch ${b.batch_code}`} onClick={() => handleSelectBatch(b)}
-              className="bg-card border border-border rounded-xl p-5  hover:border-[#800000] transition-colors cursor-pointer space-y-4 flex flex-col justify-between"
+              className="min-w-0 bg-card border border-border rounded-xl p-5 space-y-4 flex flex-col justify-between"
             >
               <div>
-                <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+                <div className="flex flex-wrap items-start justify-between gap-2 pb-3 border-b border-slate-100">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Layers className="w-4 h-4 text-brand" />
-                      <h3 className="font-bold text-foreground text-sm">{b.batch_code}</h3>
+                      <Layers aria-hidden="true" className="w-4 h-4 text-brand" />
+                      <h3 className="font-semibold text-foreground text-sm break-all">{b.batch_code}</h3>
                     </div>
                     <span className="text-[11px] text-slate-500 mt-0.5 block">
                       Breed: <strong>{b.breed}</strong> • Incubator: <strong>{b.incubator_id}</strong>
@@ -607,21 +603,26 @@ export const BatchesPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs pt-3 text-slate-600">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-3 text-slate-600">
                   <span>Initial Egg Set: <strong>{b.initial_egg_count}</strong></span>
                   <span className="font-bold text-emerald-700">{b.total_scanned > 0 ? `${b.fertility_rate}% Fertile` : 'Pending'}</span>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span className="text-slate-500">Day 10 Salvage: <strong>₱{(b.infertile_count * 14.0).toFixed(2)}</strong></span>
                 <button
                   onClick={(e) => handleOpenCertificate(b, e)}
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-brand hover:underline"
+                  className="action-link"
                 >
-                  <Award className="w-3.5 h-3.5" />
-                  <span>Certificate</span>
+                  <FileText aria-hidden="true" className="w-3.5 h-3.5" />
+                  <span>Candling record</span>
                 </button>
+              </div>
+              <div className="page-actions">
+                <button className="secondary-action" onClick={() => { void handleSelectBatch(b); }} aria-label={`Inspect batch ${b.batch_code}`}><ChevronRight aria-hidden="true" className="w-4 h-4" />Inspect</button>
+                <button className="secondary-action" onClick={() => handleOpenAnalytics(b)}><Activity aria-hidden="true" className="w-4 h-4" />Analytics</button>
+                {(b.current_stage === 'HATCHED' || b.current_stage === 'COMPLETED') && <button className="secondary-action" onClick={() => handleOpenFinalize(b)}><CheckCircle2 aria-hidden="true" className="w-4 h-4" />Hatch</button>}
               </div>
             </div>
           ))}
@@ -653,9 +654,9 @@ export const BatchesPage: React.FC = () => {
           <button
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             aria-label="Previous page" disabled={currentPage === 1}
-            className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+            className="secondary-action"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft aria-hidden="true" className="w-4 h-4" />
           </button>
           <span className="px-2 font-bold text-slate-800">
             Page {currentPage} of {totalPages}
@@ -663,9 +664,9 @@ export const BatchesPage: React.FC = () => {
           <button
             onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
             aria-label="Next page" disabled={currentPage === totalPages}
-            className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+            className="secondary-action"
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight aria-hidden="true" className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -686,17 +687,17 @@ export const BatchesPage: React.FC = () => {
               placeholder="e.g. BATCH-2026-08-KAY-03"
               value={batchCode}
               onChange={(e) => setBatchCode(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
+              className="w-full min-w-0 h-11 px-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="batchespage-field-2" className="font-semibold text-xs text-slate-700">Duck Breed</label>
               <select id="batchespage-field-2"
                 value={breed}
                 onChange={(e) => setBreed(e.target.value as DuckBreed)}
-                className="w-full h-9 px-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-[#800000]"
+                className="w-full min-w-0 h-11 px-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-[#800000]"
               >
                 <option value="KAYUMANGGI">Kayumanggi</option>
                 <option value="ITIM">Itim (Native)</option>
@@ -709,7 +710,7 @@ export const BatchesPage: React.FC = () => {
                 required
                 value={incubatorId}
                 onChange={(e) => setIncubatorId(e.target.value)}
-                className="w-full h-9 px-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
+                className="w-full min-w-0 h-11 px-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
               />
             </div>
           </div>
@@ -722,8 +723,14 @@ export const BatchesPage: React.FC = () => {
               required
               value={initialCount}
               onChange={(e) => setInitialCount(Number(e.target.value))}
-              className="w-full h-9 px-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
+              className="w-full min-w-0 h-11 px-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="batch-set-date" className="font-semibold text-xs text-slate-700">Set Date</label>
+            <input id="batch-set-date" type="date" required value={setDate} onChange={event => setSetDate(event.target.value)}
+              className="w-full min-w-0 max-w-full px-3 bg-card border border-slate-200 rounded-lg text-slate-800" />
           </div>
 
           <div className="space-y-1.5">
@@ -733,21 +740,21 @@ export const BatchesPage: React.FC = () => {
               placeholder="Breeder farm source, flock age, initial candling condition..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
+              className="w-full min-w-0 px-3 py-2 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
             />
           </div>
 
-          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <div className="page-actions justify-end pt-3 border-t border-slate-200">
             <button
               type="button"
               disabled={isCreating} onClick={() => setIsCreateOpen(false)}
-              className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 cursor-pointer"
+              className="secondary-action"
             >
               Cancel
             </button>
             <button
               type="submit" disabled={isCreating}
-              className="px-4 py-2 text-xs font-bold text-white bg-[#800000] hover:bg-[#6B0000] rounded-lg  cursor-pointer"
+              className="primary-action"
             >
               {isCreating ? 'Saving…' : 'Create batch'}
             </button>
@@ -763,12 +770,12 @@ export const BatchesPage: React.FC = () => {
         description="Incubation progress, operator candling shifts, and yield metrics"
       >
         {selectedBatch && (
-          <div className="space-y-5 text-xs">
+          <div className="min-w-0 space-y-5 text-sm break-words">
             {sessionError && <p role="alert" className="text-amber-800">Session records could not be loaded. Close and reopen this batch to retry.</p>}
             {actionError && <p role="alert" className="text-red-800">{actionError}</p>}
             {/* Timeline */}
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <span className="font-bold text-slate-800">28-Day Milestone Progress</span>
                 {getNextStage(selectedBatch.current_stage) && (
                   <button
@@ -776,7 +783,7 @@ export const BatchesPage: React.FC = () => {
                     disabled={isAdvancing}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#800000] hover:bg-[#6B0000] text-white text-[11px] font-bold  cursor-pointer disabled:opacity-50"
                   >
-                    <FastForward className="w-3 h-3" />
+                    <FastForward aria-hidden="true" className="w-3 h-3" />
                     <span>Advance to {getNextStage(selectedBatch.current_stage)}</span>
                   </button>
                 )}
@@ -826,7 +833,7 @@ export const BatchesPage: React.FC = () => {
             <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
               <div className="flex items-center justify-between">
                 <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-slate-600" />
+                  <Clock aria-hidden="true" className="w-3.5 h-3.5 text-slate-600" />
                   <span>Operator Candling Sessions & Throughput</span>
                 </h4>
                 <span className="text-[10px] font-semibold text-slate-500">{batchSessions.length} recorded</span>
@@ -836,16 +843,16 @@ export const BatchesPage: React.FC = () => {
                 <div className="space-y-2">
                   {batchSessions.map((s) => (
                     <div key={s.session_id} className="p-2.5 bg-card rounded-lg border border-slate-200 space-y-1.5 ">
-                      <div className="flex items-center justify-between font-medium">
+                      <div className="flex flex-wrap items-center justify-between gap-2 font-medium">
                         <span className="font-bold text-foreground">{s.stage} Candling Run</span>
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded">
-                          <Zap className="w-3 h-3 text-emerald-600" />
+                          <Zap aria-hidden="true" className="w-3 h-3 text-emerald-600" />
                           {s.total_scanned} eggs candled
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-600">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
                         <span className="flex items-center gap-1">
-                          <User className="w-3 h-3 text-slate-400" />
+                          <User aria-hidden="true" className="w-3 h-3 text-slate-400" />
                           {s.operator_name} • {s.device_id}
                         </span>
                         <span className="font-bold text-emerald-700">
@@ -861,22 +868,22 @@ export const BatchesPage: React.FC = () => {
             </div>
 
             {/* Official Report Exports & Certificate Trigger */}
-            <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+            <div className="page-actions justify-end pt-3 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => handleOpenCertificate(selectedBatch)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-maroon-50 text-brand border border-maroon-200 hover:bg-maroon-100 transition-colors cursor-pointer"
+                className="secondary-action"
               >
-                <Award className="w-3.5 h-3.5" />
-                <span>View Quality Certificate</span>
+                <FileText aria-hidden="true" className="w-3.5 h-3.5" />
+                <span>View candling record</span>
               </button>
 
               <a
                 href={apiClient.downloadCSVUrl(selectedBatch.batch_id)}
                 download
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors"
+                className="secondary-action"
               >
-                <Download className="w-3.5 h-3.5" />
+                <Download aria-hidden="true" className="w-3.5 h-3.5" />
                 <span>Export CSV</span>
               </a>
             </div>

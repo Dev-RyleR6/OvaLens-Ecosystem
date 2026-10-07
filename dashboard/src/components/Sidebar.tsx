@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Layers, ScanLine, TrendingUp, Cpu, Users, Settings, X } from 'lucide-react';
+import { LayoutDashboard, Layers, ScanLine, ChartNoAxesCombined, Cpu, Users, Settings, X, Radio, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { Device } from '../types';
@@ -40,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
     { to: '/', label: 'Overview', icon: LayoutDashboard },
     { to: '/batches', label: 'Incubation batches', icon: Layers },
     { to: '/scans', label: 'Candling scans', icon: ScanLine },
-    { to: '/analytics', label: 'Analytics & graphs', icon: TrendingUp },
+    { to: '/analytics', label: 'Analytics', icon: ChartNoAxesCombined },
     { to: '/devices', label: 'Sorter devices', icon: Cpu },
     ...(user?.role === 'ADMIN' ? [{ to: '/users', label: 'Users & access', icon: Users }] : []),
     { to: user?.role === 'OPERATOR' ? '/settings?tab=account' : '/settings', label: user?.role === 'OPERATOR' ? 'My account' : 'Settings', icon: Settings },
@@ -51,9 +51,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
       <aside className="relative w-60 h-full border-r border-border bg-card flex flex-col">
         <div className="lg:hidden flex items-center justify-between p-4 border-b border-border"><span className="font-semibold">Navigation</span><button onClick={onClose} aria-label="Close navigation"><X className="w-5 h-5" /></button></div>
         <nav aria-label="Main navigation" className="p-3 space-y-1 flex-1 overflow-y-auto">
-          {links.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} onClick={onClose} className={({ isActive }) => `flex items-center gap-3 px-3 py-3 rounded-lg ${isActive ? 'bg-maroon-50 text-brand font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}><Icon className="w-4 h-4 shrink-0" aria-hidden="true" />{label}</NavLink>)}
+          {links.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} onClick={onClose} className="nav-link"><Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />{label}</NavLink>)}
         </nav>
-        <div className="p-5 border-t border-border space-y-1"><NavLink to="/devices" onClick={onClose} className="font-medium text-brand underline underline-offset-4">Edge app connections</NavLink><p className="text-sm text-slate-600" role="status">{unavailable ? 'Edge status unavailable' : devices === null ? 'Checking edge apps…' : devices.length === 0 ? 'No edge apps registered' : `${reporting} of ${devices.length} edge apps online`}</p><p className="text-xs text-slate-500">Checked every 15 seconds. Offline after 90 seconds without a heartbeat. Hardware readiness is checked at the edge.</p></div>
+        <div className="p-4 border-t border-border space-y-2"><NavLink to="/devices" onClick={onClose} className="action-link w-full text-sm"><Radio className="w-4 h-4" aria-hidden="true" />Edge app connections<ChevronRight className="w-4 h-4 ml-auto" aria-hidden="true" /></NavLink><p className="text-sm text-slate-600" role="status">{unavailable ? 'Edge status unavailable' : devices === null ? 'Checking edge apps…' : devices.length === 0 ? 'No edge apps registered' : `${reporting} of ${devices.length} edge apps online`}</p><p className="text-xs text-slate-500 leading-relaxed">Checked every 15 seconds. Offline after 90 seconds without a heartbeat. Hardware readiness is checked at the edge.</p></div>
       </aside>
     </div>
   );

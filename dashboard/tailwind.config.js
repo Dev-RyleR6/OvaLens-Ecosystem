@@ -8,9 +8,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['"IBM Plex Sans"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
       },
-      fontSize: { xs: ['.875rem', '1.4'], sm: ['.875rem', '1.5'] },
+      fontSize: { xs: ['.75rem', '1.5'], sm: ['.875rem', '1.5'] },
       colors: {
         slate: themedPalette('slate'),
         emerald: themedPalette('emerald'),
@@ -36,6 +36,7 @@ export default {
           800: '#800000', // FU Primary Maroon
           900: '#5C0000', // FU Dark Maroon
         },
+        destructive: { DEFAULT: '#DC2626', foreground: '#FFFFFF', hover: '#B91C1C' },
         primary: {
           DEFAULT: "#800000",
           foreground: "#FFFFFF",

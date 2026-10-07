@@ -102,7 +102,7 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
           "fixed inset-0 bg-slate-900/65  transition-opacity",
           isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
         )}
-        onClick={onClose}
+        onClick={() => { if (!isSubmitting) onClose(); }}
       />
 
       <div
@@ -119,7 +119,7 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900">
-                Human-in-the-Loop Override
+                Correct classification
               </h2>
               <p className="text-[11px] text-slate-500">
                 Correct AI Vision Classification • Egg #{displayScan.sequence_number || 'N/A'}
@@ -128,7 +128,9 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
           </div>
 
           <button
-            onClick={onClose}
+            aria-label="Close classification correction"
+            disabled={isSubmitting}
+            onClick={() => { if (!isSubmitting) onClose(); }}
             className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -166,13 +168,13 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
 
           {/* Preset Justifications */}
           <div className="space-y-1.5">
-            <label htmlFor="humanintheloopoverridemodal-field-1" className="text-xs font-bold text-slate-700 block">
-              Quick Justification Presets
-            </label>
+            <p className="text-sm font-medium text-slate-700">Choose an inspection reason</p>
             <div className="space-y-1.5">
               {REASON_PRESETS[displayTargetClass]?.map((preset, idx) => (
                 <button
                   type="button"
+                  aria-pressed={reason === preset}
+                  disabled={isSubmitting}
                   key={idx}
                   onClick={() => handleSelectPreset(preset)}
                   className={`w-full text-left p-2.5 rounded-lg border text-xs font-medium transition-all cursor-pointer flex items-start gap-2 ${
@@ -191,21 +193,22 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
           {/* Custom Audit Justification */}
           <div className="space-y-1.5">
             <label htmlFor="humanintheloopoverridemodal-field-1" className="text-xs font-bold text-slate-700 block">
-              Audit Justification Notes (Mandatory for Quality Audit)
+              Inspection notes (required)
             </label>
             <textarea id="humanintheloopoverridemodal-field-1"
               rows={2}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Provide specific optical observation details..."
-              className="w-full p-2.5 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  resize-none"
+              disabled={isSubmitting}
+              className="w-full p-3 text-base sm:text-sm bg-card border border-input rounded-lg text-foreground resize-y"
               required
             />
           </div>
 
           {/* Economic Notice */}
           {displayTargetClass === 'INFERTILE' && (
-            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-center justify-between">
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2">
               <span>Day 10 Commercial Penoy Salvage Recovery:</span>
               <strong className="text-amber-800 font-mono font-bold">+₱14.00/egg</strong>
             </div>
@@ -215,17 +218,18 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
           <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
             <button
               type="button"
-              onClick={onClose}
-              className="px-3.5 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold cursor-pointer"
+              onClick={() => { if (!isSubmitting) onClose(); }}
+              disabled={isSubmitting}
+              className="secondary-action"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-bold  transition-colors cursor-pointer disabled:opacity-50"
+              className="primary-action"
             >
-              {isSubmitting ? 'Saving Override...' : 'Confirm & Log Override'}
+              {isSubmitting ? 'Saving correction…' : 'Save correction'}
             </button>
           </div>
         </form>

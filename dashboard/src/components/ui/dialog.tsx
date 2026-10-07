@@ -47,7 +47,7 @@ export const Dialog: React.FC<DialogProps> = ({
       {/* Dialog content */}
       <div
         className={cn(
-          "relative w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200/90 bg-card p-4 sm:p-6 text-slate-900 shadow-2xl transition-all z-10 custom-scrollbar my-auto",
+          "relative w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-y-auto rounded-xl bg-card p-4 sm:p-6 text-foreground shadow-2xl transition-colors z-10 custom-scrollbar my-auto",
           isClosing ? "animate-modal-content-exit" : "animate-modal-content",
           maxWidth,
           className
@@ -55,7 +55,7 @@ export const Dialog: React.FC<DialogProps> = ({
       >
         <button
           onClick={onClose}
-          className="absolute right-3.5 top-3.5 p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#800000]/20 cursor-pointer z-20"
+          className="absolute right-2 top-2 h-11 w-11 flex items-center justify-center rounded-lg text-slate-500 hover:text-foreground hover:bg-slate-100 transition-colors cursor-pointer z-20 print:hidden"
         >
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
