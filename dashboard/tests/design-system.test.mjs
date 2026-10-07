@@ -20,8 +20,11 @@ test('status badges keep biological classes separate from review and account rol
     ['fertility', 'FERTILE', 'Fertile', 'status-success'],
     ['fertility', 'INFERTILE', 'Infertile', 'status-danger'],
     ['status', 'MANUAL_REVIEW', 'Awaiting review', 'status-warning'],
-    ['role', 'ADMIN', 'Administrator', 'status-brand'],
+    ['role', 'ADMIN', 'Administrator', 'status-neutral'],
+    ['role', 'MANAGER', 'Manager', 'status-neutral'],
     ['role', 'OPERATOR', 'Operator', 'status-neutral'],
+    ['stage', 'DAY_10', 'Day 10 (Candling)', 'status-neutral'],
+    ['status', 'CANDLING_DUE', 'Candling due', 'status-warning'],
     ['status', 'ACTIVE', 'Active', 'status-success'],
     ['status', 'INACTIVE', 'Suspended', 'status-neutral'],
   ]) {

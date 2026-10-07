@@ -16,3 +16,4 @@ The dashboard is an operational record system. Retain the FU identity and replac
 - Use horizontal bars with complete wrapped batch identifiers, numeric axes starting at zero, and expandable exact-count tables. Keep charts in one column until the content region can fit two readable panels.
 - Treat scan events as records, not unique eggs. Show repeated scans without clamping them to the initial egg count. Classification and financial figures must use the same filter scope and persisted scan records.
 - Keep stage and status badges on one line, use the same semantic styles across pages, and allow wide operational tables to scroll rather than compressing columns.
+- Role badges share a neutral treatment. A routine Day 10 checkpoint is neutral; warning color belongs to due or review states. Paired operational charts use the same batch rows, zero-based scale, plot height, and aligned exact-count disclosures; preserve zero-scan batches and display numeric bar values.

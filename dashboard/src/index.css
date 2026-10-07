@@ -271,7 +271,7 @@
   .batch-card { padding: 1rem; }
 }
 .operational-charts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
-.chart-panel { min-width: 0; padding: 1.25rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--card); }
+.chart-panel { min-width: 0; padding: 1.25rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--card); display: flex; flex-direction: column; }
 .chart-heading { margin-bottom: 1rem; }
 .chart-heading p { margin-top: .375rem; color: rgb(var(--slate-600)); line-height: 1.6; font-size: .875rem; }
 .chart-scroll { max-height: 460px; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
@@ -307,8 +307,8 @@
 thead { background: rgb(var(--slate-50)); color: rgb(var(--slate-600)); }
 thead th { white-space: nowrap; }
 .bordered-table tbody tr + tr { border-top: 1px solid var(--border); }
-.status-badge { display: inline-flex; flex-shrink: 0; width: max-content; align-items: center; white-space: nowrap; padding: .25rem .625rem; border: 1px solid; border-radius: .375rem; font-size: .75rem; line-height: 1.5; font-weight: 500; }
-.status-small { padding: .125rem .5rem; }
+.status-badge { display: inline-flex; flex-shrink: 0; width: max-content; min-height: 28px; align-items: center; white-space: nowrap; padding: .25rem .625rem; border: 1px solid; border-radius: .375rem; font-size: .75rem; line-height: 1.5; font-weight: 500; }
+.status-small { min-height: 24px; padding: .125rem .5rem; }
 .status-success { background: var(--success-surface); color: var(--success-text); border-color: var(--success-border); }
 .status-danger { background: rgb(var(--red-50)); color: rgb(var(--red-800)); border-color: rgb(var(--red-200)); }
 .status-warning { background: rgb(var(--amber-50)); color: rgb(var(--amber-900)); border-color: rgb(var(--amber-300)); }

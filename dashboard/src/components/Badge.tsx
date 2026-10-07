@@ -18,10 +18,11 @@ export const Badge = ({ type = 'status', value, size = 'md' }: BadgeProps) => {
     ADMIN: 'Administrator', MANAGER: 'Manager', OPERATOR: 'Operator',
     ACTIVE: 'Active', INACTIVE: 'Suspended', OVERRIDDEN: 'Corrected',
   };
-  const tone = value === 'FERTILE' || value === 'ONLINE' || value === 'SCANNING' || value === 'HATCHED' || value === 'COMPLETED' || value === 'ACTIVE'
+  const tone = type === 'role' || (type === 'stage' && ['SETTING', 'DAY_10'].includes(value)) ? 'status-neutral'
+    : value === 'FERTILE' || value === 'ONLINE' || value === 'SCANNING' || value === 'HATCHED' || value === 'COMPLETED' || value === 'ACTIVE'
     ? 'status-success'
     : value === 'INFERTILE' || value === 'ERROR' ? 'status-danger'
     : ['DAY_10', 'CANDLING_DUE', 'CANDLING DUE', 'HATCH DUE', 'MANUAL_REVIEW'].includes(value) ? 'status-warning'
-    : value === 'INCUBATING' || value === 'ADMIN' ? 'status-brand' : 'status-neutral';
+    : value === 'INCUBATING' ? 'status-brand' : 'status-neutral';
   return <span className={`status-badge ${tone} ${size === 'sm' ? 'status-small' : ''}`}>{labels[value] ?? value.replace(/_/g, ' ')}</span>;
 };
