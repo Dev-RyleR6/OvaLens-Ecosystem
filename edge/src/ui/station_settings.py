@@ -110,10 +110,14 @@ class StationSettingsWindow(ctk.CTkToplevel):
         return entry
 
     def _button(self, parent, label, command, side=None):
+        primary = label in {"Apply", "Connect and identify boards"}
         button = ctk.CTkButton(parent, text=label, command=command, height=40,
                               width=max(140, len(label) * 8 + 24),
                               font=(FUTheme.FONT_FAMILY, 14, "bold"),
-                              fg_color=FUTheme.PRIMARY_MAROON, hover_color=FUTheme.HOVER_MAROON)
+                              fg_color=FUTheme.PRIMARY_MAROON if primary else FUTheme.PANEL_LIGHT_ALT,
+                              hover_color=FUTheme.HOVER_MAROON if primary else FUTheme.PANEL_ACCENT,
+                              border_width=0 if primary else 1, border_color=FUTheme.BORDER,
+                              text_color=FUTheme.TEXT_WHITE if primary else FUTheme.TEXT_PRIMARY)
         button.pack(side=side or "top", anchor="w", padx=6, pady=4)
         self.buttons.append(button)
         return button

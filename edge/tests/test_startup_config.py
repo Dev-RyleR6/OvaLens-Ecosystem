@@ -145,6 +145,13 @@ def test_minimum_window_keeps_stop_and_session_controls_visible(hidden_ui):
             assert button.winfo_rootx() >= app.winfo_rootx()
             assert button.winfo_rootx() + button.winfo_width() <= app.winfo_rootx() + app.winfo_width()
         assert app.video_container.winfo_height() > 200
+        assert app.log_textbox.winfo_ismapped()
+        assert app.log_textbox.winfo_height() >= 32
+        # A stopped holder's reason owns the HUD; duplicate session controls
+        # must not consume its width at the minimum supported resolution.
+        app._update_cycle_hud("●", "#FBBF24", "MANUAL_REVIEW | Holder 3 | Conflicting IR and camera evidence")
+        app.update_idletasks()
+        assert app.cycle_status_label.winfo_width() >= 340
     finally:
         app.current_session_id = None
         app.is_auto_cycle_running = False

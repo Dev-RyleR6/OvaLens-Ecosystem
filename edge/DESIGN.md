@@ -1,0 +1,27 @@
+# Edge operator interface
+
+Mode: **Operate**. The operator needs to see the egg, understand why the conveyor
+is stopped, and act safely. Foundation University maroon, green, red and slate
+are binding. Segoe UI is the native Windows typeface; labels use 12–14 px and
+counts use 20 px. Camera controls retain native driver terminology and readback.
+
+The camera well is the primary workspace. Its cycle message stays above the
+image. A single side panel groups the latest classification, aligned batch
+counts and recent events with spacing and thin dividers. Counts are rows rather
+than coloured metric cards. The empty camera well explains setup directly.
+
+Maroon identifies primary actions. Green identifies fertile results, amber
+identifies penoy/review information and red identifies stop actions. Secondary
+commands use neutral surfaces. Status always includes text; colour alone carries
+no instruction. Use plain command labels instead of decorative emoji, gradients,
+glow, fake instruments or ornamental animation.
+
+The footer reserves space for STOP and session controls at 1024×720. Review
+choices appear only when needed. History remains reachable while a review takes
+space from the event area. Settings are grouped by Connections, Camera, Detection
+and Calibration. No physical operation is implied by preview or a saved default.
+
+Keep latest-only camera buffering, single scheduled inference, background I/O,
+and cached widget refreshes. Do not add timers, animation or image assets for
+decoration. Inspect normal and minimum window sizes, idle and review states, plus
+settings; test long result labels and safety-control visibility.

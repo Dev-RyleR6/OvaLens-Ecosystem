@@ -260,3 +260,5 @@ These features can be claimed by any agent using `python scripts/verify_and_comm
 - [x] **TASK-NEW-BE-SCHEMA-01**: Align database schema contracts across Edge, Backend, and Dashboard: add MANUAL_REVIEW routing action, session manual review counts, scan override tracking, physical cradle indexing, and optical research metrics
 
 - [x] **TASK-NEW-EDGE-UI-POLISH-01**: Improve native edge typography, operator visibility and minimum-size layouts; eliminate redundant Tk status/control updates. Verify with simulated GUI, measured before/after updates and repository gates.
+
+- [x] **TASK-NEW-EDGE-DESIGN-02**: Apply impeccable Operate guidance to the edge station: one compact record panel, aligned count rows, restrained semantic colour, clear camera empty state and consistent action hierarchy; preserve cached refreshes and verify minimum-size review controls.

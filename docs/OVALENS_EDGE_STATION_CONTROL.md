@@ -77,3 +77,11 @@ and 7.92–23.68 ms afterward. This isolated benchmark excludes event-loop waiti
 camera rendering and inference; it establishes reduced redundant Tk work, not
 an end-to-end frame rate or sorting throughput. Native GUI verification covers
 1280×860 and 1024×720 layouts, active/review controls, startup and settings.
+
+`TASK-NEW-EDGE-DESIGN-02` refines this into one record panel with aligned 20 px
+count rows and thin section dividers, replacing the coloured metric tiles. The
+standby instruction sits directly in the camera well. Settings distinguish
+primary actions from neutral secondary commands. End Session stays in the
+footer so the cycle reason can use the full camera HUD. Cached refreshes remain
+in place; the same 500-refresh Tk probe measured 5.18 ms during this refinement.
+See `edge/DESIGN.md` for the native Operate design rules.
