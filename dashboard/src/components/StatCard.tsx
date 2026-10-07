@@ -24,7 +24,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   trend,
   highlightColor = 'maroon',
 }) => {
-  let iconBg = "bg-maroon-50 text-[#800000] border border-maroon-200/60";
+  let iconBg = "bg-maroon-50 text-brand border border-maroon-200/60";
 
   if (highlightColor === 'green') {
     iconBg = "bg-emerald-50 text-emerald-700 border border-emerald-200/60";
@@ -35,12 +35,12 @@ export const StatCard: React.FC<StatCardProps> = ({
   }
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs hover-lift transition-all animate-slide-up group">
+    <div className="bg-card border border-border rounded-xl p-5   transition-all  group">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{title}</p>
           <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl font-extrabold tracking-tight text-[#0F172A] group-hover:text-[#800000] transition-colors">
+            <span className="text-2xl font-semibold tracking-tight text-foreground group-hover:text-brand transition-colors">
               {value}
             </span>
             {unit && <span className="text-xs font-semibold text-slate-500">{unit}</span>}
@@ -48,7 +48,7 @@ export const StatCard: React.FC<StatCardProps> = ({
         </div>
 
         {Icon && (
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${iconBg} shadow-2xs group-hover:scale-105 transition-transform`}>
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${iconBg}  group-hover:scale-105 transition-transform`}>
             <Icon className="w-5 h-5" />
           </div>
         )}

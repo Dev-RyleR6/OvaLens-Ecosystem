@@ -1,3 +1,4 @@
+import { useDialogAccessibility } from '@/hooks/useDialogAccessibility';
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useModalAnimation } from '@/hooks/useModalAnimation';
@@ -19,29 +20,18 @@ export const Modal: React.FC<ModalProps> = ({
   maxWidth = 'max-w-xl',
 }) => {
   const { shouldRender, isClosing } = useModalAnimation(isOpen, 220);
+  const dialogRef = useDialogAccessibility(isOpen && shouldRender, onClose, title);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleKeyDown);
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+
 
   if (!shouldRender) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* High-Contrast Dark Backdrop Blur */}
       <div
         className={cn(
-          "fixed inset-0 bg-slate-900/65 backdrop-blur-xs transition-opacity",
+          "fixed inset-0 bg-slate-900/65  transition-opacity",
           isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
         )}
         onClick={onClose}
@@ -50,7 +40,7 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Modal Dialog */}
       <div
         className={cn(
-          `relative w-full ${maxWidth} bg-white border border-slate-200/90 rounded-2xl shadow-2xl overflow-hidden z-10 my-auto max-h-[calc(100dvh-1.5rem)] sm:max-h-[88vh] flex flex-col`,
+          `relative w-full ${maxWidth} bg-card border border-slate-200/90 rounded-2xl shadow-2xl overflow-hidden z-10 my-auto max-h-[calc(100dvh-1.5rem)] sm:max-h-[88vh] flex flex-col`,
           isClosing ? "animate-modal-content-exit" : "animate-modal-content"
         )}
       >
@@ -61,6 +51,7 @@ export const Modal: React.FC<ModalProps> = ({
             {title}
           </h3>
           <button
+            aria-label="Close dialog"
             onClick={onClose}
             className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
           >

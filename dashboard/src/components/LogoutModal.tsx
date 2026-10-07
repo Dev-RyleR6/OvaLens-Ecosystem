@@ -1,3 +1,4 @@
+import { useDialogAccessibility } from '@/hooks/useDialogAccessibility';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { LogOut, Loader2, X, CheckCircle2, Shield, User as UserIcon } from 'lucide-react';
@@ -20,6 +21,7 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
 }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { shouldRender, isClosing } = useModalAnimation(isOpen, 220);
+  const dialogRef = useDialogAccessibility(isOpen && shouldRender, () => { if (!isLoggingOut) onClose(); }, 'Sign out');
 
   // Close on Escape key
   useEffect(() => {
@@ -52,11 +54,11 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Soft Blurred Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity",
+          "fixed inset-0 bg-slate-900/40  transition-opacity",
           isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
         )}
         onClick={() => {
@@ -67,7 +69,7 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
       {/* Main Dialog Card */}
       <div
         className={cn(
-          "relative w-full max-w-md bg-white rounded-2xl p-5 sm:p-7 shadow-2xl border border-slate-200/90 z-10 font-sans text-slate-900 my-auto max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-y-auto custom-scrollbar",
+          "relative w-full max-w-md bg-card rounded-2xl p-5 sm:p-7 shadow-2xl border border-slate-200/90 z-10 font-sans text-slate-900 my-auto max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-y-auto custom-scrollbar",
           isClosing ? "animate-modal-content-exit" : "animate-modal-content"
         )}
       >
@@ -78,14 +80,14 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
           disabled={isLoggingOut}
           onClick={onClose}
           className="absolute right-4 top-4 text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-40"
-          title="Close dialog"
+          aria-label="Close dialog" title="Close dialog"
         >
           <X className="w-4 h-4" />
         </button>
 
         {/* Dialog Header */}
         <div className="flex items-start gap-4 mb-5">
-          <div className="w-11 h-11 rounded-2xl bg-red-50 text-red-700 border border-red-100 flex items-center justify-center shrink-0 shadow-xs">
+          <div className="w-11 h-11 rounded-2xl bg-red-50 text-red-700 border border-red-100 flex items-center justify-center shrink-0 ">
             <LogOut className="w-5 h-5" />
           </div>
           <div>
@@ -101,11 +103,11 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
         {/* Current Active Session Preview Tile */}
         <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3.5 mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-white text-[#800000] border border-slate-200 font-bold text-xs flex items-center justify-center shadow-xs">
+            <div className="w-9 h-9 rounded-full bg-card text-brand border border-slate-200 font-bold text-xs flex items-center justify-center ">
               {getInitials(user?.full_name)}
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-xs font-bold text-slate-900 leading-tight">
                   {user?.full_name || 'Hatchery Lead'}
                 </p>
@@ -134,7 +136,7 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
             type="button"
             disabled={isLoggingOut}
             onClick={onClose}
-            className="py-2.5 px-4 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 active:bg-slate-100 border border-slate-300 rounded-xl transition-all cursor-pointer disabled:opacity-50 active:scale-[0.98]"
+            className="py-2.5 px-4 text-xs font-semibold text-slate-700 bg-card hover:bg-slate-50 active:bg-slate-100 border border-slate-300 rounded-xl transition-all cursor-pointer disabled:opacity-50 active:scale-[0.98]"
           >
             Stay Signed In
           </button>
@@ -143,7 +145,7 @@ export const LogoutModal: React.FC<LogoutModalProps> = ({
             type="button"
             disabled={isLoggingOut}
             onClick={handleConfirm}
-            className="py-2.5 px-5 text-xs font-semibold text-white bg-[#800000] hover:bg-[#6b0000] active:bg-[#520000] rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-60 active:scale-[0.98]"
+            className="py-2.5 px-5 text-xs font-semibold text-white bg-[#800000] hover:bg-[#6b0000] active:bg-[#520000] rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer  disabled:opacity-60 active:scale-[0.98]"
           >
             {isLoggingOut ? (
               <>

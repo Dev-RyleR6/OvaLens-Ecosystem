@@ -1,3 +1,4 @@
+import { readPreferences, savePreferences } from '../hooks/usePreferences';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -32,18 +33,22 @@ interface BackupArchive {
 
 export const SettingsPage: React.FC = () => {
   const { user, updateUser } = useAuth();
+  const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [backupError, setBackupError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => readPreferences().theme);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as SettingsTab | null;
 
   const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
-    if (tabParam && ['facility', 'account', 'backups', 'preferences'].includes(tabParam)) {
+    if (tabParam && (canManage || ['account', 'preferences'].includes(tabParam)) && ['facility', 'account', 'backups', 'preferences'].includes(tabParam)) {
       return tabParam;
     }
-    return 'facility';
+    return canManage ? 'facility' : 'account';
   });
 
   useEffect(() => {
-    if (tabParam && ['facility', 'account', 'backups', 'preferences'].includes(tabParam)) {
+    if (tabParam && (canManage || ['account', 'preferences'].includes(tabParam)) && ['facility', 'account', 'backups', 'preferences'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -95,10 +100,7 @@ export const SettingsPage: React.FC = () => {
 
   // --- Preferences State ---
   const [pollingInterval, setPollingInterval] = useState<number>(() => {
-    return Number(localStorage.getItem('ovalens_polling_interval')) || 10;
-  });
-  const [audioAlerts, setAudioAlerts] = useState<boolean>(() => {
-    return localStorage.getItem('ovalens_audio_alerts') !== 'false';
+    return readPreferences().pollingInterval;
   });
   const [tableDensity, setTableDensity] = useState<'compact' | 'comfortable'>(() => {
     return (localStorage.getItem('ovalens_table_density') as 'compact' | 'comfortable') || 'comfortable';
@@ -152,24 +154,26 @@ export const SettingsPage: React.FC = () => {
 
   const fetchBackupsList = async () => {
     setIsLoadingBackups(true);
+    setBackupError(null);
     try {
       const data = await apiClient.getBackups();
       if (Array.isArray(data)) {
         setBackups(data);
       }
     } catch (err) {
-      console.error('Failed to load backups:', err);
+      setBackupError('Backup records could not be loaded. Open this tab again to retry.');
     } finally {
       setIsLoadingBackups(false);
     }
   };
 
   useEffect(() => {
-    fetchSettings();
-  }, []);
+    if (canManage) fetchSettings();
+    else setIsLoading(false);
+  }, [canManage]);
 
   useEffect(() => {
-    if (activeTab === 'backups') {
+    if (canManage && activeTab === 'backups') {
       fetchBackupsList();
     }
   }, [activeTab]);
@@ -198,11 +202,16 @@ export const SettingsPage: React.FC = () => {
     if (originalFacility.conveyor_speed_cm_s !== conveyorSpeed) {
       diffs.push({ label: 'Conveyor Belt Speed', oldValue: `${originalFacility.conveyor_speed_cm_s} cm/s`, newValue: `${conveyorSpeed} cm/s` });
     }
+    if (originalFacility.conveyor_distance_cm !== conveyorDistance) {
+      diffs.push({ label: 'Sensor to chute distance', oldValue: `${originalFacility.conveyor_distance_cm} cm`, newValue: `${conveyorDistance} cm` });
+    }
     return diffs;
   };
 
   const handleExecuteSaveFacility = async () => {
     setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
     try {
       await apiClient.updateSettings({
         facility_name: facilityName,
@@ -230,7 +239,8 @@ export const SettingsPage: React.FC = () => {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3500);
     } catch (err) {
-      console.error('Failed to save settings:', err);
+      setSaveError('Settings could not be saved. Your edits are retained. Try saving again.');
+      setIsConfirmOpen(false);
     } finally {
       setIsSaving(false);
     }
@@ -290,13 +300,14 @@ export const SettingsPage: React.FC = () => {
 
   const handleCreateBackup = async () => {
     setIsCreatingBackup(true);
+    setBackupError(null);
     try {
       await apiClient.createBackup();
       setBackupSuccess(true);
       await fetchBackupsList();
       setTimeout(() => setBackupSuccess(false), 4000);
     } catch (err) {
-      console.error('Failed to create database snapshot:', err);
+      setBackupError('The backup could not be created. Try again.');
     } finally {
       setIsCreatingBackup(false);
     }
@@ -304,18 +315,16 @@ export const SettingsPage: React.FC = () => {
 
   const handleSavePreferences = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('ovalens_polling_interval', String(pollingInterval));
-    localStorage.setItem('ovalens_audio_alerts', String(audioAlerts));
-    localStorage.setItem('ovalens_table_density', tableDensity);
+    savePreferences({ pollingInterval, tableDensity, theme });
     setPrefSaved(true);
     setTimeout(() => setPrefSaved(false), 3000);
   };
 
-  if (isError && !facilityName) {
+  if (isError && activeTab === 'facility' && !originalFacility) {
     return (
       <div className="space-y-6 max-w-4xl pb-8">
         <div className="pb-4 border-b border-slate-200">
-          <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
+          <h1 className="text-xl font-bold text-foreground tracking-tight">
             Settings & System Preferences
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -337,7 +346,7 @@ export const SettingsPage: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
-          <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
+          <h1 className="text-xl font-bold text-foreground tracking-tight">
             Settings & System Preferences
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -347,24 +356,24 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-slate-200 gap-1 sm:gap-2">
-        <button
+      <div className="flex flex-wrap border-b border-slate-200 gap-1 sm:gap-2" role="group" aria-label="Settings sections">
+        {canManage && <button
           onClick={() => handleTabChange('facility')}
-          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold  transition-colors border-b ${
             activeTab === 'facility'
-              ? 'border-[#800000] text-[#800000] bg-red-50/50'
+              ? 'border-[#800000] text-brand bg-red-50/50'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
           <Building className="w-4 h-4" />
           <span>Facility & Economics</span>
-        </button>
+        </button>}
 
         <button
           onClick={() => handleTabChange('account')}
-          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold  transition-colors border-b ${
             activeTab === 'account'
-              ? 'border-[#800000] text-[#800000] bg-red-50/50'
+              ? 'border-[#800000] text-brand bg-red-50/50'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
@@ -372,36 +381,38 @@ export const SettingsPage: React.FC = () => {
           <span>My Profile & Password</span>
         </button>
 
-        <button
+        {canManage && <button
           onClick={() => handleTabChange('backups')}
-          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold  transition-colors border-b ${
             activeTab === 'backups'
-              ? 'border-[#800000] text-[#800000] bg-red-50/50'
+              ? 'border-[#800000] text-brand bg-red-50/50'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
           <HardDrive className="w-4 h-4" />
           <span>Database Backups</span>
-        </button>
+        </button>}
 
         <button
           onClick={() => handleTabChange('preferences')}
-          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 ${
+          className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold  transition-colors border-b ${
             activeTab === 'preferences'
-              ? 'border-[#800000] text-[#800000] bg-red-50/50'
+              ? 'border-[#800000] text-brand bg-red-50/50'
               : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
           <Sliders className="w-4 h-4" />
-          <span>UI & Alert Preferences</span>
+          <span>Display preferences</span>
         </button>
       </div>
 
       {/* ========================================================================= */}
       {/* TAB 1: FACILITY & ECONOMICS                                               */}
       {/* ========================================================================= */}
-      {activeTab === 'facility' && (
+      {canManage && activeTab === 'facility' && !originalFacility && <p role="status">Loading facility settings…</p>}
+      {canManage && activeTab === 'facility' && originalFacility && (
         <form onSubmit={(e) => { e.preventDefault(); setIsConfirmOpen(true); }} className="space-y-6">
+          {saveError && <p role="alert" className="p-4 bg-red-50 text-red-800 border border-red-300 rounded-xl">{saveError}</p>}
           {saveSuccess && (
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-emerald-800 text-xs font-medium">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -410,15 +421,15 @@ export const SettingsPage: React.FC = () => {
           )}
 
           {/* Section 1: Facility Branding */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="bg-card border border-slate-200 rounded-xl p-5 ">
             <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-              <Building className="w-4 h-4 text-[#800000]" />
+              <Building className="w-4 h-4 text-brand" />
               <h2 className="text-sm font-semibold text-slate-900">Institution & Facility Profile</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Facility Name</label>
-                <input
+                <label htmlFor="settingspage-field-1" className="block text-xs font-medium text-slate-700 mb-1">Facility Name</label>
+                <input id="settingspage-field-1"
                   type="text"
                   value={facilityName}
                   onChange={(e) => setFacilityName(e.target.value)}
@@ -427,8 +438,8 @@ export const SettingsPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Institution Name (e.g. Foundation University)</label>
-                <input
+                <label htmlFor="settingspage-field-2" className="block text-xs font-medium text-slate-700 mb-1">Institution Name (e.g. Foundation University)</label>
+                <input id="settingspage-field-2"
                   type="text"
                   value={institution}
                   onChange={(e) => setInstitution(e.target.value)}
@@ -440,7 +451,7 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {/* Section 2: Economic Salvage Values */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="bg-card border border-slate-200 rounded-xl p-5 ">
             <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
               <Coins className="w-4 h-4 text-amber-600" />
               <div>
@@ -450,10 +461,10 @@ export const SettingsPage: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Day-10 Penoy Unit Price (₱)</label>
+                <label htmlFor="settingspage-day-10-penoy-unit-price" className="block text-xs font-medium text-slate-700 mb-1">Day-10 Penoy Unit Price (₱)</label>
                 <div className="relative">
                   <span className="absolute left-3 top-2 text-xs text-slate-400 font-semibold">₱</span>
-                  <input
+                  <input id="settingspage-day-10-penoy-unit-price"
                     type="number"
                     step="0.50"
                     min="0"
@@ -466,10 +477,10 @@ export const SettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Day-28 Duckling Selling Price (₱)</label>
+                <label htmlFor="settingspage-day-28-duckling-selling-price" className="block text-xs font-medium text-slate-700 mb-1">Day-28 Duckling Selling Price (₱)</label>
                 <div className="relative">
                   <span className="absolute left-3 top-2 text-xs text-slate-400 font-semibold">₱</span>
-                  <input
+                  <input id="settingspage-day-28-duckling-selling-price"
                     type="number"
                     step="1.00"
                     min="0"
@@ -482,10 +493,10 @@ export const SettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Electricity Tariff Rate (₱/kWh)</label>
+                <label htmlFor="settingspage-electricity-tariff-rate-kwh" className="block text-xs font-medium text-slate-700 mb-1">Electricity Tariff Rate (₱/kWh)</label>
                 <div className="relative">
                   <span className="absolute left-3 top-2 text-xs text-slate-400 font-semibold">₱</span>
-                  <input
+                  <input id="settingspage-electricity-tariff-rate-kwh"
                     type="number"
                     step="0.10"
                     min="0"
@@ -500,7 +511,7 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {/* Section 3: AI & Hardware Conveyor Calibration */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="bg-card border border-slate-200 rounded-xl p-5 ">
             <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
               <Zap className="w-4 h-4 text-emerald-600" />
               <h2 className="text-sm font-semibold text-slate-900">AI Vision & Conveyor Sorter Parameters</h2>
@@ -508,12 +519,12 @@ export const SettingsPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs font-medium text-slate-700">YOLOv8 Confidence Threshold</label>
+                  <label htmlFor="settingspage-yolov8-confidence-threshold" className="text-xs font-medium text-slate-700">YOLOv8 Confidence Threshold</label>
                   <span className="text-xs font-bold text-slate-900">{(confidenceThreshold * 100).toFixed(0)}%</span>
                 </div>
-                <input
+                <input id="settingspage-yolov8-confidence-threshold"
                   type="range"
-                  min="0.50"
+                  min="0.75"
                   max="0.99"
                   step="0.01"
                   value={confidenceThreshold}
@@ -523,8 +534,8 @@ export const SettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Conveyor Speed (cm/s)</label>
-                <input
+                <label htmlFor="settingspage-field-3" className="block text-xs font-medium text-slate-700 mb-1">Conveyor Speed (cm/s)</label>
+                <input id="settingspage-field-3"
                   type="number"
                   step="0.5"
                   min="1"
@@ -535,8 +546,8 @@ export const SettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Sensor to Chute Distance (cm)</label>
-                <input
+                <label htmlFor="settingspage-field-4" className="block text-xs font-medium text-slate-700 mb-1">Sensor to Chute Distance (cm)</label>
+                <input id="settingspage-field-4"
                   type="number"
                   step="1.0"
                   min="5"
@@ -559,7 +570,7 @@ export const SettingsPage: React.FC = () => {
             <button
               type="submit"
               disabled={isSaving}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#800000] hover:bg-[#5C0000] text-white text-xs font-semibold rounded-lg shadow-xs transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#800000] hover:bg-[#5C0000] text-white text-xs font-semibold rounded-lg  transition-colors disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               <span>{isSaving ? 'Saving Changes...' : 'Save Facility Constants'}</span>
@@ -574,10 +585,10 @@ export const SettingsPage: React.FC = () => {
       {activeTab === 'account' && (
         <div className="space-y-6">
           {/* Account Details Card */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="bg-card border border-slate-200 rounded-xl p-5 ">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#800000]/10 border border-[#800000]/20 flex items-center justify-center text-[#800000] font-bold text-base">
+                <div className="w-10 h-10 rounded-full bg-[#800000]/10 border border-[#800000]/20 flex items-center justify-center text-brand font-bold text-base">
                   {user?.full_name?.charAt(0).toUpperCase() || 'U'}
                 </div>
                 <div>
@@ -586,11 +597,11 @@ export const SettingsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${
                     user?.role === 'ADMIN'
-                      ? 'bg-red-50 text-[#800000] border-red-200'
+                      ? 'bg-red-50 text-brand border-red-200'
                       : user?.role === 'MANAGER'
                       ? 'bg-blue-50 text-blue-800 border-blue-200'
                       : 'bg-slate-100 text-slate-700 border-slate-200'
@@ -620,9 +631,9 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {/* Edit Profile Name Form */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="bg-card border border-slate-200 rounded-xl p-5 ">
             <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-              <UserIcon className="w-4 h-4 text-[#800000]" />
+              <UserIcon className="w-4 h-4 text-brand" />
               <h2 className="text-sm font-semibold text-slate-900">Edit Profile Information</h2>
             </div>
 
@@ -634,7 +645,7 @@ export const SettingsPage: React.FC = () => {
             )}
 
             {profileError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-800 text-xs font-medium">
+              <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-800 text-xs font-medium">
                 <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
                 <span>{profileError}</span>
               </div>
@@ -642,8 +653,8 @@ export const SettingsPage: React.FC = () => {
 
             <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Display Name / Research Title</label>
-                <input
+                <label htmlFor="settingspage-field-5" className="block text-xs font-medium text-slate-700 mb-1">Display Name / Research Title</label>
+                <input id="settingspage-field-5"
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
@@ -651,14 +662,14 @@ export const SettingsPage: React.FC = () => {
                   className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
                   required
                 />
-                <p className="text-xs text-slate-400 mt-1">This name will appear on candling session records and official PDF certificates.</p>
+                <p className="text-xs text-slate-600 mt-1">This name will appear on candling session records and official PDF certificates.</p>
               </div>
 
               <div className="flex justify-end">
                 <button
                   type="submit"
                   disabled={isSavingProfile || fullName === user?.full_name}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#800000] hover:bg-[#5C0000] text-white text-xs font-semibold rounded-lg shadow-xs transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#800000] hover:bg-[#5C0000] text-white text-xs font-semibold rounded-lg  transition-colors disabled:opacity-50"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>{isSavingProfile ? 'Saving...' : 'Update Name'}</span>
@@ -668,7 +679,7 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {/* Change Password Form */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="bg-card border border-slate-200 rounded-xl p-5 ">
             <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
               <Key className="w-4 h-4 text-amber-600" />
               <div>
@@ -685,7 +696,7 @@ export const SettingsPage: React.FC = () => {
             )}
 
             {passwordError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-800 text-xs font-medium">
+              <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-800 text-xs font-medium">
                 <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
                 <span>{passwordError}</span>
               </div>
@@ -693,9 +704,9 @@ export const SettingsPage: React.FC = () => {
 
             <form onSubmit={handleChangePassword} className="space-y-4 max-w-lg">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Current Password</label>
+                <label htmlFor="settingspage-field-6" className="block text-xs font-medium text-slate-700 mb-1">Current Password</label>
                 <div className="relative">
-                  <input
+                  <input id="settingspage-field-6"
                     type={showCurrentPassword ? 'text' : 'password'}
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
@@ -714,9 +725,9 @@ export const SettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">New Password</label>
+                <label htmlFor="settingspage-field-7" className="block text-xs font-medium text-slate-700 mb-1">New Password</label>
                 <div className="relative">
-                  <input
+                  <input id="settingspage-field-7"
                     type={showNewPassword ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
@@ -735,8 +746,8 @@ export const SettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Confirm New Password</label>
-                <input
+                <label htmlFor="settingspage-field-8" className="block text-xs font-medium text-slate-700 mb-1">Confirm New Password</label>
+                <input id="settingspage-field-8"
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -750,7 +761,7 @@ export const SettingsPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isChangingPassword || !currentPassword || !newPassword}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#800000] hover:bg-[#5C0000] text-white text-xs font-semibold rounded-lg shadow-xs transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#800000] hover:bg-[#5C0000] text-white text-xs font-semibold rounded-lg  transition-colors disabled:opacity-50"
                 >
                   <Key className="w-3.5 h-3.5" />
                   <span>{isChangingPassword ? 'Changing Password...' : 'Update Password'}</span>
@@ -764,12 +775,12 @@ export const SettingsPage: React.FC = () => {
       {/* ========================================================================= */}
       {/* TAB 3: DATABASE BACKUPS                                                   */}
       {/* ========================================================================= */}
-      {activeTab === 'backups' && (
+      {canManage && activeTab === 'backups' && (
         <div className="space-y-6">
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="bg-card border border-slate-200 rounded-xl p-5 ">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Database className="w-5 h-5 text-[#800000]" />
+              <div className="flex items-center gap-2 flex-wrap">
+                <Database className="w-5 h-5 text-brand" />
                 <div>
                   <h2 className="text-sm font-semibold text-slate-900">Automated PostgreSQL Database Snapshots</h2>
                   <p className="text-xs text-slate-500">Generate gzip-compressed JSON archives of all batches, scans, users, and audit logs.</p>
@@ -779,14 +790,15 @@ export const SettingsPage: React.FC = () => {
               <button
                 onClick={handleCreateBackup}
                 disabled={isCreatingBackup}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-[#800000] hover:bg-[#5C0000] text-white text-xs font-semibold rounded-lg shadow-xs transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-[#800000] hover:bg-[#5C0000] text-white text-xs font-semibold rounded-lg  transition-colors disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isCreatingBackup ? 'animate-spin' : ''}`} />
                 <span>{isCreatingBackup ? 'Generating Snapshot...' : 'Create Backup Snapshot'}</span>
               </button>
             </div>
 
-            {backupSuccess && (
+            {backupError && <p role="alert" className="p-4 bg-red-50 text-red-800 border border-red-300 rounded-xl">{backupError}</p>}
+          {backupSuccess && (
               <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-emerald-800 text-xs font-medium">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>New database backup snapshot created successfully!</span>
@@ -823,7 +835,7 @@ export const SettingsPage: React.FC = () => {
                             <a
                               href={apiClient.downloadBackupUrl(b.filename)}
                               download={b.filename}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-[#800000] hover:text-[#5C0000] bg-red-50 px-2.5 py-1 rounded border border-red-200"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:text-[#5C0000] bg-red-50 px-2.5 py-1 rounded border border-red-200"
                             >
                               <Download className="w-3 h-3" />
                               <span>Download .gz</span>
@@ -852,21 +864,21 @@ export const SettingsPage: React.FC = () => {
             </div>
           )}
 
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-5">
+          <div className="bg-card border border-slate-200 rounded-xl p-5  space-y-5">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-              <Sliders className="w-4 h-4 text-[#800000]" />
+              <Sliders className="w-4 h-4 text-brand" />
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">Dashboard Operational Preferences</h2>
-                <p className="text-xs text-slate-500">Configure background polling speed and sensory alert chimes.</p>
+                <h2 className="text-sm font-semibold text-slate-900">Display preferences</h2>
+                <p className="text-xs text-slate-500">Choose the scan refresh interval, appearance, and table spacing.</p>
               </div>
             </div>
 
             {/* Polling Interval */}
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label htmlFor="settingspage-field-9" className="block text-xs font-medium text-slate-700 mb-1">
                 Background Data Polling Frequency
               </label>
-              <select
+              <select id="settingspage-field-9"
                 value={pollingInterval}
                 onChange={(e) => setPollingInterval(Number(e.target.value))}
                 className="w-full sm:w-72 text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
@@ -876,33 +888,27 @@ export const SettingsPage: React.FC = () => {
                 <option value={30}>30 seconds (Low Network Usage)</option>
                 <option value={0}>Manual Refresh Only</option>
               </select>
-              <p className="text-xs text-slate-400 mt-1">Controls how often the dashboard polls PostgreSQL for active egg scans.</p>
+              <p className="text-xs text-slate-600 mt-1">Controls how often the dashboard polls PostgreSQL for active egg scans.</p>
             </div>
 
-            {/* Audio Alerts */}
-            <div className="flex items-start justify-between pt-3 border-t border-slate-100">
-              <div>
-                <span className="text-xs font-semibold text-slate-900 block">Biological Anomaly Audio Alerts</span>
-                <span className="text-xs text-slate-500">Play an audible chime when a batch drops below baseline fertility (&gt;15% drop).</span>
-              </div>
-              <input
-                type="checkbox"
-                checked={audioAlerts}
-                onChange={(e) => setAudioAlerts(e.target.checked)}
-                className="mt-1 w-4 h-4 accent-[#800000] rounded cursor-pointer"
-              />
+            <div className="border-t border-slate-200 pt-4">
+              <label htmlFor="dashboard-theme" className="block font-medium mb-2">Appearance</label>
+              <select id="dashboard-theme" value={theme} onChange={e => setTheme(e.target.value as 'light' | 'dark')} className="border border-slate-300 rounded-lg px-3 py-2 bg-card">
+                <option value="light">Light</option><option value="dark">Dark</option>
+              </select>
             </div>
 
             {/* Table Density */}
-            <div className="flex items-start justify-between pt-3 border-t border-slate-100">
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-start justify-between pt-3 border-t border-slate-100">
               <div>
                 <span className="text-xs font-semibold text-slate-900 block">Scan Explorer Table Density</span>
-                <span className="text-xs text-slate-500">Choose between compact high-density view or spaced cards.</span>
+                <span className="text-xs text-slate-500">Choose tighter or more spacious table rows.</span>
               </div>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setTableDensity('compact')}
+                  aria-pressed={tableDensity === 'compact'}
                   className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                     tableDensity === 'compact'
                       ? 'bg-[#800000] text-white border-[#800000]'
@@ -914,6 +920,7 @@ export const SettingsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setTableDensity('comfortable')}
+                  aria-pressed={tableDensity === 'comfortable'}
                   className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                     tableDensity === 'comfortable'
                       ? 'bg-[#800000] text-white border-[#800000]'
@@ -929,7 +936,7 @@ export const SettingsPage: React.FC = () => {
           <div className="flex justify-end">
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#800000] hover:bg-[#5C0000] text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#800000] hover:bg-[#5C0000] text-white text-xs font-semibold rounded-lg  transition-colors"
             >
               <Save className="w-3.5 h-3.5" />
               <span>Save UI Preferences</span>
@@ -947,7 +954,7 @@ export const SettingsPage: React.FC = () => {
         description="You are about to modify system-wide economic constants and hardware parameters. This will update future financial yield projections."
         diffs={calculateDiffs()}
         confirmText="Save Changes"
-        cancelText="Discard"
+        cancelText="Keep editing"
         variant="primary"
         isLoading={isSaving}
       />

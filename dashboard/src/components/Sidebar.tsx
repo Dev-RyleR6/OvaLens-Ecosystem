@@ -1,136 +1,62 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Layers,
-  ScanLine,
-  TrendingUp,
-  Cpu,
-  Users,
-  Settings,
-  HardDrive,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { LayoutDashboard, Layers, ScanLine, TrendingUp, Cpu, Users, Settings, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { apiClient } from '../api/client';
+import { Device } from '../types';
+import { usePreferences } from '../hooks/usePreferences';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
+import { deviceAvailability } from '../lib/deviceStatus';
 
-interface SidebarProps {
-  isOpen?: boolean;
-  onClose?: () => void;
-}
+interface SidebarProps { isOpen?: boolean; onClose?: () => void; }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
   const { user } = useAuth();
-  const userRole = user?.role || 'ADMIN';
-
-  const operationsNav = [
+  const { pollingInterval } = usePreferences();
+  const [devices, setDevices] = useState<Device[] | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const [now, setNow] = useState(Date.now);
+  const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
+  const dialogRef = useDialogAccessibility(isOpen && mobile, () => onClose?.(), 'Navigation');
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1023px)');
+    const update = () => setMobile(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  useEffect(() => {
+    let active = true;
+    const refresh = () => apiClient.getDevices().then(data => {
+      if (active) { setDevices(data); setUnavailable(false); }
+    }).catch(() => { if (active) setUnavailable(true); });
+    void refresh();
+    const timer = pollingInterval > 0 ? setInterval(() => { void refresh(); }, pollingInterval * 1000) : undefined;
+    return () => { active = false; clearInterval(timer); };
+  }, [pollingInterval]);
+  const reporting = devices?.filter(device => ['ONLINE', 'SCANNING'].includes(deviceAvailability(device, now))).length ?? 0;
+  const links = [
     { to: '/', label: 'Overview', icon: LayoutDashboard },
-    { to: '/batches', label: 'Incubation Batches', icon: Layers },
-    { to: '/scans', label: 'Candling Scans', icon: ScanLine },
-    { to: '/analytics', label: 'Economics & Salvage', icon: TrendingUp },
-    { to: '/devices', label: 'Edge Sorter Nodes', icon: Cpu },
+    { to: '/batches', label: 'Incubation batches', icon: Layers },
+    { to: '/scans', label: 'Candling scans', icon: ScanLine },
+    { to: '/analytics', label: 'Economics & salvage', icon: TrendingUp },
+    { to: '/devices', label: 'Sorter devices', icon: Cpu },
+    ...(user?.role === 'ADMIN' ? [{ to: '/users', label: 'Users & access', icon: Users }] : []),
+    { to: user?.role === 'OPERATOR' ? '/settings?tab=account' : '/settings', label: user?.role === 'OPERATOR' ? 'My account' : 'Settings', icon: Settings },
   ];
-
-  const adminNav = [
-    { to: '/users', label: 'User & Access', icon: Users, minRole: ['ADMIN'] },
-    { to: '/settings', label: 'Hatchery Settings', icon: Settings, minRole: ['ADMIN', 'MANAGER'] },
-  ].filter(item => item.minRole.includes(userRole));
-
   return (
-    <>
-      {/* Mobile Backdrop Overlay */}
-      {isOpen && (
-        <div
-          onClick={onClose}
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 lg:hidden transition-opacity animate-fade-in"
-        />
-      )}
-
-      <aside
-        className={cn(
-          "w-64 border-r border-[#E2E8F0] bg-white flex flex-col justify-between flex-shrink-0 z-50 h-full overflow-y-auto transition-transform duration-300 ease-in-out",
-          "fixed lg:static inset-y-0 left-0",
-          isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
-        )}
-      >
-        {/* Navigation List */}
-        <div className="p-4 space-y-5">
-          {/* Operations Section */}
-          <div className="space-y-1">
-            <p className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              Operations Command
-            </p>
-
-            {operationsNav.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  onClick={() => onClose?.()}
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all btn-press",
-                      isActive
-                        ? "bg-[#800000] text-white shadow-xs"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                    )
-                  }
-                >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  <span>{item.label}</span>
-                </NavLink>
-              );
-            })}
-          </div>
-
-          {/* Administration Section */}
-          <div className="space-y-1">
-            <p className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              Administration & Archives
-            </p>
-
-            {adminNav.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  onClick={() => onClose?.()}
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all btn-press",
-                      isActive
-                        ? "bg-[#800000] text-white shadow-xs"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                    )
-                  }
-                >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  <span>{item.label}</span>
-                </NavLink>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Bottom Hardware Status Card */}
-        <div className="p-3.5 m-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 hover:border-slate-300 transition-colors">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <HardDrive className="w-3.5 h-3.5 text-slate-700" />
-              <span className="text-xs font-bold text-slate-800">Station-01-RP5</span>
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-              Online
-            </span>
-          </div>
-
-          <p className="text-[11px] text-slate-500 leading-snug">
-            ONNX FP16 Vision Engine active on conveyor lane 1.
-          </p>
-        </div>
+    <div ref={dialogRef} className={`mobile-navigation ${isOpen ? 'is-open' : ''} lg:visible lg:relative lg:w-60 lg:shrink-0`} id="dashboard-navigation">
+      {isOpen && mobile && <div className="fixed inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />}
+      <aside className="relative w-60 h-full border-r border-border bg-card flex flex-col">
+        <div className="lg:hidden flex items-center justify-between p-4 border-b border-border"><span className="font-semibold">Navigation</span><button onClick={onClose} aria-label="Close navigation"><X className="w-5 h-5" /></button></div>
+        <nav aria-label="Main navigation" className="p-3 space-y-1 flex-1 overflow-y-auto">
+          {links.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} onClick={onClose} className={({ isActive }) => `flex items-center gap-3 px-3 py-3 rounded-lg ${isActive ? 'bg-maroon-50 text-brand font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}><Icon className="w-4 h-4 shrink-0" aria-hidden="true" />{label}</NavLink>)}
+        </nav>
+        <div className="p-5 border-t border-border space-y-1"><p className="font-medium">Sorter connections</p><p className="text-sm text-slate-600">{unavailable ? 'Device status unavailable' : devices === null ? 'Checking device records…' : `${reporting} of ${devices.length} recently reporting`}</p><p className="text-xs text-slate-500">Based on heartbeats within 90 seconds.{pollingInterval === 0 ? ' Refresh the page to check again.' : ''}</p></div>
       </aside>
-    </>
+    </div>
   );
 };

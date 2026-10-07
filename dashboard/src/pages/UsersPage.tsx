@@ -25,6 +25,8 @@ type SortField = 'full_name' | 'role' | 'created_at';
 type SortOrder = 'asc' | 'desc';
 
 export const UsersPage: React.FC = () => {
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
@@ -70,19 +72,15 @@ export const UsersPage: React.FC = () => {
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await apiClient.createUser({
-      full_name: fullName,
-      email,
-      password,
-      role,
-    });
-    setIsRegisterOpen(false);
-    setFullName('');
-    setEmail('');
-    setPassword('');
-    fetchUsers();
-    setToastMessage(`Account for ${fullName} created successfully.`);
-    setTimeout(() => setToastMessage(null), 3000);
+    if (isRegistering) return;
+    setIsRegistering(true); setSaveError(null);
+    try {
+      await apiClient.createUser({ full_name: fullName, email, password, role });
+      setIsRegisterOpen(false); setFullName(''); setEmail(''); setPassword('');
+      void fetchUsers(); setToastMessage(`Account for ${fullName} created.`);
+      setTimeout(() => setToastMessage(null), 3000);
+    } catch { setSaveError('The account could not be created. Check the email address and password requirements, then try again.'); }
+    finally { setIsRegistering(false); }
   };
 
   const handleConfirmToggleStatus = async () => {
@@ -98,7 +96,7 @@ export const UsersPage: React.FC = () => {
       );
       setTimeout(() => setToastMessage(null), 3500);
     } catch (err) {
-      console.error('Failed to toggle user status:', err);
+      setSaveError('Account access could not be updated. Refresh the list and try again.');
     } finally {
       setIsTogglingStatus(false);
       setUserToToggle(null);
@@ -161,10 +159,11 @@ export const UsersPage: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-8">
+      {saveError && !isRegisterOpen && <p role="alert" className="p-4 bg-red-50 text-red-800 border border-red-300 rounded-xl">{saveError}</p>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
-          <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
+          <h1 className="text-xl font-bold text-foreground tracking-tight">
             User & Access Management
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -174,7 +173,7 @@ export const UsersPage: React.FC = () => {
 
         <button
           onClick={() => setIsRegisterOpen(true)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-semibold  transition-colors cursor-pointer"
         >
           <UserPlus className="w-4 h-4" />
           <span>Register New Operator</span>
@@ -189,19 +188,19 @@ export const UsersPage: React.FC = () => {
       )}
 
       {/* Enterprise Filter Toolbar */}
-      <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xs space-y-3">
+      <div className="bg-card border border-border rounded-xl p-4  space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
           <div className="relative w-full sm:w-80">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search by operator name or email..."
-              value={searchQuery}
+              aria-label="Search users" value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#800000] shadow-xs"
+              className="w-full h-9 pl-9 pr-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#800000] "
             />
           </div>
 
@@ -209,9 +208,9 @@ export const UsersPage: React.FC = () => {
             <button
               onClick={() => setViewMode('TABLE')}
               className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${
-                viewMode === 'TABLE' ? 'bg-white text-[#800000] shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                viewMode === 'TABLE' ? 'bg-card text-brand ' : 'text-slate-500 hover:text-slate-800'
               }`}
-              title="Table View"
+              aria-label="Table View" title="Table View"
             >
               <List className="w-3.5 h-3.5" />
               <span>Table</span>
@@ -219,9 +218,9 @@ export const UsersPage: React.FC = () => {
             <button
               onClick={() => setViewMode('GRID')}
               className={`p-1.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${
-                viewMode === 'GRID' ? 'bg-white text-[#800000] shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                viewMode === 'GRID' ? 'bg-card text-brand ' : 'text-slate-500 hover:text-slate-800'
               }`}
-              title="User Cards View"
+              aria-label="User Cards View" title="User Cards View"
             >
               <LayoutGrid className="w-3.5 h-3.5" />
               <span>Grid</span>
@@ -231,12 +230,12 @@ export const UsersPage: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
           <select
-            value={roleFilter}
+            aria-label="Role" value={roleFilter}
             onChange={(e) => {
               setRoleFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
+            className="h-9 px-3 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000]  cursor-pointer"
           >
             <option value="ALL">All Roles</option>
             <option value="ADMIN">Lead Admin</option>
@@ -245,12 +244,12 @@ export const UsersPage: React.FC = () => {
           </select>
 
           <select
-            value={statusFilter}
+            aria-label="Account status" value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] shadow-xs cursor-pointer"
+            className="h-9 px-3 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000]  cursor-pointer"
           >
             <option value="ALL">All Account Statuses</option>
             <option value="ACTIVE">Active Only</option>
@@ -275,14 +274,14 @@ export const UsersPage: React.FC = () => {
           onAction={() => setIsRegisterOpen(true)}
         />
       ) : viewMode === 'TABLE' ? (
-        <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-xs overflow-hidden">
+        <div className="bg-card border border-border rounded-xl  overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <th
                     className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                    onClick={() => toggleSort('full_name')}
+                    tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort('full_name'); } }} onClick={() => toggleSort('full_name')}
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Operator / Name</span>
@@ -292,7 +291,7 @@ export const UsersPage: React.FC = () => {
                   <th className="py-3 px-4">Email</th>
                   <th
                     className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                    onClick={() => toggleSort('role')}
+                    tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort('role'); } }} onClick={() => toggleSort('role')}
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Role & Access</span>
@@ -302,7 +301,7 @@ export const UsersPage: React.FC = () => {
                   <th className="py-3 px-4">Status</th>
                   <th
                     className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                    onClick={() => toggleSort('created_at')}
+                    tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort('created_at'); } }} onClick={() => toggleSort('created_at')}
                   >
                     <div className="flex items-center gap-1.5">
                       <span>Registered</span>
@@ -315,9 +314,9 @@ export const UsersPage: React.FC = () => {
               <tbody className="divide-y divide-slate-100">
                 {paginatedUsers.map((u) => (
                   <tr key={u.user_id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-3 px-4 font-bold text-[#0F172A]">
+                    <td className="py-3 px-4 font-bold text-foreground">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full bg-maroon-50 border border-maroon-200 text-[#800000] flex items-center justify-center font-bold text-xs">
+                        <div className="w-7 h-7 rounded-full bg-maroon-50 border border-maroon-200 text-brand flex items-center justify-center font-bold text-xs">
                           {u.full_name.charAt(0)}
                         </div>
                         <span>{u.full_name}</span>
@@ -328,7 +327,7 @@ export const UsersPage: React.FC = () => {
                       <span
                         className={`inline-flex items-center gap-2 w-28 px-2.5 py-1 rounded-md text-xs font-semibold border ${
                           u.role === 'ADMIN'
-                            ? 'bg-red-50 text-[#800000] border-red-200'
+                            ? 'bg-red-50 text-brand border-red-200'
                             : u.role === 'MANAGER'
                             ? 'bg-blue-50 text-blue-800 border-blue-200'
                             : 'bg-slate-100 text-slate-700 border-slate-200'
@@ -378,16 +377,16 @@ export const UsersPage: React.FC = () => {
           {paginatedUsers.map((u) => (
             <div
               key={u.user_id}
-              className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs hover:border-[#800000] transition-colors space-y-3.5 flex flex-col justify-between"
+              className="bg-card border border-border rounded-xl p-5  hover:border-[#800000] transition-colors space-y-3.5 flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-maroon-50 border border-maroon-200 text-[#800000] flex items-center justify-center font-bold text-sm">
+                    <div className="w-10 h-10 rounded-full bg-maroon-50 border border-maroon-200 text-brand flex items-center justify-center font-bold text-sm">
                       {u.full_name.charAt(0)}
                     </div>
                     <div>
-                      <h3 className="font-bold text-[#0F172A] text-sm">{u.full_name}</h3>
+                      <h3 className="font-bold text-foreground text-sm">{u.full_name}</h3>
                       <span className="text-[11px] text-slate-500 font-mono block">{u.email}</span>
                     </div>
                   </div>
@@ -408,7 +407,7 @@ export const UsersPage: React.FC = () => {
                   <span
                     className={`inline-flex items-center gap-2 w-28 px-2.5 py-1 rounded-md text-xs font-semibold border ${
                       u.role === 'ADMIN'
-                        ? 'bg-red-50 text-[#800000] border-red-200'
+                        ? 'bg-red-50 text-brand border-red-200'
                         : u.role === 'MANAGER'
                         ? 'bg-blue-50 text-blue-800 border-blue-200'
                         : 'bg-slate-100 text-slate-700 border-slate-200'
@@ -442,17 +441,17 @@ export const UsersPage: React.FC = () => {
 
       {/* Pagination Controls */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 pt-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span>Showing {paginatedUsers.length} of {processedUsers.length} users</span>
           <span>•</span>
           <span>Rows per page:</span>
           <select
-            value={rowsPerPage}
+            aria-label="Rows per page" value={rowsPerPage}
             onChange={(e) => {
               setRowsPerPage(Number(e.target.value));
               setCurrentPage(1);
             }}
-            className="h-7 px-2 bg-white border border-slate-200 rounded text-slate-700 font-medium focus:outline-none"
+            className="h-7 px-2 bg-card border border-slate-200 rounded text-slate-700 font-medium focus:outline-none"
           >
             <option value={5}>5</option>
             <option value={10}>10</option>
@@ -463,7 +462,7 @@ export const UsersPage: React.FC = () => {
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
+            aria-label="Previous page" disabled={currentPage === 1}
             className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -473,7 +472,7 @@ export const UsersPage: React.FC = () => {
           </span>
           <button
             onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
+            aria-label="Next page" disabled={currentPage === totalPages}
             className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
           >
             <ChevronRight className="w-4 h-4" />
@@ -484,52 +483,53 @@ export const UsersPage: React.FC = () => {
       {/* Registration Modal Dialog */}
       <Dialog
         isOpen={isRegisterOpen}
-        onClose={() => setIsRegisterOpen(false)}
+        onClose={() => { if (!isRegistering) setIsRegisterOpen(false); }}
         title="Register New Hatchery Operator"
         description="Create an authorized user credential for candling station shifts."
       >
         <form onSubmit={handleRegisterSubmit} className="space-y-4 text-sm">
+          {saveError && <p role="alert" className="text-red-800">{saveError}</p>}
           <div className="space-y-1.5">
-            <label className="font-semibold text-xs text-slate-700">Full Name</label>
-            <input
+            <label htmlFor="userspage-field-1" className="font-semibold text-xs text-slate-700">Full Name</label>
+            <input id="userspage-field-1"
               required
               placeholder="e.g. Maria Clara"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
+              className="w-full h-9 px-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="font-semibold text-xs text-slate-700">Institutional Email</label>
-            <input
+            <label htmlFor="userspage-field-2" className="font-semibold text-xs text-slate-700">Institutional Email</label>
+            <input id="userspage-field-2"
               type="email"
               required
               placeholder="e.g. maria.clara@foundationu.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
+              className="w-full h-9 px-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="font-semibold text-xs text-slate-700">Temporary Password</label>
-            <input
+            <label htmlFor="userspage-field-3" className="font-semibold text-xs text-slate-700">Temporary Password</label>
+            <input id="userspage-field-3"
               type="password"
               required
               placeholder="Minimum 6 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
+              className="w-full h-9 px-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000]"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="font-semibold text-xs text-slate-700">Assigned Role</label>
-            <select
+            <label htmlFor="userspage-field-4" className="font-semibold text-xs text-slate-700">Assigned Role</label>
+            <select id="userspage-field-4"
               value={role}
               onChange={(e) => setRole(e.target.value as UserRole)}
-              className="w-full h-9 px-3 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-[#800000]"
+              className="w-full h-9 px-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-[#800000]"
             >
               <option value="OPERATOR">Sorting Operator (Edge Station & Candling)</option>
               <option value="MANAGER">Hatchery Manager (Batches & Analytics)</option>
@@ -540,14 +540,14 @@ export const UsersPage: React.FC = () => {
           <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
             <button
               type="button"
-              onClick={() => setIsRegisterOpen(false)}
+              disabled={isRegistering} onClick={() => setIsRegisterOpen(false)}
               className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 cursor-pointer"
             >
               Cancel
             </button>
             <button
-              type="submit"
-              className="px-4 py-2 text-xs font-bold text-white bg-[#800000] hover:bg-[#6B0000] rounded-lg shadow-xs cursor-pointer"
+              type="submit" disabled={isRegistering}
+              className="px-4 py-2 text-xs font-bold text-white bg-[#800000] hover:bg-[#6B0000] rounded-lg  cursor-pointer"
             >
               Create Account
             </button>

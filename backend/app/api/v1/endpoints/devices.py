@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.device import DeviceModel
-from app.schemas.device import DeviceRegister, DeviceHeartbeat, DeviceResponse
-from app.api.deps import verify_api_key, get_current_user
+from app.schemas.device import DeviceRegister, DeviceHeartbeat, DeviceResponse, DeviceCalibrationUpdate
+from app.api.deps import verify_api_key, get_current_user, require_manager_or_admin
 
 router = APIRouter(prefix="/devices", tags=["Edge Devices"])
 
@@ -45,6 +45,24 @@ def register_device(
 
     db.commit()
     db.refresh(device)
+    return device
+
+
+@router.patch("/{device_id}", response_model=DeviceResponse, summary="Save device calibration record")
+def update_device_calibration(
+    device_id: str,
+    payload: DeviceCalibrationUpdate,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_manager_or_admin),
+):
+    device = db.query(DeviceModel).filter(DeviceModel.device_id == device_id).first()
+    if not device:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
+    for key, value in payload.model_dump().items():
+        setattr(device, key, value)
+    db.commit()
+    db.refresh(device)
+    # This updates the database only; no hardware acknowledgement is implied.
     return device
 
 

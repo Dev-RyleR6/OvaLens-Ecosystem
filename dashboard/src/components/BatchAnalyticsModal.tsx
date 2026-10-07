@@ -1,3 +1,4 @@
+import { useDialogAccessibility } from '@/hooks/useDialogAccessibility';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -49,16 +50,21 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
   if (batchId) lastBatchIdRef.current = batchId;
   const displayBatchId = batchId || lastBatchIdRef.current;
 
+  const [error, setError] = useState(false);
   const [data, setData] = useState<BatchAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { shouldRender, isClosing } = useModalAnimation(isOpen, 220);
+  const dialogRef = useDialogAccessibility(isOpen && shouldRender, onClose, 'Batch details');
 
   useEffect(() => {
     if (isOpen && displayBatchId) {
       setIsLoading(true);
+      setError(false);
+      setData(null);
       apiClient
         .getBatchAnalytics(displayBatchId)
         .then((res) => setData(res))
+        .catch(() => setError(true))
         .finally(() => setIsLoading(false));
     }
   }, [isOpen, displayBatchId]);
@@ -73,11 +79,11 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
     : [];
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 bg-slate-900/65 backdrop-blur-xs transition-opacity",
+          "fixed inset-0 bg-slate-900/65  transition-opacity",
           isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
         )}
         onClick={onClose}
@@ -85,14 +91,14 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
 
       <div
         className={cn(
-          "bg-white border border-slate-200/90 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] flex flex-col overflow-hidden z-10 my-auto",
+          "bg-card border border-slate-200/90 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] flex flex-col overflow-hidden z-10 my-auto",
           isClosing ? "animate-modal-content-exit" : "animate-modal-content"
         )}
       >
         {/* Modal Header */}
-        <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-white/95 backdrop-blur-xs flex-shrink-0 z-10">
+        <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-card/95  flex-shrink-0 z-10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#800000]/10 text-[#800000] flex items-center justify-center font-black flex-shrink-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#800000]/10 text-brand flex items-center justify-center font-semibold flex-shrink-0">
               <Activity className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
@@ -100,7 +106,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
                   {data?.batch_code || displayBatchId} Analytics
                 </h2>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#800000]/10 text-[#800000] border border-[#800000]/20">
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#800000]/10 text-brand border border-[#800000]/20">
                   {data?.breed || 'KAYUMANGGI'}
                 </span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
@@ -113,7 +119,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
             </div>
           </div>
 
-          <button
+          <button aria-label="Close batch details"
             onClick={onClose}
             className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer flex-shrink-0"
           >
@@ -123,6 +129,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
 
         {/* Modal Content */}
         <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+          {error && <p role="alert" className="text-red-800">Batch details could not be loaded. Close and reopen the batch to retry.</p>}
           {isLoading ? (
             <div className="py-20 text-center text-xs text-slate-500 font-medium">
               Loading deep batch analytics...
@@ -136,11 +143,11 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                     <span>Day 10 Fertility</span>
                     <TrendingUp className="w-4 h-4 text-emerald-600" />
                   </div>
-                  <div className="text-2xl font-black text-slate-900 tracking-tight">
+                  <div className="text-2xl font-semibold text-slate-900 tracking-tight">
                     {data.day_10_fertility_rate}%
                   </div>
                   <p className="text-[10px] text-slate-500">
-                    {data.fertile_day_10} viable / {data.total_scanned_day_10 || data.initial_egg_count} eggs
+                    {data.fertile_day_10} viable / {data.total_scanned_day_10} eggs
                   </p>
                 </div>
 
@@ -149,7 +156,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                     <span>Penoy Salvaged</span>
                     <Coins className="w-4 h-4 text-amber-600" />
                   </div>
-                  <div className="text-2xl font-black text-amber-900 tracking-tight">
+                  <div className="text-2xl font-semibold text-amber-900 tracking-tight">
                     ₱{data.penoy_salvage_value_php.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                   </div>
                   <p className="text-[10px] text-amber-700">
@@ -162,7 +169,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                     <span>Power Saved</span>
                     <Zap className="w-4 h-4 text-emerald-600" />
                   </div>
-                  <div className="text-2xl font-black text-emerald-900 tracking-tight">
+                  <div className="text-2xl font-semibold text-emerald-900 tracking-tight">
                     ₱{data.electricity_saved_php.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                   </div>
                   <p className="text-[10px] text-emerald-700">
@@ -173,9 +180,9 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-1">
                   <div className="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
                     <span>Hatchability Rate</span>
-                    <Award className="w-4 h-4 text-[#800000]" />
+                    <Award className="w-4 h-4 text-brand" />
                   </div>
-                  <div className="text-2xl font-black text-slate-900 tracking-tight">
+                  <div className="text-2xl font-semibold text-slate-900 tracking-tight">
                     {data.actual_hatchability_rate > 0 ? `${data.actual_hatchability_rate}%` : 'Pending'}
                   </div>
                   <p className="text-[10px] text-slate-500">
@@ -187,13 +194,13 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
               {/* Visual Distribution Charts */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Donut Chart */}
-                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
+                <div className="bg-card border border-slate-200 rounded-xl p-4  space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold text-slate-900">
                       Day 10 Class Distribution
                     </h3>
                     <span className="text-[11px] text-slate-500 font-medium">
-                      Total: {data.total_scanned_day_10 || data.initial_egg_count} eggs
+                      Total: {data.total_scanned_day_10} eggs
                     </span>
                   </div>
 
@@ -232,7 +239,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                 </div>
 
                 {/* Batch Timeline & Incubation Parameters */}
-                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3 flex flex-col justify-between">
+                <div className="bg-card border border-slate-200 rounded-xl p-4  space-y-3 flex flex-col justify-between">
                   <div>
                     <h3 className="text-xs font-bold text-slate-900 pb-2 border-b border-slate-100">
                       Incubation Progress & Lifecycle
@@ -279,7 +286,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
               </div>
 
               {/* Candling Sessions Log */}
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-3">
+              <div className="bg-card border border-slate-200 rounded-xl p-4  space-y-3">
                 <h3 className="text-xs font-bold text-slate-900">
                   Candling Runs & Conveyor Throughput
                 </h3>
@@ -310,7 +317,7 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                             <td className="py-2 px-3 text-right font-semibold text-slate-900">{s.total_scanned}</td>
                             <td className="py-2 px-3 text-right text-emerald-700 font-bold">{s.fertile_count}</td>
                             <td className="py-2 px-3 text-right text-amber-700 font-bold">{s.infertile_count}</td>
-                            <td className="py-2 px-3 text-right font-bold text-[#800000]">{s.fertility_rate}%</td>
+                            <td className="py-2 px-3 text-right font-bold text-brand">{s.fertility_rate}%</td>
                             <td className="py-2 px-3 text-right text-slate-500">{s.avg_inference_ms} ms</td>
                           </tr>
                         ))}

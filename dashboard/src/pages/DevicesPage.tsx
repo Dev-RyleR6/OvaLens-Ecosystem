@@ -1,3 +1,5 @@
+import { useAuth } from '../context/AuthContext';
+import { deviceAvailability } from '../lib/deviceStatus';
 import React, { useState, useEffect } from 'react';
 import {
   Cpu,
@@ -19,12 +21,15 @@ import { DataUnavailableState } from '../components/ui/DataUnavailableState';
 import { EmptyState } from '../components/ui/EmptyState';
 
 export const DevicesPage: React.FC = () => {
+  const { user } = useAuth();
+  const canCalibrate = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isError, setIsError] = useState(false);
   const [savingDeviceId, setSavingDeviceId] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [diagnosticResult, setDiagnosticResult] = useState<Record<string, string>>({});
 
   // Calibration state per device
   const [calibration, setCalibration] = useState<Record<string, { speed: number; dist: number; pulse: number }>>({});
@@ -55,31 +60,27 @@ export const DevicesPage: React.FC = () => {
 
   useEffect(() => {
     fetchDevices();
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
   }, []);
-
-  const handleRunDiagnostic = (deviceId: string, actionName: string) => {
-    setDiagnosticResult(prev => ({ ...prev, [deviceId]: `Executing ${actionName}...` }));
-    setTimeout(() => {
-      setDiagnosticResult(prev => ({
-        ...prev,
-        [deviceId]: `✓ ${actionName} completed successfully (Response: 18ms ACK)`
-      }));
-    }, 450);
-  };
 
   const handleSaveCalibration = async (deviceId: string) => {
     const cal = calibration[deviceId];
     if (!cal) return;
 
     setSavingDeviceId(deviceId);
+    setSaveError(null);
+    setSaveMessage(null);
     try {
       await apiClient.updateDeviceCalibration(deviceId, {
         conveyor_speed_cm_s: cal.speed,
         conveyor_dist_cm: cal.dist,
         servo_pulse_ms: cal.pulse,
       });
-      setSaveMessage(`Calibration synced to ${deviceId} and saved in ESP32 NVRAM.`);
+      setSaveMessage(`Calibration record saved for ${deviceId}. Apply and verify these values in the edge application.`);
       setTimeout(() => setSaveMessage(null), 3000);
+    } catch {
+      setSaveError('Calibration could not be saved. Your edits are retained; try again.');
     } finally {
       setSavingDeviceId(null);
     }
@@ -90,18 +91,18 @@ export const DevicesPage: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
-          <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
-            Edge Candling Sorter Stations
+          <h1 className="text-xl font-bold text-foreground tracking-tight">
+            Sorter devices
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Edge nodes encapsulate the <strong>Camera Grabber</strong>, <strong>YOLOv8 ONNX Vision Model</strong>, and <strong>ESP32 IoT Actuator</strong>.
+            Check the latest sorter heartbeat and saved calibration records.
           </p>
         </div>
 
         <button
           onClick={fetchDevices}
           disabled={isRefreshing}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-card border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold  transition-colors cursor-pointer"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
           <span>Refresh Edge Hardware</span>
@@ -109,12 +110,14 @@ export const DevicesPage: React.FC = () => {
       </div>
 
       {saveMessage && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-800 flex items-center gap-2 shadow-xs">
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-800 flex items-center gap-2 ">
           <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
           <span>{saveMessage}</span>
         </div>
       )}
 
+      {saveError && <div role="alert" className="p-4 border border-red-300 rounded-xl bg-red-50 text-red-800">{saveError}</div>}
+      {isError && devices.length > 0 && <p role="alert" className="text-amber-800">Refresh failed. Previously loaded device records are shown.</p>}
       {/* Edge Devices Grid */}
       {isError && devices.length === 0 ? (
         <DataUnavailableState
@@ -142,74 +145,41 @@ export const DevicesPage: React.FC = () => {
           return (
             <div
               key={device.device_id}
-              className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs space-y-4 hover-lift transition-all"
+              className="bg-card border border-border rounded-xl p-5  space-y-4  transition-all"
             >
               {/* Device Header with Live Radar Beacon */}
               <div className="flex items-start justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <div className="w-10 h-10 rounded-lg bg-maroon-50 text-[#800000] border border-maroon-200 flex items-center justify-center font-bold">
+                    <div className="w-10 h-10 rounded-lg bg-maroon-50 text-brand border border-maroon-200 flex items-center justify-center font-bold">
                       <Cpu className="w-5 h-5" />
                     </div>
-                    {device.status === 'ONLINE' && (
-                      <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-600 animate-radar-green" />
+                    {['ONLINE', 'SCANNING'].includes(deviceAvailability(device)) && (
+                      <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-600 " />
                     )}
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-[#0F172A]">{device.device_name}</h3>
-                    <span className="text-[11px] text-slate-500 font-mono">{device.device_id} • IP: {device.ip_address || '192.168.1.120'}</span>
+                    <h3 className="text-sm font-bold text-foreground">{device.device_name}</h3>
+                    <span className="text-[11px] text-slate-500 font-mono">{device.device_id} • IP: {device.ip_address || 'Not reported'}</span>
                   </div>
                 </div>
-                <Badge type="device" value={device.status} />
+                <Badge type="device" value={deviceAvailability(device, now)} />
               </div>
 
-              {/* 3 Core Edge Subsystems Encapsulation Breakdown */}
-              <div className="space-y-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Encapsulated Edge Subsystems
-                </span>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                  {/* 1. Camera */}
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
-                    <div className="flex items-center gap-1.5 text-slate-700 font-bold">
-                      <Camera className="w-3.5 h-3.5 text-[#800000]" />
-                      <span>Camera</span>
-                    </div>
-                    <span className="text-[11px] text-slate-800 font-semibold block">V4L2 / DirectShow</span>
-                    <span className="text-[10px] text-emerald-700 font-bold block">60 FPS Circular Buffer</span>
-                  </div>
-
-                  {/* 2. Model */}
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
-                    <div className="flex items-center gap-1.5 text-slate-800 font-bold">
-                      <Microscope className="w-3.5 h-3.5 text-[#800000]" />
-                      <span>ONNX Model</span>
-                    </div>
-                    <span className="text-[11px] text-slate-800 font-semibold block">{device.model_version}</span>
-                    <span className="text-[10px] text-emerald-800 font-bold block">24.6 ms FP16 Pass</span>
-                  </div>
-
-                  {/* 3. IoT ESP32 */}
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
-                    <div className="flex items-center gap-1.5 text-slate-800 font-bold">
-                      <Zap className="w-3.5 h-3.5 text-[#800000]" />
-                      <span>ESP32 IoT</span>
-                    </div>
-                    <span className="text-[11px] text-slate-800 font-semibold block">115200 Baud UART</span>
-                    <span className="text-[10px] text-emerald-800 font-bold block">600ms Optical Lock</span>
-                  </div>
-                </div>
-              </div>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div><dt className="text-slate-500">Platform</dt><dd>{device.hardware_platform || 'Not reported'}</dd></div>
+                <div><dt className="text-slate-500">Model version</dt><dd className="break-all">{device.model_version || 'Not reported'}</dd></div>
+                <div className="sm:col-span-2"><dt className="text-slate-500">Last heartbeat</dt><dd>{device.last_heartbeat ? new Date(device.last_heartbeat).toLocaleString('en-PH') : 'No heartbeat recorded'}</dd></div>
+              </dl>
 
               {/* Interactive Conveyor Kinematics Calibration Box */}
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <Sliders className="w-4 h-4 text-[#800000]" />
+                    <Sliders className="w-4 h-4 text-brand" />
                     <span className="text-xs font-bold text-slate-800">Conveyor Travel Kinematics (Δt = D / v)</span>
                   </div>
-                  <span className="text-xs font-extrabold text-[#800000] bg-maroon-50 px-2 py-0.5 rounded border border-maroon-200">
+                  <span className="text-xs font-semibold text-brand bg-maroon-50 px-2 py-0.5 rounded border border-maroon-200">
                     Δt = {calculatedDelayMs} ms delay
                   </span>
                 </div>
@@ -222,6 +192,7 @@ export const DevicesPage: React.FC = () => {
                       <span>{cal.speed.toFixed(1)} cm/s</span>
                     </div>
                     <input
+                      aria-label={`Conveyor speed for ${device.device_name}`}
                       type="range"
                       min="5"
                       max="25"
@@ -244,6 +215,7 @@ export const DevicesPage: React.FC = () => {
                       <span>{cal.dist.toFixed(1)} cm</span>
                     </div>
                     <input
+                      aria-label={`Sensor to chute distance for ${device.device_name}`}
                       type="range"
                       min="10"
                       max="50"
@@ -266,6 +238,7 @@ export const DevicesPage: React.FC = () => {
                       <span>{cal.pulse} ms (Lockout: 600ms)</span>
                     </div>
                     <input
+                      aria-label={`Servo pulse duration for ${device.device_name}`}
                       type="range"
                       min="150"
                       max="400"
@@ -285,52 +258,18 @@ export const DevicesPage: React.FC = () => {
                 <div className="pt-2 flex items-center justify-end">
                   <button
                     onClick={() => handleSaveCalibration(device.device_id)}
-                    disabled={savingDeviceId === device.device_id}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                    disabled={!canCalibrate || savingDeviceId === device.device_id}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-bold  transition-colors cursor-pointer disabled:opacity-50"
                   >
                     <Save className="w-3.5 h-3.5" />
-                    <span>{savingDeviceId === device.device_id ? "Syncing..." : "Sync Calibration to ESP32"}</span>
+                    <span>{savingDeviceId === device.device_id ? "Saving…" : "Save calibration record"}</span>
                   </button>
                 </div>
               </div>
 
-              {/* Edge Hardware Diagnostic Action Bar */}
-              <div className="p-3 bg-slate-50/70 border border-slate-200 rounded-xl space-y-2">
-                <span className="text-[11px] font-bold text-slate-600 block">
-                  Hardware Diagnostics & Pulse Testing:
-                </span>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleRunDiagnostic(device.device_id, 'Diverter Solenoid Pulse')}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-800 transition-colors cursor-pointer"
-                  >
-                    <Play className="w-3 h-3 text-[#800000]" />
-                    <span>Test Diverter Flipper</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleRunDiagnostic(device.device_id, 'Strobe LED Flash')}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-800 transition-colors cursor-pointer"
-                  >
-                    <Lightbulb className="w-3 h-3 text-amber-600" />
-                    <span>Flash Strobe LED</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleRunDiagnostic(device.device_id, 'Optical Sensor Beam Check')}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-800 transition-colors cursor-pointer"
-                  >
-                    <Radio className="w-3 h-3 text-emerald-600" />
-                    <span>Poll Optical Sensor</span>
-                  </button>
-                </div>
-
-                {diagnosticResult[device.device_id] && (
-                  <p className="text-[11px] font-mono font-semibold text-emerald-800 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
-                    {diagnosticResult[device.device_id]}
-                  </p>
-                )}
+              <div className="border-t border-slate-200 pt-3 text-slate-600">
+                <p className="font-medium text-slate-800">Hardware tests</p>
+                <p className="mt-1">Run actuator, light, and sensor tests from the edge application. Remote tests are unavailable in this dashboard.</p>
               </div>
             </div>
           );

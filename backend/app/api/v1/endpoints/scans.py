@@ -1,15 +1,15 @@
 import os
 import shutil
-from typing import List, Optional
+from typing import List, Optional, Literal
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, or_, cast, String
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.scan import EggScanModel, FertilityClass
 from app.models.user import UserModel
-from app.schemas.scan import ScanSyncPayload, ScanSyncResponse, ScanListItem, ScanDetailResponse, ScanOverridePayload
+from app.schemas.scan import ScanSyncPayload, ScanSyncResponse, ScanListItem, ScanDetailResponse, ScanOverridePayload, ScanPage
 from app.services.scan_service import ScanService
 from app.api.deps import verify_api_key, get_current_user
 
@@ -68,6 +68,46 @@ def list_scans(
     if final_class:
         query = query.filter(EggScanModel.final_class == final_class)
     return query.order_by(desc(EggScanModel.scanned_at)).offset(offset).limit(limit).all()
+
+
+@router.get("/search", response_model=ScanPage, summary="Paginated scan history with search and confidence filters")
+def search_scans(
+    batch_id: Optional[str] = None,
+    final_class: Optional[FertilityClass] = None,
+    confidence: Literal["ALL", "HIGH", "MID", "LOW", "REVIEW"] = "ALL",
+    q: str = Query("", max_length=200),
+    sort: Literal["sequence_number", "confidence", "inference_ms", "scanned_at"] = "scanned_at",
+    order: Literal["asc", "desc"] = "desc",
+    limit: int = Query(20, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    query = db.query(EggScanModel)
+    if batch_id:
+        query = query.filter(EggScanModel.batch_id == batch_id)
+    if final_class:
+        query = query.filter(EggScanModel.final_class == final_class)
+    if confidence == "HIGH":
+        query = query.filter(EggScanModel.confidence >= 0.90)
+    elif confidence == "MID":
+        query = query.filter(EggScanModel.confidence >= 0.75, EggScanModel.confidence < 0.90)
+    elif confidence == "LOW":
+        query = query.filter(EggScanModel.confidence < 0.75)
+    elif confidence == "REVIEW":
+        query = query.filter(EggScanModel.confidence < 0.75)
+    if q.strip():
+        # Treat user search text literally, including SQL LIKE wildcards.
+        pattern = "%" + q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        query = query.filter(or_(
+            cast(EggScanModel.scan_id, String).ilike(pattern, escape="\\"),
+            EggScanModel.batch_id.ilike(pattern, escape="\\"),
+            cast(EggScanModel.sequence_number, String).ilike(pattern, escape="\\"),
+        ))
+    total = query.count()
+    column = getattr(EggScanModel, sort)
+    ordering = column.asc() if order == "asc" else column.desc()
+    items = query.order_by(ordering, EggScanModel.scan_id.asc()).offset(offset).limit(limit).all()
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/{scan_id}", response_model=ScanDetailResponse, summary="Get full scan record with bounding boxes")

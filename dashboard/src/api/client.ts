@@ -1,3 +1,4 @@
+import type { ScanPage, ScanSearchParams } from '../types';
 import axios from 'axios';
 import {
   Batch,
@@ -184,6 +185,11 @@ export const apiClient = {
   // Scans
   getScans: async (params?: { batch_id?: string; final_class?: string; limit?: number }): Promise<EggScan[]> => {
     const res = await api.get<EggScan[]>('/scans', { params });
+    return res.data;
+  },
+
+  searchScans: async (params: ScanSearchParams, signal?: AbortSignal): Promise<ScanPage> => {
+    const res = await api.get<ScanPage>('/scans/search', { params, signal });
     return res.data;
   },
 

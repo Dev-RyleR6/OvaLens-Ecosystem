@@ -13,7 +13,7 @@ function Badge({ className, variant = "default", ...props }: BadgeProps) {
     outline: "text-foreground border border-border",
     success: "border-transparent bg-emerald-50 text-emerald-800 border border-emerald-200",
     warning: "border-transparent bg-amber-50 text-amber-900 border border-amber-200",
-    maroon: "border-transparent bg-maroon-50 text-[#800000] border border-maroon-200",
+    maroon: "border-transparent bg-maroon-50 text-brand border border-maroon-200",
   }
 
   return (

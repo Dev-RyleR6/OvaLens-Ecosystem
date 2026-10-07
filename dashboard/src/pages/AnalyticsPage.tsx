@@ -172,7 +172,7 @@ export const AnalyticsPage: React.FC = () => {
       <div className="space-y-6 pb-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
           <div>
-            <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
+            <h1 className="text-xl font-bold text-foreground tracking-tight">
               Hatchery Economics & Salvage Analytics
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -195,7 +195,7 @@ export const AnalyticsPage: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <div>
-          <h1 className="text-xl font-bold text-[#0F172A] tracking-tight">
+          <h1 className="text-xl font-bold text-foreground tracking-tight">
             Hatchery Economics & Salvage Analytics
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -204,14 +204,14 @@ export const AnalyticsPage: React.FC = () => {
         </div>
 
         {isAnyFilterActive && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-[#800000] bg-red-50 border border-red-200 px-2.5 py-1 rounded-md">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-brand bg-red-50 border border-red-200 px-2.5 py-1 rounded-md">
               Filtered View Active
             </span>
             <button
               onClick={handleResetAllFilters}
               className="h-8 px-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-md text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Reset all filters to facility totals"
+              aria-label="Reset all filters to facility totals" title="Reset all filters to facility totals"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Reset</span>
@@ -221,10 +221,10 @@ export const AnalyticsPage: React.FC = () => {
       </div>
 
       {/* Analytics Scope & Multi-Filter Toolbar */}
-      <div className="bg-white border border-[#E2E8F0] rounded-xl p-3.5 shadow-xs space-y-3">
+      <div className="bg-card border border-border rounded-xl p-3.5  space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100 text-xs">
           <div className="flex items-center gap-2 font-bold text-slate-800">
-            <SlidersHorizontal className="w-4 h-4 text-[#800000]" />
+            <SlidersHorizontal className="w-4 h-4 text-brand" />
             <span>Economic Scope & Cohort Filters</span>
           </div>
           <span className="text-[11px] text-slate-400">
@@ -238,7 +238,7 @@ export const AnalyticsPage: React.FC = () => {
             <select
               value={breedFilter}
               onChange={(e) => handleBreedFilterChange(e.target.value)}
-              className="w-full h-9 pl-3 pr-8 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 shadow-2xs cursor-pointer appearance-none"
+              className="w-full h-9 pl-3 pr-8 text-xs font-semibold bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none"
             >
               <option value="ALL">All Duck Breeds</option>
               <option value="KAYUMANGGI">Kayumanggi (Pateros)</option>
@@ -253,7 +253,7 @@ export const AnalyticsPage: React.FC = () => {
             <select
               value={statusFilter}
               onChange={(e) => handleStatusFilterChange(e.target.value)}
-              className="w-full h-9 pl-3 pr-8 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 shadow-2xs cursor-pointer appearance-none"
+              className="w-full h-9 pl-3 pr-8 text-xs font-semibold bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none"
             >
               <option value="ALL">All Statuses</option>
               <option value="ACTIVE">Active Only (Incubating)</option>
@@ -269,7 +269,7 @@ export const AnalyticsPage: React.FC = () => {
               value={selectedBatchId}
               onChange={(e) => handleBatchChange(e.target.value)}
               disabled={isLoadingBatch}
-              className="w-full h-9 pl-8 pr-8 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 shadow-2xs cursor-pointer disabled:opacity-60 appearance-none"
+              className="w-full h-9 pl-8 pr-8 text-xs font-semibold bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer disabled:opacity-60 appearance-none"
             >
               <option value="ALL">
                 {filteredBatches.length === batches.length
@@ -289,18 +289,18 @@ export const AnalyticsPage: React.FC = () => {
 
       {/* Contextual Active Batch Banner (if filtered) */}
       {isBatchFiltered && selectedBatchInfo && (
-        <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs animate-in fade-in duration-200">
+        <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs  animate-in fade-in duration-200">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center flex-shrink-0">
               <Layers className="w-4 h-4 text-amber-900" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-amber-950 text-sm">{selectedBatchInfo.batch_code}</span>
                 <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
                   {selectedBatchInfo.breed}
                 </span>
-                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-white text-slate-700 border border-slate-200">
+                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-card text-slate-700 border border-slate-200">
                   {selectedBatchInfo.current_stage}
                 </span>
               </div>
@@ -313,11 +313,11 @@ export const AnalyticsPage: React.FC = () => {
           <div className="flex items-center gap-4 text-amber-900 font-medium self-end sm:self-auto">
             <div className="text-right">
               <span className="text-[10px] text-amber-700 uppercase tracking-wider block font-bold">Fertility Rate</span>
-              <span className="text-sm font-extrabold text-emerald-800">{batchAnalytics?.day_10_fertility_rate ?? 0}%</span>
+              <span className="text-sm font-semibold text-emerald-800">{batchAnalytics?.day_10_fertility_rate ?? 0}%</span>
             </div>
             <div className="text-right border-l border-amber-200 pl-4">
               <span className="text-[10px] text-amber-700 uppercase tracking-wider block font-bold">Total Eggs</span>
-              <span className="text-sm font-extrabold text-slate-900">{selectedBatchInfo.initial_egg_count}</span>
+              <span className="text-sm font-semibold text-slate-900">{selectedBatchInfo.initial_egg_count}</span>
             </div>
           </div>
         </div>
@@ -363,11 +363,11 @@ export const AnalyticsPage: React.FC = () => {
       </div>
 
       {/* Day-10 Penoy Economic Recovery Model */}
-      <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs">
+      <div className="bg-card border border-border rounded-xl p-5 ">
         <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-          <Coins className="w-4 h-4 text-[#800000]" />
+          <Coins className="w-4 h-4 text-brand" />
           <div>
-            <h3 className="text-base font-bold text-[#0F172A]">
+            <h3 className="text-base font-bold text-foreground">
               Day-10 Penoy Economic Recovery Model
             </h3>
             <p className="text-xs text-slate-500">
@@ -381,7 +381,7 @@ export const AnalyticsPage: React.FC = () => {
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
             <span className="text-xs font-bold text-slate-600 block">Direct Penoy Food Salvage</span>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-amber-800 font-mono">
+              <span className="text-2xl font-semibold text-amber-800 font-mono">
                 ₱{salvageRev.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </span>
             </div>
@@ -394,7 +394,7 @@ export const AnalyticsPage: React.FC = () => {
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
             <span className="text-xs font-bold text-slate-600 block">Incubator Power Avoided</span>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-emerald-800 font-mono">
+              <span className="text-2xl font-semibold text-emerald-800 font-mono">
                 ₱{powerSaved.toFixed(2)}
               </span>
             </div>
@@ -408,7 +408,7 @@ export const AnalyticsPage: React.FC = () => {
             <span className="text-xs text-amber-900 font-bold uppercase tracking-wider block">
               Total Realized Recovery
             </span>
-            <span className="text-2xl font-black text-[#800000] font-mono">
+            <span className="text-2xl font-semibold text-brand font-mono">
               ₱{totalBenefit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </span>
             <span className="text-[11px] text-amber-800 font-medium">
@@ -429,11 +429,11 @@ export const AnalyticsPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left 6 Cols: 3-Stage Incubation Mortality Breakdown */}
         <div className="lg:col-span-6">
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs h-full flex flex-col justify-between">
+          <div className="bg-card border border-border rounded-xl p-5  h-full flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div>
-                  <h3 className="text-sm font-bold text-[#0F172A]">
+                  <h3 className="text-sm font-bold text-foreground">
                     Embryonic Mortality by Stage
                   </h3>
                   <p className="text-xs text-slate-500">Early arrest vs Mid-term vs Late pipping failure</p>
@@ -449,7 +449,7 @@ export const AnalyticsPage: React.FC = () => {
                   <div key={st.stage} className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-bold text-slate-800">{st.stage}</span>
-                      <span className="font-extrabold text-slate-900">{st.rate}% mortality</span>
+                      <span className="font-semibold text-slate-900">{st.rate}% mortality</span>
                     </div>
                     <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
                       <div
@@ -472,10 +472,10 @@ export const AnalyticsPage: React.FC = () => {
 
         {/* Right 6 Cols: 28-Day Embryonic Viability Area Curve */}
         <div className="lg:col-span-6">
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs h-full flex flex-col justify-between">
+          <div className="bg-card border border-border rounded-xl p-5  h-full flex flex-col justify-between">
             <div>
               <div className="pb-3 border-b border-slate-100">
-                <h3 className="text-sm font-bold text-[#0F172A]">
+                <h3 className="text-sm font-bold text-foreground">
                   28-Day Embryonic Viability Retention
                 </h3>
                 <p className="text-xs text-slate-500">Live embryo retention curve across incubation milestones</p>
@@ -494,8 +494,8 @@ export const AnalyticsPage: React.FC = () => {
                     <YAxis domain={[75, 100]} stroke="#64748B" fontSize={11} tickLine={false} unit="%" />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#FFFFFF',
-                        borderColor: '#E2E8F0',
+                        backgroundColor: 'var(--card)',
+                        borderColor: 'var(--border)',
                         borderRadius: '0.5rem',
                         fontSize: '12px',
                         color: '#0F172A',
@@ -516,9 +516,9 @@ export const AnalyticsPage: React.FC = () => {
       </div>
 
       {/* Duck Breed Performance Comparison Matrix */}
-      <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs">
+      <div className="bg-card border border-border rounded-xl p-5 ">
         <div className="pb-3 border-b border-slate-100">
-          <h3 className="text-base font-bold text-[#0F172A]">
+          <h3 className="text-base font-bold text-foreground">
             Duck Breed Biological & Commercial Benchmarks
           </h3>
           <p className="text-xs text-slate-500">
@@ -549,7 +549,7 @@ export const AnalyticsPage: React.FC = () => {
                       isSelected ? 'bg-amber-50/80 font-semibold' : 'hover:bg-slate-50'
                     }`}
                   >
-                    <td className="py-3 px-4 font-bold text-[#0F172A]">
+                    <td className="py-3 px-4 font-bold text-foreground">
                       <div className="flex items-center gap-1.5">
                         <span>{b.breed}</span>
                         {isSelected && (
@@ -566,7 +566,7 @@ export const AnalyticsPage: React.FC = () => {
                       {b.infertile_count ?? 0} ({b.total_eggs > 0 ? (((b.infertile_count ?? 0) / b.total_eggs) * 100).toFixed(1) : '0.0'}%)
                     </td>
                     <td className="py-3 px-4 text-slate-800 font-bold">{b.hatched_count ?? 0}</td>
-                    <td className="py-3 px-4 text-right font-extrabold text-slate-900">{b.hatchability_rate ?? 0}%</td>
+                    <td className="py-3 px-4 text-right font-semibold text-slate-900">{b.hatchability_rate ?? 0}%</td>
                   </tr>
                 );
               })}

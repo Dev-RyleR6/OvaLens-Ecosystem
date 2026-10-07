@@ -3,7 +3,7 @@ export type BatchStage = 'SETTING' | 'DAY_10' | 'HATCHED' | 'COMPLETED';
 export type BatchStatus = 'INCUBATING' | 'COMPLETED' | 'CANCELLED';
 export type FertilityClass = 'FERTILE' | 'INFERTILE';
 export type RoutingAction = 'ACCEPT' | 'REJECT';
-export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
+export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'SCANNING' | 'ERROR';
 export type UserRole = 'ADMIN' | 'MANAGER' | 'OPERATOR';
 
 export interface LoginCredentials {
@@ -175,12 +175,31 @@ export interface EggScan {
   inference_ms: number;
   routing_action: RoutingAction;
   thumbnail_url?: string;
+  image_url?: string;
   detections: Array<{
     bbox: number[];
     confidence: number;
     class: string;
   }>;
   scanned_at: string;
+}
+
+export interface ScanPage {
+  items: EggScan[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface ScanSearchParams {
+  batch_id?: string;
+  final_class?: FertilityClass;
+  confidence?: 'ALL' | 'HIGH' | 'MID' | 'LOW' | 'REVIEW';
+  q?: string;
+  sort?: 'sequence_number' | 'confidence' | 'inference_ms' | 'scanned_at';
+  order?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
 }
 
 export interface Device {

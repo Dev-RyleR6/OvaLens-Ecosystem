@@ -43,7 +43,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         return <AlertTriangle className="w-5 h-5 text-amber-700" />;
       case 'primary':
       default:
-        return <Info className="w-5 h-5 text-[#800000]" />;
+        return <Info className="w-5 h-5 text-brand" />;
     }
   };
 
@@ -60,7 +60,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   };
 
   return (
-    <Dialog isOpen={isOpen} onClose={onClose} maxWidth="max-w-md">
+    <Dialog isOpen={isOpen} onClose={() => { if (!isLoading) onClose(); }} ariaLabel={title} maxWidth="max-w-md">
       <div className="space-y-4">
         {/* Header Icon + Title */}
         <div className="flex items-start gap-3">
@@ -76,7 +76,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             {getIcon()}
           </div>
           <div>
-            <h3 className="text-base font-bold text-[#0F172A]">{title}</h3>
+            <h3 className="text-base font-bold text-foreground">{title}</h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">{description}</p>
           </div>
         </div>
@@ -94,7 +94,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                   <div className="flex items-center gap-2 font-mono">
                     <span className="text-slate-400 line-through">{diff.oldValue}</span>
                     <span className="text-slate-400">→</span>
-                    <span className="font-bold text-[#800000]">{diff.newValue}</span>
+                    <span className="font-bold text-brand">{diff.newValue}</span>
                   </div>
                 </div>
               ))}
@@ -116,7 +116,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             type="button"
             onClick={onConfirm}
             disabled={isLoading}
-            className={`px-4 py-2 rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 ${getConfirmButtonClasses()}`}
+            className={`px-4 py-2 rounded-lg text-xs font-bold  transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 ${getConfirmButtonClasses()}`}
           >
             {isLoading ? (
               <span>Saving...</span>

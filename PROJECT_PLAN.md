@@ -218,6 +218,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 These features can be claimed by any agent using `python scripts/verify_and_commit.py --task <ID>`:
 
+- [x] **TASK-NEW-DASH-UX-01**: Correct dashboard telemetry and scan-history filtering/pagination, harden keyboard access and save feedback, connect display preferences, and refine the hatchery interface for readable daily operations.
+
 - [x] **TASK-NEW-DASH-LOGO-01**: Use the supplied OvaLens SVG in the dashboard navigation, login header, and browser favicon, with trimmed empty margins for readable small-size branding.
 
 - [ ] **TASK-NEW-EDGE-FLOW-01**: Improve manual diagnostic flow with visible operator states, single-click fresh-frame capture, correlated dedicated inference and deadlines, retryable session finalization, diagnostic target completion, strict batch validation, and session/batch write guards. Automatic hardware sorting remains a separate integration task.

@@ -43,18 +43,18 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
     >
       <div className="space-y-6 text-slate-800 print:m-0 print:p-0">
         {/* Certificate Container */}
-        <div className="border-2 border-[#800000] p-6 rounded-xl bg-white space-y-5 shadow-xs relative">
+        <div className="border-2 border-[#800000] p-6 rounded-xl bg-card space-y-5  relative">
           {/* Watermark Logo Accent */}
           <div className="absolute right-4 top-4 opacity-10 pointer-events-none">
-            <Building className="w-32 h-32 text-[#800000]" />
+            <Building className="w-32 h-32 text-brand" />
           </div>
 
           {/* Institutional Header */}
           <div className="text-center pb-4 border-b-2 border-[#800000] space-y-1">
-            <span className="text-[11px] font-extrabold tracking-widest text-[#800000] uppercase block">
+            <span className="text-[11px] font-semibold tracking-widest text-brand uppercase block">
               Foundation University • Hatchery Research & Agri-Tech Center
             </span>
-            <h2 className="text-lg font-black text-[#0F172A] uppercase tracking-tight">
+            <h2 className="text-lg font-semibold text-foreground uppercase tracking-tight">
               Official Duck Egg Candling & Fertility Certificate
             </h2>
             <p className="text-[11px] text-slate-500 font-medium">
@@ -70,7 +70,7 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
             </div>
             <div>
               <span className="text-[10px] text-slate-400 font-bold uppercase block">Duck Breed</span>
-              <strong className="text-[#800000]">{displayBatch.breed}</strong>
+              <strong className="text-brand">{displayBatch.breed}</strong>
             </div>
             <div>
               <span className="text-[10px] text-slate-400 font-bold uppercase block">Candling Milestone</span>
@@ -102,7 +102,7 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
                 <tr className="bg-emerald-50/40 font-medium">
                   <td className="py-2.5 px-3 font-bold text-emerald-950">Fertile Embryos (Viable)</td>
                   <td className="py-2.5 px-3 text-center text-emerald-800 font-bold">ACCEPT</td>
-                  <td className="py-2.5 px-3 text-right font-extrabold text-emerald-900">{fertileCount}</td>
+                  <td className="py-2.5 px-3 text-right font-semibold text-emerald-900">{fertileCount}</td>
                   <td className="py-2.5 px-3 text-right text-emerald-800">{((fertileCount / totalScanned) * 100).toFixed(1)}%</td>
                   <td className="py-2.5 px-3 text-right text-slate-600">Retained for incubation</td>
                 </tr>
@@ -110,7 +110,7 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
                 <tr className="bg-amber-50/40 font-medium">
                   <td className="py-2.5 px-3 font-bold text-amber-950">Infertile / Penoy</td>
                   <td className="py-2.5 px-3 text-center text-amber-800 font-bold">SALVAGE</td>
-                  <td className="py-2.5 px-3 text-right font-extrabold text-amber-900">{penoyCount}</td>
+                  <td className="py-2.5 px-3 text-right font-semibold text-amber-900">{penoyCount}</td>
                   <td className="py-2.5 px-3 text-right text-amber-800">{((penoyCount / totalScanned) * 100).toFixed(1)}%</td>
                   <td className="py-2.5 px-3 text-right font-bold text-amber-900">₱{penoySalvageValue} (@ ₱14.00)</td>
                 </tr>
@@ -120,7 +120,7 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
                   <td className="py-2.5 px-3 text-center">100% SORTED</td>
                   <td className="py-2.5 px-3 text-right">{totalScanned}</td>
                   <td className="py-2.5 px-3 text-right">100.0%</td>
-                  <td className="py-2.5 px-3 text-right text-[#800000]">₱{penoySalvageValue} Total Salvage</td>
+                  <td className="py-2.5 px-3 text-right text-brand">₱{penoySalvageValue} Total Salvage</td>
                 </tr>
               </tbody>
             </table>
@@ -128,7 +128,7 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
 
           {/* AI Verification Footer & Signature */}
           <div className="pt-4 border-t border-slate-200 grid grid-cols-2 gap-4 text-xs">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <ShieldCheck className="w-8 h-8 text-emerald-700 flex-shrink-0" />
               <div>
                 <span className="font-bold text-slate-900 block">YOLOv8 FP16 Vision Verified</span>
@@ -159,7 +159,7 @@ export const CandlingCertificateModal: React.FC<CandlingCertificateModalProps> =
           <button
             type="button"
             onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-bold  transition-colors cursor-pointer"
           >
             <Printer className="w-4 h-4" />
             <span>Print Official Certificate</span>

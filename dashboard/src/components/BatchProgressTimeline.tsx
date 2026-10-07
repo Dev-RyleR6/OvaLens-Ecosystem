@@ -42,21 +42,21 @@ export const BatchProgressTimeline: React.FC<BatchProgressTimelineProps> = ({ cu
           const isCompleted = idx < currentIndex || currentStage === 'HATCHED' || currentStage === 'COMPLETED';
           const isCurrent = idx === currentIndex && currentStage !== 'HATCHED' && currentStage !== 'COMPLETED';
 
-          let circleStyle = "bg-white text-slate-400 border-slate-300";
+          let circleStyle = "bg-card text-slate-400 border-slate-300";
           if (isCompleted) {
             circleStyle = "bg-[#800000] text-white border-[#800000]";
           } else if (isCurrent) {
-            circleStyle = "bg-white text-[#800000] border-[#800000] ring-4 ring-maroon-100";
+            circleStyle = "bg-card text-brand border-[#800000] ring-4 ring-maroon-100";
           }
 
           return (
             <div key={st.key} className="relative z-10 flex flex-col items-center text-center max-w-[90px]">
               <div
-                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all shadow-xs ${circleStyle}`}
+                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all  ${circleStyle}`}
               >
                 {isCompleted ? <Check className="w-4 h-4" /> : idx + 1}
               </div>
-              <span className="mt-2 text-xs font-bold text-[#0F172A]">
+              <span className="mt-2 text-xs font-bold text-foreground">
                 {st.day}
               </span>
               <span className="text-[11px] font-semibold text-slate-700 leading-tight">

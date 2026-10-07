@@ -1,3 +1,4 @@
+const themedPalette = name => Object.fromEntries([50,100,200,300,400,500,600,700,800,900,950].map(level => [level, `rgb(var(--${name}-${level}) / <alpha-value>)`]));
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -7,20 +8,26 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
+      fontSize: { xs: ['.875rem', '1.4'], sm: ['.875rem', '1.5'] },
       colors: {
-        border: "#E2E8F0",
-        input: "#E2E8F0",
-        ring: "#800000",
-        background: "#F8FAFC",
-        foreground: "#0F172A",
+        slate: themedPalette('slate'),
+        emerald: themedPalette('emerald'),
+        amber: themedPalette('amber'),
+        red: themedPalette('red'),
+        rose: themedPalette('rose'),
+        brand: 'var(--brand-ink)',
+        border: "var(--border)",
+        input: "var(--input)",
+        ring: "var(--focus)",
+        background: "var(--background)",
+        foreground: "var(--foreground)",
         // Foundation University Brand Standard
         maroon: {
-          50: '#FDF2F2',
-          100: '#FDE8E8',
-          200: '#FBD5D5',
+          50: 'var(--maroon-surface)',
+          100: 'var(--maroon-surface)',
+          200: 'var(--maroon-border)',
           300: '#F8B4B4',
           400: '#F98080',
           500: '#E02424',
@@ -36,7 +43,7 @@ export default {
         },
         secondary: {
           DEFAULT: "#F1F5F9",
-          foreground: "#0F172A",
+          foreground: "var(--foreground)",
         },
         muted: {
           DEFAULT: "#F1F5F9",
@@ -44,11 +51,11 @@ export default {
         },
         card: {
           DEFAULT: "#FFFFFF",
-          foreground: "#0F172A",
+          foreground: "var(--foreground)",
         },
         // Agricultural biological classification colors
         agri: {
-          green: "#15803D",     // Fertile / Viable Embryo
+          green: "var(--success-ink)",     // Fertile / Viable Embryo
           greenBg: "#F0FDF4",
           greenBorder: "#BBF7D0",
           amber: "#D97706",     // Infertile / Penoy Salvage

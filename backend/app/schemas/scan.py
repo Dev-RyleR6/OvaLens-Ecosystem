@@ -72,6 +72,15 @@ class ScanDetailResponse(BaseModel):
     synced_at: datetime
 
 
+class ScanPage(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    items: List[ScanListItem]
+    total: int
+    limit: int
+    offset: int
+
+
 class ScanOverridePayload(BaseModel):
     final_class: FertilityClass
     reason: Optional[str] = None

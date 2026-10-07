@@ -1,3 +1,4 @@
+import { useDialogAccessibility } from '@/hooks/useDialogAccessibility';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -53,6 +54,7 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { shouldRender, isClosing } = useModalAnimation(isOpen, 220);
+  const dialogRef = useDialogAccessibility(isOpen && shouldRender, () => { if (!isSubmitting) onClose(); }, 'Correct classification');
 
   useEffect(() => {
     if (displayTargetClass && REASON_PRESETS[displayTargetClass]?.length > 0) {
@@ -93,11 +95,11 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 bg-slate-900/65 backdrop-blur-xs transition-opacity",
+          "fixed inset-0 bg-slate-900/65  transition-opacity",
           isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
         )}
         onClick={onClose}
@@ -105,14 +107,14 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
 
       <div
         className={cn(
-          "bg-white border border-slate-200/90 rounded-2xl shadow-2xl max-w-lg w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] flex flex-col overflow-hidden z-10 my-auto",
+          "bg-card border border-slate-200/90 rounded-2xl shadow-2xl max-w-lg w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] flex flex-col overflow-hidden z-10 my-auto",
           isClosing ? "animate-modal-content-exit" : "animate-modal-content"
         )}
       >
         {/* Modal Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-white flex-shrink-0">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-card flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-black">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-semibold">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
@@ -136,7 +138,7 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto custom-scrollbar flex-1">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-semibold text-red-700 flex items-center gap-2">
+            <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-semibold text-red-700 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
               <span>{error}</span>
             </div>
@@ -151,20 +153,20 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
 
             <div className="flex flex-col items-center">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Override</span>
-              <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-2xs">
-                <ArrowRight className="w-4 h-4 text-[#800000]" />
+              <div className="w-8 h-8 rounded-full bg-card border border-slate-200 flex items-center justify-center text-slate-400 ">
+                <ArrowRight className="w-4 h-4 text-brand" />
               </div>
             </div>
 
             <div className="text-center space-y-1">
-              <span className="text-[10px] text-[#800000] font-bold uppercase block">Operator Corrected</span>
+              <span className="text-[10px] text-brand font-bold uppercase block">Operator Corrected</span>
               <Badge type="fertility" value={displayTargetClass} />
             </div>
           </div>
 
           {/* Preset Justifications */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 block">
+            <label htmlFor="humanintheloopoverridemodal-field-1" className="text-xs font-bold text-slate-700 block">
               Quick Justification Presets
             </label>
             <div className="space-y-1.5">
@@ -175,11 +177,11 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
                   onClick={() => handleSelectPreset(preset)}
                   className={`w-full text-left p-2.5 rounded-lg border text-xs font-medium transition-all cursor-pointer flex items-start gap-2 ${
                     reason === preset
-                      ? 'bg-maroon-50/60 border-[#800000] text-[#800000] shadow-2xs font-semibold'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                      ? 'bg-maroon-50/60 border-[#800000] text-brand  font-semibold'
+                      : 'bg-card border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
                 >
-                  <CheckCircle2 className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${reason === preset ? 'text-[#800000]' : 'text-slate-300'}`} />
+                  <CheckCircle2 className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${reason === preset ? 'text-brand' : 'text-slate-300'}`} />
                   <span className="leading-snug">{preset}</span>
                 </button>
               ))}
@@ -188,15 +190,15 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
 
           {/* Custom Audit Justification */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 block">
+            <label htmlFor="humanintheloopoverridemodal-field-1" className="text-xs font-bold text-slate-700 block">
               Audit Justification Notes (Mandatory for Quality Audit)
             </label>
-            <textarea
+            <textarea id="humanintheloopoverridemodal-field-1"
               rows={2}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Provide specific optical observation details..."
-              className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10 shadow-xs resize-none"
+              className="w-full p-2.5 text-xs bg-card border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  resize-none"
               required
             />
           </div>
@@ -221,7 +223,7 @@ export const HumanInTheLoopOverrideModal: React.FC<HumanInTheLoopOverrideModalPr
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-bold  transition-colors cursor-pointer disabled:opacity-50"
             >
               {isSubmitting ? 'Saving Override...' : 'Confirm & Log Override'}
             </button>

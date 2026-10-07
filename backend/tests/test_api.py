@@ -5,6 +5,56 @@ from app.main import app
 client = TestClient(app)
 
 
+def test_scan_history_pagination_search_and_confidence_bands():
+    first = client.get("/api/v1/scans/search", params={"limit": 2, "sort": "scanned_at", "order": "asc"})
+    assert first.status_code == 200
+    page = first.json()
+    assert page["total"] > 100  # The seeded history must remain reachable beyond the old UI cap.
+    assert len(page["items"]) == 2
+    second = client.get("/api/v1/scans/search", params={"limit": 2, "offset": 2, "sort": "scanned_at", "order": "asc"}).json()
+    assert second["total"] == page["total"]
+    assert not ({item["scan_id"] for item in page["items"]} & {item["scan_id"] for item in second["items"]})
+    older = client.get("/api/v1/scans/search", params={"limit": 2, "offset": 100}).json()
+    assert older["items"]
+    totals = []
+    for band, lower, upper in [("LOW", 0, .75), ("MID", .75, .90), ("HIGH", .90, 1.01)]:
+        response = client.get("/api/v1/scans/search", params={"confidence": band, "limit": 200})
+        assert response.status_code == 200
+        result = response.json()
+        totals.append(result["total"])
+        assert all(lower <= item["confidence"] < upper for item in result["items"])
+    assert sum(totals) == page["total"]
+    assert client.get("/api/v1/scans/search", params={"confidence": "REVIEW"}).json()["total"] == totals[0]
+    scan = page["items"][0]
+    found = client.get("/api/v1/scans/search", params={"q": scan["scan_id"]}).json()
+    assert found["total"] == 1
+    assert found["items"][0]["scan_id"] == scan["scan_id"]
+    batch = client.get("/api/v1/scans/search", params={"batch_id": scan["batch_id"], "final_class": scan["final_class"]}).json()
+    assert all(item["batch_id"] == scan["batch_id"] and item["final_class"] == scan["final_class"] for item in batch["items"])
+    assert client.get("/api/v1/scans/search", params={"q": "%"}).json()["total"] == 0
+    assert client.get("/api/v1/scans/search", params={"sort": "unknown"}).status_code == 422
+    assert client.get("/api/v1/scans/search", params={"offset": -1}).status_code == 422
+
+
+def test_device_calibration_requires_authorization_and_persists():
+    login = client.post("/api/v1/auth/login", json={"email": "admin@ovalens.fu.edu.ph", "password": "Admin@123"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    device = client.get("/api/v1/devices", headers=headers).json()[0]
+    url = f"/api/v1/devices/{device['device_id']}"
+    original = {key: device[key] for key in ("conveyor_speed_cm_s", "conveyor_dist_cm", "servo_pulse_ms")}
+    assert client.patch(url, json=original).status_code == 401
+    invalid = {**original, "conveyor_speed_cm_s": 0}
+    assert client.patch(url, json=invalid, headers=headers).status_code == 422
+    changed = {**original, "servo_pulse_ms": original["servo_pulse_ms"] + 1}
+    try:
+        response = client.patch(url, json=changed, headers=headers)
+        assert response.status_code == 200
+        stored = next(item for item in client.get("/api/v1/devices", headers=headers).json() if item["device_id"] == device["device_id"])
+        assert stored["servo_pulse_ms"] == changed["servo_pulse_ms"]
+    finally:
+        assert client.patch(url, json=original, headers=headers).status_code == 200
+
+
 def test_health_endpoint():
     response = client.get("/api/v1/health")
     assert response.status_code == 200
@@ -298,7 +348,6 @@ def test_user_profile_and_password_change_flow():
     )
     assert new_login.status_code == 200
     assert "access_token" in new_login.json()
-
 
 
 
