@@ -53,7 +53,8 @@ class OvaLensOperatorApp(ctk.CTk):
                  chamber: Optional[ChamberController] = None,
                  inference_worker: Optional[Any] = None,
                  device_id: str = "STATION-01-RP5",
-                 startup_config: Optional[Dict[str, Any]] = None):
+                 startup_config: Optional[Dict[str, Any]] = None,
+                 fullscreen: bool = True):
         super().__init__()
 
         self.camera = camera
@@ -108,7 +109,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self._last_live_infer_time = 0.0
 
         # Performance & Ergonomics State
-        self.is_fullscreen = False
+        self.is_fullscreen = bool((startup_config or {}).get("fullscreen", fullscreen))
         self.show_crosshairs = True
         self._session_start_time: Optional[float] = None
         self._cached_container_w = 640
@@ -133,6 +134,14 @@ class OvaLensOperatorApp(ctk.CTk):
         self.minsize(1024, 720)
         ctk.set_appearance_mode("dark")
         self.configure(fg_color=FUTheme.BG_LIGHT)
+        if self.is_fullscreen:
+            try:
+                self.attributes("-fullscreen", True)
+            except Exception:
+                try:
+                    self.state("zoomed")
+                except Exception:
+                    pass
 
         # Standard Window Exit Confirmation
         self.protocol("WM_DELETE_WINDOW", self.confirm_exit_dialog)
@@ -361,7 +370,7 @@ class OvaLensOperatorApp(ctk.CTk):
         # Fullscreen Kiosk Mode Button
         self.kiosk_btn = ctk.CTkButton(
             self.header_frame,
-            text="⛶ Kiosk [F11]",
+            text="🗗 Windowed [F11]" if self.is_fullscreen else "⛶ Kiosk [F11]",
             font=(FUTheme.FONT_FAMILY, 11, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT,
             text_color=FUTheme.TEXT_SECONDARY,
@@ -1963,9 +1972,19 @@ class OvaLensOperatorApp(ctk.CTk):
     def toggle_fullscreen(self, event=None):
         """Toggle borderless kiosk fullscreen for industrial touchscreens."""
         self.is_fullscreen = not self.is_fullscreen
-        self.attributes("-fullscreen", self.is_fullscreen)
+        try:
+            self.attributes("-fullscreen", self.is_fullscreen)
+        except Exception:
+            try:
+                self.state("zoomed" if self.is_fullscreen else "normal")
+            except Exception:
+                pass
         if not self.is_fullscreen:
             self.geometry("1280x860")
+        if hasattr(self, "kiosk_btn") and self.kiosk_btn.winfo_exists():
+            self.kiosk_btn.configure(
+                text="🗗 Windowed [F11]" if self.is_fullscreen else "⛶ Kiosk [F11]"
+            )
         self._log(f"[UI] Kiosk Fullscreen Mode: {'ENABLED' if self.is_fullscreen else 'DISABLED'}")
 
     def toggle_crosshairs(self, event=None):

@@ -52,6 +52,17 @@ def test_operator_window_and_shutdown_without_hardware(hidden_ui):
     db.get_distinct_batches.return_value = []
     db.get_scans_by_batch.return_value = []
     app = OvaLensOperatorApp(camera, Mock(), Mock(), db, sync)
+    assert app.is_fullscreen is True
+    assert "Windowed" in app.kiosk_btn.cget("text")
+
+    # Verify fullscreen toggling behavior
+    app.toggle_fullscreen()
+    assert app.is_fullscreen is False
+    assert "Kiosk" in app.kiosk_btn.cget("text")
+    app.toggle_fullscreen()
+    assert app.is_fullscreen is True
+    assert "Windowed" in app.kiosk_btn.cget("text")
+
     errors = []
     app.report_callback_exception = lambda *args: errors.append(args)
     app.after(50, app.open_scan_history_modal)
@@ -61,3 +72,18 @@ def test_operator_window_and_shutdown_without_hardware(hidden_ui):
     assert app._jobs.closed.is_set()
     camera.stop.assert_called()
     sync.stop.assert_called_once()
+
+
+def test_startup_window_confirms_fullscreen_config(hidden_ui):
+    window = StartupConfigWindow()
+    try:
+        window.update_idletasks()
+        window._operator_entry.insert(0, "Pedro Penduko")
+        window._on_start()
+        assert window.result is not None
+        assert window.result.get("fullscreen") is True
+    finally:
+        try:
+            window.destroy()
+        except tk.TclError:
+            pass

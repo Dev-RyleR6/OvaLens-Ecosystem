@@ -35,6 +35,15 @@ class StartupConfigWindow(ctk.CTk):
         ctk.set_appearance_mode("dark")
         self.configure(fg_color=FUTheme.BG_LIGHT)
         self.protocol("WM_DELETE_WINDOW", self._on_cancel)
+        try:
+            self.update_idletasks()
+            sw = self.winfo_screenwidth()
+            sh = self.winfo_screenheight()
+            x = max(0, (sw - 860) // 2)
+            y = max(0, (sh - 680) // 2)
+            self.geometry(f"860x680+{x}+{y}")
+        except Exception:
+            pass
 
         self._build_ui()
         self._auto_detect_ports()
@@ -467,6 +476,7 @@ class StartupConfigWindow(ctk.CTk):
             "display_result_ms": display_ms,
             "servo_pulse_ms": pulse_ms,
             "simulation": self._simulation_var.get(),
+            "fullscreen": True,
         }
         self.destroy()
 

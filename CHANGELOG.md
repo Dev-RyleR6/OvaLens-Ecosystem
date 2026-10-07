@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Firmware**: [TASK-NEW-FW-APP-01] preserve explicit egg/servo port assignments, add the COM5/COM7 hardware launcher, and display deployed controller status replies (2026-10-02).
 
 ### Added
+- **Edge**: launch operator app in full screen mode by default (2026-10-07)
 - **Dashboard**: bundle and enforce plus jakarta sans font across all components (2026-10-06)
 - **Edge App & Firmware**: [TASK-EDGE-TRK-01 / TASK-FW-STP-01] engineered event-driven ChamberController FSM, dedicated InferenceWorker thread, StartupConfigWindow pre-operation batch dialog, and ESP32 motor commands (2026-10-05).
 - **Firmware**: [TASK-NEW-FW-CYCLE-01] add automatic stepper camera and servo cycle (2026-10-02)
