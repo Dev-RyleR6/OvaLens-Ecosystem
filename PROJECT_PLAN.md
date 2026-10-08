@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-MODEL-V3-01**: Export the supplied best_v3.pt to a verified two-class ONNX detector, prefer the installed v3 export while preserving explicit model overrides and the prior export, and verify offline predictions, provenance and latency without hardware.
+
 - [x] **TASK-NEW-EDGE-CAPTURE-SETTLE-01**: Increase three-board pre-capture settling to 1500ms after lamp confirmation, retain saved custom timing and confidence checks, and verify settle-before-drain/inference plus cancellation with fake hardware. Physical blur improvement remains to be observed.
 
 - [x] **TASK-NEW-EDGE-EASYFLOW-01**: Combine remembered station discovery, inspection, preparation and start; keep camera preview ready, provide clear feeding instructions, tuck diagnostics into Tools, finalize completed batches inline, and reduce the default display hold while retaining stopped evidence and servo release checks.

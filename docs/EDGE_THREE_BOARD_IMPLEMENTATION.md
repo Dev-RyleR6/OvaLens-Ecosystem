@@ -379,3 +379,59 @@ The capture-order regression checks lamp ON, a configured 1.5-second settling
 pause, six-frame drain and three predictions in that order, independently of
 the result-display hold. STOP during the settling pause prevents capture and
 inference. Tests use fake camera/serial adapters; no device was activated.
+
+
+## Supplied best_v3 model
+
+`TASK-NEW-EDGE-MODEL-V3-01`, 2026-10-09: the user supplied
+`edge/models/weights/best_v3.pt` and requested using it. Its native model is
+Ultralytics **YOLO26n**, with **0=Fertile / 1=Infertile** and a 640px training
+input. It was exported using the installed Ultralytics 8.4.84, PyTorch 2.12.1,
+ONNX 1.22.0 and onnxslim 0.1.96:
+
+```powershell
+.\.venv\Scripts\python.exe edge/models/export_onnx.py --weights edge/models/weights/best_v3.pt --no-half --imgsz 640
+```
+
+The production artifact is `best_v3.onnx`, using FP32 input `[1,3,640,640]`,
+output `[1,6,8400]`, static dimensions and the required class metadata. ONNX
+checker and the real inference engine contract passed. The engine performs its
+usual three startup warmup passes. The raw checkpoint remains ignored by Git;
+the ONNX export is included as the deployable artifact.
+
+Default selection prefers an installed `best_v3.onnx`; explicit constructor and
+`ONNX_MODEL_PATH` choices retain priority. When no v3 export exists, `best.onnx`
+is selected. A present but invalid v3 export does not silently fall back to the
+previous ONNX. Automatic sorting still requires a verified ONNX contract.
+The old `best.onnx` is unchanged and can be selected explicitly for comparison.
+Restart the operator application to load the new detector.
+
+Artifact fingerprints (SHA-256):
+
+- Checkpoint: `59c0fbd3e31706a94871b2fe3d528d85089f0b9b59d5fb2b590502948592116e`
+- v3 ONNX: `72430a72f3292bb18c1b53f0b7082f17711d399dcc448403551f3061041640ba`
+- Preserved ONNX: `cc45d8cabe34c89ee04d76a5d6840ed76582a421792a8caa4fb354552f93fed8`
+
+Offline checks used the 20 most recent saved JPEG captures, with the same saved
+detection/NMS settings and no camera/serial activation. The old/new models found
+primary predictions on 20/19 images. Primary confidence reached 0.85 on 9/13
+images respectively; only **3 images for each model** also had exactly one
+remaining detection. These are individual-frame observations, not completed
+three-frame sorting decisions. Multiple detections, geometry and agreement checks
+can still require manual review. Labels were unavailable, so this does not
+establish accuracy, fertility correctness or superiority of the new model.
+
+On this Intel i7-10510U CPU, after warmup, 50 predictions on the same saved frame
+measured mean/p95 **69.80/76.86ms** for the old model and
+**60.69/86.61ms** for v3. This exceeds the 35ms
+performance target; it is an observed local CPU result, not a throughput SLA or a
+Raspberry Pi benchmark. Existing stopped capture, 1500ms settle, confidence
+thresholds, three-frame evidence, SQLite persistence and servo-before-release
+ordering remain in place. Physical testing and labelled model evaluation remain
+separate acceptance work.
+
+Integration verification passed **8 model-selection/artifact tests**, the required
+gate (**22 backend tests**, **337 edge tests / 1 shared-process Tk skip**, and
+dashboard build), and the skipped Tk lifecycle test in a fresh process. A final
+engine startup with the launcher's dotenv configuration selected `best_v3.onnx`
+and verified the recorded SHA-256. No camera or serial connection was opened.

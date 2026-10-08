@@ -79,7 +79,10 @@ class InferenceEngine:
         if type(self.intra_op_threads) is not int or not 1 <= self.intra_op_threads <= 32:
             raise ValueError("Inference threads must be between 1 and 32")
 
-        self.onnx_path = onnx_path or os.getenv("ONNX_MODEL_PATH") or os.path.join(weights_dir, "best.onnx")
+        default_onnx = os.path.join(weights_dir, "best_v3.onnx")
+        if not os.path.isfile(default_onnx):
+            default_onnx = os.path.join(weights_dir, "best.onnx")
+        self.onnx_path = onnx_path or os.getenv("ONNX_MODEL_PATH") or default_onnx
         self.pt_path = os.path.join(weights_dir, "best.pt")
 
         self.onnx_session: Optional[Any] = None

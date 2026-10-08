@@ -4,7 +4,15 @@
 > **Platform**: Raspberry Pi 5 / Industrial Edge PC / Desktop  
 > **License**: Apache License 2.0  
 
-**OvaLens Edge** is an offline-first, real-time computer vision application designed to inspect duck eggs on a motorized conveyor, classify embryonic development using YOLOv8 ONNX FP16, and command millisecond-accurate mechanical sorting via an ESP32 microcontroller.
+**OvaLens Edge** is an offline-first, real-time computer vision application designed to inspect duck eggs on a motorized conveyor, classify embryonic development using Ultralytics ONNX inference, and control mechanical sorting via ESP32 microcontrollers.
+
+The default detector is now **best_v3.onnx**, exported from the supplied
+**best_v3.pt** checkpoint (Ultralytics YOLO26n, two classes, 640px, FP32 input).
+The app uses its ONNX export for sorting. Explicit `ONNX_MODEL_PATH` or constructor
+paths take priority; installations without the v3 export use `best.onnx`.
+The previous export is retained. A present but invalid v3 model blocks automatic
+sorting rather than silently loading the previous ONNX. Restart the app to switch
+an already-running session. See [model verification](../docs/EDGE_THREE_BOARD_IMPLEMENTATION.md#supplied-best_v3-model).
 
 **Current main launcher status:** New stations default to the three-board handoff rig: conveyor, sensor/servo, and lamp ESP32s. Existing saved two-board settings retain their explicit profile. Sorting requires verified ONNX class metadata, inspection and calibration on each connection/batch. Three-board routing stops at measured gate boundaries; a pause does not consume passage distance. See [three-board setup and verification](../docs/EDGE_THREE_BOARD_IMPLEMENTATION.md) or [existing two-board setup](../docs/OVALENS_EDGE_STATION_CONTROL.md). Firmware compilation and simulations do not establish physical sorting accuracy.
 
