@@ -204,7 +204,7 @@ class StationSettingsWindow(ctk.CTkToplevel):
         except ValueError as exc:
             self.notice.configure(text=str(exc))
             return
-        self.app.realtime_detector.pause()
+        self.app._diagnostic_view = None
         def applied(report):
             self._fill(self.station.settings)
             self.confirm_camera.set(False)
@@ -213,7 +213,6 @@ class StationSettingsWindow(ctk.CTkToplevel):
             self.report.insert("1.0", "\n".join(f"{name}: requested {v['requested']}, readback {v['actual']} — {v['status']}" for name, v in report["properties"].items()))
             self.report.configure(state="disabled")
             self.notice.configure(text="Defaults saved." if save else "Applied for this run. Revalidate calibration before sorting.")
-            self.app.realtime_detector.resume()
         self._job(lambda: self.station.apply(settings, save, confirm), applied)
 
     def _restore(self):
@@ -266,5 +265,4 @@ class StationSettingsWindow(ctk.CTkToplevel):
         if self.pending:
             self.notice.configure(text="Wait for the current operation or use STOP.")
             return
-        self.app.realtime_detector.resume()
         self.destroy()

@@ -29,6 +29,14 @@ Detection verifies the board roles and saves the settings. Install the three v3
 firmware sketches once before connecting. Camera tuning and custom calibration
 remain in **Settings**.
 
+The camera preview stays on while eggs move. Automatic AI and bounding boxes
+start only after the sensor stop is confirmed, the lamp is on, and the 700ms
+settling period finishes. Three fresh predictions spaced at least 150ms apart
+must agree over at least 300ms. The displayed box stays on its captured image;
+it clears when movement resumes. Low confidence or disagreement holds the egg
+for manual review. **Single Scan** is an explicit diagnostic action and is
+blocked when the connected conveyor reports movement.
+
 ## 🌟 Key Subsystem Features
 
 - **Decoupled Quad-Thread Concurrency**:

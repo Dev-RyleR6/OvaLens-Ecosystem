@@ -6,6 +6,7 @@ import math
 import threading
 import time
 import uuid
+from .capture_view import CaptureView
 
 
 class ReviewRequired(RuntimeError):
@@ -94,6 +95,8 @@ class Holder:
 
 
 class SortingCycle:
+    allow_empty_capture = True
+
     def __init__(self, boards, camera, inference, db, settings, device_id, session_id,
                  batch_id, target, operator):
         self.boards, self.camera, self.inference, self.db = boards, camera, inference, db
@@ -107,6 +110,8 @@ class SortingCycle:
         self.status = {"state": "READY", "reason": "", "holder": 0}
         self.metrics = {"capture_age_ms": 0.0, "cycle_ms": 0.0}
         self.latest_result = None
+        self.capture_view = None
+        self._view_lock = threading.Lock()
         self._stop = threading.Event()
         self._decision = threading.Event()
         self._resolution = None
@@ -137,7 +142,9 @@ class SortingCycle:
         self._thread.start()
 
     def stop(self):
-        self._stop.set()
+        with self._view_lock:
+            self._stop.set()
+            self.capture_view = None
         self._decision.set()
         self.boards.halt()
 
@@ -186,6 +193,7 @@ class SortingCycle:
             self._stop.wait(min(.02, max(0, deadline - time.monotonic())))
 
     def _move(self, destination, chamber=False):
+        self.clear_capture_view()
         k = self.settings.calibration
         delta = destination - self.travel
         if delta < -k.position_tolerance_steps:
@@ -211,15 +219,42 @@ class SortingCycle:
         k = self.settings.calibration
         self._delay(k.settle_ms / 1000)
         after = time.monotonic()
-        deadline = after + 2
+        return self._collect_evidence(after, self.camera.settings_revision)
+
+    def clear_capture_view(self):
+        with self._view_lock:
+            self.capture_view = None
+
+    def _capture_health(self):
+        self._health()
+        state = self.boards.conveyor.snapshot().telemetry
+        expected = self._origin + self.travel * self.settings.calibration.direction
+        if state.get("BUSY") != "0" or int(state["POSITION"]) != expected:
+            raise RuntimeError("Conveyor is not stationary at the capture position")
+
+    def _collect_evidence(self, after, revision, frame=None):
+        try:
+            return self._collect_stopped_evidence(after, revision, frame)
+        except (ReviewRequired, TimeoutError):
+            raise  # Keep the paired snapshot available for inspection.
+        except Exception:
+            self.clear_capture_view()
+            raise
+
+    def _collect_stopped_evidence(self, after, revision, frame):
+        """Sample fresh frames at 150ms intervals, with no preview inference work."""
+        deadline = time.monotonic() + 2
         evidence = StableEvidence(self.settings.detection.sort_confidence)
         last_sequence = -1
-        revision = self.camera.settings_revision
+        next_stamp = after
         while time.monotonic() < deadline:
-            self._health()
-            frame = self.camera.snapshot()
-            if frame is None or frame.sequence == last_sequence or frame.captured_at <= after:
+            self._capture_health()
+            if frame is None:
+                frame = self.camera.snapshot(copy=False)
+            if (frame is None or frame.sequence == last_sequence
+                    or frame.captured_at <= after or frame.captured_at < next_stamp):
                 self._stop.wait(.01)
+                frame = None
                 continue
             if frame.settings_revision != revision:
                 raise RuntimeError("Camera settings changed during sorting")
@@ -227,13 +262,27 @@ class SortingCycle:
             self.metrics["capture_age_ms"] = (time.monotonic() - frame.captured_at) * 1000
             remaining = deadline - time.monotonic()
             result = self.inference.predict(frame.image, timeout=max(.01, remaining), capture=True)
+            self._capture_health()  # A late result cannot outlive a stop, fault or movement.
+            if self.camera.settings_revision != revision:
+                raise RuntimeError("Camera settings changed during inference")
             if time.monotonic() > deadline:
                 raise ReviewRequired("Classification deadline exceeded")
+            view = CaptureView.create(frame, result)
+            with self._view_lock:
+                if self._stop.is_set():
+                    raise RuntimeError("Operator stopped during inference")
+                self.capture_view = view
             self._last_result = result
+            if not self.allow_empty_capture and result.get("final_class") is None:
+                raise ReviewRequired("Sensor detected an egg but vision did not confirm it")
             if evidence.add(frame.captured_at, result):
                 return evidence.result(), {"frames": len(evidence.samples),
                     "span_ms": (frame.captured_at - evidence.samples[0][0]) * 1000,
                     "settings_revision": revision}
+            next_stamp = frame.captured_at + .15
+            if len(evidence.samples) == 2:
+                next_stamp = max(next_stamp, evidence.samples[0][0] + .3)
+            frame = None
         raise ReviewRequired("No stable fresh classification within two seconds")
 
     def _review(self, reason, holder):
@@ -334,6 +383,7 @@ class SortingCycle:
             self._checkpoint("COMPLETE")
             self._state("COMPLETE", "Gate passage timed; inspect output trays")
         except Exception as exc:
+            self.clear_capture_view()
             self.boards.halt()
             self._state("RECOVERY_REQUIRED", str(exc))
             try:

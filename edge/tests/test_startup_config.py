@@ -74,6 +74,31 @@ def test_operator_window_and_shutdown_without_hardware(hidden_ui):
     sync.stop.assert_called_once()
 
 
+def test_live_preview_does_not_submit_background_inference(hidden_ui):
+    import time
+    import numpy as np
+    from src.core.camera import CameraFrame
+    from src.core.inference_worker import InferenceWorker
+    frame = CameraFrame(1, time.monotonic(), 0, np.zeros((120, 160, 3), dtype=np.uint8))
+    camera = SimpleNamespace(is_running=True, current_fps=30., last_error=None,
+        is_mock_mode=False, stop=Mock(), snapshot=Mock(return_value=frame))
+    engine = SimpleNamespace(predict=Mock())
+    worker = InferenceWorker(engine)
+    worker.start()
+    sync = SimpleNamespace(last_error=None, heartbeat_error=None, is_online=False, stop=Mock())
+    db = Mock()
+    db.get_unsynced_count.return_value = 0
+    app = OvaLensOperatorApp(camera, engine, None, db, sync, fullscreen=False, inference_worker=worker)
+    errors = []
+    app.report_callback_exception = lambda *args: errors.append(args)
+    app.after(200, app.shutdown)
+    app.mainloop()
+    assert not errors
+    assert camera.snapshot.call_count > 1
+    engine.predict.assert_not_called()
+    assert not hasattr(app, "realtime_detector")
+
+
 def test_startup_window_confirms_fullscreen_config(hidden_ui):
     window = StartupConfigWindow()
     try:

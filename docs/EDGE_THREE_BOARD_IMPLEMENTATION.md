@@ -126,11 +126,32 @@ calibration. The old IR offset and timed passage wait apply to the two-board pro
 
 ## Candling, routing and recovery
 
+`TASK-NEW-EDGE-STOPSCAN-01`: Camera acquisition and live preview continue while
+the belt moves. The operator app creates no continuous detection/tracking worker.
+The model stays loaded after its three startup warmup passes; automatic inference
+is requested only by the stopped capture state machine. Single Scan remains an
+explicit diagnostic action, guarded against a connected conveyor reporting motion.
+
 The egg board pauses the belt locally. The host confirms lamp ON, waits settling,
 requests six buffer grabs and a fresh read on the camera's sole owning thread,
 then requires three agreeing real ONNX detections over at least 300ms within a
 two-second evidence window. Geometry, confidence, frame order and settings revision
 must agree. Camera failure cannot substitute synthetic frames into a real session.
+
+Predictions use three fresh frames spaced at least 150ms apart, avoiding redundant
+AI work during the 300ms evidence interval. Before and after each prediction the
+host checks health, stopped position, pause, held egg sequence and lamp ON.
+Camera-setting changes and late results after a stop/fault are discarded.
+The original 700ms settle and 1500ms display hold remain unchanged pending rig
+measurements. The two-second evidence deadline remains bounded.
+
+The UI receives each camera snapshot and its detections together. While held it
+shows that exact captured image, including during manual review. Stored image
+evidence is updated atomically to match the final predicted frame and records its
+sequence, capture timestamp and settings revision. Capture overlays are cleared
+before RESUME/ADVANCE/INDEX commands, on operator stop and on recovery faults.
+The render cache includes the capture/live source so the next UI refresh removes
+the box even if the camera sequence has not changed. Moving video has no AI boxes.
 
 Image evidence is written atomically and linked to the scan. The scan and decision
 commit to SQLite WAL before release or sorting commands. The journal retains
@@ -202,6 +223,18 @@ the actual main-screen controls at 1280x860 and 1024x720. Visual inspection also
 covered both sizes and the startup instructions. All device traffic used fakes.
 
 Reproduce software verification:
+
+Stopped-only inference verification (`TASK-NEW-EDGE-STOPSCAN-01`, 2026-10-09):
+the final repository gate passed **22 backend tests**, **298 edge tests** and
+the dashboard production build. One Tk initialization skip occurred in the full
+edge run; the operator-window test and the new live-preview test each passed in
+a fresh process. Coverage includes a live preview with zero background inference,
+50 simulated eggs with exactly 150 predictions, no prediction during motion,
+exact image/prediction persistence, manual-review retention, late-result rejection
+on stop/pause/sequence/position/lamp/settings changes, and cache invalidation when
+the box clears or the camera becomes stale. `launcher.py --check-runtime` confirmed
+the project interpreter and PySerial 3.5. No physical device was exercised for
+this change; actual stopping, exposure and sorting acceptance remain below.
 
 ```powershell
 python -m pytest edge/tests -v

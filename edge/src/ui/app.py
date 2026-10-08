@@ -26,7 +26,7 @@ from ..core.inference import InferenceEngine
 from ..core.chamber_controller import ChamberController, ChamberState
 from ..core.background_jobs import BackgroundJobs
 from ..core.inference_worker import InferenceWorker
-from ..core.realtime_detector import RealtimeDetectionWorker
+from ..core.capture_view import CaptureView
 from ..core.operator_flow import OperatorState, validate_batch_config
 from ..iot.serial_driver import ESP32SerialDriver
 from ..db.local_db import LocalDatabaseManager
@@ -158,8 +158,7 @@ class OvaLensOperatorApp(ctk.CTk):
         if self.inference_worker is None:
             self.inference_worker = InferenceWorker(self.engine)
             self.inference_worker.start()
-        self.realtime_detector = RealtimeDetectionWorker(self.camera, self.inference_worker)
-        self.realtime_detector.start()
+        self._diagnostic_view = None
 
         # Keyboard Accelerators & Operator Hotkeys
         self.bind("<space>", self._scan_shortcut)
@@ -222,7 +221,7 @@ class OvaLensOperatorApp(ctk.CTk):
         deadline = time.monotonic() + 5.0
         def cleanup():
             try:
-                for resource in (getattr(self, "station", None), getattr(self, "realtime_detector", None), self.inference_worker,
+                for resource in (getattr(self, "station", None), self.inference_worker,
                                  self.chamber, self.iot, self.sync_worker, self.camera):
                     if resource:
                         try:
@@ -306,14 +305,20 @@ class OvaLensOperatorApp(ctk.CTk):
         if time.monotonic() >= pending["deadline"]:
             self._scan_failed("Inference timed out; result discarded.", OperatorState.REVIEW)
             return
+        if not OvaLensOperatorApp._diagnostic_stationary(self):
+            self._scan_failed("Conveyor moved during the diagnostic; result discarded.")
+            return
+        frame = pending.get("frame")
+        if frame is None or frame.settings_revision != self.camera.settings_revision:
+            self._scan_failed("Camera settings changed; result discarded.")
+            return
+        self._diagnostic_view = CaptureView.create(frame, result)
         self._process_scan_result(result)
 
     def _scan_failed(self, message, state=OperatorState.ERROR):
         self._scan_busy = False
+        self._diagnostic_view = None
         self._latest_detections = []
-        detector = getattr(self, "realtime_detector", None)
-        if detector:
-            detector.resume()
         self.result_title.configure(text="No scan recorded")
         self.result_badge.configure(text=state.value)
         self.result_subtitle.configure(text=message)
@@ -863,7 +868,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self._setup_busy = True
         self.setup_inspected.set(False)
         self.setup_notice.configure(text=message)
-        self.realtime_detector.pause()
+        self._diagnostic_view = None
         self._set_session_active_state(False)
         def finish(value, failed=False):
             self._setup_busy = False
@@ -877,7 +882,6 @@ class OvaLensOperatorApp(ctk.CTk):
             self.result_subtitle.configure(text=text)
             self._log("[SETUP] " + text)
             self._update_cycle_hud("●", FUTheme.INFERTILE_AMBER if failed else FUTheme.TEXT_PRIMARY, text)
-            self.realtime_detector.resume()
             self._set_session_active_state(False)
         try:
             self._jobs.submit(work, lambda value: finish(value), lambda error: finish(error, True))
@@ -1051,12 +1055,7 @@ class OvaLensOperatorApp(ctk.CTk):
         except Exception:
             pass
 
-        # 2. Immediately pause & clear real-time detector and tracker
-        detector = getattr(self, "realtime_detector", None)
-        if detector:
-            detector.pause()
-            if hasattr(detector, "clear"):
-                detector.clear()
+        self._diagnostic_view = None
 
         # 3. Immediately clear all detections and blank out the camera preview
         self._latest_detections = []
@@ -1234,7 +1233,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.current_session_id = cycle.session_id
         self.is_session_active = self.is_auto_cycle_running = True
         self._station_terminal_seen = False
-        self.realtime_detector.pause()
+        self._diagnostic_view = None
         self.total_count = self.fertile_count = self.infertile_count = self.review_count = self.scan_sequence = 0
         self._session_start_time = time.time()
         self._diagnostics_complete = False
@@ -1352,12 +1351,9 @@ class OvaLensOperatorApp(ctk.CTk):
             self._scan_failed("Invalid inference latency; scan was not saved.")
             return
 
-        # Immediate real-time visual feedback
+        # The viewport uses the paired diagnostic snapshot, never a live frame.
         self._latest_detections = result.get("detections", [])
         self._last_scan_result_time = time.monotonic()
-        detector = getattr(self, "realtime_detector", None)
-        if detector:
-            detector.resume()
 
         if self.simulation or self.camera.is_mock_mode or not str(result.get("engine", "")).startswith("ONNX"):
             self._scan_busy = False
@@ -1443,13 +1439,12 @@ class OvaLensOperatorApp(ctk.CTk):
         if self.grab_current() is not None:
             self._log("[BLOCKED] Close the dialog before scanning.")
             return
+        if not OvaLensOperatorApp._diagnostic_stationary(self):
+            self._log("[BLOCKED] Stop the conveyor before a diagnostic scan.")
+            return
         self._scan_busy = True
-        detector = getattr(self, "realtime_detector", None)
-        if detector and detector.latest_detection:
-            self._latest_detections = [detector.latest_detection]
-            detector.pause()
-        else:
-            self._latest_detections = []
+        self._diagnostic_view = None
+        self._latest_detections = []
         self.result_title.configure(text="Waiting for a fresh camera frame")
         self.result_badge.configure(text="PENDING")
         self.result_subtitle.configure(text="No result recorded yet")
@@ -1473,18 +1468,21 @@ class OvaLensOperatorApp(ctk.CTk):
         if self.camera.last_error:
             self._scan_failed("Camera unavailable: " + self.camera.last_error)
             return
-        frame = self.camera.get_latest_frame(copy=True)
+        frame = self.camera.snapshot()
         if frame is None:
             self.after(50, lambda: self._await_scan_frame(generation, deadline))
             return
+        if not OvaLensOperatorApp._diagnostic_stationary(self):
+            self._scan_failed("Stop the conveyor before a diagnostic scan.")
+            return
         request_id = str(uuid.uuid4())
         self._pending_prediction = {"id": request_id, "generation": generation,
-                                    "deadline": time.monotonic() + 2.0}
+                                    "deadline": time.monotonic() + 2.0, "frame": frame}
         self._inference_request_id = request_id
         self._set_operation_state(OperatorState.CLASSIFYING, "CLASSIFYING - NO RECORD SAVED YET")
         self.result_title.configure(text="Classifying camera snapshot")
         try:
-            self.inference_worker.submit(frame, request_id)
+            self.inference_worker.submit(frame.image, request_id)
         except (queue.Full, RuntimeError) as exc:
             self._pending_prediction = self._inference_request_id = None
             self._scan_failed("Inference unavailable: " + str(exc))
@@ -1567,37 +1565,32 @@ class OvaLensOperatorApp(ctk.CTk):
         self.box_infertile.configure(text=str(self.infertile_count))
         self.box_review.configure(text=str(self.review_count))
 
+    def _diagnostic_stationary(self):
+        station = getattr(self, "station", None)
+        if station is None or getattr(station, "boards", None) is None:
+            return True  # Camera-only diagnostics are supported.
+        state = station.boards.conveyor.snapshot()
+        return (state.connected and state.identified and not state.error
+                and state.telemetry.get("BUSY") == "0")
+
+    def _get_display_capture(self):
+        if getattr(self, "_stopping", False) or not self.camera.is_running:
+            return None
+        station = getattr(self, "station", None)
+        cycle = getattr(station, "cycle", None)
+        if cycle is not None and getattr(self, "is_auto_cycle_running", False):
+            if cycle.status["state"] in {"CLASSIFYING", "SAVING", "DISPLAYING", "MANUAL_REVIEW"}:
+                return getattr(cycle, "capture_view", None)
+            return None
+        if (not getattr(self, "_scan_busy", False)
+                and time.monotonic() - getattr(self, "_last_scan_result_time", 0) < 1.5
+                and OvaLensOperatorApp._diagnostic_stationary(self)):
+            return getattr(self, "_diagnostic_view", None)
+        return None
+
     def _get_active_display_detections(self) -> List[Dict[str, Any]]:
-        """
-        Returns active detections for real-time viewport visualization.
-        Priority:
-        1. Actively scanning / locked target during single scan.
-        2. Recent single scan result (within 1.5s).
-        3. Real-time background detection & tracking on live video.
-        """
-        if getattr(self, "_stopping", False) or not getattr(self.camera, "is_running", False):
-            return []
-
-        if getattr(self, "_scan_busy", False):
-            if getattr(self, "_latest_detections", None):
-                return [{**d, "is_scanning": True} for d in self._latest_detections]
-            detector = getattr(self, "realtime_detector", None)
-            if detector and detector.latest_detection:
-                return [{**detector.latest_detection, "is_scanning": True}]
-            return []
-
-        # Fresh completed single scan: display result briefly (1.5s)
-        last_scan_time = getattr(self, "_last_scan_result_time", 0.0)
-        if getattr(self, "_latest_detections", None) and (time.monotonic() - last_scan_time < 1.5):
-            return self._latest_detections
-
-        # Active real-time background detection & tracking
-        detector = getattr(self, "realtime_detector", None)
-        if detector and detector.latest_detection:
-            return [detector.latest_detection]
-
-        # No active detection: return empty list (prevents freezing/sticking)
-        return []
+        view = OvaLensOperatorApp._get_display_capture(self)
+        return view.result.get("detections", []) if view else []
 
     def _update_video_frame(self):
         """
@@ -1609,12 +1602,11 @@ class OvaLensOperatorApp(ctk.CTk):
             if getattr(self.camera, "is_running", False) and not getattr(self, "_stopping", False):
                 snapshot = self.camera.snapshot(copy=False)
                 frame = snapshot.image if snapshot else None
-                cycle = self.station.cycle if getattr(self, "station", None) else None
-                reviewing = cycle is not None and cycle.status["state"] == "MANUAL_REVIEW" and getattr(cycle, "review_frame", None) is not None
-                if reviewing:
-                    frame = cycle.review_frame
+                view = self._get_display_capture()
+                if view is not None:
+                    frame = view.frame.image
                 if frame is not None:
-                    render_key = (("review", id(frame)) if reviewing else snapshot.sequence, self._cached_container_w, self._cached_container_h)
+                    render_key = (("capture", id(view)) if view is not None else ("live", snapshot.sequence), self._cached_container_w, self._cached_container_h)
                     if render_key == getattr(self, "_last_render_key", None):
                         return
                     self._last_render_key = render_key
@@ -1647,15 +1639,16 @@ class OvaLensOperatorApp(ctk.CTk):
                         cv2.line(disp_frame, (cx - 20, cy), (cx + 20, cy), (0, 255, 0), 1, cv2.LINE_AA)
                         cv2.line(disp_frame, (cx, cy - 20), (cx, cy + 20), (0, 255, 0), 1, cv2.LINE_AA)
 
-                    # 4. Draw Real-time AI Bounding Boxes & Classification Labels
-                    active_detections = cycle._last_result.get("detections", []) if reviewing else self._get_active_display_detections()
+                    # 4. Draw only this captured frame's predictions.
+                    active_detections = view.result.get("detections", []) if view else []
                     for det in active_detections:
                         bbox = det.get("bbox", [])
                         cls_name = det.get("class", "FERTILE")
                         conf = det.get("confidence", 0.90)
                         is_scanning = det.get("is_scanning", False)
 
-                        if len(bbox) == 4:
+                        if (len(bbox) == 4 and all(type(v) in (int, float) and math.isfinite(v) for v in bbox)
+                                and type(conf) in (int, float) and math.isfinite(conf)):
                             xc, yc, bw, bh = bbox
                             x1 = max(0, int((xc - bw / 2.0) * target_w))
                             y1 = max(0, int((yc - bh / 2.0) * target_h))
@@ -1704,8 +1697,14 @@ class OvaLensOperatorApp(ctk.CTk):
                     photo = ImageTk.PhotoImage(image=pil_img)
                     self.video_label.configure(image=photo)
                     self._current_photo = photo
+                else:
+                    self._last_render_key = None
+                    if self._current_photo is not None:
+                        self._current_photo = None
+                        self.video_label.configure(image="")
             else:
                 # Camera turned off or session ending / on standby: clear viewport completely
+                self._last_render_key = None
                 if self._current_photo is not None:
                     self._current_photo = None
                     try:

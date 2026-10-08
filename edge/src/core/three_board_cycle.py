@@ -9,7 +9,8 @@ import math
 import queue
 import time
 import uuid
-from .sorting_cycle import SortingCycle, Holder, ReviewRequired, StableEvidence
+from .capture_view import CaptureView
+from .sorting_cycle import SortingCycle, Holder, ReviewRequired
 
 
 def finite_evidence(value):
@@ -23,6 +24,8 @@ def finite_evidence(value):
 
 
 class ThreeBoardCycle(SortingCycle):
+    allow_empty_capture = False
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.review_frame = None
@@ -54,6 +57,8 @@ class ThreeBoardCycle(SortingCycle):
 
     def _capture(self):
         k = self.settings.calibration
+        self.clear_capture_view()
+        self._capture_health(lit=False)
         self._state("LIGHTING", holder=self.count + 1)
         lamp = self._command(self.boards.light, "LIGHT_ON")
         if lamp.get("LIGHT") != "1":
@@ -62,36 +67,41 @@ class ThreeBoardCycle(SortingCycle):
         self._delay(k.settle_ms / 1000)
         after, revision = time.monotonic(), self.camera.settings_revision
         frame = self.camera.capture_fresh(k.buffer_drain, timeout=3)
-        self._health()
-        self.review_frame = frame.image.copy()
+        self._capture_health()
+        if frame.settings_revision != revision:
+            raise RuntimeError("Camera settings changed during capture")
+        self.review_frame = frame.image
         self.pending_capture["image_path"] = self.db.save_scan_image(self.pending_capture["scan_id"], frame.image)
+        view = CaptureView.create(frame, {})
+        self.pending_capture["frame"] = view.identity()
+        with self._view_lock:
+            if self._stop.is_set():
+                raise RuntimeError("Operator stopped during capture")
+            self.capture_view = view
         self._checkpoint("CAPTURED")
         self._state("CLASSIFYING", holder=self.count + 1)
-        evidence, last_sequence = StableEvidence(self.settings.detection.sort_confidence), -1
-        deadline = time.monotonic() + 2
-        while time.monotonic() < deadline:
-            self._health()
-            if frame is None or frame.sequence == last_sequence or frame.captured_at <= after:
-                self._stop.wait(.01)
-                frame = self.camera.snapshot()
-                continue
-            if frame.settings_revision != revision:
-                raise RuntimeError("Camera settings changed during capture")
-            last_sequence = frame.sequence
-            self.metrics["capture_age_ms"] = (time.monotonic() - frame.captured_at) * 1000
-            result = self.inference.predict(frame.image, timeout=max(.01, deadline - time.monotonic()), capture=True)
-            self._last_result = result
-            self.pending_capture["prediction"] = finite_evidence(result)
-            if time.monotonic() > deadline:
-                raise ReviewRequired("Classification deadline exceeded")
-            if result.get("final_class") is None:
-                raise ReviewRequired("Sensor detected an egg but vision did not confirm it")
-            if evidence.add(frame.captured_at, result):
-                return evidence.result(), {"frames": len(evidence.samples),
-                    "span_ms": (frame.captured_at - evidence.samples[0][0]) * 1000,
-                    "settings_revision": revision, "buffer_drain": k.buffer_drain}
-            frame = self.camera.snapshot()
-        raise ReviewRequired("No stable fresh classification within two seconds")
+        try:
+            result, evidence = self._collect_evidence(after, revision, frame)
+            return result, {**evidence, "buffer_drain": k.buffer_drain}
+        finally:
+            view = self.capture_view
+            if view is not None:
+                # Persist the same image as the final prediction, including review cases.
+                self.review_frame = view.frame.image
+                self.pending_capture["image_path"] = self.db.save_scan_image(
+                    self.pending_capture["scan_id"], view.frame.image)
+                self.pending_capture["prediction"] = finite_evidence(view.result)
+                self.pending_capture["frame"] = view.identity()
+
+    def _capture_health(self, lit=True):
+        super()._capture_health()
+        egg = self.boards.egg.snapshot().telemetry
+        conveyor = self.boards.conveyor.snapshot().telemetry
+        if (egg.get("STATE") != "HOLDING" or egg.get("PAUSED") != "1"
+                or int(egg["EGG_SEQ"]) != self._last_egg_seq or conveyor.get("PAUSED") != "1"):
+            raise RuntimeError("Egg hold or hardware pause changed during capture")
+        if lit and self.boards.light.snapshot().telemetry.get("LIGHT") != "1":
+            raise RuntimeError("Candling lamp changed during capture")
 
     def _lamp_off(self):
         reply = self._command(self.boards.light, "LIGHT_OFF")
@@ -121,6 +131,7 @@ class ThreeBoardCycle(SortingCycle):
                 raise RuntimeError("Unexpected gate event during position-controlled routing")
 
     def _advance(self, destination):
+        self.clear_capture_view()
         k = self.settings.calibration
         delta = destination - self.travel
         if not 0 < delta <= 100000:
@@ -214,6 +225,7 @@ class ThreeBoardCycle(SortingCycle):
             self.db.create_session(self.session_id, self.batch_id, self.device_id, "DAY_10", self.operator)
             self._checkpoint("STARTED")
             self._command(self.boards.egg, "ARM")
+            self.clear_capture_view()
             self._command(self.boards.egg, "RESUME")
             while self.count < self.target or events:
                 self._health()
@@ -247,6 +259,7 @@ class ThreeBoardCycle(SortingCycle):
                         self.holders.remove(holder)
                     self._checkpoint("GATE_READY")
                 if self.boards.egg.snapshot().telemetry.get("PAUSED") == "1":
+                    self.clear_capture_view()
                     self._command(self.boards.egg, "RESUME")
             final_egg = self._command(self.boards.egg, "STATUS")
             if final_egg.get("SENSOR") != "0" or final_egg.get("STATE") != "WAITING":
@@ -257,6 +270,7 @@ class ThreeBoardCycle(SortingCycle):
             self._checkpoint("COMPLETE")
             self._state("COMPLETE", "Gate passage estimated from issued steps; inspect output trays")
         except Exception as exc:
+            self.clear_capture_view()
             self.boards.halt()
             self._state("RECOVERY_REQUIRED", str(exc))
             try:

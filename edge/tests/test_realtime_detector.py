@@ -88,56 +88,38 @@ def test_realtime_worker_lifecycle():
 
 
 def test_get_active_display_detections():
-    camera = SimpleNamespace(is_running=True)
-    app = SimpleNamespace(
-        camera=camera,
-        _stopping=False,
-        _scan_busy=False,
-        _latest_detections=[],
-        _last_scan_result_time=0.0,
-        realtime_detector=None,
-    )
-
-    # 1. Fallback when idle and no detections
-    detections = OvaLensOperatorApp._get_active_display_detections(app)
-    assert detections == []
-
-    # 2. Real-time background detection present
-    mock_live = {"bbox": [0.5, 0.5, 0.3, 0.4], "class": "FERTILE", "confidence": 0.90}
-    app.realtime_detector = SimpleNamespace(latest_detection=mock_live)
-    detections = OvaLensOperatorApp._get_active_display_detections(app)
-    assert len(detections) == 1
-    assert detections[0]["class"] == "FERTILE"
-
-    # 3. Scanning lock active
+    from edge.src.core.capture_view import CaptureView
+    from edge.src.core.camera import CameraFrame
+    detection = {"bbox": [.5, .5, .3, .4], "class": "FERTILE", "confidence": .9}
+    frame = CameraFrame(3, time.monotonic(), 0, np.zeros((20, 20, 3)))
+    view = CaptureView.create(frame, {"detections": [detection]})
+    app = SimpleNamespace(camera=SimpleNamespace(is_running=True), _stopping=False,
+        _scan_busy=False, _last_scan_result_time=time.monotonic(), _diagnostic_view=None,
+        realtime_detector=SimpleNamespace(latest_detection=detection))
+    # Legacy preview detections must never leak onto live moving video.
+    assert OvaLensOperatorApp._get_active_display_detections(app) == []
+    app._diagnostic_view = view
+    assert OvaLensOperatorApp._get_active_display_detections(app) == [detection]
     app._scan_busy = True
-    detections = OvaLensOperatorApp._get_active_display_detections(app)
-    assert len(detections) == 1
-    assert detections[0].get("is_scanning") is True
-
-    # 4. Fresh single scan result takes precedence within 1.5s
+    assert OvaLensOperatorApp._get_active_display_detections(app) == []
     app._scan_busy = False
-    app._latest_detections = [{"bbox": [0.5, 0.5, 0.3, 0.4], "class": "INFERTILE", "confidence": 0.95}]
-    app._last_scan_result_time = time.monotonic()
-    detections = OvaLensOperatorApp._get_active_display_detections(app)
-    assert len(detections) == 1
-    assert detections[0]["class"] == "INFERTILE"
-
-    # 5. After 1.5s, scan result expires; if no live detection, returns empty (NO STICKING)
-    app._last_scan_result_time = time.monotonic() - 2.0
-    app.realtime_detector.latest_detection = None
-    detections = OvaLensOperatorApp._get_active_display_detections(app)
-    assert detections == []
-
-    # 6. When session is stopping or camera is off, preview detections are immediately empty
+    app._last_scan_result_time -= 2
+    assert OvaLensOperatorApp._get_active_display_detections(app) == []
+    cycle = SimpleNamespace(status={"state": "DISPLAYING"}, capture_view=view)
+    app.station = SimpleNamespace(cycle=cycle)
+    app.is_auto_cycle_running = True
+    for state in ("CLASSIFYING", "SAVING", "DISPLAYING", "MANUAL_REVIEW"):
+        cycle.status["state"] = state
+        assert OvaLensOperatorApp._get_display_capture(app) is view
+    for state in ("SEARCHING", "INDEXING", "ROUTING", "RECOVERY_REQUIRED", "COMPLETE"):
+        cycle.status["state"] = state
+        assert OvaLensOperatorApp._get_display_capture(app) is None
+    cycle.status["state"] = "DISPLAYING"
     app._stopping = True
-    detections = OvaLensOperatorApp._get_active_display_detections(app)
-    assert detections == []
-
+    assert OvaLensOperatorApp._get_active_display_detections(app) == []
     app._stopping = False
-    camera.is_running = False
-    detections = OvaLensOperatorApp._get_active_display_detections(app)
-    assert detections == []
+    app.camera.is_running = False
+    assert OvaLensOperatorApp._get_active_display_detections(app) == []
 
 
 def test_inference_engine_thresholds():

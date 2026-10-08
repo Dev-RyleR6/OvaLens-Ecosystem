@@ -473,8 +473,11 @@ def test_real_camera_owner_flushes_six_frames_and_saves_image(tmp_path, monkeypa
         cycle.camera = camera
         cycle.inference = SimpleNamespace(predict=lambda *a, **k: prediction())
         cycle.pending_capture = {"scan_id": str(uuid.uuid4())}
+        cycle._origin, cycle._last_egg_seq = 0, 1
+        rig.conveyor.values.update(PAUSED="1")
+        rig.egg.values.update(STATE="HOLDING", PAUSED="1", EGG_SEQ="1")
         result, evidence = ThreeBoardCycle._capture(cycle)
-        assert result["final_class"] == "FERTILE" and evidence["frames"] >= 3 and evidence["span_ms"] >= 300
+        assert result["final_class"] == "FERTILE" and evidence["frames"] == 3 and evidence["span_ms"] >= 300
         assert len(grabs) == 6 and threading.get_ident() not in owners
         assert Path(cycle.pending_capture["image_path"]).is_file()
         assert not list(Path(cycle.pending_capture["image_path"]).parent.glob("*.tmp"))
@@ -516,7 +519,7 @@ def test_fifty_eggs_through_real_capture_inference_workers_and_wal(tmp_path, mon
     """Synthetic camera/model adapters, actual workers/evidence/storage/coordinator."""
     class Capture:
         def __init__(self, *args):
-            self.grabs = 0
+            self.grabs = self.reads = 0
         def isOpened(self):
             return True
         def getBackendName(self):
@@ -528,16 +531,30 @@ def test_fifty_eggs_through_real_capture_inference_workers_and_wal(tmp_path, mon
             return True
         def read(self):
             time.sleep(.01)
-            return True, np.full((120, 160, 3), 150, dtype=np.uint8)
+            self.reads += 1
+            return True, np.full((120, 160, 3), self.reads % 240, dtype=np.uint8)
         def release(self):
             pass
     capture = Capture()
     monkeypatch.setattr("src.core.camera.cv2.VideoCapture", lambda *args: capture)
     cycle, db, rig = fixture(tmp_path, count=50)
     camera = CameraGrabber()
+    calls = []
+    def infer(frame):
+        assert rig.conveyor.values["BUSY"] == "0" and rig.conveyor.values["PAUSED"] == "1"
+        assert rig.egg.values["STATE"] == "HOLDING" and rig.light.values["LIGHT"] == "1"
+        value = int(frame[0, 0, 0])
+        calls.append((int(rig.egg.values["EGG_SEQ"]), value))
+        return {**prediction("FERTILE" if int(rig.egg.values["EGG_SEQ"]) % 2 else "INFERTILE"),
+                "captured_pixel": value}
     engine = SimpleNamespace(engine_type="ONNX Runtime (simulation adapter)",
-        model_identity={"simulated": True}, predict=lambda frame:
-        prediction("FERTILE" if int(rig.egg.values["EGG_SEQ"]) % 2 else "INFERTILE"))
+        model_identity={"simulated": True}, predict=infer)
+    original_command = FakeLink.command
+    def command(link, text, timeout=3):
+        if text == "RESUME" or text.startswith("ADVANCE:"):
+            assert cycle.capture_view is None
+        return original_command(link, text, timeout)
+    monkeypatch.setattr(FakeLink, "command", command)
     worker = InferenceWorker(engine)
     camera.start()
     worker.start()
@@ -548,14 +565,18 @@ def test_fifty_eggs_through_real_capture_inference_workers_and_wal(tmp_path, mon
         cycle._run()
         assert cycle.status["state"] == "COMPLETE", cycle.status
         assert cycle.count == cycle.routed == 50 and capture.grabs == 300
+        assert len(calls) == 150  # Three predictions per egg, none during motion.
         rows = db.get_uncommitted_scans()
         assert len(rows) == 50 and len({row["scan_id"] for row in rows}) == 50
         for index, row in enumerate(rows):
             assert row["final_class"] == ("FERTILE" if index % 2 == 0 else "INFERTILE")
             evidence = json.loads(row["evidence_json"])
-            assert evidence["verification"]["frames"] >= 3
+            assert evidence["verification"]["frames"] == 3
             assert evidence["verification"]["span_ms"] >= 300
-            assert Path(row["image_path"]).is_file()
+            import cv2
+            image = cv2.imread(row["image_path"])
+            assert int(image[0, 0, 0]) == evidence["capture"]["prediction"]["captured_pixel"]
+            assert evidence["capture"]["frame"]["sequence"] > 0
         assert not worker.busy
     finally:
         cycle.stop()

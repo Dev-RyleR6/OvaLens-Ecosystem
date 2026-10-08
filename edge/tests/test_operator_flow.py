@@ -13,6 +13,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.core.inference_worker import InferenceWorker
+from src.core.camera import CameraFrame
 from src.core.operator_flow import OperatorState, validate_batch_config
 from src.ui.app import OvaLensOperatorApp
 from test_operation_safety import station, prediction
@@ -27,7 +28,7 @@ def operator(tmp_path):
     app.chamber = None
     app.is_auto_cycle_running = False
     app.camera = SimpleNamespace(is_mock_mode=False, is_running=False, last_error=None,
-                                 start=Mock(), stop=Mock(), get_latest_frame=Mock(return_value=None))
+                                 start=Mock(), stop=Mock(), settings_revision=0, snapshot=Mock(return_value=None))
     app.inference_worker = SimpleNamespace(busy=False, submit=Mock(), result_queue=queue.Queue())
     app.grab_current = Mock(return_value=None)
     app.open_batch_completion_modal = Mock()
@@ -51,7 +52,7 @@ def test_one_click_waits_for_fresh_frame_and_rejects_duplicate_click(tmp_path):
     app.trigger_candling_scan()
     app.camera.start.assert_called_once()
     app.inference_worker.submit.assert_not_called()
-    app.camera.get_latest_frame.return_value = np.zeros((20, 20, 3), dtype=np.uint8)
+    app.camera.snapshot.return_value = CameraFrame(1, time.monotonic(), 0, np.zeros((20, 20, 3), dtype=np.uint8))
     app.timers.pop(0)[1]()
     assert app._operator_state == OperatorState.CLASSIFYING
     app.inference_worker.submit.assert_called_once()
@@ -64,14 +65,14 @@ def test_camera_timeout_and_cancel_do_not_submit_stale_frame(tmp_path):
     app._await_scan_frame(0, time.monotonic() - 1)
     assert not app._scan_busy and app._operator_state == OperatorState.ERROR
     app._operation_generation += 1
-    app.camera.get_latest_frame.return_value = np.zeros((20, 20, 3))
+    app.camera.snapshot.return_value = CameraFrame(1, time.monotonic(), 0, np.zeros((20, 20, 3)))
     app.timers.pop(0)[1]()
     app.inference_worker.submit.assert_not_called()
 
 
 def test_timeout_discards_late_result_and_model_busy_blocks_more_requests(tmp_path):
     app = operator(tmp_path)
-    app.camera.get_latest_frame.return_value = np.zeros((20, 20, 3))
+    app.camera.snapshot.return_value = CameraFrame(1, time.monotonic(), 0, np.zeros((20, 20, 3)))
     app.trigger_candling_scan()
     request_id = app._inference_request_id
     app.inference_worker.busy = True
@@ -87,7 +88,7 @@ def test_timeout_discards_late_result_and_model_busy_blocks_more_requests(tmp_pa
 def test_correlated_prediction_saves_then_stops_at_diagnostic_target(tmp_path):
     app = operator(tmp_path)
     app.target_egg_count = 1
-    app.camera.get_latest_frame.return_value = np.zeros((20, 20, 3))
+    app.camera.snapshot.return_value = CameraFrame(1, time.monotonic(), 0, np.zeros((20, 20, 3)))
     app.trigger_candling_scan()
     request_id = app._inference_request_id
     app.inference_worker.result_queue.put({**prediction(), "request_id": "obsolete"})
