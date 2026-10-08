@@ -494,6 +494,11 @@ def test_offline_cycle_replays_after_lost_ack_without_duplicate_ids(tmp_path, mo
     cycle, db, rig = fixture(tmp_path, count=50)
     cycle._run()
     assert cycle.status["state"] == "COMPLETE"
+    # This fixture bypasses camera capture; attach saved evidence for full replay.
+    for row in db.get_uncommitted_scans():
+        path = db.save_scan_image(row["scan_id"], np.zeros((20, 20, 3), dtype=np.uint8))
+        with db._get_connection() as conn:
+            conn.execute("UPDATE local_scans SET image_path = ? WHERE scan_id = ?", (path, row["scan_id"]))
     worker = BackgroundSyncWorker(db, api_key="test")
     stored, phase = set(), {"offline": True, "lose_ack": True}
     def post(url, **kwargs):
@@ -501,6 +506,13 @@ def test_offline_cycle_replays_after_lost_ack_without_duplicate_ids(tmp_path, mo
             raise OSError("network down")
         if url.endswith("/sessions"):
             return SimpleNamespace(status_code=200, json=lambda: kwargs["json"])
+        if url.endswith("/upload-image"):
+            import hashlib
+            scan_id = kwargs["data"]["scan_id"]
+            data = kwargs["files"]["file"][1]
+            return SimpleNamespace(status_code=200, json=lambda: {"status": "success", "scan_id": scan_id,
+                "image_url": f"/storage/{scan_id}.jpg", "sha256": hashlib.sha256(data).hexdigest(),
+                "size_bytes": len(data)})
         incoming = {row["scan_id"] for row in kwargs["json"]["scans"]}
         duplicates = len(stored & incoming)
         stored.update(incoming)
@@ -510,6 +522,7 @@ def test_offline_cycle_replays_after_lost_ack_without_duplicate_ids(tmp_path, mo
         return SimpleNamespace(status_code=200, json=lambda: {"status": "success", "total_received": len(incoming),
             "synced_count": len(incoming) - duplicates, "duplicates_ignored": duplicates})
     monkeypatch.setattr("src.sync.sync_worker.requests.post", post)
+    monkeypatch.setattr("src.sync.sync_worker.requests.get", lambda *a, **k: SimpleNamespace(status_code=200))
     worker._perform_sync()
     assert db.get_unsynced_count() == 50
     phase["offline"] = False
@@ -517,6 +530,9 @@ def test_offline_cycle_replays_after_lost_ack_without_duplicate_ids(tmp_path, mo
         worker._perform_sync()
     assert len(stored) == db.get_unsynced_count() == 50
     worker._perform_sync()
+    assert db.get_unsynced_count() == 45 and not db.get_uncommitted_scans()
+    for _ in range(9):
+        worker._perform_sync()
     assert db.get_unsynced_count() == 0 and len(stored) == 50
 
 

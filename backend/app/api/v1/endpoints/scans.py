@@ -1,5 +1,3 @@
-import os
-import shutil
 from typing import List, Optional, Literal
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status, Request
@@ -11,6 +9,7 @@ from app.models.scan import EggScanModel, FertilityClass
 from app.models.user import UserModel
 from app.schemas.scan import ScanSyncPayload, ScanSyncResponse, ScanListItem, ScanDetailResponse, ScanOverridePayload, ScanPage
 from app.services.scan_service import ScanService
+from app.services.scan_images import store_scan_image
 from app.api.deps import verify_api_key, get_current_user
 
 router = APIRouter(prefix="/scans", tags=["Egg Scans & Ingestion"])
@@ -32,23 +31,16 @@ def upload_scan_image(
     db: Session = Depends(get_db),
     api_key: str = Depends(verify_api_key)
 ):
-    scan = db.query(EggScanModel).filter(EggScanModel.scan_id == scan_id).first()
+    scan = db.query(EggScanModel).filter(EggScanModel.scan_id == scan_id).with_for_update().first()
     if not scan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Scan '{scan_id}' not found.")
 
-    os.makedirs(settings.STORAGE_DIR, exist_ok=True)
-    filename = f"{scan_id}.jpg"
-    file_path = os.path.join(settings.STORAGE_DIR, filename)
-
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    image_url = f"/storage/{filename}"
-    scan.image_url = image_url
-    scan.thumbnail_url = image_url
+    acknowledgement = store_scan_image(scan_id, file, settings.STORAGE_DIR, settings.MAX_SCAN_IMAGE_BYTES)
+    scan.image_url = acknowledgement["image_url"]
+    scan.thumbnail_url = acknowledgement["image_url"]
     db.commit()
 
-    return {"status": "success", "scan_id": scan_id, "image_url": image_url}
+    return acknowledgement
 
 
 @router.get("", response_model=List[ScanListItem], summary="Search and filter egg scans")

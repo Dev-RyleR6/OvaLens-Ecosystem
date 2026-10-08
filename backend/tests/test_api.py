@@ -5,6 +5,142 @@ from app.main import app
 client = TestClient(app)
 
 
+@pytest.fixture
+def image_scan(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    from uuid import uuid4
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.models.scan import EggScanModel
+    from app.models.session import CandlingSessionModel
+
+    session_id, scan_id = str(uuid4()), str(uuid4())
+    headers = {"X-API-Key": settings.API_KEY}
+    storage = tmp_path / "server_photos"
+    storage.mkdir()
+    monkeypatch.setattr(settings, "STORAGE_DIR", str(storage))
+    # Exercise the actual public storage mount against isolated test evidence.
+    mount = next(route.app for route in app.routes if getattr(route, "path", None) == "/storage")
+    monkeypatch.setattr(mount, "directory", str(storage))
+    monkeypatch.setattr(mount, "all_directories", [str(storage)])
+    payload = {"scans": [{"scan_id": scan_id, "session_id": session_id,
+        "batch_id": "BATCH-2026-08-KAY-01", "sequence_number": 910,
+        "final_class": "FERTILE", "confidence": .95, "inference_ms": 20,
+        "routing_action": "ACCEPT", "scanned_at": datetime.now(timezone.utc).isoformat()}]}
+    try:
+        assert client.post("/api/v1/scans/sync", headers=headers, json=payload).status_code == 200
+        yield scan_id, headers, storage, payload
+    finally:
+        with SessionLocal() as db:
+            db.query(EggScanModel).filter(EggScanModel.session_id == session_id).delete()
+            db.query(CandlingSessionModel).filter(CandlingSessionModel.session_id == session_id).delete()
+            db.commit()
+
+
+def jpeg_bytes(color="red"):
+    import io
+    from PIL import Image
+    stream = io.BytesIO()
+    Image.new("RGB", (32, 24), color).save(stream, format="JPEG")
+    return stream.getvalue()
+
+
+def test_scan_photo_upload_replay_detail_and_public_image(image_scan):
+    import hashlib
+    scan_id, headers, storage, payload = image_scan
+    data = jpeg_bytes()
+    for _ in range(2):  # Lost acknowledgement replay must preserve identical bytes.
+        response = client.post("/api/v1/scans/upload-image", headers=headers,
+            data={"scan_id": scan_id}, files={"file": ("ignored-name.jpg", data, "image/jpeg")})
+        assert response.status_code == 200, response.text
+        ack = response.json()
+        assert ack["scan_id"] == scan_id and ack["sha256"] == hashlib.sha256(data).hexdigest()
+        assert ack["size_bytes"] == len(data)
+        assert (storage / f"{scan_id}.jpg").read_bytes() == data
+    assert client.get(ack["image_url"]).content == data
+    assert client.post("/api/v1/scans/sync", headers=headers, json=payload).json()["duplicates_ignored"] == 1
+    detail = client.get(f"/api/v1/scans/{scan_id}").json()
+    assert detail["image_url"] == detail["thumbnail_url"] == ack["image_url"]
+    items = client.get("/api/v1/scans/search", params={"q": scan_id}).json()["items"]
+    assert len(items) == 1 and items[0]["image_url"] == ack["image_url"]
+
+
+def test_scan_photo_invalid_unknown_and_unauthenticated_uploads(image_scan):
+    from uuid import uuid4
+    scan_id, headers, storage, _ = image_scan
+    url = "/api/v1/scans/upload-image"
+    assert client.post(url, data={"scan_id": scan_id}, files={"file": ("x.jpg", jpeg_bytes())}).status_code == 401
+    assert client.post(url, headers=headers, data={"scan_id": str(uuid4())},
+        files={"file": ("x.jpg", jpeg_bytes())}).status_code == 404
+    for data in (b"not a photograph", jpeg_bytes()[:120]):
+        assert client.post(url, headers=headers, data={"scan_id": scan_id},
+            files={"file": ("x.jpg", data, "image/jpeg")}).status_code == 422
+    assert not list(storage.iterdir())
+    assert client.get(f"/api/v1/scans/{scan_id}").json()["image_url"] is None
+
+
+def test_scan_photo_size_limit_and_conflicting_retry_preserve_evidence(image_scan, monkeypatch):
+    from app.core.config import settings
+    scan_id, headers, storage, _ = image_scan
+    data = jpeg_bytes()
+    def upload(data):
+        return client.post("/api/v1/scans/upload-image", headers=headers, data={"scan_id": scan_id},
+            files={"file": ("photo.jpg", data, "image/jpeg")})
+    monkeypatch.setattr(settings, "MAX_SCAN_IMAGE_BYTES", len(data) - 1)
+    assert upload(data).status_code == 413 and not list(storage.iterdir())
+    monkeypatch.setattr(settings, "MAX_SCAN_IMAGE_BYTES", 10 * 1024 * 1024)
+    assert upload(data).status_code == 200
+    assert upload(jpeg_bytes("blue")).status_code == 409
+    assert (storage / f"{scan_id}.jpg").read_bytes() == data
+
+
+def test_scan_photo_storage_failure_is_atomic_and_retryable(image_scan, monkeypatch):
+    from app.services import scan_images
+    scan_id, headers, storage, _ = image_scan
+    data = jpeg_bytes()
+    replace = scan_images.os.replace
+    monkeypatch.setattr(scan_images.os, "replace", lambda *a: (_ for _ in ()).throw(OSError("disk unavailable")))
+    response = client.post("/api/v1/scans/upload-image", headers=headers, data={"scan_id": scan_id},
+        files={"file": ("photo.jpg", data, "image/jpeg")})
+    assert response.status_code == 503 and not list(storage.iterdir())
+    assert client.get(f"/api/v1/scans/{scan_id}").json()["image_url"] is None
+    monkeypatch.setattr(scan_images.os, "replace", replace)
+    assert client.post("/api/v1/scans/upload-image", headers=headers, data={"scan_id": scan_id},
+        files={"file": ("photo.jpg", data, "image/jpeg")}).status_code == 200
+
+
+def test_saved_edge_photo_syncs_end_to_end_through_backend(image_scan, tmp_path, monkeypatch):
+    """Actual SQLite outbox -> sync worker -> API -> PostgreSQL -> public JPEG."""
+    from pathlib import Path
+    import sys
+    from app.core.config import settings
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "edge"))
+    from src.db.local_db import LocalDatabaseManager
+    from src.sync.sync_worker import BackgroundSyncWorker
+
+    scan_id, headers, storage, payload = image_scan
+    original = payload["scans"][0]
+    local = LocalDatabaseManager(str(tmp_path / "edge" / "scans.db"))
+    local.create_session(original["session_id"], original["batch_id"], "STATION-01-RP5", "DAY_10", "Test")
+    # Use an existing Edge JPEG so the backend test needs no CV/camera packages.
+    photo = tmp_path / "edge" / "local_scans" / f"{scan_id}.jpg"
+    photo.parent.mkdir()
+    photo.write_bytes(jpeg_bytes())
+    local.record_scan(scan_id, original["session_id"], original["batch_id"], 910,
+        "FERTILE", .95, 20, "ACCEPT", [], str(photo))
+    worker = BackgroundSyncWorker(local, api_key=settings.API_KEY)
+    worker._registered_sessions.add(original["session_id"])
+    def post(url, **kwargs):
+        kwargs.pop("timeout")
+        return client.post(url.replace(worker.api_base_url, ""), **kwargs)
+    monkeypatch.setattr("src.sync.sync_worker.requests.post", post)
+    worker._perform_sync()
+    assert local.get_unsynced_count() == 0 and worker.last_error is None
+    detail = client.get(f"/api/v1/scans/{scan_id}").json()
+    assert client.get(detail["image_url"]).content == Path(photo).read_bytes()
+    assert (storage / f"{scan_id}.jpg").is_file()
+
+
 def test_edge_heartbeat_authentication_and_persistence():
     from uuid import uuid4
     from datetime import datetime

@@ -114,6 +114,34 @@ Forward follows the configured conveyor direction. No home reference is reset
 by these controls. **STOP [R]** cancels motion; reconnect explicitly after
 inspection. Automatic scans and sorting stay blocked while this panel is open.
 
+## Saved scan photos and backend sync
+
+Real automatic scans and manual Single Scan captures save the exact classified
+camera snapshot as a quality-95 JPEG beside SQLite, in
+`edge/db/local_scans/<scan-id>.jpg`. Preview frames and simulation are not saved.
+The disk write runs on the capture/storage worker before the scan is committed;
+a failed photo write prevents that capture from being counted or released.
+
+With the backend running and matching `API_KEY` / `API_BASE_URL` settings, uploads
+are automatic. The background worker first syncs classification records, then
+uploads up to five queued photos per pass to `POST /api/v1/scans/upload-image`.
+Network failures retain local photos and their persistent retry state. The sync
+pending count includes photos until their scan ID, SHA-256 digest and size have
+been acknowledged. Existing locally saved photos are picked up after restart,
+including photos whose classification records were synced previously. Historical
+records without a saved photo cannot be reconstructed.
+
+Open the dashboard's **Scan Explorer** and select a scan to see its photo and
+classification. Restart the Edge app, backend and dashboard dev server after
+updating. The backend stores JPEGs in `STORAGE_DIR` (default
+`storage/candling_scans`) and serves `/storage/<scan-id>.jpg`; development and
+production dashboard proxies forward those requests. Docker uses the persistent
+`scan_images` volume. Include both PostgreSQL and this directory/volume in backups.
+The API accepts complete JPEGs up to 10 MiB by default
+(`MAX_SCAN_IMAGE_BYTES`) and 25 megapixels, preserves original uploaded bytes,
+and rejects attempts to replace a scan's photo with different bytes. Local copies
+remain on disk after upload; no automatic image cleanup is performed.
+
 ## 🌟 Key Subsystem Features
 
 - **Decoupled Quad-Thread Concurrency**:

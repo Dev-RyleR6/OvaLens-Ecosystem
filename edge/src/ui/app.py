@@ -1543,6 +1543,10 @@ class OvaLensOperatorApp(ctk.CTk):
         batch_id, sequence = self.current_batch_id, self.scan_sequence + 1
         device_id, stage, operator = self.device_id, self.current_stage, self.operator_name
         scan_id = str(uuid.uuid4())
+        view = getattr(self, "_diagnostic_view", None)
+        # Keep the inference-owned snapshot alive through the queued disk write.
+        # Legacy metadata-only callers have no paired snapshot to save.
+        image = view.frame.image if view is not None else None
         self._set_operation_state(OperatorState.SAVING, "SAVING SCAN - WAITING FOR LOCAL COMMIT")
 
         def work():
@@ -1552,8 +1556,9 @@ class OvaLensOperatorApp(ctk.CTk):
                 self.db.create_session(session_id, batch_id, device_id, stage, operator)
             if generation != self._operation_generation:
                 return None
+            image_path = self.db.save_scan_image(scan_id, image) if image is not None else None
             return self.db.record_scan(scan_id, session_id, batch_id, sequence,
-                                       final_cls, conf, latency, action, result["detections"])
+                                       final_cls, conf, latency, action, result["detections"], image_path=image_path)
 
         def saved(record):
             if generation != self._operation_generation or record is None:

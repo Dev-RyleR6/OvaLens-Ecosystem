@@ -343,9 +343,11 @@ class SortingCycle:
                         holder.final_class, holder.scan_id = result["final_class"], str(uuid.uuid4())
                         self._state("SAVING", holder=number)
                         action = "MANUAL_REVIEW" if manual else "ACCEPT" if holder.final_class == "FERTILE" else "REJECT"
+                        view = self.capture_view
+                        image_path = self.db.save_scan_image(holder.scan_id, view.frame.image) if view else None
                         self.db.record_scan(holder.scan_id, self.session_id, self.batch_id, self.count + 1,
                             holder.final_class, result["confidence"], int(result.get("inference_ms", 0)), action,
-                            result.get("detections", []), evidence={"settings": self.settings.snapshot(),
+                            result.get("detections", []), image_path=image_path, evidence={"settings": self.settings.snapshot(),
                             "holder": number, "verification": evidence})
                         self.count += 1
                         self.latest_result = {**result, "scan_id": holder.scan_id, "holder": number,

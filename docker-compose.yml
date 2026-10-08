@@ -33,6 +33,9 @@ services:
       DB_NAME: ${DB_NAME:-hatchery_db}
       API_KEY: ${API_KEY:-dev-api-key-123}
       JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-ovalens-capstone-2026}
+      STORAGE_DIR: /app/storage/candling_scans
+    volumes:
+      - scan_images:/app/storage/candling_scans
     ports:
       - "8000:8000"
     depends_on:
@@ -73,3 +76,4 @@ services:
 
 volumes:
   postgres_data:
+  scan_images:

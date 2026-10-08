@@ -7,6 +7,9 @@ import time
 import json
 import threading
 import os
+import hashlib
+from pathlib import Path
+from uuid import UUID
 from urllib.parse import quote
 from typing import Optional, List, Dict, Any
 import requests
@@ -94,6 +97,10 @@ class BackgroundSyncWorker:
             self.last_error = "API_KEY is not configured; scans remain local."
             self._is_online = False
             return
+        self._sync_scan_records()
+        self._sync_images()
+
+    def _sync_scan_records(self):
         uncommitted = self.db.get_uncommitted_scans(limit=50)
         if not uncommitted:
             # Still ping health to update online status
@@ -169,11 +176,52 @@ class BackgroundSyncWorker:
             self._is_online = False
             self.last_error = f"Scan sync rejected (HTTP {resp.status_code}); local scans retained."
 
+    def _sync_images(self):
+        """Replay a bounded durable photo outbox, independently of conveyor work."""
+        failures = 0
+        for row in self.db.get_pending_scan_images(limit=5):
+            if self._stop_event.is_set():
+                break
+            scan_id = row["scan_id"]
+            try:
+                canonical_id = str(UUID(scan_id))
+                expected = (Path(self.db.db_path).parent / "local_scans" / (canonical_id + ".jpg")).resolve()
+                path = Path(row["image_path"]).resolve()
+                if path != expected:
+                    raise ValueError("Photo path does not match its scan ID")
+                with path.open("rb") as stream:
+                    data = stream.read(10 * 1024 * 1024 + 1)
+                if not data or len(data) > 10 * 1024 * 1024:
+                    raise ValueError("Saved photo is empty or exceeds 10 MiB")
+                digest = hashlib.sha256(data).hexdigest()
+                response = requests.post(f"{self.api_base_url}/api/v1/scans/upload-image",
+                    headers={"X-API-Key": self.api_key}, data={"scan_id": scan_id},
+                    files={"file": (canonical_id + ".jpg", data, "image/jpeg")}, timeout=5.0)
+                if response.status_code != 200:
+                    raise ValueError(f"Photo upload rejected (HTTP {response.status_code})")
+                ack = response.json()
+                image_url = f"/storage/{canonical_id}.jpg"
+                if (ack.get("status") != "success" or ack.get("scan_id") != scan_id
+                        or ack.get("image_url") != image_url or ack.get("sha256") != digest
+                        or ack.get("size_bytes") != len(data)):
+                    raise ValueError("Invalid photo acknowledgement")
+                self.db.mark_scan_image_synced(scan_id, image_url)
+                self._last_sync_time = time.time()
+            except (OSError, ValueError, requests.RequestException) as exc:
+                if isinstance(exc, requests.RequestException):
+                    self._is_online = False
+                failures += 1
+                self.db.mark_scan_image_attempt(scan_id, str(exc))
+        if failures:
+            self.last_error = f"{failures} scan photo upload(s) pending; saved locally for retry."
+
     def _check_health(self):
         try:
             url = f"{self.api_base_url}/api/v1/health"
             resp = requests.get(url, timeout=2.0)
             self._is_online = (resp.status_code == 200)
+            if self._is_online:
+                self.last_error = None
         except Exception:
             self._is_online = False
 

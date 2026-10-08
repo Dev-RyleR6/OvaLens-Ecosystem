@@ -77,10 +77,18 @@ class LocalDatabaseManager:
             scan_columns = {r[1] for r in conn.execute("PRAGMA table_info(local_scans);")}
             if "evidence_json" not in scan_columns:
                 conn.execute("ALTER TABLE local_scans ADD COLUMN evidence_json TEXT;")
+            # Metadata and photos have independent acknowledgements. Existing saved
+            # photos automatically enter the outbox, including already-synced scans.
+            for column in ("image_synced_at", "image_url", "image_sync_error", "image_last_attempt_at"):
+                if column not in scan_columns:
+                    conn.execute(f"ALTER TABLE local_scans ADD COLUMN {column} TEXT;")
             conn.execute("CREATE TABLE IF NOT EXISTS machine_journal (device_id TEXT PRIMARY KEY, state_json TEXT NOT NULL);")
             if "manual_review_count" not in session_columns:
                 conn.execute("ALTER TABLE local_sessions ADD COLUMN manual_review_count INTEGER DEFAULT 0;")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_sync ON local_scans(is_synced);")
+            conn.execute("""CREATE INDEX IF NOT EXISTS idx_scan_image_outbox
+                ON local_scans(image_last_attempt_at, scanned_at, scan_id)
+                WHERE is_synced = 1 AND image_path IS NOT NULL AND image_synced_at IS NULL;""")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_session ON local_scans(session_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_batch_seq ON local_scans(batch_id, sequence_number);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_batch_class ON local_scans(batch_id, final_class, sequence_number);")
@@ -133,7 +141,8 @@ class LocalDatabaseManager:
         """Fetch scans for a batch or ALL batches with optional class and text filtering."""
         with self._get_connection() as conn:
             query = """
-                SELECT sequence_number, scan_id, batch_id, session_id, final_class, confidence, inference_ms, routing_action, scanned_at, is_synced
+                SELECT sequence_number, scan_id, batch_id, session_id, final_class, confidence, inference_ms, routing_action, scanned_at,
+                    (is_synced = 1 AND (COALESCE(image_path, '') = '' OR image_synced_at IS NOT NULL)) AS is_synced
                 FROM local_scans
                 WHERE 1=1
             """
@@ -325,10 +334,31 @@ class LocalDatabaseManager:
             return [dict(row) for row in rows]
 
     def get_unsynced_count(self) -> int:
-        """Return total number of scans pending network synchronization."""
+        """Count scans whose metadata or saved photo still needs acknowledgement."""
         with self._get_connection() as conn:
-            cursor = conn.execute("SELECT COUNT(*) FROM local_scans WHERE is_synced = 0;")
+            cursor = conn.execute("""SELECT COUNT(*) FROM local_scans WHERE is_synced = 0
+                OR (COALESCE(image_path, '') <> '' AND image_synced_at IS NULL);""")
             return cursor.fetchone()[0]
+
+    def get_pending_scan_images(self, limit: int = 5) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute("""
+                SELECT * FROM local_scans WHERE is_synced = 1
+                    AND image_path IS NOT NULL AND image_path <> '' AND image_synced_at IS NULL
+                ORDER BY image_last_attempt_at, scanned_at, scan_id LIMIT ?;
+            """, (limit,))]
+
+    def mark_scan_image_attempt(self, scan_id: str, error: str):
+        with self._get_connection() as conn:
+            conn.execute("""UPDATE local_scans SET image_last_attempt_at = ?, image_sync_error = ?
+                WHERE scan_id = ? AND image_synced_at IS NULL;""",
+                (datetime.now(timezone.utc).isoformat(), error[:500], scan_id))
+
+    def mark_scan_image_synced(self, scan_id: str, image_url: str):
+        with self._get_connection() as conn:
+            conn.execute("""UPDATE local_scans SET image_synced_at = ?, image_url = ?,
+                image_sync_error = NULL WHERE scan_id = ?;""",
+                (datetime.now(timezone.utc).isoformat(), image_url, scan_id))
 
     def mark_scans_synced(self, scan_ids: List[str]):
         """Mark a batch of scan UUIDs as successfully committed to central PostgreSQL."""
@@ -355,7 +385,8 @@ class LocalDatabaseManager:
     def get_recent_scans(self, limit: int = 20) -> List[Dict[str, Any]]:
         with self._get_connection() as conn:
             cursor = conn.execute("""
-                SELECT scan_id, sequence_number, final_class, confidence, inference_ms, routing_action, scanned_at, is_synced
+                SELECT scan_id, sequence_number, final_class, confidence, inference_ms, routing_action, scanned_at,
+                    (is_synced = 1 AND (COALESCE(image_path, '') = '' OR image_synced_at IS NOT NULL)) AS is_synced
                 FROM local_scans
                 ORDER BY sequence_number DESC
                 LIMIT ?;
@@ -398,7 +429,8 @@ class LocalDatabaseManager:
 
         with self._get_connection() as conn:
             cursor = conn.execute("""
-                SELECT sequence_number, scan_id, batch_id, final_class, confidence, routing_action, inference_ms, scanned_at, is_synced
+                SELECT sequence_number, scan_id, batch_id, final_class, confidence, routing_action, inference_ms, scanned_at,
+                    (is_synced = 1 AND (COALESCE(image_path, '') = '' OR image_synced_at IS NOT NULL)) AS is_synced
                 FROM local_scans
                 WHERE session_id = ?
                 ORDER BY sequence_number ASC;
