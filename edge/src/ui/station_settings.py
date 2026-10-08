@@ -6,6 +6,7 @@ from .theme import FUTheme
 
 
 class StationSettingsWindow(ctk.CTkToplevel):
+    PROFILES = {"Three-board candling rig": "three_v3", "Two-board indexed rig": "dual_v2"}
     def __init__(self, app):
         super().__init__(app)
         self.app, self.station = app, app.station
@@ -28,7 +29,9 @@ class StationSettingsWindow(ctk.CTkToplevel):
         tabs.pack(fill="both", expand=True, padx=20, pady=12)
         for name in ("Connections", "Camera", "Detection", "Calibration"):
             tabs.add(name)
-        self.notice = ctk.CTkLabel(self, font=(FUTheme.FONT_FAMILY, 14), text=self.station.settings_error or "Apply affects this run. Save as Default also persists settings.",
+        recovery = getattr(self.station, "recovery", None)
+        recovery_notice = "Interrupted cycle found. Inspect and reconcile physical eggs before acknowledging faults or validating." if recovery and recovery.get("state") not in {"COMPLETE", "CLEARED"} else ""
+        self.notice = ctk.CTkLabel(self, font=(FUTheme.FONT_FAMILY, 14), text=self.station.settings_error or recovery_notice or "Apply affects this run. Save as Default also persists settings.",
                                   wraplength=850, justify="left")
         self.notice.pack(fill="x", padx=24, pady=6)
         self.report = ctk.CTkTextbox(tabs.tab("Camera"), height=150,
@@ -37,12 +40,21 @@ class StationSettingsWindow(ctk.CTkToplevel):
         self.confirm_camera = ctk.BooleanVar(value=False)
         self.inspected = ctk.BooleanVar(value=False)
 
-        connection = tabs.tab("Connections")
-        self._entry(connection, "conveyor_port", "Stepper / IR ESP32 serial port", "")
-        self._entry(connection, "servo_port", "Servo ESP32 serial port", "")
+        connection = ctk.CTkScrollableFrame(tabs.tab("Connections"))
+        connection.pack(fill="both", expand=True)
+        self.profile = ctk.StringVar(value="Three-board candling rig")
+        self.profile_menu = ctk.CTkOptionMenu(connection, values=list(self.PROFILES), variable=self.profile,
+                          font=(FUTheme.FONT_FAMILY, 14), fg_color=FUTheme.PRIMARY_MAROON,
+                          button_color=FUTheme.HOVER_MAROON)
+        self.profile_menu.pack(anchor="w", padx=8, pady=8)
+        self._button(connection, "Load selected rig defaults", self._rig_defaults)
+        self._entry(connection, "conveyor_port", "Conveyor ESP32 serial port", "")
+        self._entry(connection, "servo_port", "Egg / servo ESP32 serial port", "")
+        self._entry(connection, "light_port", "Light ESP32 port (three-board rig)", "")
         self.port_label = ctk.CTkLabel(connection, font=(FUTheme.FONT_FAMILY, 14), text="Refresh to list connected serial ports", wraplength=820, justify="left")
         self.port_label.pack(anchor="w", padx=8, pady=10)
         self._button(connection, "Refresh ports", lambda: self._job(lambda: "\n".join(f"{p.device}: {p.description}" for p in list_ports.comports()) or "No ports found", self._ports))
+        self._button(connection, "Discover three-board rig", self._discover)
         self._button(connection, "Connect and identify boards", lambda: self._job(self.station.connect))
         self._button(connection, "Acknowledge inspected board faults", self._acknowledge)
         ctk.CTkLabel(connection, font=(FUTheme.FONT_FAMILY, 14), text="Connect after applying the selected ports. Acknowledgement clears faults; it does not establish conveyor position.", wraplength=820).pack(anchor="w", padx=8, pady=12)
@@ -74,7 +86,8 @@ class StationSettingsWindow(ctk.CTkToplevel):
                   "speed_us": "STEP half-period (microseconds)", "ir_offset_steps": "IR trigger to stopped capture (steps)",
                   "position_tolerance_steps": "Chamber arrival tolerance (steps)", "settle_ms": "Capture settling time (ms)",
                   "passage_ms": "Gate passage wait (ms)", "neutral_angle": "Neutral servo angle", "fertile_angle": "Fertile angle",
-                  "infertile_angle": "Infertile angle"}
+                  "infertile_angle": "Infertile angle", "hold_ms": "Result display hold (ms)",
+                  "buffer_drain": "Fresh capture buffer drain (frames)", "jam_timeout_s": "Egg search timeout (seconds)"}
         for name, label in labels.items():
             self._entry(calibration, "calibration." + name, label, "")
         self.jog = self._entry(calibration, "_jog", "Manual jog steps (signed, at most 100000)", "100")
@@ -82,7 +95,11 @@ class StationSettingsWindow(ctk.CTkToplevel):
         self._button(calibration, "Set aligned position as software home", lambda: self._job(lambda: self.station.command("CONVEYOR", "SETHOME")))
         for label, text in (("Test fertile route", "SORT:FERTILE"), ("Test infertile route", "SORT:INFERTILE"), ("Return servo to neutral", "RESET")):
             self._button(calibration, label, lambda text=text: self._job(lambda: self.station.command("SERVO", text)))
-        ctk.CTkLabel(calibration, font=(FUTheme.FONT_FAMILY, 14), text="Validate with the next holder one pitch before the chamber and all downstream holders empty. Bench-test IR stopping and both gate directions first.", wraplength=760, justify="left").pack(anchor="w", padx=8, pady=8)
+        for label, text in (("Test candling lamp ON", "LIGHT_ON"), ("Turn candling lamp OFF", "LIGHT_OFF")):
+            self._button(calibration, label, lambda text=text: self._job(lambda: self.station.command("LIGHT_CONTROLLER", text)))
+        self._button(calibration, "Release hardware pause for alignment", lambda: self._job(lambda: self.station.command("SERVO", "RESUME")))
+        self._button(calibration, "Hold hardware pause", lambda: self._job(lambda: self.station.command("SERVO", "PAUSE")))
+        ctk.CTkLabel(calibration, font=(FUTheme.FONT_FAMILY, 14), text="Clear downstream eggs and bench-test stopping, gate directions and spacing. Three-board routing uses measured gate entry / exit positions; the old IR offset and passage wait apply only to the two-board rig. Release hardware pause deliberately before an unloaded alignment jog.", wraplength=760, justify="left").pack(anchor="w", padx=8, pady=8)
         ctk.CTkCheckBox(calibration, font=(FUTheme.FONT_FAMILY, 14), text="IR / gate bench-tested, geometry measured, holders aligned and cleared",
                         variable=self.inspected).pack(anchor="w", padx=8, pady=14)
         self._button(calibration, "Load calibration and validate inspected setup", self._validate)
@@ -124,6 +141,7 @@ class StationSettingsWindow(ctk.CTkToplevel):
 
     def _fill(self, settings):
         values = settings.snapshot()
+        self.profile.set(next(label for label, value in self.PROFILES.items() if value == settings.rig_profile))
         for key, entry in self.entries.items():
             if key.startswith("_"):
                 continue
@@ -134,6 +152,7 @@ class StationSettingsWindow(ctk.CTkToplevel):
 
     def _values(self):
         values = self.station.settings.snapshot()
+        values["rig_profile"] = self.PROFILES[self.profile.get()]
         for key, entry in self.entries.items():
             if key.startswith("_"):
                 continue
@@ -155,6 +174,7 @@ class StationSettingsWindow(ctk.CTkToplevel):
         if self.pending:
             return
         self.pending = True
+        self.profile_menu.configure(state="disabled")
         for button in self.buttons:
             button.configure(state="disabled")
         for entry in self.entries.values():
@@ -164,6 +184,7 @@ class StationSettingsWindow(ctk.CTkToplevel):
             self.pending = False
             if not self.winfo_exists():
                 return
+            self.profile_menu.configure(state="normal")
             for button in self.buttons:
                 button.configure(state="normal")
             for entry in self.entries.values():
@@ -201,10 +222,29 @@ class StationSettingsWindow(ctk.CTkToplevel):
     def _ports(self, value):
         self.port_label.configure(text=value)
 
+    def _rig_defaults(self):
+        settings = EdgeSettings.three_board() if self.PROFILES[self.profile.get()] == "three_v3" else EdgeSettings()
+        self._fill(settings)
+        self.notice.configure(text="Rig defaults loaded into the form. Select ports and confirm the camera, then Apply. Physical calibration is still required.")
+
+    def _discover(self):
+        if self.PROFILES[self.profile.get()] != "three_v3":
+            self.notice.configure(text="Select the three-board rig before discovery.")
+            return
+        def found(ports):
+            for key, role in (("conveyor_port", "CONVEYOR"), ("servo_port", "EGG_CONTROLLER"), ("light_port", "LIGHT_CONTROLLER")):
+                self.entries[key].delete(0, "end")
+                self.entries[key].insert(0, ports[role])
+            self.notice.configure(text="Three roles identified. Apply these ports, then Connect and inspect the rig.")
+        self._job(self.station.discover, found)
+
     def _acknowledge(self):
         def work():
-            self.station.command("CONVEYOR", "ACK_FAULT")
-            self.station.command("SERVO", "ACK_FAULT")
+            links = self.station.board_links()
+            if not links:
+                raise RuntimeError("Connect and inspect the rig first")
+            for link in links:
+                self.station.command(link.role, "ACK_FAULT")
             return "Faults acknowledged. Align the next holder and establish software home."
         self._job(work)
 

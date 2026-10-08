@@ -45,6 +45,9 @@ class CalibrationSettings:
     neutral_angle: int = 90
     fertile_angle: int = 60
     infertile_angle: int = 120
+    hold_ms: int = 1500
+    buffer_drain: int = 6
+    jam_timeout_s: int = 30
     # Deliberately not persisted as authorization. Each connection needs validation.
 
 
@@ -53,19 +56,39 @@ class EdgeSettings:
     version: int = 1
     conveyor_port: str = ""
     servo_port: str = ""
+    rig_profile: str = "dual_v2"
+    light_port: str = ""
     camera: CameraSettings = field(default_factory=CameraSettings)
     detection: DetectionSettings = field(default_factory=DetectionSettings)
     calibration: CalibrationSettings = field(default_factory=CalibrationSettings)
+
+    @classmethod
+    def three_board(cls):
+        """Handoff defaults are a starting point, never physical authorization."""
+        settings = cls(rig_profile="three_v3")
+        settings.camera.index = 1
+        settings.detection.confidence = .30
+        settings.calibration.speed_us = 3000
+        settings.calibration.settle_ms = 700
+        settings.calibration.fertile_angle = 180
+        # 2.5 s at 3000 us half-period is about 417 steps to gate exit.
+        settings.calibration.sorter_steps = 367
+        settings.calibration.gate_clearance_steps = 50
+        return settings
 
     def validate(self):
         def integer(value, lo, hi, label):
             if type(value) is not int or not lo <= value <= hi:
                 raise ValueError(f"{label} must be a whole number between {lo} and {hi}")
         integer(self.version, 1, 1, "Settings version")
-        if not isinstance(self.conveyor_port, str) or not isinstance(self.servo_port, str):
+        if self.rig_profile not in {"dual_v2", "three_v3"}:
+            raise ValueError("Select dual_v2 or three_v3 rig profile")
+        if not all(isinstance(p, str) for p in (self.conveyor_port, self.servo_port, self.light_port)):
             raise ValueError("Serial ports must be text")
-        if self.conveyor_port and self.conveyor_port == self.servo_port:
-            raise ValueError("Select separate serial ports for the two boards")
+        ports = [p.casefold() for p in (self.conveyor_port, self.servo_port,
+                 self.light_port if self.rig_profile == "three_v3" else "") if p]
+        if len(ports) != len(set(ports)):
+            raise ValueError("Select separate serial ports for every board")
         c, d, k = self.camera, self.detection, self.calibration
         integer(c.index, 0, 99, "Camera index")
         integer(c.width, 160, 7680, "Width")
@@ -94,6 +117,9 @@ class EdgeSettings:
         integer(k.position_tolerance_steps, 0, k.gate_clearance_steps - 1, "Position tolerance")
         integer(k.settle_ms, 0, 10000, "Settling time")
         integer(k.passage_ms, 0, 10000, "Passage time")
+        integer(k.hold_ms, 0, 10000, "Result hold time")
+        integer(k.buffer_drain, 1, 30, "Camera buffer drain")
+        integer(k.jam_timeout_s, 1, 120, "Egg search timeout")
         for name in ("neutral_angle", "fertile_angle", "infertile_angle"):
             integer(getattr(k, name), 0, 180, name)
         # Next egg must not arrive inside the mandatory optical lockout.
@@ -118,7 +144,7 @@ class SettingsStore:
 
     def load(self):
         if not self.path.exists():
-            return EdgeSettings()
+            return EdgeSettings.three_board()
         try:
             return EdgeSettings.from_dict(json.loads(self.path.read_text(encoding="utf-8")))
         except (ValueError, TypeError, OSError) as exc:

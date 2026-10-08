@@ -113,6 +113,14 @@ def test_station_settings_builds_without_camera_or_board_access(hidden_ui, tmp_p
     assert "detection.iou" in window.entries
     assert "calibration.ir_offset_steps" in window.entries
     assert "conveyor_port" in window.entries and "servo_port" in window.entries
+    assert "light_port" in window.entries
+    assert window.profile.get() == "Two-board indexed rig"
+    window.profile.set("Three-board candling rig")
+    window._rig_defaults()
+    three = window._values()
+    assert three.rig_profile == "three_v3" and three.camera.index == 1
+    assert three.calibration.fertile_angle == 180 and three.calibration.buffer_drain == 6
+    assert three.calibration.settle_ms == 700 and three.calibration.hold_ms == 1500
     assert not station.halt.called
     window._close()
     app.after(50, app.shutdown)

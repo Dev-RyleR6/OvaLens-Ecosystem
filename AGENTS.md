@@ -129,7 +129,8 @@ Capstone/
 ### D. Firmware (`firmware/`)
 - **Microcontroller**: ESP32 Dev Module (115200 baud).
 - **Timing**: Use hardware timer interrupts and non-blocking state machines. Never call `delay()` inside the main loop during active conveyor operation.
-- **Debounce**: 600ms hardware optical sensor lockout window on GPIO 14.
+- **Rig profiles**: Preserve the existing `dual_v2` wiring (chamber sensor GPIO14, servo GPIO18). The handoff `three_v3` rig uses sensor GPIO26, servo GPIO32, egg pause output GPIO25 -> conveyor pause input GPIO27, and a separate lamp board GPIO27. Never infer a profile from port order.
+- **Debounce**: Retain a 600ms optical detection lockout. The three-board profile additionally confirms detection LOW for 40ms and beam clearance HIGH for 350ms; a too-early new egg faults and holds the conveyor.
 
 ---
 
@@ -223,7 +224,7 @@ All AI agents (including Codex, subagents, and human contributors) operating wit
 2. **Implementation & Accompanying Tests**:
    - Write clean, modular code satisfying the specification contract.
    - Include accompanying pytest unit tests (in `backend/tests/` or `edge/tests/`).
-   - Adhere strictly to the negative constraints (no Firebase, SQLite WAL at edge, 3 biological classes, Foundation University colors).
+   - Adhere strictly to the negative constraints (no Firebase, SQLite WAL at edge, 2 biological classes plus the MANUAL_REVIEW workflow state, Foundation University colors).
 3. **Automated Verification & Checklist Update**:
    - Upon completing the code, run the automated verification utility specifying the `--task` flag:
    ```bash

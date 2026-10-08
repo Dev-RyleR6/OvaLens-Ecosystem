@@ -19,9 +19,10 @@ class BoardState:
 
 
 class BoardLink:
-    def __init__(self, role, port, on_failure=lambda reason: None, serial_factory=None):
+    def __init__(self, role, port, on_failure=lambda reason: None, serial_factory=None, protocol=2):
         self.role, self.port = role, port
         self.on_failure, self.serial_factory = on_failure, serial_factory
+        self.protocol = protocol
         self.state = BoardState(role)
         self._lock = threading.Lock()
         self._queue = queue.Queue(maxsize=8)
@@ -33,6 +34,8 @@ class BoardLink:
         self._status_complete = False
         self._status_at = 0.0
         self._command_values = {}
+        self._report_values = {}
+        self.events = queue.Queue(maxsize=64)
 
     def snapshot(self):
         with self._lock:
@@ -77,7 +80,8 @@ class BoardLink:
         while True:
             try:
                 _, _, future = self._queue.get_nowait()
-                future.set_exception(RuntimeError(reason))
+                if not future.done():
+                    future.set_exception(RuntimeError(reason))
             except queue.Empty:
                 break
 
@@ -109,12 +113,22 @@ class BoardLink:
                 self._fail("Board reset; inspect and reconnect")
             return
         if payload.startswith("READY:"):
-            expected = f"READY:{self.role}_V2:PROTOCOL=2"
+            expected = f"READY:{self.role}_V{self.protocol}:PROTOCOL={self.protocol}"
             if payload != expected:
                 self._fail("Board role or protocol mismatch")
             else:
                 with self._lock:
                     self.state.identified = True
+            return
+        if self.protocol == 3 and payload.startswith("EVENT:"):
+            parts = payload.split(":")
+            if len(parts) != 3 or not parts[2].isdigit():
+                self._fail("Malformed hardware event")
+                return
+            try:
+                self.events.put_nowait((parts[1], int(parts[2])))
+            except queue.Full:
+                self._fail("Hardware event overflow; inspect rig")
             return
         if payload.startswith("ERROR:"):
             if ident is None or (self._pending and ident == self._pending[0]):
@@ -125,8 +139,19 @@ class BoardLink:
             self._fail("Board reset; inspect and reconnect")
             return
         if sep and key not in {"OK", "PONG", "EVENT"}:
-            with self._lock:
-                self.state.telemetry[key] = value
+            if self.protocol == 3:
+                self._report_values.setdefault(ident, {})[key] = value
+                if key == "STATE":
+                    with self._lock:
+                        previous_fault = self.state.telemetry.get("FAULT")
+                        self.state.telemetry.update(self._report_values.pop(ident))
+                        new_fault = self.state.telemetry.get("FAULT")
+                    if previous_fault == "NONE" and new_fault != "NONE":
+                        self._fail(f"Board fault: {new_fault}")
+                        return
+            else:
+                with self._lock:
+                    self.state.telemetry[key] = value
             if key == "LAST_ID" and value.isdigit():
                 self._next_id = max(self._next_id, int(value) + 1)
         if payload.startswith("EVENT:IR:"):
@@ -144,7 +169,9 @@ class BoardLink:
             if sep and key not in {"OK", "EVENT"}:
                 self._command_values[key] = value
             if payload in {"OK:MOVE_DONE", "OK:SERVO_DONE", "OK:FAULT_ACKNOWLEDGED", "OK:HOME_SET",
-                           "OK:SPEED", "OK:PRESET_SET", "OK:IR_CONFIG", "OK:STATION_SET"}:
+                           "OK:SPEED", "OK:PRESET_SET", "OK:IR_CONFIG", "OK:STATION_SET",
+                           "OK:EGG_STOPPED", "OK:RESUME", "OK:PAUSE", "OK:LIGHT_ON", "OK:LIGHT_OFF",
+                           "OK:STATUS", "OK:GATE_RESET_SCHEDULED", "OK:ARMED"}:
                 self._pending[4] = True
             # STATE is the final line of the matching command report.
             if key == "STATE" and self._pending[4]:
@@ -170,9 +197,12 @@ class BoardLink:
                 if self._halt.is_set():
                     self._halt.clear()
                     self._cancel("Stopped; physical reconciliation required")
-                    connection.write(b"ESTOP\n")
+                    if connection.write(b"ESTOP\n") != 6:
+                        raise RuntimeError("Incomplete emergency stop write")
                 if now - heartbeat >= .5:
-                    connection.write(b"STATUS\n" if self.snapshot().identified else b"HELLO\n")
+                    request = b"STATUS\n" if self.snapshot().identified else b"HELLO\n"
+                    if connection.write(request) != len(request):
+                        raise RuntimeError("Incomplete heartbeat write")
                     heartbeat = now
                 if now - self.snapshot().last_reply > 2 or (not self._status_complete and now - started > 5):
                     raise RuntimeError("Board response timeout")
@@ -194,7 +224,9 @@ class BoardLink:
                         self._next_id += 1
                         self._pending = [ident, text, min(now + timeout, future.deadline), future, False]
                         self._command_values = {}
-                        connection.write(f"@{ident} {text}\n".encode("ascii"))
+                        request = f"@{ident} {text}\n".encode("ascii")
+                        if connection.write(request) != len(request):
+                            raise RuntimeError("Incomplete command write; do not retry motion")
                 chunk = connection.read(256)
                 for byte in chunk:
                     if byte == 10:

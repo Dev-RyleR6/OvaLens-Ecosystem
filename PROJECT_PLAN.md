@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-3BOARD-01**: Integrate the three-ESP32 handoff rig with versioned serial discovery, hardware pause, candling light, fresh camera capture, position-tracked routing, durable scan evidence, manual review, explicit recovery, operator settings, firmware behavior tests, and offline integration verification. Physical flashing and rig acceptance are tracked separately in docs/EDGE_THREE_BOARD_IMPLEMENTATION.md.
+
 - [x] **TASK-NEW-DASH-BRAND-02**: Use the final OvaLens SVG, introduce FU maroon navigation, and improve incubation batch layout, readable sizing, filters, and responsive cards.
 
 - [x] **TASK-NEW-DASH-TABLE-03**: Fix batch action menu row expansion, text encoding, duplicate status labels, and wide-screen workspace alignment; verify keyboard and responsive behavior.

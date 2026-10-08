@@ -4,6 +4,8 @@ Supports ONNX Runtime (FP16/FP32), PyTorch YOLOv8, and Warmup caching.
 """
 
 import os
+import ast
+import hashlib
 import time
 from typing import List, Dict, Any, Tuple, Optional
 import numpy as np
@@ -41,7 +43,8 @@ class InferenceEngine:
         conf_threshold: float = 0.85,
         iou_threshold: float = 0.85,
         imgsz: int = 640,
-        intra_op_threads: Optional[int] = None
+        intra_op_threads: Optional[int] = None,
+        onnx_path: Optional[str] = None
     ):
         if weights_dir is None:
             weights_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "models", "weights")
@@ -76,12 +79,14 @@ class InferenceEngine:
         if type(self.intra_op_threads) is not int or not 1 <= self.intra_op_threads <= 32:
             raise ValueError("Inference threads must be between 1 and 32")
 
-        self.onnx_path = os.path.join(weights_dir, "best.onnx")
+        self.onnx_path = onnx_path or os.getenv("ONNX_MODEL_PATH") or os.path.join(weights_dir, "best.onnx")
         self.pt_path = os.path.join(weights_dir, "best.pt")
 
         self.onnx_session: Optional[Any] = None
         self.yolo_model: Optional[Any] = None
         self.engine_type = "MOCK"
+        self.model_contract_verified = False
+        self.model_identity = {}
 
         self._load_engine()
         self._warmup()
@@ -101,6 +106,7 @@ class InferenceEngine:
                 opts.intra_op_num_threads = self.intra_op_threads
 
                 self.onnx_session = ort.InferenceSession(self.onnx_path, sess_options=opts, providers=providers)
+                self._validate_onnx_contract()
                 self.engine_type = f"ONNX Runtime ({providers[0]})"
                 print(f"[SUCCESS] Loaded ONNX inference engine: {self.onnx_path}")
                 return
@@ -118,6 +124,27 @@ class InferenceEngine:
 
         self.engine_type = "HEURISTIC_SIMULATION"
         print("[WARN] Model weights not found. Running in Heuristic Simulation mode.")
+
+    def _validate_onnx_contract(self):
+        inputs, outputs = self.onnx_session.get_inputs(), self.onnx_session.get_outputs()
+        if (len(inputs) != 1 or inputs[0].shape != [1, 3, self.imgsz, self.imgsz]
+                or inputs[0].type not in {"tensor(float)", "tensor(float16)"}
+                or len(outputs) != 1 or len(outputs[0].shape) != 3
+                or outputs[0].shape[:2] != [1, 6]):
+            raise ValueError("Expected a static two-class YOLO detector with matching image size")
+        metadata = self.onnx_session.get_modelmeta().custom_metadata_map
+        names = ast.literal_eval(metadata.get("names", "{}"))
+        if isinstance(names, list):
+            names = dict(enumerate(names))
+        if (not isinstance(names, dict) or set(names) != {0, 1}
+                or CLASS_MAP.get(str(names[0]).lower()) != "FERTILE"
+                or CLASS_MAP.get(str(names[1]).lower()) != "INFERTILE"):
+            raise ValueError("Model metadata must declare 0=Fertile and 1=Infertile")
+        with open(self.onnx_path, "rb") as stream:
+            digest = hashlib.file_digest(stream, "sha256").hexdigest()
+        self.model_identity = {"path": os.path.abspath(self.onnx_path), "sha256": digest,
+                               "input_type": inputs[0].type, "classes": names}
+        self.model_contract_verified = True
 
     def _warmup(self, passes: int = 3):
         """Execute dummy warmup passes to preload weights into CPU cache."""

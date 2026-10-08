@@ -6,6 +6,8 @@ from .settings import EdgeSettings, SettingsStore
 from .sorting_cycle import SortingCycle
 from .operator_flow import validate_batch_config
 from ..iot.dual_board import DualBoardController
+from ..iot.three_board import ThreeBoardController, discover_boards
+from .three_board_cycle import ThreeBoardCycle
 
 
 class EdgeStation:
@@ -37,7 +39,7 @@ class EdgeStation:
             self.require_idle()
             self.calibrated = False
             settings = EdgeSettings.from_dict(settings.snapshot())
-            if settings.camera.index != self.settings.camera.index and not confirm_camera:
+            if (settings.camera.index != self.settings.camera.index or settings.rig_profile != self.settings.rig_profile) and not confirm_camera:
                 raise ValueError("Confirm the selected camera before changing devices")
             if confirm_camera:
                 settings.camera.identity = ""
@@ -51,7 +53,9 @@ class EdgeStation:
             # Any applied configuration requires fresh physical validation.
             self.calibrated = False
             if self.boards and (settings.conveyor_port != self.settings.conveyor_port or
-                                settings.servo_port != self.settings.servo_port):
+                                settings.servo_port != self.settings.servo_port or
+                                settings.light_port != self.settings.light_port or
+                                settings.rig_profile != self.settings.rig_profile):
                 self.boards.stop()
                 self.boards = None
             self.settings = settings
@@ -66,29 +70,48 @@ class EdgeStation:
             self.calibrated = False
             if self.boards:
                 self.boards.stop()
-            self.boards = DualBoardController(self.settings.conveyor_port, self.settings.servo_port)
+            if self.settings.rig_profile == "three_v3":
+                self.boards = ThreeBoardController(self.settings.conveyor_port, self.settings.servo_port, self.settings.light_port)
+            else:
+                self.boards = DualBoardController(self.settings.conveyor_port, self.settings.servo_port)
             self.boards.start()
             deadline = time.monotonic() + 5
             while time.monotonic() < deadline:
                 if self.boards.failure:
                     raise RuntimeError(self.boards.failure)
                 if all(link._status_complete and link.snapshot().telemetry.get("BUSY") == "0"
-                       for link in (self.boards.conveyor, self.boards.servo)):
-                    if self.boards.conveyor.snapshot().telemetry.get("IR_CAPABLE") != "1":
+                       for link in self.board_links()):
+                    if self.settings.rig_profile == "dual_v2" and self.boards.conveyor.snapshot().telemetry.get("IR_CAPABLE") != "1":
                         raise RuntimeError("Conveyor firmware lacks chamber IR capability; update and bench-test firmware")
-                    return "Both v2 boards identified. Inspect rig, then acknowledge faults."
+                    return "Required boards identified. Inspect rig, then acknowledge faults."
                 threading.Event().wait(.02)
             raise RuntimeError("Firmware identification timed out")
+
+    def board_links(self):
+        if self.boards is None:
+            return ()
+        return getattr(self.boards, "links", (self.boards.conveyor, self.boards.servo))
+
+    def discover(self):
+        with self._lock:
+            self.require_idle()
+            self.calibrated = False
+            if self.boards:
+                self.boards.stop()
+                self.boards = None
+            return discover_boards()
 
     def command(self, role, text, timeout=5):
         with self._lock:
             self.require_idle()
             if not self.boards:
-                raise RuntimeError("Connect and identify both boards first")
-            if role not in {"CONVEYOR", "SERVO"}:
+                raise RuntimeError("Connect and identify the required boards first")
+            links = {link.role: link for link in self.board_links()}
+            links["SERVO"] = self.boards.servo
+            if role not in links:
                 raise ValueError("Unknown board role")
             self.calibrated = False
-            link = self.boards.conveyor if role == "CONVEYOR" else self.boards.servo
+            link = links[role]
             return link.command(text, timeout).result(timeout + .5)
 
     def validate_calibration(self, inspected):
@@ -100,15 +123,20 @@ class EdgeStation:
             self.settings.validate()
             self.recovery = self.db.load_machine_state(self.device_id)
             self.boards.require_ready()
-            if self.boards.conveyor.snapshot().telemetry.get("IR_ACTIVE") != "0":
+            three = self.settings.rig_profile == "three_v3"
+            sensor = self.boards.servo.snapshot().telemetry.get("SENSOR") if three else self.boards.conveyor.snapshot().telemetry.get("IR_ACTIVE")
+            if sensor != "0":
                 raise RuntimeError("Clear the chamber IR beam before validating the next holder")
             k = self.settings.calibration
             commands = [(self.boards.conveyor, f"SPEED:{k.speed_us}"),
-                        (self.boards.conveyor, f"IR_OFFSET:{k.ir_offset_steps}"),
                         (self.boards.servo, f"SET_NEUTRAL:{k.neutral_angle}"),
                         (self.boards.servo, f"SET_FERTILE:{k.fertile_angle}"),
                         (self.boards.servo, f"SET_INFERTILE:{k.infertile_angle}"),
                         (self.boards.servo, "RESET")]
+            if three:
+                commands.extend([(self.boards.light, "LIGHT_OFF"), (self.boards.egg, "ARM")])
+            else:
+                commands.insert(1, (self.boards.conveyor, f"IR_OFFSET:{k.ir_offset_steps}"))
             for link, text in commands:
                 link.command(text).result(3.5)
             if self.recovery and self.recovery.get("state") not in {"COMPLETE", "CLEARED"}:
@@ -129,8 +157,11 @@ class EdgeStation:
                 raise RuntimeError("Validate calibration and holder alignment before sorting")
             if not str(self.inference.engine.engine_type).startswith("ONNX"):
                 raise RuntimeError("Real ONNX model is required for sorting")
+            if not getattr(self.inference.engine, "model_contract_verified", False):
+                raise RuntimeError("Verify ONNX dimensions and two-class metadata before sorting")
             self.boards.require_ready()
-            self.cycle = SortingCycle(self.boards, self.camera, self.inference, self.db, self.settings,
+            kind = ThreeBoardCycle if self.settings.rig_profile == "three_v3" else SortingCycle
+            self.cycle = kind(self.boards, self.camera, self.inference, self.db, self.settings,
                 self.device_id, str(uuid.uuid4()), batch_id, target, operator)
             self.calibrated = False  # Every batch starts from an inspected reference.
             self.cycle.start()

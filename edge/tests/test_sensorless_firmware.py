@@ -3,6 +3,7 @@
 Requires g++/clang++ (CI or WSL). Tests are not physical stopping/ISR proofs.
 """
 from pathlib import Path
+import os
 import shutil
 import subprocess
 
@@ -14,17 +15,20 @@ NATIVE = Path(__file__).parent / "firmware_native"
 @pytest.fixture(scope="session")
 def sketches(tmp_path_factory):
     compiler = shutil.which("g++") or shutil.which("clang++")
-    if compiler is None:
+    zig = os.getenv("OVALENS_TEST_ZIG")
+    if compiler is None and not zig:
         pytest.skip("Native firmware behavior tests require g++ or clang++")
+    prefix = [compiler] if compiler else [zig, "c++", "-nostdlib++"]
     result = {}
     build = tmp_path_factory.mktemp("firmware-native")
     for board in ("conveyor", "servo"):
-        executable = build / board
-        command = [compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
+        executable = build / (board + (".exe" if os.name == "nt" else ""))
+        command = prefix + ["-std=c++17", "-Wall", "-Wextra", "-Werror",
                    f"-I{NATIVE}", str(NATIVE / "driver.cpp"), "-o", str(executable)]
         if board == "conveyor":
             command.append("-DBOARD_CONVEYOR")
-        subprocess.run(command, check=True, capture_output=True, text=True)
+        result_compile = subprocess.run(command, capture_output=True, text=True, timeout=180)
+        assert result_compile.returncode == 0, result_compile.stderr
         result[board] = executable
     return result
 

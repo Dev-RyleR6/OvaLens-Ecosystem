@@ -47,6 +47,7 @@ class CameraGrabber:
         self._sequence = 0
         self.settings_revision = 0
         self._requests = queue.Queue(maxsize=4)
+        self._still_requests = queue.Queue(maxsize=1)
         self.property_report = {}
         self.identity = ""
         self._discard_frames = 0
@@ -145,12 +146,50 @@ class CameraGrabber:
             return CameraFrame(self._sequence, self._last_frame_at, self.settings_revision,
                                self._latest_frame.copy() if copy else self._latest_frame)
 
+    def capture_fresh(self, drain=6, timeout=3):
+        """Flush and capture on the sole VideoCapture owner, never on the caller."""
+        if type(drain) is not int or not 1 <= drain <= 30:
+            raise ValueError("Camera drain must be between 1 and 30 frames")
+        if not self._is_running or self.allow_mock:
+            raise RuntimeError("Fresh capture requires an active real camera")
+        future = Future()
+        self._still_requests.put_nowait((drain, future))
+        try:
+            return future.result(timeout=timeout)
+        except TimeoutError:
+            future.cancel()
+            raise
+
+    def _publish(self, frame):
+        with self._lock:
+            self._latest_frame = frame
+            self._last_frame_at = time.monotonic()
+            self._sequence += 1
+            return CameraFrame(self._sequence, self._last_frame_at, self.settings_revision, frame)
+
     def _capture_loop(self):
         try:
             self._open_camera()
             if self.initial_settings is not None and self._requests.empty() and not self.allow_mock:
                 self._apply_on_worker(self.initial_settings)
             while self._is_running:
+                try:
+                    drain, still = self._still_requests.get_nowait()
+                except queue.Empty:
+                    pass
+                else:
+                    if still.set_running_or_notify_cancel():
+                        try:
+                            for _ in range(drain):
+                                if not self._is_running or not self.cap.grab():
+                                    raise RuntimeError("Fresh camera buffer drain failed")
+                            ok, image = self.cap.read()
+                            if not self._is_running or not ok or image is None:
+                                raise RuntimeError("Fresh camera capture failed")
+                            still.set_result(self._publish(image))
+                        except Exception as exc:
+                            still.set_exception(exc)
+                            raise
                 try:
                     settings, future = self._requests.get_nowait()
                 except queue.Empty:
@@ -171,10 +210,7 @@ class CameraGrabber:
                 if self._discard_frames:
                     self._discard_frames -= 1
                     continue
-                with self._lock:
-                    self._latest_frame = frame
-                    self._last_frame_at = time.monotonic()
-                    self._sequence += 1
+                self._publish(frame)
                 self._update_fps()
         except Exception as exc:
             self.last_error = str(exc)
@@ -192,6 +228,11 @@ class CameraGrabber:
                     future.set_exception(RuntimeError(self.last_error or "Camera stopped"))
                 except queue.Empty:
                     break
+
+            while not self._still_requests.empty():
+                _, future = self._still_requests.get_nowait()
+                if not future.done():
+                    future.set_exception(RuntimeError(self.last_error or "Camera stopped"))
 
     def _update_fps(self):
         self._fps_count += 1

@@ -14,6 +14,10 @@ class ReviewRequired(RuntimeError):
 
 class CycleState(str, Enum):
     READY = "READY"
+    SEARCHING = "SEARCHING"
+    LIGHTING = "LIGHTING"
+    STABILIZING = "STABILIZING"
+    DISPLAYING = "DISPLAYING"
     INDEXING = "INDEXING"
     CLASSIFYING = "CLASSIFYING"
     SAVING = "SAVING"
@@ -235,8 +239,8 @@ class SortingCycle:
     def _review(self, reason, holder):
         self._decision.clear()
         self._resolution = None
-        self._state("MANUAL_REVIEW", reason, holder.number)
         self._checkpoint("MANUAL_REVIEW")
+        self._state("MANUAL_REVIEW", reason, holder.number)
         while not self._decision.wait(.05):
             self._health()
         self._health()

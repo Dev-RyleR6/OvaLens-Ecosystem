@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Firmware**: [TASK-NEW-FW-APP-01] preserve explicit egg/servo port assignments, add the COM5/COM7 hardware launcher, and display deployed controller status replies (2026-10-02).
 
 ### Added
+- **Edge**: [TASK-NEW-EDGE-3BOARD-01] integrate three-board candling rig (2026-10-08)
 - **Edge**: [TASK-NEW-EDGE-UI-POLISH-01] improve operator typography and status performance (2026-10-07)
 - **Edge**: [TASK-NEW-EDGE-CONTROL-01] integrate dual-board sorting and camera defaults (2026-10-07)
 - **Dashboard**: [TASK-NEW-DASH-BRAND-02] refresh branding and incubation batch layout (2026-10-07)

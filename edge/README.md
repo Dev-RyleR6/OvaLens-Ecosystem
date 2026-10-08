@@ -6,7 +6,7 @@
 
 **OvaLens Edge** is an offline-first, real-time computer vision application designed to inspect duck eggs on a motorized conveyor, classify embryonic development using YOLOv8 ONNX FP16, and command millisecond-accurate mechanical sorting via an ESP32 microcontroller.
 
-**Current main launcher status:** Config integrates two v2 ESP32 boards, chamber IR stopping, idle camera/AI defaults, measured holder calibration and automatic holder tracking. Sorting requires explicit inspection and validation on each connection/batch. The sketches must be identified, uploaded and bench-tested on the actual rig before use. Simulation and fallback results remain preview-only. See [station setup and recovery](../docs/OVALENS_EDGE_STATION_CONTROL.md).
+**Current main launcher status:** New stations default to the three-board handoff rig: conveyor, sensor/servo, and lamp ESP32s. Existing saved two-board settings retain their explicit profile. Sorting requires verified ONNX class metadata, inspection and calibration on each connection/batch. Three-board routing stops at measured gate boundaries; a pause does not consume passage distance. See [three-board setup and verification](../docs/EDGE_THREE_BOARD_IMPLEMENTATION.md) or [existing two-board setup](../docs/OVALENS_EDGE_STATION_CONTROL.md). Firmware compilation and simulations do not establish physical sorting accuracy.
 
 Press **Single Scan** once to wait for a fresh frame and classify it. The interface shows camera, inference, and storage progress; timeouts discard late results. **End Session** cancels unfinished predictions and finalizes local records. If finalization fails, **Retry Finalization** preserves the original session. Reaching the diagnostic target stops additional scans until a new batch is configured.
 
@@ -29,7 +29,7 @@ Press **Single Scan** once to wait for a fresh frame and classify it. The interf
 ```
 edge/
 ├── models/                       # YOLOv8 weights & ONNX exporter
-│   ├── weights/best.onnx         # 11.7 MB FP16 ONNX model
+│   ├── weights/best.onnx         # Current model; inspect actual tensor precision
 │   └── export_onnx.py            # Automated export script
 ├── src/
 │   ├── core/
@@ -65,7 +65,7 @@ pip install -r requirements.txt
 API_KEY=dev-api-key-123
 API_BASE_URL=http://localhost:8000
 DEVICE_ID=STATION-01-RP5
-CAMERA_INDEX=0
+CAMERA_INDEX=1
 SERIAL_PORT=COM3
 SERIAL_BAUD=115200
 CONVEYOR_SPEED_CM_S=12.50

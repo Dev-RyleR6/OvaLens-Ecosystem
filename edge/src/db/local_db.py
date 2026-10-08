@@ -216,6 +216,29 @@ class LocalDatabaseManager:
             "started_at": started_at
         }
 
+    def save_scan_image(self, scan_id, image):
+        """Atomically persist the captured evidence before releasing its egg."""
+        import cv2
+        import tempfile
+        scan_id = str(uuid.UUID(str(scan_id)))
+        directory = os.path.join(os.path.dirname(self.db_path), "local_scans")
+        os.makedirs(directory, exist_ok=True)
+        ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        if not ok:
+            raise OSError("Could not encode candling evidence")
+        target = os.path.join(directory, scan_id + ".jpg")
+        fd, temporary = tempfile.mkstemp(dir=directory, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(encoded.tobytes())
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, target)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        return target
+
     def record_scan(self, scan_id: str, session_id: str, batch_id: str, sequence_number: int,
                     final_class: str, confidence: float, inference_ms: int, routing_action: str,
                     detections: list, image_path: Optional[str] = None,

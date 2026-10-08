@@ -35,7 +35,7 @@ def main():
         print("[EXIT] Startup cancelled.")
         return
     try:
-        camera_index = int(os.getenv("CAMERA_INDEX", "0"))
+        camera_index = int(os.getenv("CAMERA_INDEX", "1"))
     except ValueError as exc:
         raise ValueError("CAMERA_INDEX must be an integer") from exc
 

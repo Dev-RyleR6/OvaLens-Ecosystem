@@ -1056,13 +1056,20 @@ class OvaLensOperatorApp(ctk.CTk):
         boards = station.boards
         parts = []
         if boards:
-            for link in (boards.conveyor, boards.servo):
+            for link in getattr(boards, "links", (boards.conveyor, boards.servo)):
                 state = link.snapshot()
                 status = state.error or state.telemetry.get("FAULT", "identifying")
                 parts.append(f"{link.role}: {status if state.connected else 'disconnected'}")
-            parts.append("IR: " + boards.conveyor.snapshot().telemetry.get("IR_ACTIVE", "unknown"))
+            if hasattr(boards, "egg"):
+                parts.append("IR: " + boards.egg.snapshot().telemetry.get("SENSOR", "unknown"))
+                parts.append("Lamp: " + boards.light.snapshot().telemetry.get("LIGHT", "unknown"))
+            else:
+                parts.append("IR: " + boards.conveyor.snapshot().telemetry.get("IR_ACTIVE", "unknown"))
         else:
             parts.append("Boards disconnected")
+        recovery = getattr(station, "recovery", None)
+        if recovery and recovery.get("state") not in {"COMPLETE", "CLEARED"}:
+            parts.append("Recovery: inspect interrupted eggs before validating")
         parts.append("Camera: " + (self.camera.last_error or ("ready" if self.camera.is_running else "idle")))
         label = " | ".join(parts)
         if label != getattr(self, "_last_station_label", None):
@@ -1076,7 +1083,7 @@ class OvaLensOperatorApp(ctk.CTk):
         if result and result["scan_id"] != getattr(self, "_last_station_scan", None):
             self._last_station_scan = result["scan_id"]
             self._update_result_banner(result["final_class"], result["confidence"], result["routing_action"], result.get("inference_ms", 0))
-            self.result_subtitle.configure(text=f"Holder {result['holder']} saved locally; routing is tracked and gate passage is timed.")
+            self.result_subtitle.configure(text=f"Egg {result['holder']} saved locally; gate passage is estimated. Inspect the output trays.")
         key = (cycle.session_id, status["state"], status.get("holder"), status.get("reason"))
         if key != getattr(self, "_last_cycle_status", None):
             self._last_cycle_status = key
@@ -1112,18 +1119,18 @@ class OvaLensOperatorApp(ctk.CTk):
             self.is_auto_cycle_running = False
             if status["state"] == "COMPLETE":
                 # Let End Session reconcile the final counters and release local identity.
-                self._log(f"[COMPLETE] {cycle.count} saved scans; {cycle.routed} timed gate passages. End session to review totals.")
+                self._log(f"[COMPLETE] {cycle.count} saved scans; {cycle.routed} estimated gate passages. End session to review totals.")
             else:
                 self._log("[RECOVERY] Stop/finalize this session, inspect holders, then reconnect and validate setup.")
             self._set_session_active_state(True)
 
     def toggle_auto_session(self):
-        """Only the inspected dual-board service can initiate physical motion."""
+        """Only an inspected station service can initiate physical motion."""
         if self.is_session_active or self.is_auto_cycle_running:
             self.stop_or_cancel_session()
             return
         if not self.station or self.simulation:
-            self._log("[BLOCKED] Real camera and validated dual-board station required.")
+            self._log("[BLOCKED] Real camera and validated sorting station required.")
             return
         if self.grab_current() is not None or self._scan_busy or self._stopping or self.current_session_id:
             self._log("[BLOCKED] Close settings and finish the current session first.")
@@ -1406,7 +1413,7 @@ class OvaLensOperatorApp(ctk.CTk):
         station = getattr(self, "station", None)
         if station:
             station.halt()
-        self._log("[STOP] Stop requested on both boards. Inspect the rig before recovery.")
+        self._log("[STOP] Stop requested on all required boards. Inspect the rig before recovery.")
 
     def _update_result_banner(self, final_cls: str, conf: float, action: str, lat_ms: int):
         if final_cls == "FERTILE":
@@ -1512,8 +1519,12 @@ class OvaLensOperatorApp(ctk.CTk):
             if getattr(self.camera, "is_running", False) and not getattr(self, "_stopping", False):
                 snapshot = self.camera.snapshot(copy=False)
                 frame = snapshot.image if snapshot else None
+                cycle = self.station.cycle if getattr(self, "station", None) else None
+                reviewing = cycle is not None and cycle.status["state"] == "MANUAL_REVIEW" and getattr(cycle, "review_frame", None) is not None
+                if reviewing:
+                    frame = cycle.review_frame
                 if frame is not None:
-                    render_key = (snapshot.sequence, self._cached_container_w, self._cached_container_h)
+                    render_key = (("review", id(frame)) if reviewing else snapshot.sequence, self._cached_container_w, self._cached_container_h)
                     if render_key == getattr(self, "_last_render_key", None):
                         return
                     self._last_render_key = render_key
@@ -1547,7 +1558,7 @@ class OvaLensOperatorApp(ctk.CTk):
                         cv2.line(disp_frame, (cx, cy - 20), (cx, cy + 20), (0, 255, 0), 1, cv2.LINE_AA)
 
                     # 4. Draw Real-time AI Bounding Boxes & Classification Labels
-                    active_detections = self._get_active_display_detections()
+                    active_detections = cycle._last_result.get("detections", []) if reviewing else self._get_active_display_detections()
                     for det in active_detections:
                         bbox = det.get("bbox", [])
                         cls_name = det.get("class", "FERTILE")

@@ -1,5 +1,8 @@
 # OvaLens edge station control
 
+This guide describes the existing two-board `dual_v2` profile. New stations use
+the three-board handoff profile; see [three-board setup](EDGE_THREE_BOARD_IMPLEMENTATION.md).
+
 Task: `TASK-NEW-EDGE-CONTROL-01`; extends `TASK-NEW-FW-SAFE-01` and replaces the sensorless assumption in `TASK-NEW-EDGE-POS-SPEC-01` for this rig.
 
 ## Run and configure

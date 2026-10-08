@@ -1,5 +1,6 @@
 #include "Arduino.h"
-#include <iostream>
+#include <stdlib.h>
+#include <string.h>
 #ifdef BOARD_CONVEYOR
 #include "../../../firmware/sketches_only/conveyor_esp32/conveyor_esp32.ino"
 #else
@@ -8,7 +9,7 @@
 #endif
 
 int main(int argc, char **argv) {
-  if (argc > 1 && std::string(argv[1]) == "fail-init") {
+  if (argc > 1 && !strcmp(argv[1], "fail-init")) {
 #ifdef BOARD_CONVEYOR
     failTimer = true;
 #else
@@ -16,32 +17,33 @@ int main(int argc, char **argv) {
 #endif
   }
   setup();
-  std::string line;
-  while (std::getline(std::cin, line)) {
-    if (line.rfind("CLOCK ", 0) == 0) {
-      fakeMillis = static_cast<uint32_t>(std::stoull(line.substr(6)));
+  char line[65536];
+  while (fgets(line, sizeof(line), stdin)) {
+    line[strcspn(line, "\r\n")] = '\0';
+    if (!strncmp(line, "CLOCK ", 6)) {
+      fakeMillis = static_cast<uint32_t>(strtoull(line + 6, nullptr, 10));
 #ifdef BOARD_CONVEYOR
       if (pulseTimer && timer.running) pulseTick();
 #endif
       loop();
-    } else if (line == "IR") {
+    } else if (!strcmp(line, "IR")) {
 #ifdef BOARD_CONVEYOR
       pinValues[IR_PIN] = LOW; chamberIr();
 #endif
-    } else if (line == "IR_CLEAR") {
+    } else if (!strcmp(line, "IR_CLEAR")) {
 #ifdef BOARD_CONVEYOR
       pinValues[IR_PIN] = HIGH;
 #endif
-    } else if (line.rfind("TICKS ", 0) == 0) {
+    } else if (!strncmp(line, "TICKS ", 6)) {
 #ifdef BOARD_CONVEYOR
-      int count = std::stoi(line.substr(6));
+      int count = atoi(line + 6);
       for (int i = 0; i < count; ++i) {
         if (pulseTimer && timer.running) pulseTick();
         loop();
       }
 #endif
-    } else if (line.rfind("SEND ", 0) == 0) {
-      for (char c : line.substr(5)) Serial.input.push_back(c);
+    } else if (!strncmp(line, "SEND ", 5)) {
+      for (const char *c = line + 5; *c; ++c) Serial.input.push_back(*c);
       Serial.input.push_back('\n');
       while (Serial.available()) loop();
       loop();
