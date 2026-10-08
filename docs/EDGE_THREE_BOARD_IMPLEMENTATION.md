@@ -476,8 +476,9 @@ opened. The local previous-model override is retained.
 ## Camera sliders and cradle alignment
 
 `TASK-NEW-EDGE-CAMERA-ALIGN-01` adds draggable numeric camera sliders paired with
-exact entries. Dragging edits the pending form only; Apply sends one camera-owner
-request. Automatic On disables its paired manual slider. Range exposes editable
+exact entries. Initially dragging edited the pending form until Apply; the live
+tuning update below supersedes that interaction. Automatic On disables its
+paired manual slider. Range exposes editable
 minimum/maximum tuning spans, stored under `camera.slider_ranges` in the station
 JSON. Defaults are UI starting spans, not queried driver limits. Existing saved
 values outside a span expand its display without silently changing the value.
@@ -507,3 +508,39 @@ STOP before a completed worker's UI callback. Native inspection at 1280x860 and
 Screenshots use a saved capture; camera/board adapters are fake. No physical
 camera or connected ESP32 was operated, and physical cradle alignment remains
 an operator check on the rig.
+
+## Live camera tuning
+
+`TASK-NEW-EDGE-CAMERA-LIVE-01` applies slider and automatic-mode edits live, using
+a 150ms coalescing window and at most one camera request in flight. Continuous
+dragging sends the newest value during the drag; edits received while a request
+is running replace the next pending value. Typed values use a 350ms trailing
+pause. Live completions update driver readback without replacing newer form
+input, and duplicate unchanged requests are skipped. Save remains explicit.
+Apply now can immediately apply the form or retry a failed request. Load saved
+settings fills the form only. Errors wait for an edit or explicit retry.
+
+Explicit actions supersede the scheduled live request. Cradle selection and
+STOP cancel pending timers. Done waits for an in-flight camera request, finishes
+the last valid pending edit, then performs the existing hold/lamp cleanup. An
+invalid incomplete edit leaves the previous applied values intact. Shutdown
+cancels timers through the existing STOP path. A live camera request cannot
+dispatch stepper commands or bypass station idle/conveyor checks.
+
+The capture-owner API accepts `live_preview=True` only with `controls_only=True`.
+It preserves resolution/FPS without restarting the normal .3s frame-discard
+period for every slider tick. The previously displayed frame remains available
+with its original settings revision until the next capture publishes the new
+revision, avoiding a blank preview handoff. Normal settings application and the sorting coordinator keep their
+existing settling and fresh-evidence rules. Optical response latency remains
+camera dependent; software verification does not establish physical sharpness.
+
+Final verification passed **22 backend tests**, **381 edge tests** with one
+shared-process Tk skip, the skipped native alignment/UI test in a fresh process,
+and the dashboard production build. The final focused camera/live UI run passed
+**20 tests**. Coverage includes latest-value coalescing, editable controls during
+slow camera I/O, unchanged-value deduplication, auto/manual switching, explicit
+save, invalid input, failure/retry, restore/STOP cancellation, Save/Done ordering,
+continuous frame publication and correct revision on a held frame. Native
+inspection at 1280x860 and 1024x720 retained preview, focus slider, actions and
+STOP. All adapters are fake; no physical camera or serial board was opened.

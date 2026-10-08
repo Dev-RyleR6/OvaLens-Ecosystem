@@ -65,16 +65,18 @@ an earlier arrival holds the rig for inspection to protect the previous egg's ro
 Before starting a session, click **Camera controls** above the preview (also under
 **Tools > Camera controls**). The side panel keeps the image visible while you
 change autofocus, exposure, gain, white balance, brightness, contrast, saturation
-or sharpness. Drag a slider or type an exact value, then Apply. Scroll for
+or sharpness. Sliders and automatic modes update the preview live. Typed values
+apply after a short pause. Changes remain temporary until saved. Scroll for
 additional controls. **Range** edits a slider's minimum and maximum; these are
 editable tuning spans, not hardware-reported limits. Custom spans save with
 camera defaults. Turn an automatic mode **Off** to
 edit its corresponding manual value; **On** clears that manual preference.
 
-- **Apply to preview** sends the values to the current camera without saving.
+- **Apply now** sends the form immediately, including loaded saved values, without saving.
 - **Save as default** applies and saves them in `edge/db/edge_settings.json`.
-- **Load saved settings** fills the form; click Apply to preview to use them.
-- **Done** closes the panel and leaves the applied preview settings in place.
+- **Load saved settings** fills the form; click Apply now to use them.
+- **Done** finishes the last valid queued live edit and closes the panel, keeping
+  the applied preview settings. Incomplete or invalid edits are not applied.
 
 Blank numeric values and **Unchanged** leave that camera property untouched;
 they do not reset it to its factory value. Values use the camera driver's units,
@@ -84,6 +86,15 @@ sharpness: inspect a stationary egg in the preview. Camera tuning is locked
 during sessions and scans. Applying changes clears the inspection confirmation;
 check the rig again before Start sorting. Preview-only changes remain in memory
 until restart; Save as default keeps them for the next launch.
+
+Live updates combine rapid slider changes into the newest value, with at most
+one camera request in flight. Sliders stay responsive while the background
+camera worker applies a request. Failed live updates report the error and wait
+for another edit or Apply now rather than repeatedly retrying. Switching to
+Cradle or pressing STOP cancels scheduled live edits; automatic sorting and
+scanning remain blocked while tuning. Camera hardware may take time to settle
+after a setting changes. Normal sorting retains its stopped settle and fresh
+capture checks.
 
 To position a cradle for camera calibration, open the **Cradle** section:
 

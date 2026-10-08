@@ -35,6 +35,7 @@ class CameraGrabber:
         self.cap: Optional[cv2.VideoCapture] = None
         self._lock = threading.Lock()
         self._latest_frame: Optional[np.ndarray] = None
+        self._latest_revision = 0
         self._is_running = False
         self._thread: Optional[threading.Thread] = None
         self._is_mock_mode = False
@@ -95,16 +96,18 @@ class CameraGrabber:
         normalized = bool(self.cap.get(cv2.CAP_PROP_MODE)) if self.identity.endswith((":V4L2", ":V4L")) else False
         self.exposure_modes = exposure_modes(self.identity, normalized)
 
-    def apply_settings(self, settings, timeout=10, *, controls_only=False):
+    def apply_settings(self, settings, timeout=10, *, controls_only=False, live_preview=False):
         """Called from an operation worker; only the capture thread touches VideoCapture."""
         future = Future()
-        self._requests.put_nowait((settings, future, controls_only))
+        self._requests.put_nowait((settings, future, controls_only, live_preview))
         self.start()
         return future.result(timeout=timeout)
 
-    def _apply_on_worker(self, settings, controls_only=False):
+    def _apply_on_worker(self, settings, controls_only=False, live_preview=False):
         from .settings import EdgeSettings
         EdgeSettings(camera=settings).validate()
+        if live_preview and not controls_only:
+            raise ValueError("Live preview updates must preserve camera stream settings")
         if self.allow_mock:
             raise RuntimeError("Camera property tuning requires a real camera")
         if controls_only and settings.index != self.camera_index:
@@ -148,9 +151,12 @@ class CameraGrabber:
         self.property_report = {**self.property_report, **report}
         with self._lock:
             self.settings_revision += 1
-            self._latest_frame = None
-            self._last_frame_at = 0.0
-        self._discard_frames = max(3, int(settings.fps * .3))
+            if not live_preview:
+                self._latest_frame = None
+                self._last_frame_at = 0.0
+        # Live tuning must not repeatedly restart the settling drain and starve
+        # the preview. Sorting still uses its full settle + fresh capture path.
+        self._discard_frames = 0 if live_preview else max(3, int(settings.fps * .3))
         return {"identity": self.identity, "properties": report, "revision": self.settings_revision,
                 "exposure_modes": dict(self.exposure_modes)}
 
@@ -158,7 +164,7 @@ class CameraGrabber:
         with self._lock:
             if not self._is_running or self._latest_frame is None or time.monotonic() - self._last_frame_at > .5:
                 return None
-            return CameraFrame(self._sequence, self._last_frame_at, self.settings_revision,
+            return CameraFrame(self._sequence, self._last_frame_at, self._latest_revision,
                                self._latest_frame.copy() if copy else self._latest_frame)
 
     def capture_fresh(self, drain=6, timeout=3):
@@ -178,6 +184,7 @@ class CameraGrabber:
     def _publish(self, frame):
         with self._lock:
             self._latest_frame = frame
+            self._latest_revision = self.settings_revision
             self._last_frame_at = time.monotonic()
             self._sequence += 1
             return CameraFrame(self._sequence, self._last_frame_at, self.settings_revision, frame)
@@ -206,13 +213,13 @@ class CameraGrabber:
                             still.set_exception(exc)
                             raise
                 try:
-                    settings, future, controls_only = self._requests.get_nowait()
+                    settings, future, controls_only, live_preview = self._requests.get_nowait()
                 except queue.Empty:
                     pass
                 else:
                     if future.set_running_or_notify_cancel():
                         try:
-                            future.set_result(self._apply_on_worker(settings, controls_only))
+                            future.set_result(self._apply_on_worker(settings, controls_only, live_preview))
                         except Exception as exc:
                             future.set_exception(exc)
                 if self._is_mock_mode:
@@ -239,7 +246,7 @@ class CameraGrabber:
                 self._last_frame_at = 0.0
             while not self._requests.empty():
                 try:
-                    _, future, _ = self._requests.get_nowait()
+                    _, future, _, _ = self._requests.get_nowait()
                     future.set_exception(RuntimeError(self.last_error or "Camera stopped"))
                 except queue.Empty:
                     break

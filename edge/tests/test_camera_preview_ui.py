@@ -130,7 +130,7 @@ def test_slider_drag_span_and_cradle_stop_during_background_move(hidden_ui, tmp_
         slider._canvas.event_generate("<Button-1>", x=slider.winfo_width() // 2, y=8)
         app.update()
         assert float(panel.entries["focus"].get()) > 0
-        assert not applied  # Dragging does not queue camera or serial work.
+        assert not applied  # The short live-update window coalesces the initial drag.
         _, low, high = panel.range_fields["focus"]
         for entry, value in ((low, "-10"), (high, "300")):
             entry.delete(0, "end")

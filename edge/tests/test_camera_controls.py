@@ -95,8 +95,45 @@ def test_camera_only_apply_on_owner_preserves_stream_and_skips_auto_manual_confl
         assert report["properties"]["sharpness"]["status"] == "rejected / unsupported"
         assert report["properties"]["focus"]["status"] == "inactive while automatic mode is on"
         assert report["exposure_modes"] == {"On": 1., "Off": 0.}
+        # Live updates must keep producing new frames, even during repeated edits.
+        for brightness in (13, 14, 15):
+            settings.brightness = brightness
+            live = camera.apply_settings(settings, controls_only=True, live_preview=True)
+            deadline = time.monotonic() + .5
+            while time.monotonic() < deadline:
+                frame = camera.snapshot()
+                if frame is not None and frame.settings_revision == live["revision"]:
+                    break
+                time.sleep(.005)
+            assert frame is not None and frame.settings_revision == live["revision"]
+            assert camera._discard_frames == 0
     finally:
         camera.stop()
+
+
+def test_live_preview_rejects_stream_changes_before_opening_device():
+    camera = CameraGrabber()
+    with pytest.raises(ValueError, match="preserve camera stream"):
+        camera._apply_on_worker(CameraSettings(), live_preview=True)
+
+
+def test_live_frame_handoff_retains_old_revision_until_new_capture():
+    camera = CameraGrabber()
+    camera._is_running = True
+    camera.identity = "opencv:0:DSHOW"
+    camera.cap = SimpleNamespace(set=lambda *args: True, get=lambda *args: 0)
+    try:
+        original = camera._publish(np.zeros((8, 8, 3), dtype=np.uint8))
+        report = camera._apply_on_worker(CameraSettings(brightness=10), controls_only=True, live_preview=True)
+        held = camera.snapshot()
+        assert held is not None and held.sequence == original.sequence
+        assert held.settings_revision == original.settings_revision < report["revision"]
+        fresh = camera._publish(np.ones((8, 8, 3), dtype=np.uint8))
+        assert camera.snapshot().settings_revision == fresh.settings_revision == report["revision"]
+        camera._apply_on_worker(CameraSettings(brightness=20), controls_only=True)
+        assert camera.snapshot() is None  # Normal settings retain invalidation/settling.
+    finally:
+        camera._is_running = False
 
 
 def test_camera_service_saves_only_camera_values_and_does_not_issue_serial_commands(tmp_path):
@@ -119,6 +156,10 @@ def test_camera_service_saves_only_camera_values_and_does_not_issue_serial_comma
     station.inference.predict.assert_not_called()
     camera.apply_settings.assert_called_with(controls, controls_only=True)
     assert not station.calibrated
+    controls.focus = 90
+    station.apply_camera_controls(controls, live_preview=True)
+    camera.apply_settings.assert_called_with(controls, controls_only=True, live_preview=True)
+    assert store.load().camera.focus == 80  # Live preview never persists by itself.
 
 
 @pytest.mark.parametrize("blocked", ["active", "moving", "device"])

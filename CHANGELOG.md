@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Firmware**: [TASK-NEW-FW-APP-01] preserve explicit egg/servo port assignments, add the COM5/COM7 hardware launcher, and display deployed controller status replies (2026-10-02).
 
 ### Added
+- **Edge**: [TASK-NEW-EDGE-CAMERA-LIVE-01] apply camera preview tweaks live (2026-10-09)
 - **Edge**: [TASK-NEW-EDGE-CAMERA-ALIGN-01] add camera sliders and cradle alignment (2026-10-09)
 - **Edge**: [TASK-NEW-EDGE-CAMERA-PREVIEW-01] tune camera beside live preview (2026-10-09)
 - **Edge**: [TASK-NEW-EDGE-MODEL-V3-01] use verified best_v3 model export (2026-10-09)

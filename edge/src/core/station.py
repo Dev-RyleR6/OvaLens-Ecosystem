@@ -66,7 +66,7 @@ class EdgeStation:
                 self.store.save(settings)
             return report
 
-    def apply_camera_controls(self, camera_settings, save=False):
+    def apply_camera_controls(self, camera_settings, save=False, live_preview=False):
         """Tune only the current camera; no serial commands or model reconfiguration."""
         with self._lock:
             self.require_idle()
@@ -80,7 +80,10 @@ class EdgeStation:
             if settings.camera.index != self.settings.camera.index:
                 raise ValueError("Use station settings to change the camera device")
             self.calibrated = False
-            report = self.camera.apply_settings(settings.camera, controls_only=True)
+            options = {"controls_only": True}
+            if live_preview:
+                options["live_preview"] = True
+            report = self.camera.apply_settings(settings.camera, **options)
             settings.camera.identity = report["identity"]
             self.settings = settings
             self.camera.initial_settings = settings.camera

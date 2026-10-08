@@ -1,6 +1,7 @@
 """Idle camera tuning alongside the main preview, using background requests."""
 import math
 import threading
+from dataclasses import replace
 import customtkinter as ctk
 
 from ..core.camera_controls import (AUTO_CONTROLS, NUMERIC_CONTROLS, MANUAL_PAIRS,
@@ -15,6 +16,11 @@ class CameraControlsPanel(ctk.CTkFrame):
                          border_width=1, border_color=FUTheme.BORDER)
         self.app = app
         self.pending = False
+        self._live_after = None
+        self._live_busy = False
+        self._live_dirty = False
+        self._live_last = None
+        self._live_delay = 150
         self.entries, self.modes, self.readbacks, self.controls = {}, {}, {}, []
         self.sliders, self.range_fields = {}, {}
         self.slider_ranges = {}
@@ -29,13 +35,13 @@ class CameraControlsPanel(ctk.CTkFrame):
         self.done.pack(side="right")
         ctk.CTkLabel(header, text="Camera controls", font=(FUTheme.FONT_FAMILY, 20, "bold"),
                      text_color=FUTheme.TEXT_PRIMARY).pack(side="left")
-        ctk.CTkLabel(self, text="Drag values, then Apply. Blank stays unchanged.", height=18,
+        ctk.CTkLabel(self, text="Live preview. Save to remember your changes.", height=18,
             wraplength=340, justify="left", anchor="w", font=(FUTheme.FONT_FAMILY, 13),
             text_color=FUTheme.TEXT_SECONDARY).pack(fill="x", padx=18, pady=(0, 8))
         actions = self.camera_actions = ctk.CTkFrame(self, fg_color="transparent")
         actions.pack(side="bottom", fill="x", padx=18, pady=(4, 10))
         actions.grid_columnconfigure((0, 1), weight=1)
-        for column, (label, save) in enumerate((("Apply to preview", False), ("Save as default", True))):
+        for column, (label, save) in enumerate((("Apply now", False), ("Save as default", True))):
             button = ctk.CTkButton(actions, text=label, height=34, width=155,
                 font=(FUTheme.FONT_FAMILY, 13, "bold"),
                 fg_color=FUTheme.PRIMARY_MAROON if not save else FUTheme.PANEL_LIGHT_ALT,
@@ -49,7 +55,7 @@ class CameraControlsPanel(ctk.CTkFrame):
             hover_color=FUTheme.PANEL_ACCENT, command=self.restore)
         restore.grid(row=1, column=0, columnspan=2, sticky="ew", padx=3, pady=4)
         self.controls.append(restore)
-        self.notice = ctk.CTkLabel(self, text="Apply to inspect; Save to remember.", height=18,
+        self.notice = ctk.CTkLabel(self, text="Changes update the preview automatically.", height=18,
             font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_SECONDARY,
             wraplength=340, justify="left", anchor="w")
         self.notice.pack(side="bottom", fill="x", padx=20, pady=6)
@@ -72,7 +78,7 @@ class CameraControlsPanel(ctk.CTkFrame):
                 control = ctk.CTkOptionMenu(row, values=["Unchanged", "On", "Off", "Saved value"],
                     width=140, height=34, font=(FUTheme.FONT_FAMILY, 13),
                     fg_color=FUTheme.PANEL_LIGHT_ALT, button_color=FUTheme.PANEL_ACCENT,
-                    button_hover_color=FUTheme.BORDER_DARK, command=lambda _: self._manual_states())
+                    button_hover_color=FUTheme.BORDER_DARK, command=self._mode_changed)
                 self.modes[name] = control
             else:
                 control = ctk.CTkEntry(row, width=92, height=34, font=(FUTheme.FONT_FAMILY, 13),
@@ -84,11 +90,12 @@ class CameraControlsPanel(ctk.CTkFrame):
                 control.bind("<FocusOut>", lambda _, name=name: self._entry_changed(name))
             control.pack(side="right")
             self.controls.append(control)
-        ctk.CTkLabel(body, text="Drag a slider, then Apply. Range edits its tuning span; these are not camera-reported limits. Turn automatic mode Off to tune its manual value.",
+        ctk.CTkLabel(body, text="Sliders and automatic modes update the preview live. Typed values apply after a short pause. Range edits the tuning span, not camera-reported limits. Turn automatic mode Off to tune its manual value.",
             wraplength=320, justify="left", font=(FUTheme.FONT_FAMILY, 12),
             text_color=FUTheme.TEXT_MUTED).pack(fill="x", padx=6, pady=10)
         self._build_cradle()
         self.fill(self.base)
+        self._live_last = replace(self.base, slider_ranges=dict(self.slider_ranges))
         self.show_report(getattr(app.camera, "property_report", {}))
         self.place(x=0, y=0, relwidth=1, relheight=1)
         self.lift()
@@ -164,12 +171,87 @@ class CameraControlsPanel(ctk.CTkFrame):
             return
         entry.delete(0, "end")
         entry.insert(0, f"{value:.6g}")
+        self._queue_live()
 
     def _entry_changed(self, name):
         if not self.pending:
             self._configure_slider(name)
+            self._queue_live(delay=350, trailing=True)
+
+    def _mode_changed(self, _):
+        self._manual_states()
+        self._queue_live()
+
+    def _values(self):
+        camera = camera_values(self.base, {k: e.get() for k, e in self.entries.items()},
+                               {k: m.get() for k, m in self.modes.items()}, self._exposure_modes())
+        camera.slider_ranges = {k: list(v) for k, v in self.slider_ranges.items()}
+        return camera
+
+    def _cancel_live(self):
+        if self._live_after is not None:
+            self.after_cancel(self._live_after)
+            self._live_after = None
+        self._live_dirty = False
+
+    def _queue_live(self, delay=150, trailing=False):
+        if self.pending or self.app._closing or self.section.get() != "Camera":
+            return
+        self._live_dirty = True
+        self._live_delay = delay
+        if self._live_busy:
+            return  # One in-flight request; the next one reads only the newest form.
+        if self._live_after is not None:
+            if not trailing:
+                return
+            self.after_cancel(self._live_after)
+        self._live_after = self.after(delay, self._flush_live)
+
+    def _flush_live(self):
+        self._live_after = None
+        if self.pending or self._live_busy or self.app._closing or not self.winfo_exists():
+            return
+        if not self._live_dirty or self.section.get() != "Camera" or not self.app._camera_tuning_allowed():
+            self._live_dirty = False
+            return
+        self._live_dirty = False
+        try:
+            camera = self._values()
+        except ValueError as exc:
+            self.notice.configure(text=str(exc))
+            return
+        if camera == self._live_last:
+            return
+        self._live_busy = True
+        self.app._diagnostic_view = None
+        self.app.setup_inspected.set(False)
+        self.notice.configure(text="Updating live preview...")
+        def finished(report, failed=False):
+            self._live_busy = False
+            if self.app._closing or not self.winfo_exists():
+                return
+            if not failed:
+                self._live_last = camera
+                self.base = self.app.station.settings.camera
+            if self.pending or self.section.get() != "Camera":
+                return  # An explicit action already supersedes the live request.
+            if failed:
+                self._cancel_live()
+                self.notice.configure(text="Live update failed: " + str(report) + "; adjust a value or use Apply now to retry.")
+            else:
+                self.show_report(report["properties"])
+                self.notice.configure(text="Live preview updated. Save to remember.")
+                if self._live_dirty:
+                    self._queue_live(delay=self._live_delay)
+        try:
+            self.app._jobs.submit(lambda: self.app.station.apply_camera_controls(camera, live_preview=True),
+                finished, lambda error: finished(error, True))
+        except Exception as exc:
+            finished(str(exc), True)
 
     def _section(self, name):
+        if name != "Camera":
+            self._cancel_live()
         self.camera_body.pack_forget()
         self.cradle_body.pack_forget()
         self.camera_actions.pack_forget()
@@ -244,6 +326,7 @@ class CameraControlsPanel(ctk.CTkFrame):
                       "Alignment stopped. Inspect and reconnect."), "Moving cradle; STOP [R] is available...")
 
     def cancel_alignment(self):
+        self._cancel_live()
         self.alignment_cancel.set()
         self.alignment_ready = False
         self.path_clear.set(False)
@@ -297,6 +380,7 @@ class CameraControlsPanel(ctk.CTkFrame):
     def _job(self, work, success, message="Applying camera settings..."):
         if self.pending or self.app._closing:
             return
+        self._cancel_live()
         self.pending = True
         for control in [self.done, *self.controls]:
             control.configure(state="disabled")
@@ -326,15 +410,14 @@ class CameraControlsPanel(ctk.CTkFrame):
         if self.pending or not self.app._camera_tuning_allowed():
             return
         try:
-            camera = camera_values(self.base, {k: e.get() for k, e in self.entries.items()},
-                                   {k: m.get() for k, m in self.modes.items()}, self._exposure_modes())
-            camera.slider_ranges = {k: list(v) for k, v in self.slider_ranges.items()}
+            camera = self._values()
         except ValueError as exc:
             self.notice.configure(text=str(exc))
             return
         self.app._diagnostic_view = None
         self.app.setup_inspected.set(False)
         def applied(report):
+            self._live_last = camera
             self.fill(self.app.station.settings.camera)
             self.show_report(report["properties"])
             self.notice.configure(text="Defaults saved. Inspect driver readback." if save else
@@ -349,13 +432,27 @@ class CameraControlsPanel(ctk.CTkFrame):
     def close(self):
         if self.pending:
             return
+        dirty = self._live_dirty
+        self._cancel_live()
+        if dirty:
+            try:
+                camera = self._values()
+            except ValueError:
+                camera = None  # Leave the last valid applied values on an incomplete edit.
+        else:
+            camera = None
         self.alignment_ready = False
-        if self.app.station._camera_alignment_boards is not None:
-            self._job(self.app.station.finish_camera_alignment, lambda _: self._destroy(), "Holding conveyor and turning lamp off...")
+        if self._live_busy or camera is not None or self.app.station._camera_alignment_boards is not None:
+            def finish():
+                if camera is not None:
+                    self.app.station.apply_camera_controls(camera, live_preview=True)
+                self.app.station.finish_camera_alignment()
+            self._job(finish, lambda _: self._destroy(), "Finishing camera preview and holding conveyor...")
             return
         self._destroy()
 
     def _destroy(self):
+        self._cancel_live()
         self.app._camera_panel = None
         self.destroy()
         self.app._set_session_active_state(False)

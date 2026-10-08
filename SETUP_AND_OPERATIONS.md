@@ -195,13 +195,15 @@ Measured gate distances and physical acceptance remain required for the rig.
 - **Camera controls** above the preview (also **Tools > Camera controls**): Tune
   the idle camera while watching its image. Set Autofocus On, or choose Off and
   enter manual Focus. Exposure, gain, white balance and image controls are also
-  available as sliders and exact numeric values. Drag, then Apply. **Range** edits
+  available as sliders and exact numeric values. Sliders and automatic modes
+  update the preview live; typed values apply after a short pause. **Range** edits
   a slider's tuning span; it does not claim driver-supported limits. Scroll to
   reach the remaining controls. Driver feedback reports
   unsupported requests; numeric ranges depend on the webcam.
-- **Apply to preview** applies camera changes temporarily. **Save as default**
+- **Apply now** immediately applies the form temporarily. **Save as default**
   applies and saves them for future launches. **Load saved settings** fills the
-  form without applying. Blank values leave properties unchanged. Click **Done**
+  form without applying; use Apply now to activate loaded values. Blank values
+  leave properties unchanged. Click **Done**
   and inspect the conveyor again before starting a session.
 - **Camera controls > Cradle**: Confirm the path is clear, then **Connect for
   alignment**. The saved boards connect, the lamp turns on and the belt stays

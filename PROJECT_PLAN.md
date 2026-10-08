@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-CAMERA-LIVE-01**: Apply camera edits live with bounded latest-value coalescing, responsive controls, separate persistence, continuous preview frames and cancellation around cradle work, STOP and panel shutdown; verify with fake camera/board adapters.
+
 - [x] **TASK-NEW-EDGE-CAMERA-ALIGN-01**: Add camera-value sliders with editable saved spans and idle cradle alignment controls; bound each stepper jog, restore hardware pause, preserve STOP cancellation and verify with fake devices and native UI.
 
 - [x] **TASK-NEW-EDGE-CAMERA-PREVIEW-01**: Add an idle camera-control panel beside live preview with autofocus, exposure, gain, white balance and image controls; background camera-only application, driver readback, saved defaults, operation locks and fake-device/native UI verification.
