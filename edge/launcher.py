@@ -1,11 +1,21 @@
 """OvaLens desktop launcher: explicit preview, no unvalidated hardware motion."""
 import os
 import sys
+
+# Select Python before dotenv, serial, Tk or other third-party modules are loaded.
+sys.path.insert(0, os.path.dirname(__file__))
+if __name__ == "__main__":
+    from project_runtime import restart_in_project_environment, check_runtime
+    runtime_exit = restart_in_project_environment(__file__)
+    if runtime_exit is not None:
+        raise SystemExit(runtime_exit)
+    if "--check-runtime" in sys.argv[1:]:
+        raise SystemExit(check_runtime())
+
 import platform
 from contextlib import ExitStack
 from dotenv import load_dotenv
 
-sys.path.insert(0, os.path.dirname(__file__))
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 from src.ui.startup_config import show_startup_config

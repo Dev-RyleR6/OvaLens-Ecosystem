@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Edge**: [TASK-NEW-EDGE-RUNTIME-01] select project Python before loading packages (2026-10-08)
 - **Dashboard**: [TASK-NEW-DASH-CLOSE-06] standardize close buttons across overlays (2026-10-07)
 - **Dashboard**: [TASK-NEW-DASH-STATUS-05] unify incubation status across pages (2026-10-07)
 - **Dashboard**: [TASK-NEW-DASH-CHART-04] align operational charts and badge semantics (2026-10-07)

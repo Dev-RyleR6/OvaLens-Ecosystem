@@ -75,6 +75,9 @@ mechanical stopping on the rig; neither simulation nor compilation proves them.
 ### Quick setup with defaults
 
 1. Run `python edge/launcher.py`, enter the batch details, and open the operator app.
+   Windows users can instead double-click **Start_OvaLens.cmd** in the root folder.
+   Both launch methods prefer the project `.venv`; close and reopen an older
+   running window after a package/environment fix.
 2. Empty the conveyor, then click **Use defaults & detect** on the main screen. Default ports are **COM5
    stepper**, **COM7 servo + IR sensor**, and **COM9 light**. Camera 1 and the handoff
    timing defaults load automatically. Detected roles and settings are saved.

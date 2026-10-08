@@ -14,6 +14,13 @@ Press **Single Scan** once to wait for a fresh frame and classify it. The interf
 
 ## Quick setup
 
+On Windows, double-click **Start_OvaLens.cmd** in the repository root. It uses the
+project `.venv` automatically. `python edge/launcher.py` also selects that
+environment before importing packages, so the shared `serial` package cannot
+mask the project's PySerial. Close and reopen an already-running app after an
+environment fix. Check imports without hardware using
+`python edge/launcher.py --check-runtime`.
+
 Run `python edge/launcher.py` and enter the batch details. On the main screen,
 click **Use defaults & detect**, check the live camera and empty conveyor,
 tick the inspection box, and click **Prepare conveyor**. Then click **Start sorting**.
