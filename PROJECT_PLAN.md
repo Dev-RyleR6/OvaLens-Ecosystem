@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-FW-INSTALL-01**: Install and verify the three-board v3 firmware on the confirmed COM5 conveyor, COM7 egg controller and COM9 light controller after explicit user authorization with the conveyor empty. Confirm versioned identities and stopped/paused/lamp-off telemetry; physical sorting and calibration remain separate acceptance work.
+
 - [x] **TASK-NEW-EDGE-RUNTIME-01**: Make the normal launcher prefer the project Python environment before importing dependencies, add a double-click Windows launcher and hardware-free runtime check, and prevent the shared serial package from masking PySerial.
 
 - [x] **TASK-NEW-EDGE-SETUP-01**: Simplify three-board station setup with remembered COM5 stepper, COM7 egg/servo/IR and COM9 light defaults, automatic role detection, a main-screen empty-conveyor preparation action, cancellation and software-only verification.

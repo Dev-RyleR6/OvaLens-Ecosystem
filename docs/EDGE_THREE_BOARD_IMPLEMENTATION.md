@@ -217,7 +217,7 @@ if a prior in-process Tk initialization fails.
 
 Physical acceptance remains unchecked until observed:
 
-- [ ] Identify installed firmware roles and upload the three v3 builds to the matching boards.
+- [x] Identify installed firmware roles and upload the three v3 builds to the matching boards (2026-10-08; see installation record below).
 - [ ] Confirm unloaded wiring, pause polarity / broken-wire hold, servo stroke and lamp relay behavior.
 - [ ] Measure detection-to-pause latency and stopping distance; calibrate capture position and gate boundaries.
 - [ ] Verify minimum egg spacing, beam clearance, motor stall/slip handling and both destination trays.
@@ -225,6 +225,32 @@ Physical acceptance remains unchecked until observed:
 - [ ] If replacing the approved existing model later, verify the new ONNX export, provenance and measured latency.
 - [ ] Complete TASK-EVL-01 / TASK-EVL-02 with physical eggs and measured throughput.
 
-The user requested software verification only and approved keeping the existing
-best.onnx. No boards have been opened for serial identification, flashed or
-commanded to move by this implementation session. USB port enumeration was read-only.
+## Authorized firmware installation record
+
+Task: `TASK-NEW-FW-INSTALL-01`, 2026-10-08. The initial integration remained
+software-only and retained the existing best.onnx. The user subsequently
+explicitly authorized serial checks and firmware uploads, confirming the conveyor
+was empty. All three boards answered their expected PING identities but rejected
+the v3 HELLO, establishing that the previous unversioned firmware was installed.
+
+All three current sketches were rebuilt for ESP32 Dev Module with Arduino-ESP32
+3.3.11 and ESP32Servo 3.2.1, then uploaded in conveyor / egg / light order using
+Arduino CLI `upload --verify`. Each upload reported a verified flash data hash.
+
+| Port | Verified identity | Observed boot telemetry |
+| --- | --- | --- |
+| COM5 | CONVEYOR_V3, PROTOCOL=3 | POSITION=0, PAUSED=1, BUSY=0, REFERENCE_VALID=0 |
+| COM7 | EGG_CONTROLLER_V3, PROTOCOL=3 | ANGLE=90, SENSOR=0, PAUSED=1, BUSY=0 after settling |
+| COM9 | LIGHT_CONTROLLER_V3, PROTOCOL=3 | LIGHT=0, BUSY=0 |
+
+All boards reported the expected STARTUP_ACK_REQUIRED fault. The application's
+real `discover_boards` function subsequently returned CONVEYOR=COM5,
+EGG_CONTROLLER=COM7 and LIGHT_CONTROLLER=COM9. Firmware checks sent PING / HELLO
+only; no fault acknowledgements, conveyor moves, pause releases or lamp-ON
+commands were sent. The egg board requests its neutral servo angle at boot.
+
+Retry **Use defaults & detect** in the operator app, inspect and confirm the
+empty conveyor, then click **Prepare conveyor**. This installation verifies
+firmware identity and reported boot states; physical stop latency, relay output,
+servo travel, gate distances and actual egg sorting still require the remaining
+acceptance checks above.
