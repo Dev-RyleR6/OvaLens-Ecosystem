@@ -144,36 +144,56 @@ Capstone/
 
 ### Step 4: ESP32 IoT Conveyor Firmware (Hardware Rig)
 
-1. Open `firmware/esp32_actuator/esp32_actuator.ino` in **Arduino IDE**.
-2. Install the **`ESP32Servo`** library via Arduino Library Manager.
-3. Select Board: **ESP32 Dev Module**.
-4. Connect the ESP32 via USB and upload the sketch.
+The current rig uses three ESP32 Dev Module boards at 115200 baud:
+
+- **COM5**: `firmware/three_board/conveyor_esp32` (stepper).
+- **COM7**: `firmware/three_board/egg_controller_esp32` (servo and IR).
+- **COM9**: `firmware/three_board/light_controller_esp32` (candling light).
+
+These sketches were installed on this rig. Rebuild/upload only when intentionally
+updating firmware. See [wiring, calibration and verification](docs/EDGE_THREE_BOARD_IMPLEMENTATION.md).
 
 ---
 
 ## 🎮 How to Operate OvaLens in Production
 
 ### 1. Daily Startup Sequence
-1. Start the **FastAPI Backend Server** (Port 8000).
-2. Connect the **USB Camera** and **ESP32 Microcontroller** to the Edge Machine.
-3. Power on the **10W Cree Candling Lamp** and **Conveyor Motor**.
-4. Launch the **Edge Operator App** (`python launcher.py`).
-5. Open the **React Admin Dashboard** (`http://localhost:5173` or port 3000 on Docker) on the hatchery manager's computer.
+
+1. Connect camera 0 and the three ESP32s; power the rig.
+2. Double-click **Start_OvaLens.cmd** in the repository root and enter the batch
+   details. The camera preview starts automatically using remembered controls.
+3. Check the empty conveyor, alignment and gate, then tick the inspection box.
+4. Click **Start sorting** once. The app connects and prepares the saved station
+   in the background. STOP remains available throughout preparation.
+5. Start the backend/dashboard when network reporting is needed. Sorting records
+   scans locally in SQLite and continues through network outages.
 
 ### 2. Conducting a Candling Run
-1. In the Edge GUI, verify the **ESP32: CONNECTED** and **SYNC: ONLINE** status badges in the top right.
-2. Click **▶ START CANDLING SESSION** (or press `[SPACEBAR]`).
-3. Place duck eggs onto the motorized infeed lane.
-4. As each egg passes over the candling aperture:
-   * The **Optical Sensor** triggers a snapshot.
-   * **YOLOv8 ONNX FP16** classifies the egg in $\le 30\text{ms}$.
-   * If **`FERTILE`**: Egg passes freely to the incubator collection tray.
-   * If **`INFERTILE`**: The ESP32 microsecond timer fires the servo flipper gate at the exact arrival moment ($\Delta t = D/v$), directing the egg into the Day 10 Penoy salvage chute.
-5. Review real-time batch counts and the Day-10 Penoy salvage revenue on the Web Dashboard.
 
-### 3. Keyboard Shortcuts & Overrides:
-* **`[SPACEBAR]`**: Trigger manual candling scan.
-* **`[R]`**: Manual diverter ejection override (fires servo kicker immediately).
+1. Feed one Day 10 egg only when the large instruction says **Feed next egg**.
+2. Wait through **Inspecting egg**, **Positioning gate** and **Wait ? egg passing**.
+   Inference and boxes appear after the sensor stop is confirmed, lamp ON and
+   camera settling; three agreeing fresh predictions are required.
+3. Classification saves locally before the servo moves. The gate confirms its
+   stroke before the stepper resumes, then holds its angle through gate exit.
+4. Low confidence or disagreement holds the egg for manual review. Review choices
+   appear when needed; STOP halts the station and finalizes local records.
+5. At the target, final totals and **Start next batch** appear on the same screen.
+   Configure the next batch, inspect the empty conveyor and Start sorting again.
+
+Defaults: camera **0**, **COM5 stepper**, **COM7 servo + IR**, **COM9 light**. Saved
+camera controls and gate calibration are retained. New three-board display hold
+is **300ms**; the **700ms** camera settle and evidence/servo checks are preserved.
+Measured gate distances and physical acceptance remain required for the rig.
+
+### 3. Keyboard Shortcuts & Tools
+
+- **Space**: Single scan diagnostic, also under **Tools > Single scan**.
+- **R**: STOP; it does not fire the diverter.
+- **F1**: Operator guide.
+- **F11**: Kiosk/windowed display.
+- **Tools > Settings**: Camera controls, connections and measured calibration.
+- **Tools > Retry camera preview**: Restart the preview after fixing its connection.
 
 ---
 
@@ -220,7 +240,7 @@ The dashboard checks device records every 15 seconds, independently of the data 
 
 1. **Camera Feed is Black / Blank**:
    - Verify `CAMERA_INDEX` in `edge/.env`. On Windows with multiple webcams, try index `1` or `2`.
-   - If no camera is plugged in, OvaLens automatically falls back to the **Synthetic Candling Stream Generator** for seamless offline testing.
+   - If the camera is unavailable, reconnect it and use **Tools > Retry camera preview**. Normal sorting never substitutes synthetic frames; preview simulation must be explicitly selected at startup.
 
 2. **ESP32 Serial Connection Error**:
    - Check device manager for the COM port (e.g. `COM3` on Windows, `/dev/ttyUSB0` on Linux).

@@ -13,7 +13,7 @@ def controls():
                           _scan_busy=False, _stopping=False, _closing=False,
                           _pending_finalization_id=None, _finalization_failed=False,
                           inference_worker=SimpleNamespace(busy=False), _diagnostics_complete=False)
-    for name in ('session_btn', 'scan_btn', 'cancel_btn', 'hud_cancel_btn',
+    for name in ('session_btn', 'scan_btn', 'cancel_btn', 'hud_cancel_btn', 'eject_btn',
                  'batch_setup_btn', 'settings_btn'):
         setattr(app, name, Mock())
     return app
@@ -69,6 +69,7 @@ def test_setup_locks_scanning_and_start_until_preparation_completes():
         assert button.configure.call_args.kwargs['state'] == 'disabled'
     app._setup_busy = False
     app.station.calibrated = True
+    app.setup_inspected = SimpleNamespace(get=lambda: True)
     refresh()
     assert app.session_btn.configure.call_args.kwargs['state'] == 'normal'
 

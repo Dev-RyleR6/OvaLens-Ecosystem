@@ -28,6 +28,7 @@ from ..core.background_jobs import BackgroundJobs
 from ..core.inference_worker import InferenceWorker
 from ..core.capture_view import CaptureView
 from ..core.operator_flow import OperatorState, validate_batch_config
+from ..core.operator_cues import cycle_cue
 from ..iot.serial_driver import ESP32SerialDriver
 from ..db.local_db import LocalDatabaseManager
 from ..sync.sync_worker import BackgroundSyncWorker
@@ -73,10 +74,13 @@ class OvaLensOperatorApp(ctk.CTk):
         self._pending_finalization_id = None
         self._finalization_failed = False
         self._diagnostics_complete = False
+        self._batch_complete = False
         self.device_id = device_id
         self._ui_events = queue.Queue()
         self._closing = False
         self._operation_generation = 0
+        self._setup_request = None
+        self._automatic_complete_cycle = None
         self._scan_busy = False
         self._stopping = False
         self.simulation = bool((startup_config or {}).get("simulation", False))
@@ -181,7 +185,8 @@ class OvaLensOperatorApp(ctk.CTk):
         self._update_video_frame()
         self._update_status_loop()
         self._drain_operation_events()
-        self._set_operation_state(OperatorState.READY, "Click Use defaults & detect to connect the station")
+        self._set_operation_state(OperatorState.READY, "Check the empty conveyor, then Start sorting")
+        self.after(0, self._start_preview)
 
         # Auto-start operation if invoked with startup configuration
         if startup_config is not None:
@@ -287,7 +292,14 @@ class OvaLensOperatorApp(ctk.CTk):
         color = (FUTheme.INFERTILE_AMBER if state in
                  {OperatorState.REVIEW, OperatorState.ERROR, OperatorState.RECOVERY}
                  else FUTheme.TEXT_MUTED)
-        self._update_cycle_hud("●", color, message)
+        titles = {
+            OperatorState.READY: "Ready to prepare", OperatorState.CAMERA_STARTING: "Starting camera",
+            OperatorState.CLASSIFYING: "Inspecting egg", OperatorState.SAVING: "Saving scan",
+            OperatorState.REVIEW: "Inspect this egg", OperatorState.ERROR: "Check station",
+            OperatorState.STOPPING: "Stopping", OperatorState.RECOVERY: "Sorting stopped",
+            OperatorState.COMPLETE: "Diagnostics complete",
+        }
+        self._update_cycle_hud("", color, titles.get(state, "Wait"), detail=message)
         self._set_session_active_state(self.is_session_active or self._scan_busy or self._stopping)
 
     def _drain_predictions(self):
@@ -496,7 +508,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.left_panel.pack(side="left", fill="both", expand=True, padx=(0, 10))
 
         # Top of Left Panel: Live Automated Cycle State Indicator
-        self.cycle_hud = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.PANEL_LIGHT_ALT, height=60, corner_radius=8)
+        self.cycle_hud = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.PANEL_LIGHT_ALT, height=96, corner_radius=8)
         self.cycle_hud.pack(fill="x", padx=10, pady=(10, 6))
         self.cycle_hud.pack_propagate(False)
 
@@ -505,12 +517,18 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         self.cycle_status_dot.pack(side="left", padx=(12, 6))
 
+        cue_body = ctk.CTkFrame(self.cycle_hud, fg_color="transparent")
+        cue_body.pack(side="left", fill="both", expand=True, padx=(0, 10), pady=8)
         self.cycle_status_label = ctk.CTkLabel(
-            self.cycle_hud, text="Conveyor standby — use defaults & detect to begin",
-            font=(FUTheme.FONT_FAMILY, 13, "bold"), text_color=FUTheme.TEXT_PRIMARY
+            cue_body, text="Ready to prepare",
+            font=(FUTheme.FONT_FAMILY, 21, "bold"), text_color=FUTheme.TEXT_PRIMARY
         )
         self.cycle_status_label.configure(wraplength=340, justify="left", anchor="w")
-        self.cycle_status_label.pack(side="left", fill="both", expand=True, padx=(0, 8))
+        self.cycle_status_label.pack(fill="x")
+        self.cycle_detail_label = ctk.CTkLabel(cue_body, text="Check the empty conveyor, then Start sorting.",
+            font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_SECONDARY,
+            wraplength=340, justify="left", anchor="w")
+        self.cycle_detail_label.pack(fill="x")
 
         # Inner container with disabled propagation to lock video dimensions
         self.video_container = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.DARKROOM_VIEWPORT, corner_radius=8)
@@ -570,7 +588,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self.result_title.pack(anchor="w", padx=16, pady=(2, 1))
 
         self.result_subtitle = ctk.CTkLabel(
-            self.result_banner, text="Use defaults & detect to prepare sorting; Single Scan checks the camera",
+            self.result_banner, text="Check the empty conveyor and gate, then click Start sorting.",
             font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_MUTED
         )
         self.result_subtitle.configure(wraplength=360, justify="left")
@@ -662,13 +680,13 @@ class OvaLensOperatorApp(ctk.CTk):
             child.destroy()
 
         # The camera well is the empty-state surface; no nested floating card.
-        ctk.CTkLabel(self.standby_frame, text="Camera on standby",
+        ctk.CTkLabel(self.standby_frame, text="Camera preview",
                      font=(FUTheme.FONT_FAMILY, 22, "bold"),
                      text_color=FUTheme.TEXT_PRIMARY).pack(padx=24, pady=(16, 8))
-        ctk.CTkLabel(self.standby_frame, text="Empty the conveyor, then use defaults & detect below.\nCheck the camera and prepare the conveyor for sorting.",
+        ctk.CTkLabel(self.standby_frame, text="Camera 0 starts automatically.\nCheck the empty conveyor, then click Start sorting.",
                      font=(FUTheme.FONT_FAMILY, 14), text_color=FUTheme.TEXT_SECONDARY,
                      justify="center").pack(padx=24, pady=(0, 16))
-        ctk.CTkLabel(self.standby_frame, text="SPACE  Single scan     F1  Operator guide",
+        ctk.CTkLabel(self.standby_frame, text="F1  Operator guide     Tools  Camera diagnostics",
                      font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED).pack(padx=20, pady=(0, 16))
 
     def _create_count_row(self, parent, label_text: str, value_text: str, row: int, color: str):
@@ -689,21 +707,13 @@ class OvaLensOperatorApp(ctk.CTk):
         self.setup_row = ctk.CTkFrame(self.station_strip, fg_color="transparent")
         setup_actions = ctk.CTkFrame(self.setup_row, fg_color="transparent")
         setup_actions.pack(fill="x")
-        self.detect_btn = ctk.CTkButton(setup_actions, text="Use defaults & detect", width=200, height=38,
-            font=(FUTheme.FONT_FAMILY, 14, "bold"), fg_color=FUTheme.PRIMARY_MAROON,
-            hover_color=FUTheme.HOVER_MAROON, command=self._detect_default_station)
-        self.detect_btn.pack(side="left", padx=(0, 16), pady=4)
         self.setup_inspected = ctk.BooleanVar(value=False)
         self.setup_check = ctk.CTkCheckBox(setup_actions, text="Conveyor empty, aligned; gate checked",
-            font=(FUTheme.FONT_FAMILY, 13), variable=self.setup_inspected)
-        self.setup_check.pack(side="left", padx=8)
-        self.prepare_btn = ctk.CTkButton(setup_actions, text="Prepare conveyor", width=175, height=38,
-            font=(FUTheme.FONT_FAMILY, 14, "bold"), fg_color=FUTheme.PANEL_LIGHT_ALT,
-            hover_color=FUTheme.PANEL_ACCENT, text_color=FUTheme.TEXT_PRIMARY,
-            border_width=1, border_color=FUTheme.BORDER, command=self._prepare_default_station)
-        self.prepare_btn.pack(side="left", padx=16, pady=4)
+            font=(FUTheme.FONT_FAMILY, 14), variable=self.setup_inspected,
+            command=lambda: self._set_session_active_state(False))
+        self.setup_check.pack(side="left", padx=4, pady=8)
         self.setup_notice = ctk.CTkLabel(self.setup_row,
-            text="Start with an empty conveyor. Camera 0  |  COM5 stepper  |  COM7 servo + IR  |  COM9 light. Prepare returns the gate to neutral.",
+            text="Start sorting connects and prepares the station using your saved settings. The gate returns to neutral before the belt starts.",
             anchor="w", justify="left", wraplength=950, font=(FUTheme.FONT_FAMILY, 12),
             text_color=FUTheme.TEXT_SECONDARY)
         self.setup_notice.pack(fill="x", pady=(0, 8))
@@ -738,7 +748,6 @@ class OvaLensOperatorApp(ctk.CTk):
             text_color=FUTheme.TEXT_PRIMARY, command=self.trigger_candling_scan,
             width=160, height=44, corner_radius=8
         )
-        self.scan_btn.pack(side="left", padx=6, pady=13)
 
         # Dedicated Terminate / Cancel / End Session Button (hidden in Standby, visible when active)
         self.cancel_btn = ctk.CTkButton(
@@ -772,12 +781,50 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Conveyor Settings Button
         self.settings_btn = ctk.CTkButton(
-            self.footer_frame, text="Settings", font=(FUTheme.FONT_FAMILY, 14),
+            self.footer_frame, text="Tools", font=(FUTheme.FONT_FAMILY, 14),
             fg_color=FUTheme.PANEL_LIGHT_ALT, border_width=1, border_color=FUTheme.BORDER,
             text_color=FUTheme.TEXT_SECONDARY, hover_color=FUTheme.PANEL_ACCENT,
-            command=self.open_calibration_dialog, width=100, height=42, corner_radius=8
+            command=self.open_tools_menu, width=100, height=42, corner_radius=8
         )
         self.settings_btn.pack(side="right", padx=6, pady=13)
+        self.tools_menu = tk.Menu(self, tearoff=False, bg=FUTheme.PANEL_LIGHT,
+            fg=FUTheme.TEXT_PRIMARY, activebackground=FUTheme.PANEL_ACCENT,
+            activeforeground=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 12))
+        self.tools_menu.add_command(label="Single scan    Space", command=self.trigger_candling_scan)
+        self.tools_menu.add_command(label="Settings", command=self.open_calibration_dialog)
+        self.tools_menu.add_command(label="Retry camera preview", command=self._start_preview)
+
+    def open_tools_menu(self):
+        try:
+            self.tools_menu.tk_popup(self.settings_btn.winfo_rootx(),
+                                     self.settings_btn.winfo_rooty() - 100)
+        finally:
+            self.tools_menu.grab_release()
+
+    def _start_preview(self):
+        if self._closing or self._stopping or getattr(self, "_setup_busy", False):
+            return
+        if not self.camera.is_running:
+            start = getattr(self.camera, "start", None)
+            if not callable(start):
+                return
+            try:
+                start()
+            except Exception as exc:
+                self._set_operation_state(OperatorState.ERROR, str(exc))
+                return
+        deadline = time.monotonic() + 3
+        def ready():
+            if self._closing or self._stopping:
+                return
+            snapshot = getattr(self.camera, "snapshot", None)
+            if callable(snapshot) and snapshot(copy=False) is not None:
+                self.standby_frame.place_forget()
+            elif time.monotonic() < deadline and not self.camera.last_error:
+                self.after(50, ready)
+            elif not getattr(self, "_setup_busy", False) and not self.is_auto_cycle_running:
+                self._set_operation_state(OperatorState.ERROR, "Check camera 0; use Tools to retry the preview")
+        ready()
 
     def _set_session_active_state(self, is_active: bool):
         """Refresh controls from pending work and local session identity."""
@@ -789,6 +836,8 @@ class OvaLensOperatorApp(ctk.CTk):
                      self._pending_finalization_id, self._finalization_failed,
                      bool(self.inference_worker.busy), self._diagnostics_complete,
                      cycle.session_id if cycle is not None else None,
+                     bool(getattr(self, "_batch_complete", False)),
+                     bool(self.setup_inspected.get()) if hasattr(self, "setup_inspected") else False,
                      getattr(self, "_setup_busy", False), bool(getattr(station, "calibrated", False)),
                      bool(getattr(station, "boards", None)))
         if hasattr(self, "setup_row"):
@@ -798,7 +847,10 @@ class OvaLensOperatorApp(ctk.CTk):
         self._controls_signature = signature
         if is_active:
             # Reveal cancel buttons dynamically when active
-            self.cancel_btn.pack(side="left", padx=6, pady=13, after=self.scan_btn)
+            if self.is_auto_cycle_running:
+                self.cancel_btn.pack_forget()
+            else:
+                self.cancel_btn.pack(side="left", padx=6, pady=13, after=self.eject_btn)
             if self.is_auto_cycle_running:
                 self.session_btn.configure(
                     text="Stop sorting", fg_color=FUTheme.REJECT_RED,
@@ -808,7 +860,7 @@ class OvaLensOperatorApp(ctk.CTk):
             # Hide cancel buttons when in standby
             self.cancel_btn.pack_forget()
             self.session_btn.configure(
-                text="Start sorting", fg_color=FUTheme.PRIMARY_MAROON,
+                text="Start next batch" if getattr(self, "_batch_complete", False) else "Start sorting", fg_color=FUTheme.PRIMARY_MAROON,
                 hover_color=FUTheme.HOVER_MAROON
             )
         blocked = self._pending_finalization_id is not None or self._finalization_failed
@@ -819,21 +871,24 @@ class OvaLensOperatorApp(ctk.CTk):
         station = getattr(self, "station", None)
         automatic_session = station is not None and station.cycle is not None and self.current_session_id == station.cycle.session_id
         busy = self._scan_busy or self._stopping or self._closing or self.inference_worker.busy or self.is_auto_cycle_running or automatic_session or setup_busy
-        needs_setup = station is not None and not getattr(station, "calibrated", False) and not is_active
-        self.session_btn.configure(state="disabled" if self._scan_busy or self._stopping or blocked or setup_busy or needs_setup or (is_active and not self.is_auto_cycle_running) else "normal")
+        needs_setup = (station is not None and not is_active and not getattr(self, "_batch_complete", False)
+                       and not (self.setup_inspected.get() if hasattr(self, "setup_inspected") else False))
+        self.session_btn.configure(state="disabled" if self._scan_busy or self._stopping or blocked or setup_busy or needs_setup or (is_active and not self.is_auto_cycle_running) else "normal",
+                                   text="Preparing..." if setup_busy else "Stop sorting" if self.is_auto_cycle_running else "Start next batch" if getattr(self, "_batch_complete", False) else "Start sorting")
         self.scan_btn.configure(state="disabled" if busy or blocked or self._diagnostics_complete else "normal",
                                 text="Working…" if self._scan_busy else "Single Scan [SPACE]")
         self.cancel_btn.configure(state="disabled" if self._stopping else "normal",
                                   text="Retry Finalization" if blocked else "End Session [ESC]")
+        if hasattr(self, "tools_menu"):
+            self.tools_menu.entryconfigure(0, state="disabled" if busy or blocked or self._diagnostics_complete else "normal")
+            self.tools_menu.entryconfigure(1, state=state)
         if blocked:
-            self.cancel_btn.pack(side="left", padx=6, pady=13, after=self.scan_btn)
+            self.cancel_btn.pack(side="left", padx=6, pady=13, after=self.eject_btn)
 
     def _refresh_setup_controls(self, is_active):
-        station = self.station
         busy = getattr(self, "_setup_busy", False)
-        visible = station is not None and not is_active and not station.calibrated and not self._closing
-        connected = bool(station and station.boards)
-        signature = (visible, busy, connected, self._scan_busy, self._stopping)
+        visible = self.station is not None and not is_active and not self._closing and not getattr(self, "_batch_complete", False)
+        signature = (visible, busy, self._scan_busy, self._stopping)
         if signature == getattr(self, "_setup_controls_signature", None):
             return
         self._setup_controls_signature = signature
@@ -841,52 +896,7 @@ class OvaLensOperatorApp(ctk.CTk):
             self.setup_row.pack(fill="x", padx=16)
         else:
             self.setup_row.pack_forget()
-        blocked = busy or self._scan_busy or self._stopping
-        self.detect_btn.configure(state="disabled" if blocked else "normal")
-        self.setup_check.configure(state="disabled" if blocked or not connected else "normal")
-        self.prepare_btn.configure(state="disabled" if blocked or not connected else "normal")
-
-    def _detect_default_station(self):
-        self._run_station_setup(self.station.use_defaults_and_detect,
-                                "Detecting boards and preparing camera 0…")
-
-    def _prepare_default_station(self):
-        inspected = self.setup_inspected.get()
-        if not inspected:
-            self.setup_notice.configure(text="Check the camera, empty and align the conveyor, and check the gate. Then tick the box above.")
-            return
-        self._run_station_setup(lambda: self.station.prepare_empty_conveyor(inspected),
-                                "Preparing the empty conveyor; returning the gate to neutral…")
-
-    def _run_station_setup(self, work, message):
-        if (getattr(self, "_setup_busy", False) or self._closing or self._stopping or self._scan_busy
-                or self.current_session_id or not self.station or self.grab_current() is not None):
-            return
-        if self.simulation:
-            self.setup_notice.configure(text="Exit preview mode and reopen OvaLens to connect the real station.")
-            return
-        self._setup_busy = True
-        self.setup_inspected.set(False)
-        self.setup_notice.configure(text=message)
-        self._diagnostic_view = None
-        self._set_session_active_state(False)
-        def finish(value, failed=False):
-            self._setup_busy = False
-            if self._closing:
-                return
-            text = ("Setup needs attention: " if failed else "") + str(value)
-            self.setup_notice.configure(text=text)
-            self.result_title.configure(text="Setup needs attention" if failed else
-                                        "Ready to sort" if self.station.calibrated else "Check camera and conveyor")
-            self.result_badge.configure(text="SETUP" if failed or not self.station.calibrated else "READY")
-            self.result_subtitle.configure(text=text)
-            self._log("[SETUP] " + text)
-            self._update_cycle_hud("●", FUTheme.INFERTILE_AMBER if failed else FUTheme.TEXT_PRIMARY, text)
-            self._set_session_active_state(False)
-        try:
-            self._jobs.submit(work, lambda value: finish(value), lambda error: finish(error, True))
-        except (queue.Full, RuntimeError) as exc:
-            finish(str(exc), True)
+        self.setup_check.configure(state="disabled" if busy or self._scan_busy or self._stopping else "normal")
 
     @_building_dialog
     def open_end_session_modal(self, event=None):
@@ -1033,8 +1043,15 @@ class OvaLensOperatorApp(ctk.CTk):
         if self._stopping:
             return
         station = getattr(self, "station", None)
-        if station and station.active:
+        request = getattr(self, "_setup_request", None)
+        if request:
+            request["cancel"].set()
+        if station and (station.active or getattr(self, "_setup_busy", False)):
             station.halt()
+        completed = getattr(self, "_automatic_complete_cycle", None)
+        if completed is not None and self.current_session_id == completed.session_id:
+            self._finalize_automatic_batch(completed)
+            return
         self._operation_generation += 1
         self._pending_prediction = self._inference_request_id = None
         self._scan_busy = False
@@ -1045,12 +1062,12 @@ class OvaLensOperatorApp(ctk.CTk):
         self.is_auto_cycle_running = False
         self.is_session_active = False
 
-        # 1. Immediately turn off camera capture to stop preview stream
+        # Keep the station preview available while stopping physical operations.
         try:
-            request_stop = getattr(self.camera, "request_stop", None)
+            request_stop = getattr(self.camera, "request_stop", None) if station is None else None
             if callable(request_stop):
                 request_stop()
-            else:
+            elif station is None:
                 self.camera.stop()
         except Exception:
             pass
@@ -1075,7 +1092,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self._set_operation_state(OperatorState.STOPPING, "STOPPING - FINALIZING LOCAL RECORDS")
 
         def finish():
-            if callable(getattr(self.camera, "request_stop", None)):
+            if station is None and callable(getattr(self.camera, "request_stop", None)):
                 self.camera.stop()
             if station and station.cycle and station.cycle.active:
                 station.cycle._thread.join(timeout=5)
@@ -1101,6 +1118,10 @@ class OvaLensOperatorApp(ctk.CTk):
             self.current_session_id = self._pending_finalization_id = None
             self._finalization_failed = False
             self._session_start_time = None
+            if self.camera.is_running:
+                self.standby_frame.place_forget()
+            if hasattr(self, "setup_inspected"):
+                self.setup_inspected.set(False)
             self._set_operation_state(OperatorState.COMPLETE if self._diagnostics_complete else OperatorState.READY,
                                       "DIAGNOSTIC TARGET REACHED" if self._diagnostics_complete else "STOPPED - LOCAL RECORDS FINALIZED")
             automatic = station is not None and station.cycle is not None and station.cycle.session_id == session_id
@@ -1175,7 +1196,9 @@ class OvaLensOperatorApp(ctk.CTk):
         if key != getattr(self, "_last_cycle_status", None):
             self._last_cycle_status = key
             message = f"{status['state']} | Holder {status.get('holder', 0)} | {status.get('reason', '')}"
-            self._update_cycle_hud("●", FUTheme.INFERTILE_AMBER if status["state"] in {"MANUAL_REVIEW", "RECOVERY_REQUIRED"} else FUTheme.TEXT_PRIMARY, message)
+            title, detail, tone = cycle_cue(status)
+            color = FUTheme.INFERTILE_AMBER if tone in {"review", "error"} else FUTheme.TEXT_PRIMARY
+            self._update_cycle_hud("", color, title, detail=detail)
             if status["state"] == "MANUAL_REVIEW":
                 self.review_row.pack(fill="x", padx=12, pady=(0, 8))
             else:
@@ -1183,7 +1206,7 @@ class OvaLensOperatorApp(ctk.CTk):
             for button in self.review_buttons:
                 button.configure(state="normal" if status["state"] == "MANUAL_REVIEW" else "disabled")
             self._log("[CYCLE] " + message)
-        if self.current_session_id == cycle.session_id and not getattr(self, "_station_stats_pending", False) and now - getattr(self, "_station_stats_at", 0) >= .5:
+        if status["state"] != "COMPLETE" and self.current_session_id == cycle.session_id and not getattr(self, "_station_stats_pending", False) and now - getattr(self, "_station_stats_at", 0) >= .5:
             self._station_stats_at = now
             self._station_stats_pending = True
             session_id = cycle.session_id
@@ -1205,41 +1228,156 @@ class OvaLensOperatorApp(ctk.CTk):
             self._station_terminal_seen = True
             self.is_auto_cycle_running = False
             if status["state"] == "COMPLETE":
-                # Let End Session reconcile the final counters and release local identity.
-                self._log(f"[COMPLETE] {cycle.count} saved scans; {cycle.routed} estimated gate passages. End session to review totals.")
+                self._finalize_automatic_batch(cycle)
             else:
                 self._log("[RECOVERY] Stop/finalize this session, inspect holders, then reconnect and validate setup.")
             self._set_session_active_state(True)
 
     def toggle_auto_session(self):
-        """Only an inspected station service can initiate physical motion."""
-        if getattr(self, "_setup_busy", False):
+        """One inspected action connects, prepares and starts the normal station."""
+        if getattr(self, "_setup_busy", False) or self._stopping or self._closing:
             return
         if self.is_session_active or self.is_auto_cycle_running:
             self.stop_or_cancel_session()
             return
-        if not self.station or self.simulation:
-            self._log("[BLOCKED] Real camera and validated sorting station required.")
+        if getattr(self, "_batch_complete", False):
+            self.open_batch_setup_dialog()
             return
-        if self.grab_current() is not None or self._scan_busy or self._stopping or self.current_session_id:
-            self._log("[BLOCKED] Close settings and finish the current session first.")
+        if (not self.station or self.simulation or self.grab_current() is not None
+                or self._scan_busy or self.current_session_id or self._finalization_failed):
+            self._log("[BLOCKED] Finish the current operation before starting sorting.")
+            return
+        inspected = self.setup_inspected.get()
+        if not inspected:
+            self.setup_notice.configure(text="Check the empty conveyor and gate, then tick the inspection box.")
             return
         try:
-            validate_batch_config(self.current_batch_id, self.operator_name, self.target_egg_count, self.current_stage)
-            cycle = self.station.start_cycle(self.current_batch_id, self.target_egg_count, self.operator_name)
-        except Exception as exc:
-            self._log("[BLOCKED] " + str(exc))
+            args = validate_batch_config(self.current_batch_id, self.operator_name,
+                                         self.target_egg_count, self.current_stage)
+        except ValueError as exc:
+            self.setup_notice.configure(text=str(exc))
             return
+        batch, operator, target = args
+        if getattr(getattr(self.station, "settings", None), "rig_profile", None) == "dual_v2":
+            if not self.station.calibrated:
+                self.setup_notice.configure(text="Prepare the saved two-board profile in Tools / Settings first.")
+                return
+            try:
+                self._activate_cycle(self.station.start_cycle(batch, target, operator))
+                self.setup_inspected.set(False)
+            except Exception as exc:
+                self.station.halt()
+                self.setup_notice.configure(text=str(exc))
+            return
+        request = {"generation": self._operation_generation, "cancel": threading.Event()}
+        self._setup_request = request
+        self._setup_busy = True
+        self.setup_inspected.set(False)
+        self._diagnostic_view = None
+        self.setup_notice.configure(text="Preparing station. Keep the conveyor empty; STOP remains available.")
+        self._update_cycle_hud("", FUTheme.TEXT_PRIMARY, "Preparing station", detail="Keep the conveyor empty.")
+        self._set_session_active_state(False)
+        def progress(message):
+            def show():
+                if (self._setup_request is request and self._setup_busy and not request["cancel"].is_set()
+                        and request["generation"] == self._operation_generation and not self._closing):
+                    self.setup_notice.configure(text=message)
+                    self._update_cycle_hud("", FUTheme.TEXT_PRIMARY, "Preparing station", detail=message)
+            self._ui_events.put(show)
+        def finish(error=None):
+            if self._setup_request is not request:
+                return
+            self._setup_busy = False
+            self._setup_request = None
+            if self._closing:
+                return
+            if request["cancel"].is_set() or request["generation"] != self._operation_generation:
+                self.setup_notice.configure(text="Setup stopped. Check the empty conveyor before trying again.")
+            elif error:
+                self.setup_notice.configure(text=str(error))
+                self._update_cycle_hud("", FUTheme.INFERTILE_AMBER, "Check station", detail=str(error))
+                self._log("[SETUP] " + str(error))
+            else:
+                try:
+                    cycle = self.station.start_cycle(batch, target, operator)
+                    self._activate_cycle(cycle)
+                except Exception as exc:
+                    self.station.halt()
+                    self.setup_notice.configure(text=str(exc))
+                    self._update_cycle_hud("", FUTheme.INFERTILE_AMBER, "Check station", detail=str(exc))
+            self._set_session_active_state(self.is_session_active)
+        try:
+            self._jobs.submit(lambda: self.station.prepare_for_sorting(inspected, request["cancel"], progress),
+                              lambda _: finish(), finish)
+        except (queue.Full, RuntimeError) as exc:
+            finish(str(exc))
+
+    def _activate_cycle(self, cycle):
         self.current_session_id = cycle.session_id
         self.is_session_active = self.is_auto_cycle_running = True
         self._station_terminal_seen = False
+        self._automatic_complete_cycle = None
         self._diagnostic_view = None
+        self._batch_complete = False
         self.total_count = self.fertile_count = self.infertile_count = self.review_count = self.scan_sequence = 0
         self._session_start_time = time.time()
         self._diagnostics_complete = False
         self.standby_frame.place_forget()
-        self._log("[STARTED] Automatic holder tracking; scans are committed locally before advance.")
+        self._log("[STARTED] Feed one egg when the instruction says Feed next egg.")
         self._set_session_active_state(True)
+
+    def _finalize_automatic_batch(self, cycle):
+        if self._stopping or self.current_session_id != cycle.session_id:
+            return
+        self._automatic_complete_cycle = cycle
+        self._pending_finalization_id = cycle.session_id
+        self._stopping = True
+        self.is_auto_cycle_running = False
+        generation = self._operation_generation
+        self._update_cycle_hud("", FUTheme.TEXT_PRIMARY, "Finishing batch", detail="Saving totals locally.")
+        self._set_session_active_state(True)
+        def work():
+            if cycle.active:
+                cycle._thread.join(timeout=5)
+                if cycle.active:
+                    raise RuntimeError("Sorting is still stopping. Retry finalization.")
+            if cycle.status["state"] != "COMPLETE":
+                raise RuntimeError("Sorting did not finish. Inspect the conveyor.")
+            stats = self.db.get_session_stats(cycle.session_id)
+            if not stats or not stats.get("ended_at"):
+                raise RuntimeError("Final totals are unavailable. Retry finalization.")
+            return stats
+        def success(stats):
+            if generation != self._operation_generation or self._closing:
+                return
+            self._stopping = self.is_session_active = False
+            self._last_session_id = cycle.session_id
+            self.current_session_id = self._pending_finalization_id = None
+            self._finalization_failed = False
+            self._batch_complete = True
+            self._session_start_time = None
+            self.setup_inspected.set(False)
+            self.total_count = self.scan_sequence = stats["total_scanned"]
+            self.fertile_count, self.infertile_count, self.review_count = (stats["fertile_count"],
+                stats["infertile_count"], stats["manual_review_count"])
+            self._update_counters_ui()
+            self._set_session_active_state(False)
+            self._update_cycle_hud("", FUTheme.FERTILE_GREEN_TEXT, "Batch complete", detail="Review the totals or start the next batch.")
+            self.result_title.configure(text="Batch complete")
+            self.result_badge.configure(text="COMPLETE")
+            self.result_subtitle.configure(text=f"{self.total_count} scans saved locally. Inspect the output trays.")
+            self._log(f"[COMPLETE] {cycle.count} saved scans; {cycle.routed} estimated gate passages.")
+        def failed(error):
+            if generation != self._operation_generation or self._closing:
+                return
+            self._stopping = False
+            self._finalization_failed = True
+            self._set_session_active_state(True)
+            self._update_cycle_hud("", FUTheme.INFERTILE_AMBER, "Retry finalization", detail=error)
+        try:
+            self._jobs.submit(work, success, failed)
+        except (queue.Full, RuntimeError) as exc:
+            failed(str(exc))
 
     def _auto_conveyor_cycle_loop(self):
         raise RuntimeError("The legacy timed conveyor cycle is disabled.")
@@ -1256,8 +1394,7 @@ class OvaLensOperatorApp(ctk.CTk):
         if self.simulation:
             self._log("[SIMULATION] Preview only: no hardware commands or saved scans.")
         else:
-            self._log("[READY] Use a manual camera scan to check classification. "
-                      "Use defaults & detect, then prepare the empty conveyor.")
+            self._log("[READY] Check the empty conveyor, then Start sorting. Tools contains diagnostics and settings.")
 
     def _on_chamber_state_change(self, state: str, current: int, total: int):
         """ChamberController state callback — updates the cycle HUD (runs on main thread via after())."""
@@ -1324,15 +1461,17 @@ class OvaLensOperatorApp(ctk.CTk):
                       command=lambda: self._animate_modal_close(dialog, on_close=self.stop_or_cancel_session),
                       height=38, corner_radius=8, width=130).pack(side="right")
 
-    def _update_cycle_hud(self, dot_icon: str, dot_color: str, status_text: str, bg_color: str = None):
+    def _update_cycle_hud(self, dot_icon: str, dot_color: str, status_text: str, bg_color: str = None, detail=""):
         hud_bg = bg_color or FUTheme.PANEL_LIGHT_ALT
-        signature = (dot_icon, dot_color, status_text, hud_bg)
+        signature = (dot_icon, dot_color, status_text, hud_bg, detail)
         if signature == getattr(self, "_hud_signature", None):
             return
         self._hud_signature = signature
         self.cycle_hud.configure(fg_color=hud_bg)
         self.cycle_status_dot.configure(text=dot_icon, text_color=dot_color)
         self.cycle_status_label.configure(text=status_text, text_color=dot_color if dot_color != FUTheme.TEXT_MUTED else FUTheme.TEXT_PRIMARY)
+        if hasattr(self, "cycle_detail_label"):
+            self.cycle_detail_label.configure(text=detail)
 
     def _process_scan_result(self, result):
         """Persist a manual diagnostic scan on a worker; never actuate from a UI callback."""
@@ -1501,7 +1640,11 @@ class OvaLensOperatorApp(ctk.CTk):
         station = getattr(self, "station", None)
         if station:
             station.halt()
-        self._log("[STOP] Stop requested on all required boards. Inspect the rig before recovery.")
+        if (getattr(self, "_setup_busy", False) or self.current_session_id or self._scan_busy):
+            self.stop_or_cancel_session()
+        if hasattr(self, "setup_inspected"):
+            self.setup_inspected.set(False)
+        self._log("[STOP] Inspect the empty conveyor before starting again.")
 
     def _update_result_banner(self, final_cls: str, conf: float, action: str, lat_ms: int):
         if final_cls == "FERTILE":
@@ -1840,7 +1983,7 @@ class OvaLensOperatorApp(ctk.CTk):
     @_building_dialog
     def open_batch_setup_dialog(self):
         """Robust Modal for Batch creation, selection, and candling stage setup with Offline Format Builder."""
-        if self.current_session_id or self.is_session_active or self._scan_busy or self._stopping or self._finalization_failed:
+        if self.current_session_id or self.is_session_active or self._scan_busy or self._stopping or self._finalization_failed or getattr(self, "_setup_busy", False):
             self._log("[BLOCKED] Finish the current session before changing batch parameters.")
             return
 
@@ -2110,6 +2253,8 @@ class OvaLensOperatorApp(ctk.CTk):
             self.target_egg_count = parsed_qty
             self.operator_name = raw_op
             self._diagnostics_complete = False
+            self._batch_complete = False
+            self.setup_inspected.set(False)
             self.scan_sequence = 0
 
             if not self.is_session_active:
@@ -2121,7 +2266,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
             self.batch_btn.configure(text=f"Batch: {self.current_batch_id}  ({self.current_stage})  ▾")
             self._update_counters_ui()
-            self._set_operation_state(OperatorState.READY, "BATCH CONFIGURED - READY FOR MANUAL DIAGNOSTICS")
+            self._set_operation_state(OperatorState.READY, "Check the empty conveyor, then Start sorting")
             self._log(f"[BATCH] Configured: {self.current_batch_id} | Breed: {self.current_breed} | Stage: {self.current_stage} | Target: {self.target_egg_count} eggs")
             self._animate_modal_close(dialog)
 
@@ -2188,7 +2333,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         s2_body = ctk.CTkLabel(
             s2,
-            text="• Click Use defaults & detect to connect the three boards and camera.\n• Check the live camera and clear the conveyor; confirm the checkbox and click Prepare conveyor.\n• Click Start sorting. Feed each Day 10 egg when the status says Gate clear.\n• The servo positions before release; wait for gate clearance before feeding again.\n• Low confidence holds the belt for your decision. STOP is always available.\n• Use Settings to adjust camera controls or measured gate distances.",
+            text="Check the live camera and empty conveyor.\nConfirm the inspection checkbox, then click Start sorting.\nFeed one Day 10 egg only when the screen says Feed next egg.\nWait while the egg is inspected and passes the sorting gate.\nLow confidence holds the egg for your decision. STOP is always available.\nUse Tools for a single scan, camera retry or settings.",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s2_body.pack(anchor="w", padx=14, pady=(2, 10))

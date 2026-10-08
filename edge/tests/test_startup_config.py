@@ -145,7 +145,7 @@ def test_station_settings_builds_without_camera_or_board_access(hidden_ui, tmp_p
     three = window._values()
     assert three.rig_profile == "three_v3" and three.camera.index == 0
     assert three.calibration.fertile_angle == 180 and three.calibration.buffer_drain == 6
-    assert three.calibration.settle_ms == 700 and three.calibration.hold_ms == 1500
+    assert three.calibration.settle_ms == 700 and three.calibration.hold_ms == 300
     assert not station.halt.called
     window._close()
     app.after(50, app.shutdown)
@@ -172,7 +172,8 @@ def test_minimum_window_keeps_stop_and_session_controls_visible(hidden_ui):
         app._set_session_active_state(True)
         app.review_row.pack(fill="x", padx=12, pady=(0, 8))
         app.update_idletasks()
-        for button in (app.eject_btn, app.cancel_btn, app.session_btn, app.settings_btn,
+        assert not app.cancel_btn.winfo_ismapped()  # STOP handles automatic sorting.
+        for button in (app.eject_btn, app.session_btn, app.settings_btn,
                        app.kiosk_btn, *app.review_buttons):
             assert button.winfo_ismapped()
             assert button.winfo_rootx() >= app.winfo_rootx()
@@ -196,25 +197,21 @@ def test_simple_setup_main_screen_without_hardware(hidden_ui):
     import queue
     import threading
     import time
-    from src.iot.dual_board import BoardState
     entered, release = threading.Event(), threading.Event()
+    cycle = SimpleNamespace(session_id="cycle", active=False, latest_result=None,
+        status={"state": "SEARCHING", "holder": 1, "reason": "Gate clear"}, count=0, routed=0)
     station = SimpleNamespace(cycle=None, boards=None, calibrated=False, recovery=None,
-        active=False, halt=Mock(), stop=Mock(), start_cycle=Mock())
-    def detect():
+        active=False, halt=Mock(), stop=Mock(), start_cycle=Mock(return_value=cycle))
+    def prepare(inspected, cancel, progress):
+        assert inspected
         entered.set()
         assert release.wait(3)
-        links = [SimpleNamespace(role=role, snapshot=lambda role=role: BoardState(role, True, True,
-                 {"FAULT": "STARTUP_ACK_REQUIRED", "SENSOR": "0", "LIGHT": "0"}))
-                 for role in ("CONVEYOR", "EGG_CONTROLLER", "LIGHT_CONTROLLER")]
-        station.boards = SimpleNamespace(links=links, conveyor=links[0], servo=links[1],
-                                        egg=links[1], light=links[2])
-        return "Connected. Check camera and prepare the empty conveyor."
-    def prepare(inspected):
-        assert inspected
+        assert not cancel.is_set()
+        progress("Station ready")
         station.calibrated = True
-        return "Ready. Click Start sorting."
-    station.use_defaults_and_detect = Mock(side_effect=detect)
-    station.prepare_empty_conveyor = Mock(side_effect=prepare)
+        station.cycle = cycle
+        return "Ready"
+    station.prepare_for_sorting = Mock(side_effect=prepare)
     camera = SimpleNamespace(is_running=False, current_fps=0., last_error=None,
                              is_mock_mode=False, stop=Mock())
     sync = SimpleNamespace(last_error=None, heartbeat_error=None, is_online=False, stop=Mock())
@@ -225,12 +222,6 @@ def test_simple_setup_main_screen_without_hardware(hidden_ui):
                              inference_worker=worker, station=station)
     errors = []
     app.report_callback_exception = lambda *args: errors.append(args)
-    def finish_setup():
-        deadline = time.monotonic() + 3
-        while app._setup_busy and time.monotonic() < deadline:
-            app.update()
-            time.sleep(.005)
-        assert not app._setup_busy
     try:
         app.deiconify()
         for width, height in ((1280, 860), (1024, 720)):
@@ -238,28 +229,33 @@ def test_simple_setup_main_screen_without_hardware(hidden_ui):
             app.update()
             app._set_session_active_state(False)
             app.update_idletasks()
-            for control in (app.detect_btn, app.prepare_btn, app.setup_check, app.eject_btn):
+            for control in (app.session_btn, app.setup_check, app.eject_btn, app.settings_btn):
                 assert control.winfo_ismapped()
                 assert control.winfo_rootx() + control.winfo_width() <= app.winfo_rootx() + app.winfo_width()
             assert app.video_container.winfo_height() > 200
-        app.detect_btn.invoke()
+            assert not app.scan_btn.winfo_ismapped()
+            assert app.settings_btn.cget("text") == "Tools"
+        assert app.session_btn.cget("state") == "disabled"
+        app.setup_inspected.set(True)
+        app._set_session_active_state(False)
+        app.session_btn.invoke()
         assert entered.wait(1)
-        assert app._setup_busy
-        for button in (app.settings_btn, app.scan_btn, app.session_btn, app.detect_btn):
-            assert button.cget("state") == "disabled"
+        assert app._setup_busy and app.session_btn.cget("text") == "Preparing..."
         assert app.eject_btn.cget("state") == "normal"
         release.set()
-        finish_setup()
-        app.prepare_btn.invoke()
-        assert not station.prepare_empty_conveyor.called
-        app.setup_inspected.set(True)
-        app.prepare_btn.invoke()
-        finish_setup()
-        assert station.calibrated and app.session_btn.cget("state") == "normal"
+        deadline = time.monotonic() + 3
+        while app._setup_busy and time.monotonic() < deadline:
+            app.update()
+            time.sleep(.005)
+        assert not app._setup_busy and app.is_auto_cycle_running
+        station.start_cycle.assert_called_once()
+        app._poll_station()
+        assert app.cycle_status_label.cget("text") == "Feed next egg"
         assert not app.setup_row.winfo_ismapped()
-        station.start_cycle.assert_not_called()
         assert not errors
     finally:
         release.set()
+        app.current_session_id = None
+        app.is_session_active = app.is_auto_cycle_running = False
         app.shutdown()
         app.mainloop()

@@ -92,7 +92,7 @@ class EdgeStation:
     @staticmethod
     def _check_setup_cancel(cancel):
         if cancel is not None and cancel.is_set():
-            raise RuntimeError("Setup stopped. Retry detection when ready.")
+            raise RuntimeError("Setup stopped. Inspect the empty conveyor before trying again.")
 
     def use_defaults_and_detect(self):
         """Explicit operator action: detect, apply and save; leave faults latched."""
@@ -127,7 +127,63 @@ class EdgeStation:
                     self.boards = None
                 raise
 
-    def prepare_empty_conveyor(self, inspected):
+    def prepare_for_sorting(self, inspected, cancel, progress=lambda message: None):
+        """One explicit inspected action; preserve remembered camera/calibration."""
+        with self._lock:
+            self.require_idle()
+            if not inspected:
+                raise RuntimeError("Confirm the conveyor is empty, aligned and the gate checked.")
+            self._check_setup_cancel(cancel)
+            self._setup_cancel.clear()
+            self.calibrated = False
+            def check():
+                self._check_setup_cancel(cancel)
+                self._check_setup_cancel(self._setup_cancel)
+            try:
+                if self.settings_error:
+                    raise RuntimeError(self.settings_error + " Open Tools / Settings to correct it.")
+                if self.settings.rig_profile != "three_v3":
+                    raise RuntimeError("Use Tools / Settings to prepare the saved two-board profile.")
+                check()
+                progress("Checking camera and saved settings")
+                settings = EdgeSettings.from_dict(self.settings.snapshot())
+                self.apply(settings)
+                settings = EdgeSettings.from_dict(self.settings.snapshot())
+                check()
+                # Reuse healthy identified links between batches; discovery may reset boards.
+                reusable = self.boards is not None and not self.boards.failure and all(
+                    link.snapshot().connected and link.snapshot().identified and not link.snapshot().error
+                    for link in self.board_links())
+                if not reusable:
+                    if self.boards:
+                        self.boards.stop()
+                        self.boards = None
+                    progress("Connecting stepper, sorting gate and light")
+                    ports = discover_boards(cancel=cancel, preferred=(settings.conveyor_port,
+                        settings.servo_port, settings.light_port, "COM5", "COM7", "COM9"))
+                    check()
+                    settings.conveyor_port, settings.servo_port, settings.light_port = (
+                        ports["CONVEYOR"], ports["EGG_CONTROLLER"], ports["LIGHT_CONTROLLER"])
+                    self.settings = settings
+                    self.connect(cancel=cancel)
+                check()
+                progress("Checking the empty conveyor and positioning the gate")
+                # Applying camera controls discards transient frames on the camera worker.
+                deadline = time.monotonic() + 3
+                while self.camera.snapshot() is None:
+                    check()
+                    if self.camera.last_error or time.monotonic() >= deadline:
+                        raise RuntimeError("Camera is not ready. Check camera 0, then retry Start sorting.")
+                    cancel.wait(.02)
+                self.prepare_empty_conveyor(True, cancel=cancel)
+                check()
+                self.store.save(self.settings)
+                return "Station ready"
+            except Exception:
+                self.halt()
+                raise
+
+    def prepare_empty_conveyor(self, inspected, cancel=None):
         """Combine inspected acknowledgement, home and presets without belt travel."""
         with self._lock:
             self.require_idle()
@@ -140,7 +196,11 @@ class EdgeStation:
                 raise RuntimeError("Check the live camera before preparing the conveyor.")
             if not getattr(self.inference.engine, "model_contract_verified", False):
                 raise RuntimeError("The existing ONNX model is unavailable. Check Settings before sorting.")
-            self._setup_cancel.clear()
+            if cancel is None:
+                self._setup_cancel.clear()
+            else:
+                self._check_setup_cancel(cancel)
+                self._check_setup_cancel(self._setup_cancel)
             try:
                 for link in self.board_links():
                     state = link.snapshot()
@@ -152,9 +212,11 @@ class EdgeStation:
                 commands += [(self.boards.light, "LIGHT_OFF"), (self.boards.egg, "PAUSE"),
                              (self.boards.conveyor, "SETHOME")]
                 for link, command in commands:
+                    self._check_setup_cancel(cancel)
                     self._check_setup_cancel(self._setup_cancel)
                     link.command(command).result(3.5)
-                self.validate_calibration(True, cancel=self._setup_cancel)
+                self.validate_calibration(True, cancel=self._setup_cancel, other_cancel=cancel)
+                self._check_setup_cancel(cancel)
                 self._check_setup_cancel(self._setup_cancel)
                 return "Ready. Click Start sorting when you are ready to feed eggs."
             except Exception:
@@ -188,7 +250,7 @@ class EdgeStation:
             link = links[role]
             return link.command(text, timeout).result(timeout + .5)
 
-    def validate_calibration(self, inspected, cancel=None):
+    def validate_calibration(self, inspected, cancel=None, other_cancel=None):
         with self._lock:
             self.require_idle()
             self.calibrated = False
@@ -213,8 +275,10 @@ class EdgeStation:
                 commands.insert(1, (self.boards.conveyor, f"IR_OFFSET:{k.ir_offset_steps}"))
             for link, text in commands:
                 self._check_setup_cancel(cancel)
+                self._check_setup_cancel(other_cancel)
                 link.command(text).result(3.5)
             self._check_setup_cancel(cancel)
+            self._check_setup_cancel(other_cancel)
             if self.recovery and self.recovery.get("state") not in {"COMPLETE", "CLEARED"}:
                 session_id = self.recovery.get("session_id")
                 if session_id and self.db.get_session_stats(session_id):

@@ -8,7 +8,7 @@
 
 **Current main launcher status:** New stations default to the three-board handoff rig: conveyor, sensor/servo, and lamp ESP32s. Existing saved two-board settings retain their explicit profile. Sorting requires verified ONNX class metadata, inspection and calibration on each connection/batch. Three-board routing stops at measured gate boundaries; a pause does not consume passage distance. See [three-board setup and verification](../docs/EDGE_THREE_BOARD_IMPLEMENTATION.md) or [existing two-board setup](../docs/OVALENS_EDGE_STATION_CONTROL.md). Firmware compilation and simulations do not establish physical sorting accuracy.
 
-Press **Single Scan** once to wait for a fresh frame and classify it. The interface shows camera, inference, and storage progress; timeouts discard late results. **End Session** cancels unfinished predictions and finalizes local records. If finalization fails, **Retry Finalization** preserves the original session. Reaching the diagnostic target stops additional scans until a new batch is configured.
+Use **Tools > Single scan** (Space) for a camera diagnostic. It waits for a fresh frame and shows inference/storage progress; timeouts discard late results. **End Session** cancels unfinished predictions and finalizes local records. If finalization fails, **Retry Finalization** preserves the original session. Reaching the diagnostic target stops additional scans until a new batch is configured.
 
 ---
 
@@ -21,13 +21,23 @@ mask the project's PySerial. Close and reopen an already-running app after an
 environment fix. Check imports without hardware using
 `python edge/launcher.py --check-runtime`.
 
-Run `python edge/launcher.py` and enter the batch details. On the main screen,
-click **Use defaults & detect**, check the live camera and empty conveyor,
-tick the inspection box, and click **Prepare conveyor**. Then click **Start sorting**.
-Defaults remember **COM5 stepper**, **COM7 servo + IR**, **COM9 light**, and camera 0.
-Detection verifies the board roles and saves the settings. Install the three v3
-firmware sketches once before connecting. Camera tuning and custom calibration
-remain in **Settings**.
+Run `python edge/launcher.py` and enter the batch details. The saved camera starts
+its preview automatically. Check the empty conveyor, alignment and gate, tick
+the inspection box, then click **Start sorting**. This checks the camera, connects
+the boards, prepares the empty station and starts the batch in the background.
+**STOP** remains available during preparation. Saved camera controls, timing and
+gate calibration are retained. New defaults use **COM5 stepper**, **COM7 servo +
+IR**, **COM9 light**, and **camera 0**. Discovery verifies firmware roles if USB
+ports change; healthy connections are reused between batches. Install the three
+v3 sketches once before connecting. **Tools** contains Single scan, Settings and
+Retry camera preview.
+
+Feed one egg only when the large instruction says **Feed next egg**. Wait through
+**Inspecting egg**, **Positioning gate** and **Wait — egg passing**. Review choices
+appear when needed. At the target, the station finishes the last gate passage,
+saves final totals locally and shows **Start next batch** on the same screen.
+The three-board result hold defaults to **300ms**; saved custom timings remain
+unchanged. Camera settling remains 700ms and evidence checks remain intact.
 
 The camera preview stays on while eggs move. Automatic AI and bounding boxes
 start only after the sensor stop is confirmed, the lamp is on, and the 700ms
@@ -39,7 +49,7 @@ blocked when the connected conveyor reports movement.
 
 After classification is saved locally, the sorting servo positions and confirms
 completion **before the stepper resumes**. Its angle stays set through the
-calibrated gate exit. Feed the next egg when the status says **Gate clear**;
+calibrated gate exit. Feed the next egg when the status says **Feed next egg**;
 an earlier arrival holds the rig for inspection to protect the previous egg's route.
 
 ## 🌟 Key Subsystem Features

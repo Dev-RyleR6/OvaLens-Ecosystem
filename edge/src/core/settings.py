@@ -71,6 +71,7 @@ class EdgeSettings:
         settings.detection.confidence = .30
         settings.calibration.speed_us = 3000
         settings.calibration.settle_ms = 700
+        settings.calibration.hold_ms = 300
         settings.calibration.fertile_angle = 180
         # 2.5 s at 3000 us half-period is about 417 steps to gate exit.
         settings.calibration.sorter_steps = 367

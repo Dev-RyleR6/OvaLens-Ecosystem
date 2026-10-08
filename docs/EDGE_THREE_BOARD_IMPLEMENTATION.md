@@ -72,39 +72,38 @@ mechanical stopping on the rig; neither simulation nor compilation proves them.
 
 ## Operator setup
 
-### Quick setup with defaults
+### Daily setup with remembered settings
 
-1. Run `python edge/launcher.py`, enter the batch details, and open the operator app.
-   Windows users can instead double-click **Start_OvaLens.cmd** in the root folder.
-   Both launch methods prefer the project `.venv`; close and reopen an older
-   running window after a package/environment fix.
-2. Empty the conveyor, then click **Use defaults & detect** on the main screen. Default ports are **COM5
-   stepper**, **COM7 servo + IR sensor**, and **COM9 light**. Camera 0 and the handoff
-   timing defaults load automatically. Detected roles and settings are saved.
-3. Check the live camera, empty and align the conveyor, and check the gate. Tick
-   **Conveyor empty, aligned; gate checked**, then click **Prepare conveyor**.
-   This acknowledges faults, sets the inspected position as home and returns the
-   servo to neutral. The conveyor stays stopped and the lamp stays off.
-4. Click **Start sorting**, then feed one egg when the status says **Gate clear**.
-   Wait for the current egg's gate clearance before feeding the next.
-   **STOP** remains available during setup
-   and operation. Repeat preparation for each batch.
+1. Double-click **Start_OvaLens.cmd**, or run `python edge/launcher.py`, and enter
+   the batch details. Both launchers prefer the project `.venv`. Restart an older
+   running window after updating the app or packages.
+2. The saved camera starts its preview automatically. New defaults use **camera
+   0**, **COM5 stepper**, **COM7 servo + IR**, and **COM9 light**.
+3. Empty and align the conveyor; inspect the gate. Tick **Conveyor empty, aligned;
+   gate checked**, then click **Start sorting** once. Preparation checks the
+   camera, discovers required firmware roles, acknowledges faults, sets the
+   inspected position as home, loads the saved presets and returns the gate to
+   neutral before starting. **STOP** cancels preparation and prevents late
+   callbacks from starting a batch. Inspect again before retrying.
+4. Feed one egg only when the large instruction says **Feed next egg**. Wait
+   through **Inspecting egg**, **Positioning gate** and **Wait ? egg passing**.
+   Review decisions appear only when the current egg needs inspection.
+5. At the target, the last egg finishes its calibrated gate passage and the
+   worker finalizes SQLite records. Totals and **Start next batch** appear inline.
+   If reading final totals fails, **Retry Finalization** retains the session ID.
+   Each new batch requires another empty-conveyor inspection.
 
-Detection verifies firmware roles rather than trusting COM numbers; if the USB
-ports change, it searches the other available ports. All three v3 sketches must
-be installed first. Missing/wrong firmware produces a setup error with the source
-location; nothing is flashed automatically. This update was tested only with
-software fakes and did not open the connected boards.
-
-**Use defaults & detect** replaces custom camera/timing settings with the handoff
-presets. Use **Settings** for a previously measured custom calibration or a saved
-two-board rig. Default gate distances are starting estimates; replace them with
-measured distances when calibrating the physical rig.
+Saved camera controls and measured calibration are retained. Healthy board links
+are reused between batches; disconnected links trigger role discovery using the
+remembered ports first. All three v3 sketches must already be installed; the app
+does not flash them. **Tools** groups Single scan (Space), Settings and Retry
+camera preview. A saved two-board profile still uses its advanced preparation.
+Default gate distances are starting estimates requiring physical measurement.
 
 ### Advanced setup and calibration
 
 1. Run `python edge/launcher.py`. Opening the app never starts a conveyor.
-2. Open Settings, choose **Three-board candling rig**, and **Load selected rig
+2. Open Tools > Settings, choose **Three-board candling rig**, and **Load selected rig
    defaults** if migrating. Existing saved profiles stay two-board until changed.
 3. Discover the three boards or enter their separate COM ports. Apply, then Connect.
    Profile or camera-index changes require camera confirmation. Camera 0 is the
@@ -120,7 +119,7 @@ measured distances when calibrating the physical rig.
    encountered while draining require recovery, rather than an unrecorded route.
 
 Defaults: speed 3000us half-period, fertile 180 / infertile 120 / neutral 90,
-settle 700ms, six buffer grabs, display hold 1500ms, search timeout 30 seconds,
+settle 700ms, six buffer grabs, display hold 300ms, search timeout 30 seconds,
 detection threshold 0.30 and automatic-sort threshold 0.85 (minimum 0.75).
 The default gate exit is 417 steps from capture, approximately 2.5 seconds of
 movement at the default speed. This estimate must be replaced with measured
@@ -144,8 +143,9 @@ Predictions use three fresh frames spaced at least 150ms apart, avoiding redunda
 AI work during the 300ms evidence interval. Before and after each prediction the
 host checks health, stopped position, pause, held egg sequence and lamp ON.
 Camera-setting changes and late results after a stop/fault are discarded.
-The original 700ms settle and 1500ms display hold remain unchanged pending rig
-measurements. The two-second evidence deadline remains bounded.
+The 700ms camera settle remains unchanged. The new three-board display hold is
+300ms; explicitly saved timings are retained. This extra result pause occurs
+after the sorting servo has confirmed completion. The two-second evidence deadline remains bounded.
 
 The UI receives each camera snapshot and its detections together. While held it
 shows that exact captured image, including during manual review. Stored image
@@ -310,8 +310,43 @@ EGG_CONTROLLER=COM7 and LIGHT_CONTROLLER=COM9. Firmware checks sent PING / HELLO
 only; no fault acknowledgements, conveyor moves, pause releases or lamp-ON
 commands were sent. The egg board requests its neutral servo angle at boot.
 
-Retry **Use defaults & detect** in the operator app, inspect and confirm the
-empty conveyor, then click **Prepare conveyor**. This installation verifies
+Restart the operator app, inspect and confirm the empty conveyor, then click
+**Start sorting** to connect and prepare it. This installation verifies
 firmware identity and reported boot states; physical stop latency, relay output,
 servo travel, gate distances and actual egg sorting still require the remaining
 acceptance checks above.
+
+## Simplified daily workflow verification
+
+`TASK-NEW-EDGE-EASYFLOW-01`, 2026-10-09: one inspected Start sorting action now
+combines remembered configuration, firmware role discovery, empty-station
+preparation and cycle start. STOP cancels queued or running setup; late progress
+and completion callbacks cannot restart it. Camera preview starts when the app
+opens and remains available between batches. Inference remains stopped-only.
+
+The main instruction uses plain feeding cues. Single scan and settings live in
+Tools; automatic completion reads durable local totals and offers Start next
+batch inline. Failed final-total reads retain the session identity for retry.
+Saved camera/calibration settings survive preparation, and healthy board links
+are reused. The new three-board display hold is 300ms. This machine's previous
+1500ms default was changed to 300ms while retaining camera 0, COM5/COM7/COM9 and
+all other remembered settings; custom saved hold values remain respected.
+
+Verification used synthetic camera/serial adapters only:
+
+- Required gate: **22 backend tests passed**, **325 edge tests passed / 1 Tk
+  lifecycle skip**, and **dashboard production build passed**. The skipped Tk
+  lifecycle test passed separately in a fresh Python process.
+- Setup cancellation at queued, camera, discovery and preparation stages,
+  including an external stop during presets; late callbacks, duplicate clicks,
+  invalid batch input, failure/retry and preserved calibration were covered.
+- Native window checks passed at 1280×860 and 1024×720. Captured idle, feeding,
+  passage, review and completion layouts were inspected; STOP and review choices
+  remain visible. The Tools entries and hidden main-screen diagnostic were
+  checked in the native tests.
+- `edge/launcher.py --check-runtime` confirmed the project `.venv` and PySerial
+  **3.5**. No camera device or connected board was opened for this change.
+
+The existing stopped evidence, WAL-before-release and gate-before-resume tests
+passed in the full edge gate. Physical sorting accuracy and measured throughput
+remain part of the rig acceptance checks, rather than software-test claims.

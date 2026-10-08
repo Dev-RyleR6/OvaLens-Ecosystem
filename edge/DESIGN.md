@@ -10,6 +10,13 @@ image. A single side panel groups the latest classification, aligned batch
 counts and recent events with spacing and thin dividers. Counts are rows rather
 than coloured metric cards. The empty camera well explains setup directly.
 
+Daily operation uses one inspected Start sorting action. Camera preview starts
+on opening; discovery and preparation run in the background with saved settings.
+The cycle heading gives a short feeding instruction, with an explanation below.
+Only a clear gate invites the next egg. Completed batches show totals and a
+Start next batch action inline. Tools groups Single scan, Settings and camera
+retry. Keep the inspection checkbox reachable before every batch.
+
 Maroon identifies primary actions. Green identifies fertile results, amber
 identifies penoy/review information and red identifies stop actions. Secondary
 commands use neutral surfaces. Status always includes text; colour alone carries
