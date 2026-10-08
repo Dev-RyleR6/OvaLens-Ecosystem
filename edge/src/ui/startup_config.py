@@ -282,12 +282,12 @@ class StartupConfigWindow(ctk.CTk):
     def _build_hardware_panel(self, parent):
         ctk.CTkLabel(parent, text="Station setup", font=(FUTheme.FONT_FAMILY, 14, "bold"),
                      text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=20, pady=(18, 12))
-        ctk.CTkLabel(parent, font=(FUTheme.FONT_FAMILY, 14), text="Configure the station from Settings after opening the operator app.\n\n"
-                     "Connections: select and identify both ESP32 boards.\n\n"
-                     "Camera: tune exposure, focus and white balance; save defaults.\n\n"
-                     "Detection: set confidence and IoU thresholds.\n\n"
-                     "Calibration: measure holder spacing and gate travel, then validate the inspected setup.\n\n"
-                     "Opening the app starts no conveyor movement.",
+        ctk.CTkLabel(parent, font=(FUTheme.FONT_FAMILY, 14), text="After opening the app:\n\n"
+                     "Empty the conveyor, then click Use defaults & detect.\n\n"
+                     "Check the live camera, empty and align the conveyor, then click Prepare conveyor.\n\n"
+                     "Click Start sorting when ready.\n\n"
+                     "Remembered connections:\nCOM5 — stepper\nCOM7 — servo + IR sensor\nCOM9 — candling light\n\n"
+                     "Camera and timing defaults are included. Adjust them in Settings when needed.",
                      wraplength=250, justify="left", text_color=FUTheme.TEXT_SECONDARY).pack(anchor="w", padx=20, pady=12)
         ctk.CTkCheckBox(parent, font=(FUTheme.FONT_FAMILY, 14), text="Simulation preview only", variable=self._simulation_var,
                        text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=20, pady=16)

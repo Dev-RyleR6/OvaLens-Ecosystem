@@ -72,6 +72,32 @@ mechanical stopping on the rig; neither simulation nor compilation proves them.
 
 ## Operator setup
 
+### Quick setup with defaults
+
+1. Run `python edge/launcher.py`, enter the batch details, and open the operator app.
+2. Empty the conveyor, then click **Use defaults & detect** on the main screen. Default ports are **COM5
+   stepper**, **COM7 servo + IR sensor**, and **COM9 light**. Camera 1 and the handoff
+   timing defaults load automatically. Detected roles and settings are saved.
+3. Check the live camera, empty and align the conveyor, and check the gate. Tick
+   **Conveyor empty, aligned; gate checked**, then click **Prepare conveyor**.
+   This acknowledges faults, sets the inspected position as home and returns the
+   servo to neutral. The conveyor stays stopped and the lamp stays off.
+4. Click **Start sorting**, then feed eggs. **STOP** remains available during setup
+   and operation. Repeat preparation for each batch.
+
+Detection verifies firmware roles rather than trusting COM numbers; if the USB
+ports change, it searches the other available ports. All three v3 sketches must
+be installed first. Missing/wrong firmware produces a setup error with the source
+location; nothing is flashed automatically. This update was tested only with
+software fakes and did not open the connected boards.
+
+**Use defaults & detect** replaces custom camera/timing settings with the handoff
+presets. Use **Settings** for a previously measured custom calibration or a saved
+two-board rig. Default gate distances are starting estimates; replace them with
+measured distances when calibrating the physical rig.
+
+### Advanced setup and calibration
+
 1. Run `python edge/launcher.py`. Opening the app never starts a conveyor.
 2. Open Settings, choose **Three-board candling rig**, and **Load selected rig
    defaults** if migrating. Existing saved profiles stay two-board until changed.
@@ -163,6 +189,13 @@ all five Tk GUI smoke checks and 43 native firmware checks. A 50-egg test uses
 the actual capture/inference workers, image persistence, WAL store and coordinator
 with synthetic camera/model/board adapters; it does not establish model accuracy
 or physical throughput. Existing backend deprecation and Vite warnings remain.
+
+The setup simplification (`TASK-NEW-EDGE-SETUP-01`, 2026-10-08) passed **22 backend
+tests**, **277 edge tests** with no skips, and the dashboard production build.
+Added checks cover remembered ports, changed port order, fallback discovery,
+inspection requirements, STOP during detection/preparation, saved defaults and
+the actual main-screen controls at 1280x860 and 1024x720. Visual inspection also
+covered both sizes and the startup instructions. All device traffic used fakes.
 
 Reproduce software verification:
 

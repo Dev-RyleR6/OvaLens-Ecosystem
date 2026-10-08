@@ -12,6 +12,16 @@ Press **Single Scan** once to wait for a fresh frame and classify it. The interf
 
 ---
 
+## Quick setup
+
+Run `python edge/launcher.py` and enter the batch details. On the main screen,
+click **Use defaults & detect**, check the live camera and empty conveyor,
+tick the inspection box, and click **Prepare conveyor**. Then click **Start sorting**.
+Defaults remember **COM5 stepper**, **COM7 servo + IR**, **COM9 light**, and camera 1.
+Detection verifies the board roles and saves the settings. Install the three v3
+firmware sketches once before connecting. Camera tuning and custom calibration
+remain in **Settings**.
+
 ## 🌟 Key Subsystem Features
 
 - **Decoupled Quad-Thread Concurrency**:

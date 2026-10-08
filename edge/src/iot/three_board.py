@@ -7,13 +7,20 @@ from .dual_board import BoardLink
 ROLES = ("CONVEYOR", "EGG_CONTROLLER", "LIGHT_CONTROLLER")
 
 
-def discover_boards(ports=None, serial_factory=None, timeout=4):
+def discover_boards(ports=None, serial_factory=None, timeout=4, cancel=None, preferred=None):
     factory = serial_factory or getattr(serial, "Serial", None)
     if factory is None:
         raise RuntimeError("PySerial unavailable; install pyserial, not the unrelated serial package")
     found = {}
-    candidates = ports if ports is not None else [p.device for p in list_ports.comports()]
+    automatic = ports is None
+    candidates = list(ports) if ports is not None else list(preferred or ("COM5", "COM7", "COM9")) + [p.device for p in list_ports.comports()]
+    unique_ports = {}
     for port in candidates:
+        if port:
+            unique_ports.setdefault(port.casefold(), port)
+    for port in unique_ports.values():
+        if cancel is not None and cancel.is_set():
+            raise RuntimeError("Setup stopped. Retry detection when ready.")
         connection = None
         try:
             connection = factory(port, 115200, timeout=.02, write_timeout=.2)
@@ -21,6 +28,8 @@ def discover_boards(ports=None, serial_factory=None, timeout=4):
             buffer = bytearray()
             pong, version = None, None
             while time.monotonic() < deadline:
+                if cancel is not None and cancel.is_set():
+                    raise RuntimeError("Setup stopped. Retry detection when ready.")
                 now = time.monotonic()
                 if now - sent >= .25:
                     for request in (b"PING\n", b"HELLO\n"):
@@ -49,9 +58,12 @@ def discover_boards(ports=None, serial_factory=None, timeout=4):
         finally:
             if connection is not None:
                 connection.close()
+        if automatic and len(found) == len(ROLES):
+            break
     missing = set(ROLES) - set(found)
     if missing:
-        raise RuntimeError("Missing v3 boards: " + ", ".join(sorted(missing)))
+        raise RuntimeError("Missing v3 boards: " + ", ".join(sorted(missing))
+                           + ". Check USB cables and install the matching firmware/three_board sketches.")
     return found
 
 

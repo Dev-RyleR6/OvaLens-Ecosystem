@@ -165,3 +165,76 @@ def test_minimum_window_keeps_stop_and_session_controls_visible(hidden_ui):
         app.is_auto_cycle_running = False
         app.shutdown()
         app.mainloop()
+
+
+def test_simple_setup_main_screen_without_hardware(hidden_ui):
+    import queue
+    import threading
+    import time
+    from src.iot.dual_board import BoardState
+    entered, release = threading.Event(), threading.Event()
+    station = SimpleNamespace(cycle=None, boards=None, calibrated=False, recovery=None,
+        active=False, halt=Mock(), stop=Mock(), start_cycle=Mock())
+    def detect():
+        entered.set()
+        assert release.wait(3)
+        links = [SimpleNamespace(role=role, snapshot=lambda role=role: BoardState(role, True, True,
+                 {"FAULT": "STARTUP_ACK_REQUIRED", "SENSOR": "0", "LIGHT": "0"}))
+                 for role in ("CONVEYOR", "EGG_CONTROLLER", "LIGHT_CONTROLLER")]
+        station.boards = SimpleNamespace(links=links, conveyor=links[0], servo=links[1],
+                                        egg=links[1], light=links[2])
+        return "Connected. Check camera and prepare the empty conveyor."
+    def prepare(inspected):
+        assert inspected
+        station.calibrated = True
+        return "Ready. Click Start sorting."
+    station.use_defaults_and_detect = Mock(side_effect=detect)
+    station.prepare_empty_conveyor = Mock(side_effect=prepare)
+    camera = SimpleNamespace(is_running=False, current_fps=0., last_error=None,
+                             is_mock_mode=False, stop=Mock())
+    sync = SimpleNamespace(last_error=None, heartbeat_error=None, is_online=False, stop=Mock())
+    db = Mock()
+    db.get_unsynced_count.return_value = 0
+    worker = SimpleNamespace(busy=False, result_queue=queue.Queue(), stop=Mock())
+    app = OvaLensOperatorApp(camera, Mock(), None, db, sync, fullscreen=False,
+                             inference_worker=worker, station=station)
+    errors = []
+    app.report_callback_exception = lambda *args: errors.append(args)
+    def finish_setup():
+        deadline = time.monotonic() + 3
+        while app._setup_busy and time.monotonic() < deadline:
+            app.update()
+            time.sleep(.005)
+        assert not app._setup_busy
+    try:
+        app.deiconify()
+        for width, height in ((1280, 860), (1024, 720)):
+            app.geometry(f"{width}x{height}")
+            app.update()
+            app._set_session_active_state(False)
+            app.update_idletasks()
+            for control in (app.detect_btn, app.prepare_btn, app.setup_check, app.eject_btn):
+                assert control.winfo_ismapped()
+                assert control.winfo_rootx() + control.winfo_width() <= app.winfo_rootx() + app.winfo_width()
+            assert app.video_container.winfo_height() > 200
+        app.detect_btn.invoke()
+        assert entered.wait(1)
+        assert app._setup_busy
+        for button in (app.settings_btn, app.scan_btn, app.session_btn, app.detect_btn):
+            assert button.cget("state") == "disabled"
+        assert app.eject_btn.cget("state") == "normal"
+        release.set()
+        finish_setup()
+        app.prepare_btn.invoke()
+        assert not station.prepare_empty_conveyor.called
+        app.setup_inspected.set(True)
+        app.prepare_btn.invoke()
+        finish_setup()
+        assert station.calibrated and app.session_btn.cget("state") == "normal"
+        assert not app.setup_row.winfo_ismapped()
+        station.start_cycle.assert_not_called()
+        assert not errors
+    finally:
+        release.set()
+        app.shutdown()
+        app.mainloop()

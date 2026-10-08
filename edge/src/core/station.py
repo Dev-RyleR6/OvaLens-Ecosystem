@@ -24,7 +24,8 @@ class EdgeStation:
         self.cycle = None
         self.calibrated = False
         self.recovery = db.load_machine_state(device_id)
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._setup_cancel = threading.Event()
 
     @property
     def active(self):
@@ -64,7 +65,7 @@ class EdgeStation:
                 self.store.save(settings)
             return report
 
-    def connect(self):
+    def connect(self, cancel=None):
         with self._lock:
             self.require_idle()
             self.calibrated = False
@@ -77,6 +78,7 @@ class EdgeStation:
             self.boards.start()
             deadline = time.monotonic() + 5
             while time.monotonic() < deadline:
+                self._check_setup_cancel(cancel)
                 if self.boards.failure:
                     raise RuntimeError(self.boards.failure)
                 if all(link._status_complete and link.snapshot().telemetry.get("BUSY") == "0"
@@ -86,6 +88,78 @@ class EdgeStation:
                     return "Required boards identified. Inspect rig, then acknowledge faults."
                 threading.Event().wait(.02)
             raise RuntimeError("Firmware identification timed out")
+
+    @staticmethod
+    def _check_setup_cancel(cancel):
+        if cancel is not None and cancel.is_set():
+            raise RuntimeError("Setup stopped. Retry detection when ready.")
+
+    def use_defaults_and_detect(self):
+        """Explicit operator action: detect, apply and save; leave faults latched."""
+        with self._lock:
+            self.require_idle()
+            self._setup_cancel.clear()
+            self.calibrated = False
+            if self.boards:
+                self.boards.stop()
+                self.boards = None
+            try:
+                settings = EdgeSettings.three_board()
+                ports = discover_boards(cancel=self._setup_cancel,
+                    preferred=(self.settings.conveyor_port, self.settings.servo_port,
+                               self.settings.light_port, "COM5", "COM7", "COM9"))
+                settings.conveyor_port = ports["CONVEYOR"]
+                settings.servo_port = ports["EGG_CONTROLLER"]
+                settings.light_port = ports["LIGHT_CONTROLLER"]
+                self._check_setup_cancel(self._setup_cancel)
+                self.apply(settings, confirm_camera=True)
+                self._check_setup_cancel(self._setup_cancel)
+                self.connect(cancel=self._setup_cancel)
+                self._check_setup_cancel(self._setup_cancel)
+                self.store.save(self.settings)
+                self.settings_error = ""
+                return (f"Connected: stepper {settings.conveyor_port}, servo + IR {settings.servo_port}, "
+                        f"light {settings.light_port}. Check the camera and clear the conveyor, then Prepare conveyor.")
+            except Exception:
+                self.calibrated = False
+                if self.boards:
+                    self.boards.stop()
+                    self.boards = None
+                raise
+
+    def prepare_empty_conveyor(self, inspected):
+        """Combine inspected acknowledgement, home and presets without belt travel."""
+        with self._lock:
+            self.require_idle()
+            self.calibrated = False
+            if not inspected:
+                raise RuntimeError("Confirm the conveyor is empty, aligned and the gate checked.")
+            if self.settings.rig_profile != "three_v3" or not self.boards:
+                raise RuntimeError("Use defaults & detect first.")
+            if self.camera.is_mock_mode or self.camera.last_error or self.camera.snapshot() is None:
+                raise RuntimeError("Check the live camera before preparing the conveyor.")
+            if not getattr(self.inference.engine, "model_contract_verified", False):
+                raise RuntimeError("The existing ONNX model is unavailable. Check Settings before sorting.")
+            self._setup_cancel.clear()
+            try:
+                for link in self.board_links():
+                    state = link.snapshot()
+                    if not state.connected or not state.identified or state.error or state.telemetry.get("BUSY") != "0":
+                        raise RuntimeError("A board is unavailable or busy. Use defaults & detect again.")
+                if self.boards.egg.snapshot().telemetry.get("SENSOR") != "0":
+                    raise RuntimeError("Remove the egg from the IR sensor before preparing.")
+                commands = [(link, "ACK_FAULT") for link in self.board_links()]
+                commands += [(self.boards.light, "LIGHT_OFF"), (self.boards.egg, "PAUSE"),
+                             (self.boards.conveyor, "SETHOME")]
+                for link, command in commands:
+                    self._check_setup_cancel(self._setup_cancel)
+                    link.command(command).result(3.5)
+                self.validate_calibration(True, cancel=self._setup_cancel)
+                self._check_setup_cancel(self._setup_cancel)
+                return "Ready. Click Start sorting when you are ready to feed eggs."
+            except Exception:
+                self.halt()
+                raise
 
     def board_links(self):
         if self.boards is None:
@@ -114,7 +188,7 @@ class EdgeStation:
             link = links[role]
             return link.command(text, timeout).result(timeout + .5)
 
-    def validate_calibration(self, inspected):
+    def validate_calibration(self, inspected, cancel=None):
         with self._lock:
             self.require_idle()
             self.calibrated = False
@@ -138,7 +212,9 @@ class EdgeStation:
             else:
                 commands.insert(1, (self.boards.conveyor, f"IR_OFFSET:{k.ir_offset_steps}"))
             for link, text in commands:
+                self._check_setup_cancel(cancel)
                 link.command(text).result(3.5)
+            self._check_setup_cancel(cancel)
             if self.recovery and self.recovery.get("state") not in {"COMPLETE", "CLEARED"}:
                 session_id = self.recovery.get("session_id")
                 if session_id and self.db.get_session_stats(session_id):
@@ -168,6 +244,7 @@ class EdgeStation:
             return self.cycle
 
     def halt(self):
+        self._setup_cancel.set()
         self.calibrated = False
         if self.cycle:
             self.cycle.stop()

@@ -57,6 +57,22 @@ def test_session_identity_and_diagnostic_completion_invalidate_controls():
     assert app.session_btn.configure.call_args.kwargs['state'] == 'normal'
 
 
+def test_setup_locks_scanning_and_start_until_preparation_completes():
+    app = controls()
+    app.station = SimpleNamespace(cycle=None, calibrated=False, boards=None)
+    refresh = lambda: OvaLensOperatorApp._set_session_active_state(app, False)
+    refresh()
+    assert app.session_btn.configure.call_args.kwargs['state'] == 'disabled'
+    app._setup_busy = True
+    refresh()
+    for button in (app.settings_btn, app.batch_setup_btn, app.scan_btn, app.session_btn):
+        assert button.configure.call_args.kwargs['state'] == 'disabled'
+    app._setup_busy = False
+    app.station.calibrated = True
+    refresh()
+    assert app.session_btn.configure.call_args.kwargs['state'] == 'normal'
+
+
 def test_review_message_and_color_are_never_suppressed_by_hud_cache():
     app = SimpleNamespace(cycle_hud=Mock(), cycle_status_dot=Mock(), cycle_status_label=Mock())
     refresh = lambda message, color: OvaLensOperatorApp._update_cycle_hud(app, '●', color, message)

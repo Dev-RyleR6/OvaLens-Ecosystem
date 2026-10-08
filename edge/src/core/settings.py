@@ -65,7 +65,8 @@ class EdgeSettings:
     @classmethod
     def three_board(cls):
         """Handoff defaults are a starting point, never physical authorization."""
-        settings = cls(rig_profile="three_v3")
+        settings = cls(rig_profile="three_v3", conveyor_port="COM5",
+                       servo_port="COM7", light_port="COM9")
         settings.camera.index = 1
         settings.detection.confidence = .30
         settings.calibration.speed_us = 3000
