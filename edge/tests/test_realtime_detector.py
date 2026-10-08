@@ -108,10 +108,10 @@ def test_get_active_display_detections():
     cycle = SimpleNamespace(status={"state": "DISPLAYING"}, capture_view=view)
     app.station = SimpleNamespace(cycle=cycle)
     app.is_auto_cycle_running = True
-    for state in ("CLASSIFYING", "SAVING", "DISPLAYING", "MANUAL_REVIEW"):
+    for state in ("CLASSIFYING", "SAVING", "ROUTING", "DISPLAYING", "MANUAL_REVIEW"):
         cycle.status["state"] = state
         assert OvaLensOperatorApp._get_display_capture(app) is view
-    for state in ("SEARCHING", "INDEXING", "ROUTING", "RECOVERY_REQUIRED", "COMPLETE"):
+    for state in ("SEARCHING", "INDEXING", "RECOVERY_REQUIRED", "COMPLETE"):
         cycle.status["state"] = state
         assert OvaLensOperatorApp._get_display_capture(app) is None
     cycle.status["state"] = "DISPLAYING"

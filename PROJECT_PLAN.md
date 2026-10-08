@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-GATEFIRST-01**: Position the three-board sorting servo immediately after a durable classification and await completion before conveyor release; retain the gate through passage, reject conflicting early arrivals, and verify command ordering and failures with simulated boards.
+
 - [x] **TASK-NEW-EDGE-STOPSCAN-01**: Keep the camera preview live while restricting AI to confirmed stationary captures; collect three agreeing frames across 300ms, pair overlays and saved evidence with their exact frames, clear before movement, and verify cancellation/manual review with simulated hardware.
 
 - [x] **TASK-NEW-FW-INSTALL-01**: Install and verify the three-board v3 firmware on the confirmed COM5 conveyor, COM7 egg controller and COM9 light controller after explicit user authorization with the conveyor empty. Confirm versioned identities and stopped/paused/lamp-off telemetry; physical sorting and calibration remain separate acceptance work.

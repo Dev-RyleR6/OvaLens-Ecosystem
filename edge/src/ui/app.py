@@ -1579,7 +1579,7 @@ class OvaLensOperatorApp(ctk.CTk):
         station = getattr(self, "station", None)
         cycle = getattr(station, "cycle", None)
         if cycle is not None and getattr(self, "is_auto_cycle_running", False):
-            if cycle.status["state"] in {"CLASSIFYING", "SAVING", "DISPLAYING", "MANUAL_REVIEW"}:
+            if cycle.status["state"] in {"CLASSIFYING", "SAVING", "ROUTING", "DISPLAYING", "MANUAL_REVIEW"}:
                 return getattr(cycle, "capture_view", None)
             return None
         if (not getattr(self, "_scan_busy", False)
@@ -2188,7 +2188,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         s2_body = ctk.CTkLabel(
             s2,
-            text="• Click Use defaults & detect to connect the three boards and camera.\n• Check the live camera and clear the conveyor; confirm the checkbox and click Prepare conveyor.\n• Click Start sorting, then feed Day 10 eggs.\n• Low confidence holds the belt for your decision. STOP is always available.\n• Use Settings to adjust camera controls or measured gate distances.",
+            text="• Click Use defaults & detect to connect the three boards and camera.\n• Check the live camera and clear the conveyor; confirm the checkbox and click Prepare conveyor.\n• Click Start sorting. Feed each Day 10 egg when the status says Gate clear.\n• The servo positions before release; wait for gate clearance before feeding again.\n• Low confidence holds the belt for your decision. STOP is always available.\n• Use Settings to adjust camera controls or measured gate distances.",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s2_body.pack(anchor="w", padx=14, pady=(2, 10))

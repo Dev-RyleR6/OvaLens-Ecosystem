@@ -227,7 +227,7 @@ class FakeLink:
     def __init__(self, role, rig):
         self.role, self.rig, self.events = role, rig, queue.Queue()
         self.values = {"FAULT": "NONE", "BUSY": "0", "POSITION": "0", "PAUSED": "0", "SENSOR": "0",
-                       "EGG_SEQ": "0", "STATE": "WAITING", "REFERENCE_VALID": "1", "LIGHT": "0"}
+                       "EGG_SEQ": "0", "STATE": "WAITING", "REFERENCE_VALID": "1", "LIGHT": "0", "ANGLE": "90"}
 
     def snapshot(self):
         return BoardState(self.role, True, True, dict(self.values))
@@ -251,6 +251,8 @@ class FakeLink:
                     rig.egg.events.put(("EGG_DETECTED", seq))
                     if rig.duplicate:
                         rig.egg.events.put(("EGG_DETECTED", seq))
+            elif command.startswith("SORT:") or command == "RESET":
+                self.values["ANGLE"] = "180" if command == "SORT:FERTILE" else "120" if command == "SORT:INFERTILE" else "90"
             elif command == "RESUME":
                 self.values.update(PAUSED="0", SENSOR="0", STATE="WAITING")
                 rig.conveyor.values["PAUSED"] = "0"
@@ -285,7 +287,7 @@ class Rig:
 
 def fixture(tmp_path, count=2, arrivals=None):
     db = LocalDatabaseManager(str(tmp_path / "scans.db"))
-    boards = Rig(db, arrivals if arrivals is not None else [100 + n * 200 for n in range(count)])
+    boards = Rig(db, arrivals if arrivals is not None else [100 + n * 450 for n in range(count)])
     settings = EdgeSettings.three_board()
     settings.calibration.hold_ms = settings.calibration.settle_ms = 0
     image = np.full((120, 160, 3), 150, dtype=np.uint8)
@@ -306,7 +308,7 @@ def test_fifty_egg_cycle_orders_gates_and_persists_every_decision(tmp_path):
     assert len(routes) == 50
     for index, (command, position, saved) in enumerate(routes):
         assert command == ("SORT:FERTILE" if index % 2 == 0 else "SORT:INFERTILE")
-        assert position == rig.arrivals[index] + 317 and saved >= index + 1
+        assert position == rig.arrivals[index] and saved >= index + 1
     assert db.get_unsynced_count() == 50
     assert db.load_machine_state("station")["state"] == "COMPLETE"
     assert rig.egg.values["PAUSED"] == "1" and rig.light.values["LIGHT"] == "0"
@@ -315,11 +317,14 @@ def test_fifty_egg_cycle_orders_gates_and_persists_every_decision(tmp_path):
 def test_next_egg_does_not_overwrite_previous_gate(tmp_path):
     cycle, db, rig = fixture(tmp_path, arrivals=[100, 250])
     cycle._run()
-    assert cycle.status["state"] == "COMPLETE", cycle.status
-    route_trace = [(command, position) for _, command, position, _ in rig.trace if command.startswith("SORT:") or command == "RESET"]
-    assert route_trace == [("SORT:FERTILE", 417), ("RESET", 517), ("SORT:INFERTILE", 567), ("RESET", 667)]
-    first_route = next(item for item in rig.trace if item[1].startswith("SORT:"))
-    assert first_route[3] == 2  # Both captures committed before the earlier egg reaches its gate.
+    assert cycle.status["state"] == "RECOVERY_REQUIRED"
+    assert "increase feed spacing" in cycle.status["reason"]
+    assert [(command, position) for _, command, position, _ in rig.trace
+            if command.startswith("SORT:") or command == "RESET"] == [("SORT:FERTILE", 100)]
+    assert cycle.count == 1 and cycle.routed == 0
+    pending = db.load_machine_state("station")["pending_capture"]
+    assert pending["egg_seq"] == 2 and pending["position"] == 250
+    assert rig.egg.values["PAUSED"] == "1"
 
 
 @pytest.mark.parametrize("failure", ["storage", "duplicate", "lamp", "camera", "overlap", "extra"])

@@ -85,7 +85,9 @@ mechanical stopping on the rig; neither simulation nor compilation proves them.
    **Conveyor empty, aligned; gate checked**, then click **Prepare conveyor**.
    This acknowledges faults, sets the inspected position as home and returns the
    servo to neutral. The conveyor stays stopped and the lamp stays off.
-4. Click **Start sorting**, then feed eggs. **STOP** remains available during setup
+4. Click **Start sorting**, then feed one egg when the status says **Gate clear**.
+   Wait for the current egg's gate clearance before feeding the next.
+   **STOP** remains available during setup
    and operation. Repeat preparation for each batch.
 
 Detection verifies firmware roles rather than trusting COM numbers; if the USB
@@ -165,12 +167,24 @@ review cannot exceed its independent ON limit. The operator sees the retained
 captured image. Fertile/Infertile decisions remain marked MANUAL_REVIEW in the scan;
 EMPTY confirms a false sensor trigger without creating a third biological class.
 
-After capture the lamp turns OFF. The belt advances only to the next sensor stop
-or tracked gate boundary. A later egg's classification cannot overwrite an earlier
-egg's route. The gate changes while stationary at entry and resets after the
-tracked exit. Pauses do not consume passage distance. Overlapping gate intervals,
-missing clearance, extra eggs, storage faults and synchronization disagreements
-require recovery. No gate-passage sensor exists, so delivery remains estimated.
+`TASK-NEW-EDGE-GATEFIRST-01`: Immediately after the classification commits to WAL,
+the host sends SORT while the hardware pause still holds the egg in the chamber.
+It waits for the correlated completion, BUSY=0 and the expected configured ANGLE,
+then rechecks the stopped position and held egg sequence. Only then does the
+display hold finish, the lamp turn OFF and the host send RESUME. Completion is
+the firmware's existing 500ms settling timer; there is no physical angle sensor.
+A failed/missing completion stops the rig with the saved decision retained.
+
+The gate angle is retained from release through the calibrated exit position;
+RESET completes at that stopped boundary. There is no delayed approach-position
+SORT command. Feed one egg at a time when the status says Gate clear. An arrival
+before the previous gate exit enters recovery with both holder identities retained,
+without a new classification, gate change or release. If arrival and exit coincide,
+the previous gate reset completes before the new egg is classified and preset.
+The search timeout begins again after clearance, while gate passage remains bounded
+by motion-command deadlines. Pauses do not consume passage distance. Missing
+clearance, extra eggs, storage faults and synchronization disagreements require
+recovery. No gate-passage sensor exists, so delivery remains estimated.
 
 Stop/error cleanup holds transport, turns the lamp OFF and preserves the gate
 angle; it never sends RESUME or resets a potentially loaded gate. On restart the
@@ -235,6 +249,19 @@ on stop/pause/sequence/position/lamp/settings changes, and cache invalidation wh
 the box clears or the camera becomes stale. `launcher.py --check-runtime` confirmed
 the project interpreter and PySerial 3.5. No physical device was exercised for
 this change; actual stopping, exposure and sorting acceptance remain below.
+
+Servo-before-release verification (`TASK-NEW-EDGE-GATEFIRST-01`, 2026-10-09):
+**22 backend tests**, **307 edge tests** and the dashboard build passed. One
+minimum-window GUI test skipped during Tk initialization and passed in a fresh
+process. Added tests hold a servo completion pending and prove no release occurs,
+cover both sorting presets before the display hold, stop/cancellation, missing or
+invalid completion, wrong angle, lost hardware pause, and simultaneous gate exit
+and next arrival. The 50-egg integration uses feed arrivals 450 steps apart, beyond
+the default 417-step gate exit; earlier conflicting arrivals stop without replacing
+the previous gate preset. This change uses existing v3 firmware completion reports
+and requires restarting the host app, with no firmware upload. All new verification
+used simulated devices; physical servo travel and calibrated gate clearance remain
+rig acceptance work.
 
 ```powershell
 python -m pytest edge/tests -v

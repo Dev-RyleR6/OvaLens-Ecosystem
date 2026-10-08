@@ -1,7 +1,7 @@
 """Sensor arrivals and position events for the three-board candling rig.
 
-The belt stops at gate boundaries. Pauses cannot consume passage distance and
-classification of a later egg cannot change an earlier egg's gate preset.
+The gate is positioned before releasing each classified egg and retained until
+its calibrated exit. A new arrival cannot change an earlier egg's gate preset.
 """
 from dataclasses import asdict
 import heapq
@@ -171,6 +171,8 @@ class ThreeBoardCycle(SortingCycle):
                                 "position": self.travel}
         self._last_result = {}
         self._checkpoint("EGG_HELD")
+        if self._gate_holder is not None:
+            raise RuntimeError("Next egg arrived before the previous egg cleared the gate; increase feed spacing")
         manual = False
         try:
             result, verification = self._capture()
@@ -200,17 +202,45 @@ class ThreeBoardCycle(SortingCycle):
             holder.stage = "SAVED"
             self.latest_result = {**result, "holder": holder.number, "scan_id": holder.scan_id, "routing_action": action}
             k = self.settings.calibration
-            if any(h is not holder and abs(h.chamber_position - holder.chamber_position) < 2 * k.gate_clearance_steps for h in self.holders):
-                raise RuntimeError("Egg gate intervals overlap; correct feed spacing before recovery")
-            heapq.heappush(events, (self.travel + k.sorter_steps - k.gate_clearance_steps, 1, "route", holder.number))
-            heapq.heappush(events, (self.travel + k.sorter_steps + k.gate_clearance_steps, 0, "clear", holder.number))
             self._checkpoint("SAVED")
+            self._position_gate(holder)
+            heapq.heappush(events, (self.travel + k.sorter_steps + k.gate_clearance_steps, 0, "clear", holder.number))
             self._state("DISPLAYING", holder=holder.number)
             self._delay(k.hold_ms / 1000)
         self._lamp_off()
         self.pending_capture = None
         self.review_frame = None
         self._checkpoint("CAPTURE_COMPLETE")
+
+    def _position_gate(self, holder):
+        """Complete the servo stroke while the detected egg still holds the belt."""
+        self._capture_health(lit=False)
+        self._state("ROUTING", "Positioning sorting gate; belt held", holder=holder.number)
+        self._checkpoint("SERVO_IN_FLIGHT")
+        reply = self._command(self.boards.egg, f"SORT:{holder.final_class}")
+        angle = (self.settings.calibration.fertile_angle if holder.final_class == "FERTILE"
+                 else self.settings.calibration.infertile_angle)
+        if reply.get("BUSY") != "0" or reply.get("ANGLE") != str(angle):
+            raise RuntimeError("Sorting servo did not confirm the required gate position")
+        self._capture_health(lit=False)
+        self._gate_holder, holder.stage = holder.number, "ROUTE_COMMANDED"
+        self._checkpoint("GATE_READY")
+
+    def _clear_gate(self, events):
+        while events and events[0][0] <= self.travel:
+            position, _, kind, number = heapq.heappop(events)
+            if position != self.travel or kind != "clear":
+                raise RuntimeError("A gate boundary was crossed without a stopped routing decision")
+            holder = next(h for h in self.holders if h.number == number)
+            if self._gate_holder != number or holder.stage != "ROUTE_COMMANDED":
+                raise RuntimeError("Egg crossed an unprepared sorting gate")
+            self._state("ROUTING", holder=number)
+            self._command(self.boards.egg, "RESET")
+            self._gate_holder = None
+            holder.stage = "PASSAGE_ESTIMATED"
+            self.routed += 1
+            self.holders.remove(holder)
+            self._checkpoint("GATE_READY")
 
     def _run(self):
         started = last_arrival = time.monotonic()
@@ -229,35 +259,23 @@ class ThreeBoardCycle(SortingCycle):
             self._command(self.boards.egg, "RESUME")
             while self.count < self.target or events:
                 self._health()
-                if self.count < self.target and time.monotonic() - last_arrival >= k.jam_timeout_s:
+                if self._gate_holder is None and self.count < self.target and time.monotonic() - last_arrival >= k.jam_timeout_s:
                     raise RuntimeError("No egg arrival before the search deadline")
                 destination = min(self.travel + k.holder_steps, events[0][0]) if events else self.travel + k.holder_steps
-                self._search_deadline = last_arrival + k.jam_timeout_s
-                self._state("SEARCHING" if self.count < self.target else "INDEXING", holder=self.count + 1)
-                if self._advance(destination):
+                self._search_deadline = last_arrival + k.jam_timeout_s if self._gate_holder is None else None
+                if self._gate_holder is not None:
+                    self._state("INDEXING", "Egg travelling to gate; wait before feeding", holder=self._gate_holder)
+                else:
+                    self._state("SEARCHING", "Gate clear; feed next egg", holder=self.count + 1)
+                detected = self._advance(destination)
+                # At an exact exit/arrival boundary, finish the previous egg first.
+                routed_before = self.routed
+                self._clear_gate(events)
+                if self.routed != routed_before:
+                    last_arrival = time.monotonic()
+                if detected:
                     self._handle_egg(events)
                     last_arrival = time.monotonic()
-                while events and events[0][0] <= self.travel:
-                    position, _, kind, number = heapq.heappop(events)
-                    if position != self.travel:
-                        raise RuntimeError("A gate boundary was crossed without a stopped routing decision")
-                    holder = next(h for h in self.holders if h.number == number)
-                    self._state("ROUTING", holder=number)
-                    if kind == "route":
-                        if self._gate_holder is not None or holder.stage != "SAVED":
-                            raise RuntimeError("Gate is occupied or egg lacks a durable decision")
-                        self._checkpoint("SERVO_IN_FLIGHT")
-                        self._command(self.boards.egg, f"SORT:{holder.final_class}")
-                        self._gate_holder, holder.stage = number, "ROUTE_COMMANDED"
-                    else:
-                        if self._gate_holder != number or holder.stage != "ROUTE_COMMANDED":
-                            raise RuntimeError("Egg crossed an unprepared sorting gate")
-                        self._command(self.boards.egg, "RESET")
-                        self._gate_holder = None
-                        holder.stage = "PASSAGE_ESTIMATED"
-                        self.routed += 1
-                        self.holders.remove(holder)
-                    self._checkpoint("GATE_READY")
                 if self.boards.egg.snapshot().telemetry.get("PAUSED") == "1":
                     self.clear_capture_view()
                     self._command(self.boards.egg, "RESUME")

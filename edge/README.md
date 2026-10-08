@@ -37,6 +37,11 @@ it clears when movement resumes. Low confidence or disagreement holds the egg
 for manual review. **Single Scan** is an explicit diagnostic action and is
 blocked when the connected conveyor reports movement.
 
+After classification is saved locally, the sorting servo positions and confirms
+completion **before the stepper resumes**. Its angle stays set through the
+calibrated gate exit. Feed the next egg when the status says **Gate clear**;
+an earlier arrival holds the rig for inspection to protect the previous egg's route.
+
 ## 🌟 Key Subsystem Features
 
 - **Decoupled Quad-Thread Concurrency**:
