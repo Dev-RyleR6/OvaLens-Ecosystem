@@ -65,6 +65,28 @@ class EdgeStation:
                 self.store.save(settings)
             return report
 
+    def apply_camera_controls(self, camera_settings, save=False):
+        """Tune only the current camera; no serial commands or model reconfiguration."""
+        with self._lock:
+            self.require_idle()
+            if self.boards:
+                state = self.boards.conveyor.snapshot()
+                if not state.connected or not state.identified or state.error or state.telemetry.get("BUSY") != "0":
+                    raise RuntimeError("Confirm the conveyor is stopped before camera tuning")
+            settings = EdgeSettings.from_dict(self.settings.snapshot())
+            settings.camera = camera_settings
+            settings.validate()
+            if settings.camera.index != self.settings.camera.index:
+                raise ValueError("Use station settings to change the camera device")
+            self.calibrated = False
+            report = self.camera.apply_settings(settings.camera, controls_only=True)
+            settings.camera.identity = report["identity"]
+            self.settings = settings
+            self.camera.initial_settings = settings.camera
+            if save:
+                self.store.save(settings)
+            return report
+
     def connect(self, cancel=None):
         with self._lock:
             self.require_idle()

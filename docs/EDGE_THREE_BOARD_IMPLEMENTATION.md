@@ -435,3 +435,40 @@ gate (**22 backend tests**, **337 edge tests / 1 shared-process Tk skip**, and
 dashboard build), and the skipped Tk lifecycle test in a fresh process. A final
 engine startup with the launcher's dotenv configuration selected `best_v3.onnx`
 and verified the recorded SHA-256. No camera or serial connection was opened.
+
+## Camera controls beside live preview
+
+`TASK-NEW-EDGE-CAMERA-PREVIEW-01` adds an idle side panel accessible above the
+preview or through Tools. Autofocus, exposure and white balance have automatic
+mode selectors paired with manual fields; gain, brightness, contrast,
+saturation and sharpness retain native driver units. Blank/Unchanged preferences
+skip writes. Explicit automatic On suppresses its corresponding manual write.
+Apply is temporary; Save applies and persists the camera configuration in the
+existing station JSON without changing calibration, ports or inference settings.
+Load saved settings fills the form only. Done keeps the current preview alive.
+
+Camera requests use the existing capture-owner queue through background UI jobs.
+The camera-only path does not reset resolution/FPS or issue serial commands.
+It invalidates transient frames and station inspection. Session/scan/setup
+locks prevent conflicting work; connected conveyors must report stopped before
+controls apply. Unsupported, accepted-but-unverified and verified readbacks are
+displayed separately. If saving fails after application, the camera may already
+have changed; retry saving after correcting the storage error.
+
+Automatic exposure values follow the active backend rather than a universal
+slider: OpenCV DirectShow uses 1/0; V4L2 uses 3/1 or .75/.25 when normalized.
+Unknown backends retain saved native values and require advanced Settings for
+explicit auto-exposure configuration. DirectShow autofocus readback can return
+driver flag values rather than the requested boolean; those remain unverified.
+Implementation references: OpenCV [DirectShow source](https://github.com/opencv/opencv/blob/4.x/modules/videoio/src/cap_dshow.cpp)
+and [V4L2 source](https://github.com/opencv/opencv/blob/4.x/modules/videoio/src/cap_v4l.cpp).
+Readback verifies a driver response, not physical sharpness or model accuracy.
+
+Verification: **15 focused camera/control UI tests passed**, followed by the
+required gate (**22 backend tests**, **353 edge tests**, dashboard build). Fake
+VideoCapture tests verify capture-thread ownership, stream preservation, automatic
+mode ordering and unsupported readback. Native UI tests cover apply/save/restore,
+session locks, a retryable storage error and shutdown. Visual inspection at
+1280x860 and 1024x720 covered the panel, error feedback and closed state using a
+saved image and fake camera adapter. No physical camera or serial board was
+opened. The local previous-model override is retained.

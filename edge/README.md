@@ -38,7 +38,7 @@ gate calibration are retained. New defaults use **COM5 stepper**, **COM7 servo +
 IR**, **COM9 light**, and **camera 0**. Discovery verifies firmware roles if USB
 ports change; healthy connections are reused between batches. Install the three
 v3 sketches once before connecting. **Tools** contains Single scan, Settings and
-Retry camera preview.
+Retry camera preview and Camera controls.
 
 Feed one egg only when the large instruction says **Feed next egg**. Wait through
 **Inspecting egg**, **Positioning gate** and **Wait — egg passing**. Review choices
@@ -59,6 +59,28 @@ After classification is saved locally, the sorting servo positions and confirms
 completion **before the stepper resumes**. Its angle stays set through the
 calibrated gate exit. Feed the next egg when the status says **Feed next egg**;
 an earlier arrival holds the rig for inspection to protect the previous egg's route.
+
+## Tune the camera beside its preview
+
+Before starting a session, click **Camera controls** above the preview (also under
+**Tools > Camera controls**). The side panel keeps the image visible while you
+change autofocus, exposure, gain, white balance, brightness, contrast, saturation
+or sharpness. Scroll for additional controls. Turn an automatic mode **Off** to
+edit its corresponding manual value; **On** clears that manual preference.
+
+- **Apply to preview** sends the values to the current camera without saving.
+- **Save as default** applies and saves them in `edge/db/edge_settings.json`.
+- **Load saved settings** fills the form; click Apply to preview to use them.
+- **Done** closes the panel and leaves the applied preview settings in place.
+
+Blank numeric values and **Unchanged** leave that camera property untouched;
+they do not reset it to its factory value. Values use the camera driver's units,
+so supported controls and ranges depend on the webcam. Readback shows verified,
+unverified or rejected requests. A verified readback does not establish optical
+sharpness: inspect a stationary egg in the preview. Camera tuning is locked
+during sessions and scans. Applying changes clears the inspection confirmation;
+check the rig again before Start sorting. Preview-only changes remain in memory
+until restart; Save as default keeps them for the next launch.
 
 ## 🌟 Key Subsystem Features
 

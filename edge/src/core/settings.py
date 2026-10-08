@@ -22,6 +22,10 @@ class CameraSettings:
     auto_exposure: float | None = None
     autofocus: float | None = None
     auto_white_balance: float | None = None
+    brightness: float | None = None
+    contrast: float | None = None
+    saturation: float | None = None
+    sharpness: float | None = None
 
 
 @dataclass
@@ -99,7 +103,8 @@ class EdgeSettings:
         integer(c.fps, 1, 120, "FPS")
         if not isinstance(c.identity, str):
             raise ValueError("Camera identity must be text")
-        for name in ("exposure", "gain", "focus", "white_balance", "auto_exposure", "autofocus", "auto_white_balance"):
+        for name in ("exposure", "gain", "focus", "white_balance", "auto_exposure", "autofocus", "auto_white_balance",
+                     "brightness", "contrast", "saturation", "sharpness"):
             value = getattr(c, name)
             if value is not None and (type(value) not in (float, int) or not math.isfinite(value)):
                 raise ValueError(f"{name} must be finite or blank")

@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 import cv2
 import numpy as np
+from .camera_controls import exposure_modes
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,7 @@ class CameraGrabber:
         self.identity = ""
         self._discard_frames = 0
         self.initial_settings = None
+        self.exposure_modes = {}
 
     def _init_static_bg(self):
         """Pre-render darkroom candling aperture background once to minimize CPU cycles."""
@@ -90,19 +92,23 @@ class CameraGrabber:
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self._is_mock_mode = False
         self.identity = f"opencv:{self.camera_index}:{self.cap.getBackendName()}"
+        normalized = bool(self.cap.get(cv2.CAP_PROP_MODE)) if self.identity.endswith((":V4L2", ":V4L")) else False
+        self.exposure_modes = exposure_modes(self.identity, normalized)
 
-    def apply_settings(self, settings, timeout=10):
+    def apply_settings(self, settings, timeout=10, *, controls_only=False):
         """Called from an operation worker; only the capture thread touches VideoCapture."""
         future = Future()
-        self._requests.put_nowait((settings, future))
+        self._requests.put_nowait((settings, future, controls_only))
         self.start()
         return future.result(timeout=timeout)
 
-    def _apply_on_worker(self, settings):
+    def _apply_on_worker(self, settings, controls_only=False):
         from .settings import EdgeSettings
         EdgeSettings(camera=settings).validate()
         if self.allow_mock:
             raise RuntimeError("Camera property tuning requires a real camera")
+        if controls_only and settings.index != self.camera_index:
+            raise RuntimeError("Use station settings to change the camera device")
         if settings.index != self.camera_index:
             self.cap.release()
             self.camera_index = settings.index
@@ -116,28 +122,37 @@ class CameraGrabber:
             "autofocus": cv2.CAP_PROP_AUTOFOCUS, "auto_white_balance": cv2.CAP_PROP_AUTO_WB,
             "exposure": cv2.CAP_PROP_EXPOSURE, "gain": cv2.CAP_PROP_GAIN,
             "focus": cv2.CAP_PROP_FOCUS, "white_balance": cv2.CAP_PROP_WB_TEMPERATURE,
+            "brightness": cv2.CAP_PROP_BRIGHTNESS, "contrast": cv2.CAP_PROP_CONTRAST,
+            "saturation": cv2.CAP_PROP_SATURATION, "sharpness": cv2.CAP_PROP_SHARPNESS,
         }
+        if controls_only:
+            properties = {name: prop for name, prop in properties.items() if name not in {"width", "height", "fps"}}
         report = {}
         for name, prop in properties.items():
             requested = getattr(settings, name)
             try:
-                accepted = self.cap.set(prop, requested) if requested is not None else None
+                automatic = {"focus": settings.autofocus == 1,
+                    "white_balance": settings.auto_white_balance == 1,
+                    "exposure": settings.auto_exposure is not None and settings.auto_exposure == self.exposure_modes.get("On")}
+                inactive = automatic.get(name, False)
+                accepted = self.cap.set(prop, requested) if requested is not None and not inactive else None
                 actual = self.cap.get(prop)
                 verified = (accepted is True and np.isfinite(actual)
                             and abs(actual - requested) <= max(.01, abs(requested) * .01))
                 report[name] = {"requested": requested, "actual": actual if np.isfinite(actual) else None,
-                                "status": "verified readback" if verified else
+                                "status": "inactive while automatic mode is on" if inactive else "verified readback" if verified else
                                 "rejected / unsupported" if accepted is False else "unverified"}
             except (cv2.error, ValueError) as exc:
                 report[name] = {"requested": requested, "actual": None, "status": str(exc)}
         self.width, self.height, self.fps = settings.width, settings.height, settings.fps
-        self.property_report = report
+        self.property_report = {**self.property_report, **report}
         with self._lock:
             self.settings_revision += 1
             self._latest_frame = None
             self._last_frame_at = 0.0
         self._discard_frames = max(3, int(settings.fps * .3))
-        return {"identity": self.identity, "properties": report, "revision": self.settings_revision}
+        return {"identity": self.identity, "properties": report, "revision": self.settings_revision,
+                "exposure_modes": dict(self.exposure_modes)}
 
     def snapshot(self, copy=True):
         with self._lock:
@@ -191,13 +206,13 @@ class CameraGrabber:
                             still.set_exception(exc)
                             raise
                 try:
-                    settings, future = self._requests.get_nowait()
+                    settings, future, controls_only = self._requests.get_nowait()
                 except queue.Empty:
                     pass
                 else:
                     if future.set_running_or_notify_cancel():
                         try:
-                            future.set_result(self._apply_on_worker(settings))
+                            future.set_result(self._apply_on_worker(settings, controls_only))
                         except Exception as exc:
                             future.set_exception(exc)
                 if self._is_mock_mode:
@@ -224,7 +239,7 @@ class CameraGrabber:
                 self._last_frame_at = 0.0
             while not self._requests.empty():
                 try:
-                    _, future = self._requests.get_nowait()
+                    _, future, _ = self._requests.get_nowait()
                     future.set_exception(RuntimeError(self.last_error or "Camera stopped"))
                 except queue.Empty:
                     break

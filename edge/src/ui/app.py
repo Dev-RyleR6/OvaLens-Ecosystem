@@ -33,6 +33,7 @@ from ..iot.serial_driver import ESP32SerialDriver
 from ..db.local_db import LocalDatabaseManager
 from ..sync.sync_worker import BackgroundSyncWorker
 from .station_settings import StationSettingsWindow
+from .camera_controls import CameraControlsPanel
 
 
 def _building_dialog(method):
@@ -81,6 +82,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self._operation_generation = 0
         self._setup_request = None
         self._automatic_complete_cycle = None
+        self._camera_panel = None
         self._scan_busy = False
         self._stopping = False
         self.simulation = bool((startup_config or {}).get("simulation", False))
@@ -517,6 +519,12 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         self.cycle_status_dot.pack(side="left", padx=(12, 6))
 
+        self.camera_controls_btn = ctk.CTkButton(self.cycle_hud, text="Camera controls",
+            width=132, height=34, font=(FUTheme.FONT_FAMILY, 13),
+            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
+            border_width=1, border_color=FUTheme.BORDER, command=self.open_camera_controls)
+        self.camera_controls_btn.pack(side="right", padx=10)
+
         cue_body = ctk.CTkFrame(self.cycle_hud, fg_color="transparent")
         cue_body.pack(side="left", fill="both", expand=True, padx=(0, 10), pady=8)
         self.cycle_status_label = ctk.CTkLabel(
@@ -793,6 +801,25 @@ class OvaLensOperatorApp(ctk.CTk):
         self.tools_menu.add_command(label="Single scan    Space", command=self.trigger_candling_scan)
         self.tools_menu.add_command(label="Settings", command=self.open_calibration_dialog)
         self.tools_menu.add_command(label="Retry camera preview", command=self._start_preview)
+        self.tools_menu.add_command(label="Camera controls", command=self.open_camera_controls)
+
+    def _camera_tuning_allowed(self):
+        return (self.station is not None and not self.simulation and not self._closing
+                and not self._stopping and not self._scan_busy and not self.current_session_id
+                and not self.is_session_active and not self.is_auto_cycle_running
+                and not self._finalization_failed and not self._pending_finalization_id
+                and not getattr(self, "_setup_busy", False) and not self.station.active
+                and self.grab_current() is None)
+
+    def open_camera_controls(self):
+        if not self._camera_tuning_allowed():
+            self._log("[CAMERA] Finish the current operation before tuning the camera.")
+            return
+        if self._camera_panel is not None:
+            self._camera_panel.lift()
+            return
+        self._camera_panel = CameraControlsPanel(self)
+        self._set_session_active_state(False)
 
     def open_tools_menu(self):
         try:
@@ -831,6 +858,7 @@ class OvaLensOperatorApp(ctk.CTk):
         is_active = is_active or self.current_session_id is not None
         station = getattr(self, "station", None)
         cycle = station.cycle if station is not None else None
+        tuning = getattr(self, "_camera_panel", None) is not None
         signature = (is_active, self.current_session_id, self.is_auto_cycle_running,
                      self._scan_busy, self._stopping, self._closing,
                      self._pending_finalization_id, self._finalization_failed,
@@ -839,7 +867,7 @@ class OvaLensOperatorApp(ctk.CTk):
                      bool(getattr(self, "_batch_complete", False)),
                      bool(self.setup_inspected.get()) if hasattr(self, "setup_inspected") else False,
                      getattr(self, "_setup_busy", False), bool(getattr(station, "calibrated", False)),
-                     bool(getattr(station, "boards", None)))
+                     bool(getattr(station, "boards", None)), tuning)
         if hasattr(self, "setup_row"):
             self._refresh_setup_controls(is_active)
         if signature == getattr(self, "_controls_signature", None):
@@ -865,15 +893,15 @@ class OvaLensOperatorApp(ctk.CTk):
             )
         blocked = self._pending_finalization_id is not None or self._finalization_failed
         setup_busy = getattr(self, "_setup_busy", False)
-        state = "disabled" if is_active or self._scan_busy or self._stopping or blocked or setup_busy else "normal"
+        state = "disabled" if is_active or self._scan_busy or self._stopping or blocked or setup_busy or tuning else "normal"
         self.batch_setup_btn.configure(state=state)
         self.settings_btn.configure(state=state)
         station = getattr(self, "station", None)
         automatic_session = station is not None and station.cycle is not None and self.current_session_id == station.cycle.session_id
-        busy = self._scan_busy or self._stopping or self._closing or self.inference_worker.busy or self.is_auto_cycle_running or automatic_session or setup_busy
+        busy = self._scan_busy or self._stopping or self._closing or self.inference_worker.busy or self.is_auto_cycle_running or automatic_session or setup_busy or tuning
         needs_setup = (station is not None and not is_active and not getattr(self, "_batch_complete", False)
                        and not (self.setup_inspected.get() if hasattr(self, "setup_inspected") else False))
-        self.session_btn.configure(state="disabled" if self._scan_busy or self._stopping or blocked or setup_busy or needs_setup or (is_active and not self.is_auto_cycle_running) else "normal",
+        self.session_btn.configure(state="disabled" if self._scan_busy or self._stopping or blocked or setup_busy or tuning or needs_setup or (is_active and not self.is_auto_cycle_running) else "normal",
                                    text="Preparing..." if setup_busy else "Stop sorting" if self.is_auto_cycle_running else "Start next batch" if getattr(self, "_batch_complete", False) else "Start sorting")
         self.scan_btn.configure(state="disabled" if busy or blocked or self._diagnostics_complete else "normal",
                                 text="Working…" if self._scan_busy else "Single Scan [SPACE]")
@@ -882,6 +910,9 @@ class OvaLensOperatorApp(ctk.CTk):
         if hasattr(self, "tools_menu"):
             self.tools_menu.entryconfigure(0, state="disabled" if busy or blocked or self._diagnostics_complete else "normal")
             self.tools_menu.entryconfigure(1, state=state)
+            self.tools_menu.entryconfigure(3, state=state)
+        if hasattr(self, "camera_controls_btn"):
+            self.camera_controls_btn.configure(state="disabled" if is_active or self._scan_busy or self._stopping or blocked or setup_busy or self._closing or self.simulation or station is None else "normal")
         if blocked:
             self.cancel_btn.pack(side="left", padx=6, pady=13, after=self.eject_btn)
 
@@ -1235,7 +1266,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
     def toggle_auto_session(self):
         """One inspected action connects, prepares and starts the normal station."""
-        if getattr(self, "_setup_busy", False) or self._stopping or self._closing:
+        if getattr(self, "_setup_busy", False) or self._stopping or self._closing or getattr(self, "_camera_panel", None) is not None:
             return
         if self.is_session_active or self.is_auto_cycle_running:
             self.stop_or_cancel_session()
@@ -1560,6 +1591,9 @@ class OvaLensOperatorApp(ctk.CTk):
 
     def trigger_candling_scan(self):
         """One click waits for a fresh camera frame, then starts bounded inference."""
+        if getattr(self, "_camera_panel", None) is not None:
+            self._log("[CAMERA] Finish camera tuning before scanning.")
+            return
         if self._closing or self._scan_busy or self._stopping or self.is_auto_cycle_running or getattr(self, "_setup_busy", False):
             return
         station = getattr(self, "station", None)
@@ -1982,7 +2016,9 @@ class OvaLensOperatorApp(ctk.CTk):
 
     @_building_dialog
     def open_batch_setup_dialog(self):
-        """Robust Modal for Batch creation, selection, and candling stage setup with Offline Format Builder."""
+        """Modal for batch creation, selection, and candling stage setup."""
+        if getattr(self, "_camera_panel", None) is not None:
+            return
         if self.current_session_id or self.is_session_active or self._scan_busy or self._stopping or self._finalization_failed or getattr(self, "_setup_busy", False):
             self._log("[BLOCKED] Finish the current session before changing batch parameters.")
             return
@@ -2379,6 +2415,8 @@ class OvaLensOperatorApp(ctk.CTk):
 
     @_building_dialog
     def open_calibration_dialog(self):
+        if getattr(self, "_camera_panel", None) is not None:
+            return
         if self.current_session_id or self.is_session_active or self._scan_busy or self._stopping or self._finalization_failed or getattr(self, "_setup_busy", False):
             self._log("[BLOCKED] Stop the session before editing calibration.")
             return

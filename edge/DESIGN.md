@@ -32,3 +32,11 @@ Keep latest-only camera buffering, single scheduled inference, background I/O,
 and cached widget refreshes. Do not add timers, animation or image assets for
 decoration. Inspect normal and minimum window sizes, idle and review states, plus
 settings; test long result labels and safety-control visibility.
+
+Idle Camera controls replaces the right record panel while retaining the main
+preview and STOP. Automatic modes sit beside their paired manual fields in the
+scrollable body. Apply, Save as default, Load saved settings and Done stay
+reachable at minimum size. Use native units and textual driver readback instead
+of guessed slider ranges. Sorting, scans and batch changes wait until Done;
+camera work runs in the background. Do not add a second camera stream or live AI
+to this panel. Blank preferences leave the current hardware value unchanged.

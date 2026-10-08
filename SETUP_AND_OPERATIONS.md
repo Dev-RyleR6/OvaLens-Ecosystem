@@ -192,7 +192,16 @@ Measured gate distances and physical acceptance remain required for the rig.
 - **R**: STOP; it does not fire the diverter.
 - **F1**: Operator guide.
 - **F11**: Kiosk/windowed display.
-- **Tools > Settings**: Camera controls, connections and measured calibration.
+- **Camera controls** above the preview (also **Tools > Camera controls**): Tune
+  the idle camera while watching its image. Set Autofocus On, or choose Off and
+  enter manual Focus. Exposure, gain, white balance and image controls are also
+  available. Scroll to reach the remaining controls. Driver feedback reports
+  unsupported requests; numeric ranges depend on the webcam.
+- **Apply to preview** applies camera changes temporarily. **Save as default**
+  applies and saves them for future launches. **Load saved settings** fills the
+  form without applying. Blank values leave properties unchanged. Click **Done**
+  and inspect the conveyor again before starting a session.
+- **Tools > Settings**: Advanced camera configuration, connections and measured calibration.
 - **Tools > Retry camera preview**: Restart the preview after fixing its connection.
 
 ---

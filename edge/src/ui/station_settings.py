@@ -64,10 +64,11 @@ class StationSettingsWindow(ctk.CTkToplevel):
         camera_labels = {"index": "Camera index", "width": "Width (pixels)", "height": "Height (pixels)", "fps": "Requested FPS",
                          "auto_exposure": "Auto exposure (native driver value)", "autofocus": "Autofocus (0 off / 1 on)",
                          "auto_white_balance": "Auto white balance (0 off / 1 on)", "exposure": "Exposure (native driver units)",
-                         "gain": "Gain", "focus": "Focus", "white_balance": "White balance temperature"}
+                         "gain": "Gain", "focus": "Focus", "white_balance": "White balance temperature",
+                         "brightness": "Brightness", "contrast": "Contrast", "saturation": "Saturation", "sharpness": "Sharpness"}
         for name in camera_labels:
             self._entry(camera, "camera." + name, camera_labels[name], "")
-        ctk.CTkLabel(camera, font=(FUTheme.FONT_FAMILY, 14), text="Blank optional fields leave the driver unchanged. DirectShow commonly uses 0.25 for manual exposure and 0.75 for automatic; verify the readback on your camera.", wraplength=760, justify="left").pack(anchor="w", padx=8, pady=10)
+        ctk.CTkLabel(camera, font=(FUTheme.FONT_FAMILY, 14), text="Blank optional fields leave the driver unchanged. DirectShow uses 0 for manual exposure and 1 for automatic. Use Camera controls beside the preview for backend-aware On / Off choices; verify readback.", wraplength=760, justify="left").pack(anchor="w", padx=8, pady=10)
         ctk.CTkCheckBox(camera, font=(FUTheme.FONT_FAMILY, 14), text="Confirm selected camera / changed device identity", variable=self.confirm_camera).pack(anchor="w", padx=8, pady=6)
         self.report.pack(fill="x", pady=(8, 0))
         self.report.insert("1.0", "No camera property report yet. Apply settings to start idle preview and inspect readback.")
