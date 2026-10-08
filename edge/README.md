@@ -24,7 +24,7 @@ environment fix. Check imports without hardware using
 Run `python edge/launcher.py` and enter the batch details. On the main screen,
 click **Use defaults & detect**, check the live camera and empty conveyor,
 tick the inspection box, and click **Prepare conveyor**. Then click **Start sorting**.
-Defaults remember **COM5 stepper**, **COM7 servo + IR**, **COM9 light**, and camera 1.
+Defaults remember **COM5 stepper**, **COM7 servo + IR**, **COM9 light**, and camera 0.
 Detection verifies the board roles and saves the settings. Install the three v3
 firmware sketches once before connecting. Camera tuning and custom calibration
 remain in **Settings**.
@@ -82,7 +82,7 @@ pip install -r requirements.txt
 API_KEY=dev-api-key-123
 API_BASE_URL=http://localhost:8000
 DEVICE_ID=STATION-01-RP5
-CAMERA_INDEX=1
+CAMERA_INDEX=0
 SERIAL_PORT=COM3
 SERIAL_BAUD=115200
 CONVEYOR_SPEED_CM_S=12.50

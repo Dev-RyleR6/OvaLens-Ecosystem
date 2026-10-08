@@ -698,7 +698,7 @@ class OvaLensOperatorApp(ctk.CTk):
             border_width=1, border_color=FUTheme.BORDER, command=self._prepare_default_station)
         self.prepare_btn.pack(side="left", padx=16, pady=4)
         self.setup_notice = ctk.CTkLabel(self.setup_row,
-            text="Start with an empty conveyor. Camera 1  |  COM5 stepper  |  COM7 servo + IR  |  COM9 light. Prepare returns the gate to neutral.",
+            text="Start with an empty conveyor. Camera 0  |  COM5 stepper  |  COM7 servo + IR  |  COM9 light. Prepare returns the gate to neutral.",
             anchor="w", justify="left", wraplength=950, font=(FUTheme.FONT_FAMILY, 12),
             text_color=FUTheme.TEXT_SECONDARY)
         self.setup_notice.pack(fill="x", pady=(0, 8))
@@ -843,7 +843,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
     def _detect_default_station(self):
         self._run_station_setup(self.station.use_defaults_and_detect,
-                                "Detecting boards and preparing camera 1…")
+                                "Detecting boards and preparing camera 0…")
 
     def _prepare_default_station(self):
         inspected = self.setup_inspected.get()

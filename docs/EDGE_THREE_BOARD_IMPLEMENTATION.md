@@ -79,7 +79,7 @@ mechanical stopping on the rig; neither simulation nor compilation proves them.
    Both launch methods prefer the project `.venv`; close and reopen an older
    running window after a package/environment fix.
 2. Empty the conveyor, then click **Use defaults & detect** on the main screen. Default ports are **COM5
-   stepper**, **COM7 servo + IR sensor**, and **COM9 light**. Camera 1 and the handoff
+   stepper**, **COM7 servo + IR sensor**, and **COM9 light**. Camera 0 and the handoff
    timing defaults load automatically. Detected roles and settings are saved.
 3. Check the live camera, empty and align the conveyor, and check the gate. Tick
    **Conveyor empty, aligned; gate checked**, then click **Prepare conveyor**.
@@ -105,8 +105,9 @@ measured distances when calibrating the physical rig.
 2. Open Settings, choose **Three-board candling rig**, and **Load selected rig
    defaults** if migrating. Existing saved profiles stay two-board until changed.
 3. Discover the three boards or enter their separate COM ports. Apply, then Connect.
-   Profile or camera-index changes require camera confirmation. Camera 1 and
-   1280x720 are handoff starting values; check the actual device/readback.
+   Profile or camera-index changes require camera confirmation. Camera 0 is the
+   user-selected default (the original handoff specified 1); 1280x720 remains the
+   starting resolution. Check the actual device/readback.
 4. Inspect the unloaded mechanisms and acknowledge faults. Deliberately release
    hardware pause before an alignment jog; establish software home only after
    inspection. Stopping and reconnecting do not restore permission to sort.

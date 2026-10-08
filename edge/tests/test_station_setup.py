@@ -29,7 +29,7 @@ def station_fixture(tmp_path, monkeypatch, roles=None):
     monkeypatch.setattr("src.core.station.ThreeBoardController", lambda *ports: ThreeBoardController(*ports, serial_factory=factory))
     def apply(settings):
         applied.append(settings)
-        return {"identity": "opencv:1:DSHOW", "properties": {}}
+        return {"identity": f"opencv:{settings.index}:DSHOW", "properties": {}}
     camera = SimpleNamespace(apply_settings=apply, is_mock_mode=False, last_error=None,
                              snapshot=lambda: object())
     inference = SimpleNamespace(engine=SimpleNamespace(model_contract_verified=True),
@@ -49,7 +49,7 @@ def test_defaults_detect_and_prepare_without_conveyor_travel(tmp_path, monkeypat
         message = station.use_defaults_and_detect()
         assert "COM5" in message and "COM7" in message and "COM9" in message
         assert opened[:3] == ["COM5", "COM7", "COM9"]
-        assert len(applied) == 1 and applied[0].index == 1
+        assert len(applied) == 1 and applied[0].index == 0
         assert station.store.load().snapshot() == station.settings.snapshot()
         assert not station.calibrated and not commands(wires)
         assert all(link.snapshot().telemetry["FAULT"] == "STARTUP_ACK_REQUIRED" for link in station.board_links())

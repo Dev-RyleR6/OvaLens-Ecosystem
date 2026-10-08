@@ -118,7 +118,7 @@ def test_station_settings_builds_without_camera_or_board_access(hidden_ui, tmp_p
     window.profile.set("Three-board candling rig")
     window._rig_defaults()
     three = window._values()
-    assert three.rig_profile == "three_v3" and three.camera.index == 1
+    assert three.rig_profile == "three_v3" and three.camera.index == 0
     assert three.calibration.fertile_angle == 180 and three.calibration.buffer_drain == 6
     assert three.calibration.settle_ms == 700 and three.calibration.hold_ms == 1500
     assert not station.halt.called

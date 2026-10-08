@@ -150,7 +150,7 @@ def test_v3_reports_are_atomic_correlated_and_events_are_bounded():
 @pytest.mark.parametrize("fault", ["low", "missing", "duplicate", "case"])
 def test_three_board_configuration_and_saved_profile_migration(tmp_path, fault):
     settings = EdgeSettings.three_board()
-    assert (settings.camera.index, settings.calibration.fertile_angle, settings.calibration.speed_us) == (1, 180, 3000)
+    assert (settings.camera.index, settings.calibration.fertile_angle, settings.calibration.speed_us) == (0, 180, 3000)
     settings.conveyor_port, settings.servo_port, settings.light_port = "COM1", "COM2", "COM3"
     if fault == "low":
         settings.detection.sort_confidence = .74
