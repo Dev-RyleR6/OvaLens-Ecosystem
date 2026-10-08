@@ -26,6 +26,8 @@ class CameraSettings:
     contrast: float | None = None
     saturation: float | None = None
     sharpness: float | None = None
+    # UI tuning spans, not hardware-reported limits.
+    slider_ranges: dict[str, list[float]] = field(default_factory=dict)
 
 
 @dataclass
@@ -103,6 +105,8 @@ class EdgeSettings:
         integer(c.fps, 1, 120, "FPS")
         if not isinstance(c.identity, str):
             raise ValueError("Camera identity must be text")
+        from .camera_controls import validate_slider_ranges
+        validate_slider_ranges(c.slider_ranges)
         for name in ("exposure", "gain", "focus", "white_balance", "auto_exposure", "autofocus", "auto_white_balance",
                      "brightness", "contrast", "saturation", "sharpness"):
             value = getattr(c, name)

@@ -1075,9 +1075,12 @@ class OvaLensOperatorApp(ctk.CTk):
             return
         station = getattr(self, "station", None)
         request = getattr(self, "_setup_request", None)
+        panel = getattr(self, "_camera_panel", None)
+        if panel is not None:
+            panel.cancel_alignment()
         if request:
             request["cancel"].set()
-        if station and (station.active or getattr(self, "_setup_busy", False)):
+        if station and (station.active or getattr(self, "_setup_busy", False) or getattr(self, "_camera_panel", None) is not None):
             station.halt()
         completed = getattr(self, "_automatic_complete_cycle", None)
         if completed is not None and self.current_session_id == completed.session_id:
@@ -1671,6 +1674,9 @@ class OvaLensOperatorApp(ctk.CTk):
                           OperatorState.REVIEW)
 
     def trigger_manual_eject(self):
+        panel = getattr(self, "_camera_panel", None)
+        if panel is not None:
+            panel.cancel_alignment()
         station = getattr(self, "station", None)
         if station:
             station.halt()

@@ -65,7 +65,10 @@ an earlier arrival holds the rig for inspection to protect the previous egg's ro
 Before starting a session, click **Camera controls** above the preview (also under
 **Tools > Camera controls**). The side panel keeps the image visible while you
 change autofocus, exposure, gain, white balance, brightness, contrast, saturation
-or sharpness. Scroll for additional controls. Turn an automatic mode **Off** to
+or sharpness. Drag a slider or type an exact value, then Apply. Scroll for
+additional controls. **Range** edits a slider's minimum and maximum; these are
+editable tuning spans, not hardware-reported limits. Custom spans save with
+camera defaults. Turn an automatic mode **Off** to
 edit its corresponding manual value; **On** clears that manual preference.
 
 - **Apply to preview** sends the values to the current camera without saving.
@@ -81,6 +84,24 @@ sharpness: inspect a stationary egg in the preview. Camera tuning is locked
 during sessions and scans. Applying changes clears the inspection confirmation;
 check the rig again before Start sorting. Preview-only changes remain in memory
 until restart; Save as default keeps them for the next launch.
+
+To position a cradle for camera calibration, open the **Cradle** section:
+
+1. Check that the movement path is clear and keep hands away from the mechanism.
+2. Tick the path confirmation and click **Connect for alignment**. This opens the
+   saved COM5/COM7/COM9 links, acknowledges startup/STOP faults, holds the belt and
+   turns on the candling light. Other faults require inspection in Settings.
+3. Start with **10** or **25 steps per click**, then click **Forward** or
+   **Backward**. Each click makes one slow move and holds again. The IR sensor
+   can stop a move early; actual movement and software position appear below.
+4. Switch to **Camera**, adjust focus/exposure while stopped, then Save as default.
+5. Click **Done** to hold the conveyor and turn the light off. Re-inspect and align
+   the empty rig before sorting; normal preparation restores the saved speed.
+
+Jogs are limited to 1000 steps per click and use a 5000us pulse half-period.
+Forward follows the configured conveyor direction. No home reference is reset
+by these controls. **STOP [R]** cancels motion; reconnect explicitly after
+inspection. Automatic scans and sorting stay blocked while this panel is open.
 
 ## 🌟 Key Subsystem Features
 

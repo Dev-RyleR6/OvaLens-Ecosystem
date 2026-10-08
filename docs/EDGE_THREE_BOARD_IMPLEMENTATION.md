@@ -472,3 +472,38 @@ session locks, a retryable storage error and shutdown. Visual inspection at
 1280x860 and 1024x720 covered the panel, error feedback and closed state using a
 saved image and fake camera adapter. No physical camera or serial board was
 opened. The local previous-model override is retained.
+
+## Camera sliders and cradle alignment
+
+`TASK-NEW-EDGE-CAMERA-ALIGN-01` adds draggable numeric camera sliders paired with
+exact entries. Dragging edits the pending form only; Apply sends one camera-owner
+request. Automatic On disables its paired manual slider. Range exposes editable
+minimum/maximum tuning spans, stored under `camera.slider_ranges` in the station
+JSON. Defaults are UI starting spans, not queried driver limits. Existing saved
+values outside a span expand its display without silently changing the value.
+
+The Cradle section prepares an explicit, inspected three-v3 alignment operation
+on saved ports. Healthy links are reused; startup/STOP faults may be acknowledged.
+Other faults require inspection. Setup holds the egg-board pause, selects 5000us
+stepper half-period and turns on the candling lamp; it does not home the belt or
+move the sorting gate. Opening serial links may reset boards to boot positions.
+
+Each signed jog is limited to 1..1000 steps. It checks idle/healthy reports,
+releases pause, verifies the hardware input, dispatches one correlated JOG,
+awaits final position/BUSY=0 and reasserts pause. Partial movement caused by the
+sensor is reported. Unexpected completion, timeout or command failure halts all
+boards and revokes alignment readiness; motion is never retried automatically.
+STOP sets a persistent per-panel cancellation event before halting, including
+while setup is queued. Done holds and turns off the lamp. Camera and serial I/O
+stay on workers, and normal sorting preparation restores configured speed and
+requires renewed empty-rig inspection. Current model selection is unchanged.
+
+Verification passed the full gate: **22 backend tests**, **376 edge tests**, and
+dashboard production build. Focused tests cover slider/native entry synchronization,
+saved spans, automatic/manual locks, signed jogs, early sensor stopping, busy and
+fault rejection, command timeout, failed pause, no motion retry, queued STOP and
+STOP before a completed worker's UI callback. Native inspection at 1280x860 and
+1024x720 confirmed visible focus slider, cradle controls, live preview and STOP.
+Screenshots use a saved capture; camera/board adapters are fake. No physical
+camera or connected ESP32 was operated, and physical cradle alignment remains
+an operator check on the rig.

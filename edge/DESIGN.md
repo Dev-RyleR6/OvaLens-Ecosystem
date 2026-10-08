@@ -36,7 +36,10 @@ settings; test long result labels and safety-control visibility.
 Idle Camera controls replaces the right record panel while retaining the main
 preview and STOP. Automatic modes sit beside their paired manual fields in the
 scrollable body. Apply, Save as default, Load saved settings and Done stay
-reachable at minimum size. Use native units and textual driver readback instead
-of guessed slider ranges. Sorting, scans and batch changes wait until Done;
+reachable at minimum size. Sliders pair with exact numeric values and editable
+Range fields; spans are explicitly not camera-reported limits. Use native units
+and textual driver readback. Camera and Cradle sections share the same panel.
+Cradle uses one path confirmation, explicit connection and discrete short
+Forward/Backward moves; keep STOP visible throughout. Sorting, scans and batch changes wait until Done;
 camera work runs in the background. Do not add a second camera stream or live AI
 to this panel. Blank preferences leave the current hardware value unchanged.

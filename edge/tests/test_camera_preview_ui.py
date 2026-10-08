@@ -109,3 +109,87 @@ def test_camera_controls_apply_save_restore_and_error_without_hardware(hidden_ui
     finally:
         app.shutdown()
         app.mainloop()
+
+
+def test_slider_drag_span_and_cradle_stop_during_background_move(hidden_ui, tmp_path):
+    import threading
+    from test_camera_alignment import AlignmentRig
+    app, camera, applied = preview_app(tmp_path)
+    rig = app.station.boards = AlignmentRig()
+    errors = []
+    app.report_callback_exception = lambda *args: errors.append(args)
+    started, release = threading.Event(), threading.Event()
+    try:
+        app.deiconify()
+        app.open_camera_controls()
+        panel = app._camera_panel
+        panel.modes["autofocus"].set("Off")
+        panel._manual_states()
+        app.update()
+        slider = panel.sliders["focus"]
+        slider._canvas.event_generate("<Button-1>", x=slider.winfo_width() // 2, y=8)
+        app.update()
+        assert float(panel.entries["focus"].get()) > 0
+        assert not applied  # Dragging does not queue camera or serial work.
+        _, low, high = panel.range_fields["focus"]
+        for entry, value in ((low, "-10"), (high, "300")):
+            entry.delete(0, "end")
+            entry.insert(0, value)
+        panel._set_range("focus")
+        panel.apply(save=True)
+        finish(app, panel)
+        assert app.station.store.load().camera.slider_ranges["focus"] == [-10, 300]
+        panel.modes["autofocus"].set("On")
+        panel._manual_states()
+        assert slider.cget("state") == "disabled"
+        panel.section.set("Cradle")
+        panel._section("Cradle")
+        for width, height in ((1280, 860), (1024, 720)):
+            app.geometry(f"{width}x{height}")
+            app.update()
+            for control in (panel.connect_alignment, *panel.jog_buttons, app.eject_btn):
+                assert control.winfo_ismapped()
+                assert control.winfo_rooty() + control.winfo_height() <= app.winfo_rooty() + app.winfo_height()
+        panel._prepare_alignment()
+        assert not rig.calls
+        panel.path_clear.set(True)
+        panel._alignment_states()
+        panel._prepare_alignment()
+        # STOP after worker completion but before its UI callback must win.
+        deadline = time.monotonic() + 2
+        while app.station._camera_alignment_boards is None and time.monotonic() < deadline:
+            time.sleep(.005)
+        assert app.station._camera_alignment_boards is not None
+        app.trigger_manual_eject()
+        finish(app, panel)
+        assert not panel.alignment_ready and "Alignment stopped" in panel.notice.cget("text")
+        panel.path_clear.set(True)
+        panel._prepare_alignment()
+        finish(app, panel)
+        assert panel.alignment_ready
+        def delayed(role, text):
+            if text.startswith("JOG:"):
+                started.set()
+                assert release.wait(2)
+        rig.before_command = delayed
+        panel._jog(-1)
+        deadline = time.monotonic() + 2
+        while not started.is_set() and time.monotonic() < deadline:
+            app.update()
+            time.sleep(.005)
+        assert started.is_set() and panel.pending
+        assert panel.done.cget("state") == "disabled"
+        panel._jog(1)
+        app.trigger_manual_eject()
+        assert panel.alignment_cancel.is_set() and not panel.path_clear.get() and rig.halts
+        release.set()
+        finish(app, panel)
+        assert not panel.alignment_ready
+        assert [text for _, text, _ in rig.calls if text.startswith("JOG:")] == ["JOG:-25"]
+        assert "Setup stopped" in panel.notice.cget("text")
+        panel.close()
+        assert app._camera_panel is None and not errors
+    finally:
+        release.set()
+        app.shutdown()
+        app.mainloop()

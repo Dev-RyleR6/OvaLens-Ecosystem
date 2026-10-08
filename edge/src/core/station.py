@@ -26,6 +26,7 @@ class EdgeStation:
         self.recovery = db.load_machine_state(device_id)
         self._lock = threading.RLock()
         self._setup_cancel = threading.Event()
+        self._camera_alignment_boards = None
 
     @property
     def active(self):
@@ -90,6 +91,7 @@ class EdgeStation:
     def connect(self, cancel=None):
         with self._lock:
             self.require_idle()
+            self._camera_alignment_boards = None
             self.calibrated = False
             if self.boards:
                 self.boards.stop()
@@ -272,6 +274,109 @@ class EdgeStation:
             link = links[role]
             return link.command(text, timeout).result(timeout + .5)
 
+    def prepare_camera_alignment(self, inspected, cancel=None):
+        """Explicit idle alignment setup: connect, hold, slow jog speed and lamp."""
+        with self._lock:
+            self.require_idle()
+            if not inspected:
+                raise RuntimeError("Check the cradle path is clear before connecting for alignment")
+            if self.settings.rig_profile != "three_v3":
+                raise RuntimeError("Camera alignment controls require the three-board v3 rig")
+            if self.settings_error:
+                raise RuntimeError(self.settings_error + " Correct saved settings before alignment.")
+            self._check_setup_cancel(cancel)
+            self._setup_cancel.clear()
+            def check():
+                self._check_setup_cancel(cancel)
+                self._check_setup_cancel(self._setup_cancel)
+            self.calibrated = False
+            self._camera_alignment_boards = None
+            try:
+                reusable = self.boards is not None and not self.boards.failure and all(
+                    link.snapshot().connected and link.snapshot().identified and not link.snapshot().error
+                    for link in self.board_links())
+                if not reusable:
+                    self.connect(cancel=cancel or self._setup_cancel)
+                for link in self.board_links():
+                    check()
+                    state = link.snapshot()
+                    if state.telemetry.get("BUSY") != "0":
+                        raise RuntimeError("Wait for all boards to stop before alignment")
+                    fault = state.telemetry.get("FAULT")
+                    if fault not in {"NONE", "STARTUP_ACK_REQUIRED", "EMERGENCY_STOP"}:
+                        raise RuntimeError("Inspect board faults in Tools / Settings before alignment")
+                    if fault != "NONE":
+                        link.command("ACK_FAULT").result(3.5)
+                for link, text in ((self.boards.egg, "PAUSE"), (self.boards.conveyor, "SPEED:5000"),
+                                   (self.boards.light, "LIGHT_ON")):
+                    check()
+                    link.command(text).result(3.5)
+                check()
+                self._camera_alignment_boards = self.boards
+                check()
+                return "Alignment ready. Lamp on; conveyor held. Choose a short jog."
+            except Exception:
+                self.halt()
+                raise
+
+    def jog_camera_cradle(self, steps, cancel=None):
+        """One bounded manual move; no home reset, classification or automatic retry."""
+        if type(steps) is not int or not 1 <= abs(steps) <= 1000:
+            raise ValueError("Choose 1 to 1000 steps per jog")
+        with self._lock:
+            self.require_idle()
+            if self.boards is None or self._camera_alignment_boards is not self.boards:
+                raise RuntimeError("Connect for alignment before jogging the cradle")
+            self.calibrated = False
+            def check():
+                self._check_setup_cancel(cancel)
+                self._check_setup_cancel(self._setup_cancel)
+            try:
+                check()
+                for link in self.board_links():
+                    state = link.snapshot()
+                    if (not state.connected or not state.identified or state.error
+                            or state.telemetry.get("FAULT") != "NONE" or state.telemetry.get("BUSY") != "0"):
+                        raise RuntimeError("Alignment requires healthy, stopped boards")
+                conveyor = self.boards.conveyor
+                before = int(conveyor.command("STATUS").result(3.5)["POSITION"])
+                check()
+                self.boards.egg.command("RESUME").result(3.5)
+                check()
+                state = conveyor.command("STATUS").result(3.5)
+                if state.get("PAUSED") != "0" or state.get("BUSY") != "0" or state.get("FAULT") != "NONE":
+                    raise RuntimeError("Hardware pause is still active; inspect the pause wiring")
+                check()
+                timeout = 3 + abs(steps) * .01  # 5000 us half-period: 10ms per step.
+                result = conveyor.command(f"JOG:{steps}", timeout).result(timeout + .5)
+                check()
+                actual = int(result["POSITION"]) - before
+                if (result.get("BUSY") != "0" or result.get("FAULT") != "NONE"
+                        or not 0 <= actual * (1 if steps > 0 else -1) <= abs(steps)):
+                    raise RuntimeError("Unexpected jog completion; inspect the cradle position")
+                self.boards.egg.command("PAUSE").result(3.5)
+                check()
+                note = " (sensor held the move early)" if actual != steps else ""
+                return f"Cradle moved {actual} steps; position {result['POSITION']}. Conveyor held{note}."
+            except Exception:
+                self.halt()
+                raise
+
+    def finish_camera_alignment(self):
+        with self._lock:
+            if self._camera_alignment_boards is None:
+                return
+            self._camera_alignment_boards = None
+            self.calibrated = False
+            try:
+                self._check_setup_cancel(self._setup_cancel)
+                self.boards.egg.command("PAUSE").result(3.5)
+                self._check_setup_cancel(self._setup_cancel)
+                self.boards.light.command("LIGHT_OFF").result(3.5)
+            except Exception:
+                self.halt()
+                raise
+
     def validate_calibration(self, inspected, cancel=None, other_cancel=None):
         with self._lock:
             self.require_idle()
@@ -314,6 +419,8 @@ class EdgeStation:
     def start_cycle(self, batch_id, target, operator):
         with self._lock:
             self.require_idle()
+            if self._camera_alignment_boards is not None:
+                raise RuntimeError("Finish camera alignment before sorting")
             batch_id, operator, target = validate_batch_config(batch_id, operator, target, "DAY_10")
             if not self.calibrated or not self.boards:
                 raise RuntimeError("Validate calibration and holder alignment before sorting")
@@ -331,6 +438,7 @@ class EdgeStation:
 
     def halt(self):
         self._setup_cancel.set()
+        self._camera_alignment_boards = None
         self.calibrated = False
         if self.cycle:
             self.cycle.stop()

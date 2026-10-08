@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-CAMERA-ALIGN-01**: Add camera-value sliders with editable saved spans and idle cradle alignment controls; bound each stepper jog, restore hardware pause, preserve STOP cancellation and verify with fake devices and native UI.
+
 - [x] **TASK-NEW-EDGE-CAMERA-PREVIEW-01**: Add an idle camera-control panel beside live preview with autofocus, exposure, gain, white balance and image controls; background camera-only application, driver readback, saved defaults, operation locks and fake-device/native UI verification.
 
 - [x] **TASK-NEW-EDGE-MODEL-V3-01**: Export the supplied best_v3.pt to a verified two-class ONNX detector, prefer the installed v3 export while preserving explicit model overrides and the prior export, and verify offline predictions, provenance and latency without hardware.
