@@ -37,10 +37,10 @@ Feed one egg only when the large instruction says **Feed next egg**. Wait throug
 appear when needed. At the target, the station finishes the last gate passage,
 saves final totals locally and shows **Start next batch** on the same screen.
 The three-board result hold defaults to **300ms**; saved custom timings remain
-unchanged. Camera settling remains 700ms and evidence checks remain intact.
+unchanged. Pre-capture settling defaults to 1500ms; evidence checks remain intact.
 
 The camera preview stays on while eggs move. Automatic AI and bounding boxes
-start only after the sensor stop is confirmed, the lamp is on, and the 700ms
+start only after the sensor stop is confirmed, the lamp is on, and the 1500ms default
 settling period finishes. Three fresh predictions spaced at least 150ms apart
 must agree over at least 300ms. The displayed box stays on its captured image;
 it clears when movement resumes. Low confidence or disagreement holds the egg

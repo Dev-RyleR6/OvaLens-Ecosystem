@@ -35,6 +35,58 @@ def held_cycle(tmp_path):
     return cycle, rig
 
 
+@pytest.mark.parametrize("result_hold", [0, 300, 1500])
+def test_capture_waits_after_lamp_before_fresh_frame_and_inference(tmp_path, result_hold):
+    """TASK-NEW-EDGE-CAPTURE-SETTLE-01: the result pause cannot shorten settling."""
+    from src.core.settings import EdgeSettings
+    cycle, rig = held_cycle(tmp_path)
+    cycle.settings.calibration.settle_ms = EdgeSettings.three_board().calibration.settle_ms
+    cycle.settings.calibration.hold_ms = result_hold
+    events = []
+    def settle(seconds):
+        assert rig.light.values["LIGHT"] == "1"
+        assert rig.egg.values["STATE"] == "HOLDING"
+        assert rig.conveyor.values["PAUSED"] == "1"
+        assert seconds == 1.5
+        events.append("settle")
+    cycle._delay = settle
+    capture = cycle.camera.capture_fresh
+    def fresh(drain, timeout):
+        assert events == ["settle"] and drain == 6
+        events.append("fresh")
+        return capture(drain, timeout=timeout)
+    cycle.camera.capture_fresh = fresh
+    def predict(*args, **kwargs):
+        assert events[:2] == ["settle", "fresh"]
+        events.append("inference")
+        return prediction()
+    cycle.inference = SimpleNamespace(predict=predict)
+    _, evidence = ThreeBoardCycle._capture(cycle)
+    assert events == ["settle", "fresh", "inference", "inference", "inference"]
+    assert evidence["settle_ms"] == 1500 and evidence["frames"] == 3
+    assert evidence["span_ms"] >= 300
+    assert not any(text == "RESUME" for _, text, _, _ in rig.trace)
+
+
+def test_stop_during_longer_settle_prevents_capture_and_inference(tmp_path):
+    import threading
+    cycle, _ = held_cycle(tmp_path)
+    cycle.settings.calibration.settle_ms = 1500
+    cycle.camera.capture_fresh = Mock()
+    cycle.inference = SimpleNamespace(predict=Mock())
+    timer = threading.Timer(.05, cycle.stop)
+    timer.start()
+    try:
+        with pytest.raises(RuntimeError, match="Operator stopped"):
+            ThreeBoardCycle._capture(cycle)
+        cycle.camera.capture_fresh.assert_not_called()
+        cycle.inference.predict.assert_not_called()
+        assert cycle.db.get_unsynced_count() == 0
+    finally:
+        timer.cancel()
+        timer.join()
+
+
 @pytest.mark.parametrize("change", ["busy", "pause", "sequence", "position", "lamp", "revision", "stop"])
 def test_late_prediction_cannot_survive_changed_capture_conditions(tmp_path, change):
     cycle, rig = held_cycle(tmp_path)

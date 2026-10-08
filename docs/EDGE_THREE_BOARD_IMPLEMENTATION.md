@@ -119,7 +119,7 @@ Default gate distances are starting estimates requiring physical measurement.
    encountered while draining require recovery, rather than an unrecorded route.
 
 Defaults: speed 3000us half-period, fertile 180 / infertile 120 / neutral 90,
-settle 700ms, six buffer grabs, display hold 300ms, search timeout 30 seconds,
+settle 1500ms, six buffer grabs, display hold 300ms, search timeout 30 seconds,
 detection threshold 0.30 and automatic-sort threshold 0.85 (minimum 0.75).
 The default gate exit is 417 steps from capture, approximately 2.5 seconds of
 movement at the default speed. This estimate must be replaced with measured
@@ -143,7 +143,7 @@ Predictions use three fresh frames spaced at least 150ms apart, avoiding redunda
 AI work during the 300ms evidence interval. Before and after each prediction the
 host checks health, stopped position, pause, held egg sequence and lamp ON.
 Camera-setting changes and late results after a stop/fault are discarded.
-The 700ms camera settle remains unchanged. The new three-board display hold is
+The three-board camera settle defaults to 1500ms after lamp ON confirmation. The display hold is
 300ms; explicitly saved timings are retained. This extra result pause occurs
 after the sorting servo has confirmed completion. The two-second evidence deadline remains bounded.
 
@@ -350,3 +350,32 @@ Verification used synthetic camera/serial adapters only:
 The existing stopped evidence, WAL-before-release and gate-before-resume tests
 passed in the full edge gate. Physical sorting accuracy and measured throughput
 remain part of the rig acceptance checks, rather than software-test claims.
+
+
+## Capture-settling adjustment
+
+`TASK-NEW-EDGE-CAPTURE-SETTLE-01`, 2026-10-09: the operator reported blurred
+captures and lower confidence. The previous three-board pre-capture pause was
+700ms. The new default is **1500ms after confirmed lamp ON**, while the egg is
+held and the conveyor is stopped. This adds 800ms per egg before flushing six
+camera frames and collecting the existing three-frame evidence. The **300ms
+post-classification result hold** is separate and remains unchanged.
+
+The remembered settings on this machine were changed from 700ms to 1500ms only
+for this pre-capture pause. Camera 0, COM5/COM7/COM9, camera controls, confidence
+thresholds, gate calibration and result hold remain as saved. Other saved custom
+settle values remain respected. Capture evidence now includes the configured
+`settle_ms` alongside frame-drain and evidence timing.
+
+This is a conservative first adjustment, not a measured blur correction. If the
+held image stays blurred after the longer pause, inspect focus, exposure and egg
+vibration with the lamp on. A lower confidence threshold would not correct image
+quality. Physical sharpness and throughput must be observed on the actual rig.
+
+Software verification: **37 focused regressions passed**; the required gate
+passed **22 backend tests**, **329 edge tests / 1 shared-process Tk skip**, and
+the dashboard build. The skipped Tk lifecycle test passed in a fresh process.
+The capture-order regression checks lamp ON, a configured 1.5-second settling
+pause, six-frame drain and three predictions in that order, independently of
+the result-display hold. STOP during the settling pause prevents capture and
+inference. Tests use fake camera/serial adapters; no device was activated.

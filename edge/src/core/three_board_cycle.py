@@ -82,7 +82,7 @@ class ThreeBoardCycle(SortingCycle):
         self._state("CLASSIFYING", holder=self.count + 1)
         try:
             result, evidence = self._collect_evidence(after, revision, frame)
-            return result, {**evidence, "buffer_drain": k.buffer_drain}
+            return result, {**evidence, "buffer_drain": k.buffer_drain, "settle_ms": k.settle_ms}
         finally:
             view = self.capture_view
             if view is not None:

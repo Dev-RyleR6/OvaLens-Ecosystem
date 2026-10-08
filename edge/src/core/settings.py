@@ -70,7 +70,8 @@ class EdgeSettings:
         settings.camera.index = 0
         settings.detection.confidence = .30
         settings.calibration.speed_us = 3000
-        settings.calibration.settle_ms = 700
+        # Allow the stopped egg and camera controls to settle before fresh capture.
+        settings.calibration.settle_ms = 1500
         settings.calibration.hold_ms = 300
         settings.calibration.fertile_angle = 180
         # 2.5 s at 3000 us half-period is about 417 steps to gate exit.

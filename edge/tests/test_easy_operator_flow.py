@@ -157,12 +157,14 @@ def test_combined_setup_preserves_calibration_and_reuses_healthy_connections(tmp
     station, opened, wires, _ = station_fixture(tmp_path, monkeypatch)
     station.settings.camera.exposure = -7
     station.settings.calibration.hold_ms = 800
+    station.settings.calibration.settle_ms = 1900
     station.settings.calibration.sorter_steps = 900
     try:
         station.prepare_for_sorting(True, threading.Event())
         saved = station.store.load()
         assert saved.camera.exposure == -7
         assert saved.calibration.hold_ms == 800 and saved.calibration.sorter_steps == 900
+        assert saved.calibration.settle_ms == 1900
         assert saved.camera.index == 0 and saved.camera.identity
         initial = len(opened)
         station.prepare_for_sorting(True, threading.Event())

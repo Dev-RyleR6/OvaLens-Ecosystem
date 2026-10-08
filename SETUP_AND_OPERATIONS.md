@@ -183,7 +183,7 @@ updating firmware. See [wiring, calibration and verification](docs/EDGE_THREE_BO
 
 Defaults: camera **0**, **COM5 stepper**, **COM7 servo + IR**, **COM9 light**. Saved
 camera controls and gate calibration are retained. New three-board display hold
-is **300ms**; the **700ms** camera settle and evidence/servo checks are preserved.
+is **300ms**; pre-capture settling defaults to **1500ms** and evidence/servo checks are preserved.
 Measured gate distances and physical acceptance remain required for the rig.
 
 ### 3. Keyboard Shortcuts & Tools
