@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-OFFCENTER-01**: Permit stable single-egg automatic sorting anywhere in the camera frame at the configured confidence threshold; remove the fixed central-position veto while retaining geometry validation, fresh agreeing captures, durable scan evidence and confirmed gate-before-release ordering. Replay the recorded off-centre capture with simulated hardware.
+
 - [x] **TASK-NEW-EDGE-SESSION-SYNC-01**: Diagnose missing dashboard batches, replay completed session timestamps durably after scan acknowledgements, report missing batches explicitly, prevent one blocked session from starving other scans, and refresh/display candling completion in the dashboard. Preserve pending evidence and verify offline/restart recovery without hardware.
 
 - [x] **TASK-NEW-EDGE-CONFIDENCE-70-01**: Lower automatic sorting defaults, minimum and this station's saved threshold to 0.70; retain stopped evidence and review below the configured threshold, permit durable 70% decisions and align synced review metrics/filtering with explicit review actions. Verify boundaries, persistence and backend counts without hardware.

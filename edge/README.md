@@ -63,6 +63,14 @@ Existing saved thresholds are retained unless edited. Manual diagnostic scans
 keep their 75% review threshold. Confidence bands in backend history are separate
 from the actual sorting/review action.
 
+An off-centre egg can sort automatically: the preview crosshair is an alignment
+guide, not a mandatory acceptance zone. A single IR-stopped egg must still have
+valid geometry, meet the saved confidence threshold in all three fresh frames,
+and retain the same class and stable box position. Multiple eggs, low confidence,
+invalid geometry or inconsistent captures require manual review. Restart Edge
+when the station is idle after updating; an existing review is not automatically
+accepted or released by a code change.
+
 After classification is saved locally, the sorting servo positions and confirms
 completion **before the stepper resumes**. Its angle stays set through the
 calibrated gate exit. Feed the next egg when the status says **Feed next egg**;

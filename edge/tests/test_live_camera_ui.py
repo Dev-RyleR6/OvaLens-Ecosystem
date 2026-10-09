@@ -5,6 +5,11 @@ from unittest.mock import Mock
 
 from test_camera_preview_ui import preview_app, finish, hidden_ui
 
+# Windows can spend several seconds processing initial Tk layout in a full run.
+# Keep the simulated camera held until the test explicitly releases it, with a
+# finite backstop if the test fails to reach its cleanup/release path.
+SIMULATED_CAMERA_HOLD_TIMEOUT_S = 10
+
 
 def pump(app, condition, timeout=3):
     deadline = time.monotonic() + timeout
@@ -21,7 +26,7 @@ def test_live_edits_coalesce_stay_responsive_and_save_explicitly(hidden_ui, tmp_
     def slow(settings, **kwargs):
         if not entered.is_set():
             entered.set()
-            assert release.wait(2)
+            assert release.wait(SIMULATED_CAMERA_HOLD_TIMEOUT_S)
         return original(settings, **kwargs)
     camera.apply_settings = slow
     errors = []
@@ -134,7 +139,7 @@ def test_save_and_done_wait_for_live_request_without_losing_latest_edit(hidden_u
     def slow(settings, **kwargs):
         if not entered.is_set():
             entered.set()
-            assert release.wait(2)
+            assert release.wait(SIMULATED_CAMERA_HOLD_TIMEOUT_S)
         return original(settings, **kwargs)
     camera.apply_settings = slow
     try:

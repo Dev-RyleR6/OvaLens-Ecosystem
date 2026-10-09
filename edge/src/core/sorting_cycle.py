@@ -69,9 +69,11 @@ class StableEvidence:
                 raise ReviewRequired("Detection and classification evidence disagree")
             if (len(bbox) != 4 or not all(type(v) in (int, float) and math.isfinite(v) for v in bbox)
                     or not all(0 <= v <= 1 for v in bbox) or bbox[2] <= 0 or bbox[3] <= 0
-                    or not .65 <= bbox[2] / bbox[3] <= 1.45
-                    or abs(bbox[0] - .5) > .15 or abs(bbox[1] - .5) > .15):
-                raise ReviewRequired("Egg position or geometry requires inspection")
+                    or not .65 <= bbox[2] / bbox[3] <= 1.45):
+                raise ReviewRequired("Egg geometry requires inspection")
+            # The IR stop associates this single egg with its holder. Camera
+            # framing need not place it in the central 30% of the image;
+            # movement is checked against the next fresh frame below.
         if self.samples:
             previous = self.samples[-1]
             if stamp <= previous[0]:
