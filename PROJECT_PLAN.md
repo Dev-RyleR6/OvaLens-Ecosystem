@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-PAUSE-01**: Pause and resume an active three-board sorting session at a stopped boundary, preserving durable scans, counts, holder positions and gate state while the app stays open; verify hold/resume checks and native operator controls without hardware.
+
 - [x] **TASK-NEW-EDGE-MANUAL-LIGHT-01**: Add a visible manual candling light switch with confirmed board state, lamp-only connection, automatic-mode locks, watchdog renewal, STOP/shutdown cancellation and hardware-free operator tests.
 
 - [x] **TASK-NEW-EDGE-IMAGE-SYNC-01**: Save paired scan photos locally and synchronize them through a durable independent image outbox; verify retry acknowledgements, backend JPEG storage, scan history image routing and persistent container storage without hardware.

@@ -7,6 +7,7 @@ from dataclasses import asdict
 import heapq
 import math
 import queue
+import threading
 import time
 import uuid
 from .capture_view import CaptureView
@@ -34,6 +35,103 @@ class ThreeBoardCycle(SortingCycle):
         self._detected_events = set()
         self._gate_holder = None
         self._search_deadline = None
+        self._pause_requested = threading.Event()
+        self._resume_requested = threading.Event()
+        self._pause_context = None
+
+    @property
+    def pause_requested(self):
+        return self._pause_requested.is_set()
+
+    @property
+    def resume_requested(self):
+        return self._resume_requested.is_set()
+
+    def request_pause(self):
+        """Ask the worker to pause at a completed motion/capture boundary."""
+        if not self.active or self._stop.is_set() or self.status["state"] in {
+                "COMPLETE", "RECOVERY_REQUIRED", "RESUMING"}:
+            raise RuntimeError("Sorting is not available to pause")
+        self._pause_requested.set()
+
+    def resume(self):
+        """Signal only; the worker verifies the held rig before releasing it."""
+        if (not self.active or self._stop.is_set() or self.status["state"] != "PAUSED"
+                or self._pause_context is None):
+            raise RuntimeError("Sorting is not paused")
+        self._resume_requested.set()
+
+    def _check_paused(self):
+        self._health()
+        context = self._pause_context
+        egg = self.boards.egg.snapshot().telemetry
+        conveyor = self.boards.conveyor.snapshot().telemetry
+        self._events()
+        allowed_states = {context["state"]}
+        if context["state"] == "CLEARING":
+            allowed_states.add("WAITING")
+        if (conveyor.get("POSITION") != context["position"] or conveyor.get("BUSY") != "0"
+                or conveyor.get("PAUSED") != "1" or conveyor.get("REFERENCE_VALID") != "1"
+                or egg.get("PAUSED") != "1" or egg.get("BUSY") != "0"
+                or egg.get("EGG_SEQ") != context["egg_seq"] or self._detected_events
+                or egg.get("SENSOR") != context["sensor"] or egg.get("ANGLE") != context["angle"]
+                or egg.get("STATE") not in allowed_states
+                or self.boards.light.snapshot().telemetry.get("LIGHT") != "0"
+                or self.camera.settings_revision != context["camera_revision"]):
+            raise RuntimeError("Paused rig changed; inspect eggs before recovery")
+
+    def _pause_at_boundary(self, events):
+        if not self.pause_requested:
+            return 0.0
+        if self.count >= self.target and not events:
+            self._pause_requested.clear()
+            return 0.0
+        started = time.monotonic()
+        self._state("PAUSING", "Holding conveyor; keeping this session open")
+        self._checkpoint("PAUSING")
+        before = self._command(self.boards.egg, "STATUS")
+        reply = self._command(self.boards.egg, "PAUSE")
+        if reply.get("PAUSED") != "1":
+            raise RuntimeError("Egg controller did not confirm pause")
+        deadline = time.monotonic() + 1
+        while True:
+            conveyor = self._command(self.boards.conveyor, "STATUS")
+            if conveyor.get("PAUSED") == "1" and conveyor.get("BUSY") == "0":
+                break
+            if time.monotonic() >= deadline:
+                raise RuntimeError("Conveyor did not confirm pause")
+            self._delay(.02)
+        self._lamp_off()
+        if (int(conveyor["POSITION"]) != self._origin + self.travel * self.settings.calibration.direction
+                or int(reply["EGG_SEQ"]) != self._last_egg_seq):
+            raise RuntimeError("Position or egg sequence changed while pausing")
+        self._pause_context = {
+            "position": conveyor["POSITION"], "egg_seq": reply["EGG_SEQ"],
+            "sensor": reply["SENSOR"], "state": reply["STATE"], "angle": reply["ANGLE"],
+            "camera_revision": self.camera.settings_revision, "was_paused": before.get("PAUSED") == "1",
+            "events": list(events)}
+        self.clear_capture_view()
+        self._check_paused()
+        # A visible Resume button always corresponds to a durable held checkpoint.
+        self._checkpoint("PAUSED")
+        self._state("PAUSED", "Scans saved; keep eggs in place and use Resume")
+        while not self._resume_requested.wait(.05):
+            self._check_paused()
+        for link in self.boards.links:
+            self._command(link, "STATUS")
+        self._check_paused()
+        self._state("RESUMING", "Checking held position before continuing")
+        self._checkpoint("RESUMING")
+        if not self._pause_context["was_paused"]:
+            reply = self._command(self.boards.egg, "RESUME")
+            if reply.get("PAUSED") != "0":
+                raise RuntimeError("Egg controller did not confirm resume")
+        # An egg already held for capture is released by the normal gate-first path.
+        self._pause_context = None
+        self._resume_requested.clear()
+        self._pause_requested.clear()
+        self._checkpoint("RESUMED")
+        return time.monotonic() - started
 
     def _checkpoint(self, state):
         self.db.save_machine_state(self.device_id, finite_evidence({
@@ -41,6 +139,7 @@ class ThreeBoardCycle(SortingCycle):
             "batch_id": self.batch_id, "travel": self.travel, "count": self.count,
             "routed": self.routed, "egg_seq": self._last_egg_seq,
             "holders": [asdict(h) for h in self.holders], "pending_capture": self.pending_capture,
+            "pause": self._pause_context, "gate_holder": self._gate_holder,
             "settings": self.settings.snapshot()}))
 
     def _health(self):
@@ -255,10 +354,12 @@ class ThreeBoardCycle(SortingCycle):
             self.db.create_session(self.session_id, self.batch_id, self.device_id, "DAY_10", self.operator)
             self._checkpoint("STARTED")
             self._command(self.boards.egg, "ARM")
+            last_arrival += self._pause_at_boundary(events)
             self.clear_capture_view()
             self._command(self.boards.egg, "RESUME")
             while self.count < self.target or events:
                 self._health()
+                last_arrival += self._pause_at_boundary(events)
                 if self._gate_holder is None and self.count < self.target and time.monotonic() - last_arrival >= k.jam_timeout_s:
                     raise RuntimeError("No egg arrival before the search deadline")
                 destination = min(self.travel + k.holder_steps, events[0][0]) if events else self.travel + k.holder_steps
@@ -276,6 +377,7 @@ class ThreeBoardCycle(SortingCycle):
                 if detected:
                     self._handle_egg(events)
                     last_arrival = time.monotonic()
+                last_arrival += self._pause_at_boundary(events)
                 if self.boards.egg.snapshot().telemetry.get("PAUSED") == "1":
                     self.clear_capture_view()
                     self._command(self.boards.egg, "RESUME")

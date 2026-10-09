@@ -56,3 +56,12 @@ reachable during camera tuning. Its action follows confirmed lamp telemetry;
 pending requests show Switching light and disable competing operation starts.
 Automatic sorting displays the lamp state with manual changes disabled. Keep
 serial work and manual watchdog renewal off the Tk thread.
+
+During a three-board run, show a neutral Pause button beside STOP. Pending pause
+and resume requests disable the button and name the action. The paused state
+offers Resume while retaining the current session and counters; the main cue
+says scans are saved and eggs must stay in place. Keep STOP and Stop sorting
+available. A pause completes current motion and classification before holding;
+never present an unconfirmed hold as Paused. Camera and manual light controls
+remain locked until the session ends. Cache button updates with the other footer
+controls and preserve their visibility at 1024 by 720.

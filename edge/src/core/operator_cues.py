@@ -4,6 +4,12 @@
 def cycle_cue(status):
     state = status["state"]
     reason = status.get("reason", "")
+    if state == "PAUSING":
+        return "Pausing sorting", "Wait for the stopped boundary. Scans and counts are kept.", "wait"
+    if state == "PAUSED":
+        return "Sorting paused", "Scans saved. Keep eggs in place; press Resume to continue this session.", "ready"
+    if state == "RESUMING":
+        return "Resuming sorting", "Checking the held position before continuing.", "wait"
     if state == "SEARCHING":
         return "Feed next egg", "Place one egg on the conveyor.", "ready"
     if state in {"LIGHTING", "STABILIZING", "CLASSIFYING", "SAVING"}:

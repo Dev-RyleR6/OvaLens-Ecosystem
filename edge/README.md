@@ -60,7 +60,26 @@ completion **before the stepper resumes**. Its angle stays set through the
 calibrated gate exit. Feed the next egg when the status says **Feed next egg**;
 an earlier arrival holds the rig for inspection to protect the previous egg's route.
 
+## Pause and resume sorting
+
+During three-board sorting, use **Pause** beside STOP to take a break without
+ending the session. **Pausing...** finishes the current move or egg classification,
+saves the scan and positions its gate before holding the conveyor. Wait for
+**Sorting paused**, then leave eggs and the cradle in place. The lamp turns off;
+the camera preview and background sync continue. **Resume** checks the held
+position and egg state, then continues the same session with its saved counts
+and photos. A changed position, sensor, gate or disconnected board requires
+inspection and recovery instead of resuming. Paused time does not count toward
+the no-egg timeout. Finish any manual review before pausing.
+
+Pause/Resume works while the app remains open. **Stop sorting**, **STOP** and
+closing the app end or interrupt the run; saved scans and photos remain in local
+history. Reopening requires inspecting the interrupted rig rather than automatic
+motion recovery. Camera controls and manual light remain locked during a paused
+sorting session.
+
 ## Tune the camera beside its preview
+
 
 Before starting a session, click **Camera controls** above the preview (also under
 **Tools > Camera controls**). The side panel keeps the image visible while you

@@ -783,6 +783,11 @@ class OvaLensOperatorApp(ctk.CTk):
             text_color=FUTheme.TEXT_PRIMARY, command=self.toggle_manual_light)
         self.light_btn.pack(side="left", padx=6, pady=13)
 
+        self.pause_btn = ctk.CTkButton(self.footer_frame, text="Pause", width=105, height=44,
+            font=(FUTheme.FONT_FAMILY, 13, "bold"), fg_color=FUTheme.PANEL_LIGHT_ALT,
+            hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER,
+            text_color=FUTheme.TEXT_PRIMARY, command=self.toggle_sorting_pause)
+
         # Batch Setup Quick Button
         self.batch_setup_btn = ctk.CTkButton(
             self.footer_frame, text="Batch setup", font=(FUTheme.FONT_FAMILY, 14, "bold"),
@@ -808,6 +813,45 @@ class OvaLensOperatorApp(ctk.CTk):
         self.tools_menu.add_command(label="Settings", command=self.open_calibration_dialog)
         self.tools_menu.add_command(label="Retry camera preview", command=self._start_preview)
         self.tools_menu.add_command(label="Camera controls", command=self.open_camera_controls)
+
+    def _refresh_pause_control(self):
+        if not hasattr(self, "pause_btn"):
+            return
+        cycle = getattr(getattr(self, "station", None), "cycle", None)
+        visible = bool(cycle is not None and callable(getattr(cycle, "request_pause", None))
+                       and cycle.active and self.is_auto_cycle_running)
+        state = cycle.status["state"] if visible else ""
+        pending = bool(visible and cycle.pause_requested)
+        resuming = bool(visible and cycle.resume_requested)
+        text = ("Resuming..." if resuming or state == "RESUMING" else "Resume" if state == "PAUSED"
+                else "Pausing..." if pending or state == "PAUSING" else "Pause")
+        allowed = (visible and not self._stopping and not self._closing
+                   and state not in {"MANUAL_REVIEW", "PAUSING", "RESUMING", "COMPLETE", "RECOVERY_REQUIRED"}
+                   and not resuming and (state == "PAUSED" or not pending))
+        signature = visible, text, allowed
+        if signature == getattr(self, "_pause_signature", None):
+            return
+        self._pause_signature = signature
+        if visible:
+            self.pause_btn.pack(side="left", padx=6, pady=13, after=self.eject_btn)
+        else:
+            self.pause_btn.pack_forget()
+        self.pause_btn.configure(text=text, state="normal" if allowed else "disabled")
+
+    def toggle_sorting_pause(self):
+        cycle = getattr(getattr(self, "station", None), "cycle", None)
+        if self._stopping or self._closing or not self.is_auto_cycle_running or cycle is None or not cycle.active:
+            return
+        try:
+            if cycle.status["state"] == "PAUSED":
+                cycle.resume()
+                self._log("[CYCLE] Resume requested; checking the held rig.")
+            elif cycle.status["state"] != "MANUAL_REVIEW" and not cycle.pause_requested:
+                cycle.request_pause()
+                self._log("[CYCLE] Pause requested; finishing the current motion or egg first.")
+        except RuntimeError as exc:
+            self._log("[CYCLE] " + str(exc))
+        self._refresh_pause_control()
 
     def _manual_light_allowed(self):
         station = getattr(self, "station", None)
@@ -926,6 +970,7 @@ class OvaLensOperatorApp(ctk.CTk):
         cycle = station.cycle if station is not None else None
         tuning = getattr(self, "_camera_panel", None) is not None
         OvaLensOperatorApp._refresh_light_control(self)
+        OvaLensOperatorApp._refresh_pause_control(self)
         signature = (is_active, self.current_session_id, self.is_auto_cycle_running,
                      self._scan_busy, self._stopping, self._closing,
                      self._pending_finalization_id, self._finalization_failed,
@@ -1264,6 +1309,7 @@ class OvaLensOperatorApp(ctk.CTk):
         if station is None:
             return
         OvaLensOperatorApp._refresh_light_control(self)
+        OvaLensOperatorApp._refresh_pause_control(self)
         now = time.monotonic()
         self._ui_tick_ms = (now - getattr(self, "_last_station_poll", now)) * 1000
         self._last_station_poll = now
@@ -1303,11 +1349,14 @@ class OvaLensOperatorApp(ctk.CTk):
             self._last_station_scan = result["scan_id"]
             self._update_result_banner(result["final_class"], result["confidence"], result["routing_action"], result.get("inference_ms", 0))
             self.result_subtitle.configure(text=f"Egg {result['holder']} saved locally; gate passage is estimated. Inspect the output trays.")
-        key = (cycle.session_id, status["state"], status.get("holder"), status.get("reason"))
+        pending_pause = bool(getattr(cycle, "pause_requested", False))
+        key = (cycle.session_id, status["state"], status.get("holder"), status.get("reason"), pending_pause)
         if key != getattr(self, "_last_cycle_status", None):
             self._last_cycle_status = key
             message = f"{status['state']} | Holder {status.get('holder', 0)} | {status.get('reason', '')}"
             title, detail, tone = cycle_cue(status)
+            if pending_pause and status["state"] not in {"PAUSED", "PAUSING", "RESUMING", "MANUAL_REVIEW", "COMPLETE", "RECOVERY_REQUIRED"}:
+                title, detail, tone = cycle_cue({"state": "PAUSING"})
             color = FUTheme.INFERTILE_AMBER if tone in {"review", "error"} else FUTheme.TEXT_PRIMARY
             self._update_cycle_hud("", color, title, detail=detail)
             if status["state"] == "MANUAL_REVIEW":
