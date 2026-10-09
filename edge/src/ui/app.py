@@ -2523,7 +2523,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         s3_body = ctk.CTkLabel(
             s3,
-            text="FERTILE (Accept): Day 10 embryo viability verified -> remains in incubation.\nINFERTILE (Reject): Non-fertile Day 10 result -> diverted to Penoy salvage @ ₱14.00.\n⚪ MANUAL REVIEW: Low confidence (< 75%) or synchronization error -> operator review.",
+            text="FERTILE (Accept): Day 10 embryo viability verified -> remains in incubation.\nINFERTILE (Reject): Non-fertile Day 10 result -> diverted to Penoy salvage @ ₱14.00.\n⚪ MANUAL REVIEW: Below saved sorting confidence (70% default) or synchronization error.\nManual diagnostic scans use a 75% review threshold.",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s3_body.pack(anchor="w", padx=14, pady=(2, 10))

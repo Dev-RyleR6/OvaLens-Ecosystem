@@ -153,7 +153,7 @@ def test_three_board_configuration_and_saved_profile_migration(tmp_path, fault):
     assert (settings.camera.index, settings.calibration.fertile_angle, settings.calibration.speed_us) == (0, 180, 3000)
     settings.conveyor_port, settings.servo_port, settings.light_port = "COM1", "COM2", "COM3"
     if fault == "low":
-        settings.detection.sort_confidence = .74
+        settings.detection.sort_confidence = .69
     elif fault == "missing":
         settings.light_port = ""
         with pytest.raises(ValueError):

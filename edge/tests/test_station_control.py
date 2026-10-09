@@ -130,7 +130,7 @@ def test_saved_settings_roundtrip_and_corrupt_defaults_fail_explicitly(tmp_path)
 
 
 @pytest.mark.parametrize("group,name,value", [
-    ("detection", "sort_confidence", .74), ("detection", "confidence", float("nan")),
+    ("detection", "sort_confidence", .69), ("detection", "confidence", float("nan")),
     ("calibration", "direction", 0), ("calibration", "holder_steps", True),
     ("calibration", "gate_clearance_steps", 500), ("camera", "fps", 0)])
 def test_invalid_settings_are_rejected(group, name, value):

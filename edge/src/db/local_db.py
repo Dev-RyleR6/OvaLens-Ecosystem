@@ -260,7 +260,9 @@ class LocalDatabaseManager:
         expected = "ACCEPT" if final_class == "FERTILE" else "REJECT"
         if routing_action not in {expected, "MANUAL_REVIEW"}:
             raise ValueError("routing action contradicts classification.")
-        if confidence < 0.75 and routing_action != "MANUAL_REVIEW":
+        # Automatic cycles validate the configured (>=70%) threshold and stable
+        # stopped evidence before this durable write. Diagnostics still use 75%.
+        if confidence < 0.70 and routing_action != "MANUAL_REVIEW":
             raise ValueError("Low confidence requires MANUAL_REVIEW.")
         if type(sequence_number) is not int or sequence_number < 1 or type(inference_ms) is not int or inference_ms < 0:
             raise ValueError("Sequence and latency must be nonnegative integers (sequence >= 1).")

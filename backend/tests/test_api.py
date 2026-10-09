@@ -194,7 +194,9 @@ def test_scan_history_pagination_search_and_confidence_bands():
         totals.append(result["total"])
         assert all(lower <= item["confidence"] < upper for item in result["items"])
     assert sum(totals) == page["total"]
-    assert client.get("/api/v1/scans/search", params={"confidence": "REVIEW"}).json()["total"] == totals[0]
+    reviews = client.get("/api/v1/scans/search", params={"confidence": "REVIEW", "limit": 200}).json()
+    assert all(item["routing_action"] == "MANUAL_REVIEW" or
+               (item["confidence"] < .70 and not item["is_overridden"]) for item in reviews["items"])
     scan = page["items"][0]
     found = client.get("/api/v1/scans/search", params={"q": scan["scan_id"]}).json()
     assert found["total"] == 1
@@ -665,6 +667,43 @@ def test_manual_review_routing_action_sync_and_metrics():
         with SessionLocal() as db:
             db.query(EggScanModel).filter(EggScanModel.session_id == test_session_id).delete()
             db.query(CandlingSessionModel).filter(CandlingSessionModel.session_id == test_session_id).delete()
+            db.commit()
+
+
+def test_seventy_percent_automatic_scans_sync_without_false_review_counts():
+    from uuid import uuid4
+    from datetime import datetime, timezone
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.models.scan import EggScanModel
+    from app.models.session import CandlingSessionModel
+    from app.services.scan_metrics import scan_totals
+
+    session_id = str(uuid4())
+    cases = [("FERTILE", .70, "ACCEPT"), ("INFERTILE", .72, "REJECT"),
+             ("FERTILE", .69, "MANUAL_REVIEW"), ("FERTILE", .95, "MANUAL_REVIEW")]
+    scans = [{"scan_id": str(uuid4()), "session_id": session_id, "batch_id": "BATCH-2026-08-KAY-01",
+              "sequence_number": 920 + index, "final_class": kind, "confidence": confidence,
+              "inference_ms": 8, "routing_action": action, "scanned_at": datetime.now(timezone.utc).isoformat()}
+             for index, (kind, confidence, action) in enumerate(cases)]
+    try:
+        for attempt in range(2):
+            response = client.post("/api/v1/scans/sync", headers={"X-API-Key": settings.API_KEY}, json={"scans": scans})
+            assert response.status_code == 200
+            assert response.json()["synced_count"] == (4 if attempt == 0 else 0)
+        with SessionLocal() as db:
+            session = db.get(CandlingSessionModel, session_id)
+            assert session.total_scanned == 4 and session.manual_review_count == 2
+            totals = scan_totals(db, session_id=session_id)
+            assert totals.scanned == 4 and totals.manual_review == 2
+        for scan, (_, _, action) in zip(scans, cases):
+            response = client.get("/api/v1/scans/search", params={"confidence": "REVIEW", "q": scan["scan_id"]})
+            assert response.status_code == 200
+            assert response.json()["total"] == int(action == "MANUAL_REVIEW")
+    finally:
+        with SessionLocal() as db:
+            db.query(EggScanModel).filter(EggScanModel.session_id == session_id).delete()
+            db.query(CandlingSessionModel).filter(CandlingSessionModel.session_id == session_id).delete()
             db.commit()
 
 

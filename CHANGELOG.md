@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Edge**: [TASK-NEW-EDGE-CONFIDENCE-70-01] allow automatic sorting at 70 percent confidence (2026-10-09)
 - **Edge**: [TASK-NEW-EDGE-CAPTURE-SETTLE-01] allow longer settling before egg capture (2026-10-09)
 - **Edge**: [TASK-NEW-EDGE-GATEFIRST-01] position sorting gate before conveyor release (2026-10-09)
 - **Edge**: [TASK-NEW-EDGE-SETUP-01] use camera zero for station defaults (2026-10-08)

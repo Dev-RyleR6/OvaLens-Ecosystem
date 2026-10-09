@@ -285,7 +285,7 @@ export const ScanExplorerPage: React.FC = () => {
             <option value="ALL">All Confidence Levels</option>
             <option value="HIGH">High Confidence (≥ 90%)</option>
             <option value="MID">Medium confidence (75% to under 90%)</option>
-            <option value="REVIEW">Needs inspection (under 75%)</option>
+            <option value="REVIEW">Needs manual review</option>
           </select>
         </div>
       </div>

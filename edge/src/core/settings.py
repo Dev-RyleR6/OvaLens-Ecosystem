@@ -34,7 +34,7 @@ class CameraSettings:
 class DetectionSettings:
     confidence: float = .25
     iou: float = .45
-    sort_confidence: float = .85
+    sort_confidence: float = .70
 
 
 @dataclass
@@ -112,7 +112,7 @@ class EdgeSettings:
             value = getattr(c, name)
             if value is not None and (type(value) not in (float, int) or not math.isfinite(value)):
                 raise ValueError(f"{name} must be finite or blank")
-        for name, lo in (("confidence", .01), ("iou", .01), ("sort_confidence", .75)):
+        for name, lo in (("confidence", .01), ("iou", .01), ("sort_confidence", .70)):
             value = getattr(d, name)
             if type(value) not in (float, int) or not math.isfinite(value) or not lo <= value <= .99:
                 raise ValueError(f"{name} must be between {lo} and 0.99")

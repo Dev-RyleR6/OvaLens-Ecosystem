@@ -76,7 +76,7 @@ class StationSettingsWindow(ctk.CTkToplevel):
 
         detection = tabs.tab("Detection")
         for name, label in (("confidence", "Detection confidence (0.01–0.99)"), ("iou", "NMS IoU (0.01–0.99)"),
-                            ("sort_confidence", "Automatic-sort confidence (0.75–0.99)")):
+                            ("sort_confidence", "Automatic-sort confidence (0.70–0.99)")):
             self._entry(detection, "detection." + name, label, "")
         ctk.CTkLabel(detection, font=(FUTheme.FONT_FAMILY, 14), text="Sorting requires three agreeing fresh frames over at least 300 ms, within two seconds. Low confidence or conflicting evidence holds the conveyor for review.", wraplength=800, justify="left").pack(anchor="w", padx=8, pady=20)
 

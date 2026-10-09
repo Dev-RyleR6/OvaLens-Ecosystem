@@ -55,6 +55,14 @@ it clears when movement resumes. Low confidence or disagreement holds the egg
 for manual review. **Single Scan** is an explicit diagnostic action and is
 blocked when the connected conveyor reports movement.
 
+Automatic sorting defaults to **0.70 (70%)** confidence. Change it in
+**Tools > Settings > Detection > Automatic-sort confidence** (0.70–0.99).
+All three stopped-frame predictions must meet the configured threshold and agree;
+lower confidence, conflicting evidence or a rig fault still requires review.
+Existing saved thresholds are retained unless edited. Manual diagnostic scans
+keep their 75% review threshold. Confidence bands in backend history are separate
+from the actual sorting/review action.
+
 After classification is saved locally, the sorting servo positions and confirms
 completion **before the stepper resumes**. Its angle stays set through the
 calibrated gate exit. Feed the next egg when the status says **Feed next egg**;

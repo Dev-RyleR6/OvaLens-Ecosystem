@@ -21,7 +21,7 @@ This document serves as the **Master Source of Truth & Architecture Guide** for 
    - **Classes**:
      - `FERTILE`: Active embryo with spider blood veins or viable shadow (Action: `ACCEPT` $\to$ Incubation Tray).
      - `INFERTILE`: Any non-fertile Day 10 result (Action: `REJECT` $\to$ Salvaged as Penoy @ ₱14.00).
-   - **Fallback State**: Low-confidence captures ($\tau < 0.75$) or synchronization errors MUST trigger `MANUAL_REVIEW`.
+   - **Fallback State**: Automatic sorting uses the saved station confidence threshold (default and minimum `0.70`, per operator configuration). Captures below that threshold or synchronization errors MUST trigger `MANUAL_REVIEW`. Manual diagnostic scans retain their `0.75` review threshold.
 4. **Offline-First Edge Resilience**:
    - The Edge application MUST record every scan to local SQLite (with WAL mode enabled) before syncing over the network.
    - Network dropouts must never block or delay the physical conveyor belt sorting speed.

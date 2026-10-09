@@ -10,6 +10,7 @@ from app.models.user import UserModel
 from app.schemas.scan import ScanSyncPayload, ScanSyncResponse, ScanListItem, ScanDetailResponse, ScanOverridePayload, ScanPage
 from app.services.scan_service import ScanService
 from app.services.scan_images import store_scan_image
+from app.services.scan_metrics import review_condition
 from app.api.deps import verify_api_key, get_current_user
 
 router = APIRouter(prefix="/scans", tags=["Egg Scans & Ingestion"])
@@ -86,7 +87,7 @@ def search_scans(
     elif confidence == "LOW":
         query = query.filter(EggScanModel.confidence < 0.75)
     elif confidence == "REVIEW":
-        query = query.filter(EggScanModel.confidence < 0.75)
+        query = query.filter(review_condition())
     if q.strip():
         # Treat user search text literally, including SQL LIKE wildcards.
         pattern = "%" + q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"

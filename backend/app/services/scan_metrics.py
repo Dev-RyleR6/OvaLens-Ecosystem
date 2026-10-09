@@ -5,9 +5,14 @@ from app.models.scan import EggScanModel, FertilityClass, RoutingAction
 from app.models.batch import BatchModel
 
 
+def review_condition():
+    """Keep explicit reviews and flag unreviewed results below the sorting floor."""
+    return or_(EggScanModel.routing_action == RoutingAction.MANUAL_REVIEW,
+               and_(EggScanModel.confidence < .70, EggScanModel.is_overridden.is_(False)))
+
+
 def scan_totals(db: Session, batch_id=None, breed=None, status=None, session_id=None):
-    review = or_(EggScanModel.routing_action == RoutingAction.MANUAL_REVIEW,
-                 and_(EggScanModel.confidence < .75, EggScanModel.is_overridden.is_(False)))
+    review = review_condition()
     query = db.query(
         func.count(EggScanModel.scan_id).label("scanned"),
         func.coalesce(func.sum(case((EggScanModel.final_class == FertilityClass.FERTILE, 1), else_=0)), 0).label("fertile"),
