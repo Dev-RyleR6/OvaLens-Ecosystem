@@ -707,6 +707,64 @@ def test_seventy_percent_automatic_scans_sync_without_false_review_counts():
             db.commit()
 
 
+def test_edge_session_end_replay_preserves_time_counts_and_incubation_state(image_scan):
+    from datetime import datetime, timedelta, timezone
+
+    scan_id, headers, _, payload = image_scan
+    session_id = payload["scans"][0]["session_id"]
+    batch_id = payload["scans"][0]["batch_id"]
+    before = client.get(f"/api/v1/batches/{batch_id}").json()
+    ended_at = (datetime.fromisoformat(payload["scans"][0]["scanned_at"]) + timedelta(seconds=1)).astimezone(
+        timezone(timedelta(hours=8))).isoformat()
+    for _ in range(2):
+        response = client.put(f"/api/v1/sessions/{session_id}/end", headers=headers, json={"ended_at": ended_at})
+        assert response.status_code == 200
+        body = response.json()
+        assert datetime.fromisoformat(body["ended_at"]) == datetime.fromisoformat(ended_at)
+        assert body["total_scanned"] == 1
+    after = client.get(f"/api/v1/batches/{batch_id}").json()
+    assert after["status"] == before["status"] and after["current_stage"] == before["current_stage"]
+
+
+@pytest.mark.parametrize("stage,status,expected_stage", [
+    ("SETTING", "INCUBATING", "DAY_10"),
+    ("DAY_10", "CANDLING_DUE", "DAY_10"),
+    ("HATCHED", "INCUBATING", "HATCHED"),
+    ("COMPLETED", "COMPLETED", "COMPLETED"),
+    ("COMPLETED", "ARCHIVED", "COMPLETED"),
+])
+def test_offline_session_registration_never_regresses_incubation(stage, status, expected_stage):
+    from datetime import datetime, timedelta, timezone
+    from uuid import uuid4
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.models.batch import BatchModel
+    from app.models.session import CandlingSessionModel
+
+    batch_id, session_id = f"SYNC-TEST-{uuid4()}", str(uuid4())
+    now = datetime.now(timezone.utc)
+    headers = {"X-API-Key": settings.API_KEY}
+    try:
+        with SessionLocal() as db:
+            db.add(BatchModel(batch_id=batch_id, batch_code=batch_id, breed="KAYUMANGGI",
+                incubator_id="TEST", initial_egg_count=1, set_date=now,
+                target_hatch_date=now + timedelta(days=28), current_stage=stage, status=status))
+            db.commit()
+        for _ in range(2):
+            response = client.post("/api/v1/sessions", headers=headers, json={
+                "session_id": session_id, "batch_id": batch_id, "device_id": "STATION-01-RP5",
+                "operator_name": "Test", "stage": "DAY_10", "started_at": now.isoformat()})
+            assert response.status_code == 200
+            assert response.json()["session_id"] == session_id
+        batch = client.get(f"/api/v1/batches/{batch_id}").json()
+        assert batch["current_stage"] == expected_stage and batch["status"] == status
+    finally:
+        with SessionLocal() as db:
+            db.query(CandlingSessionModel).filter(CandlingSessionModel.session_id == session_id).delete()
+            db.query(BatchModel).filter(BatchModel.batch_id == batch_id).delete()
+            db.commit()
+
+
 def test_scan_override_persists_is_overridden_and_reason():
     from uuid import uuid4
     from datetime import datetime, timezone

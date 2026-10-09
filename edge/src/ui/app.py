@@ -2055,6 +2055,9 @@ class OvaLensOperatorApp(ctk.CTk):
             except (queue.Full, RuntimeError):
                 self._queue_count_pending = False
         count = getattr(self, "_unsynced_count", None)
+        pending_ends = getattr(self.sync_worker, "pending_session_ends", 0)
+        if count is not None and type(pending_ends) is int:
+            count += pending_ends
         error = self.sync_worker.last_error or self.sync_worker.heartbeat_error
         if error:
             text, color = "SYNC: ATTENTION", FUTheme.INFERTILE_AMBER
@@ -2176,7 +2179,7 @@ class OvaLensOperatorApp(ctk.CTk):
             font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.TEXT_PRIMARY
         ).pack(pady=(16, 2))
         ctk.CTkLabel(
-            dialog, text="Select active batch from office or create one using the quick builder",
+            dialog, text="Builder codes are local. Create matching batches in Dashboard > Batches.",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
         ).pack(pady=(0, 12))
 
@@ -2268,7 +2271,7 @@ class OvaLensOperatorApp(ctk.CTk):
         p_top = ctk.CTkFrame(preview_frame, fg_color="transparent")
         p_top.pack(fill="x", padx=12, pady=(6, 0))
         ctk.CTkLabel(p_top, text="LIVE BATCH CODE:", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(side="left")
-        ctk.CTkLabel(p_top, text="● READY FOR CONVEYOR", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.FERTILE_GREEN).pack(side="right")
+        ctk.CTkLabel(p_top, text="LOCAL CODE", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(side="right")
 
         preview_label = ctk.CTkLabel(preview_frame, text="BATCH-2026-08-KAY-01", font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.TEXT_PRIMARY)
         preview_label.pack(anchor="w", padx=12, pady=(0, 6))
@@ -2328,7 +2331,7 @@ class OvaLensOperatorApp(ctk.CTk):
             custom_frame.pack_forget()
             if "Builder" in selected_mode:
                 builder_frame.pack(fill="x", padx=16, pady=(0, 6))
-            elif "Server" in selected_mode:
+            elif "Office" in selected_mode:
                 server_frame.pack(fill="x", padx=16, pady=(0, 6))
             else:
                 custom_frame.pack(fill="x", padx=16, pady=(0, 6))
@@ -2398,16 +2401,15 @@ class OvaLensOperatorApp(ctk.CTk):
                 b_num = batch_num_dropdown.get()
                 final_batch_id = f"BATCH-{ym}-{b_code}-{b_num}"
                 final_breed = full_breed
-            elif "Server" in mode:
+            elif "Office" in mode:
                 sel = server_dropdown.get()
-                raw_code = sel.split(" ")[0]
-                if raw_code.startswith("BATCH-"):
-                    final_batch_id = raw_code
-                    matched = next((b for b in server_batches_cache if b.get("batch_code") == raw_code or b.get("batch_id") == raw_code), None)
-                    final_breed = matched.get("breed", "KAYUMANGGI") if matched else "KAYUMANGGI"
-                else:
-                    final_batch_id = self.current_batch_id
-                    final_breed = self.current_breed
+                matched = next((b for b in server_batches_cache
+                    if f"{b.get('batch_code', b.get('batch_id'))} ({b.get('breed')})" == sel), None)
+                if matched is None:
+                    validation_error.configure(text="Select a saved office batch, or use a local code while offline.")
+                    return
+                final_batch_id = matched["batch_id"]
+                final_breed = matched.get("breed", "KAYUMANGGI")
             else:
                 final_batch_id = custom_entry.get().strip() or self.current_batch_id
                 final_breed = self.current_breed

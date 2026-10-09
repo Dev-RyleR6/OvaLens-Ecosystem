@@ -74,6 +74,9 @@ class LocalDatabaseManager:
             """)
 
             session_columns = {r[1] for r in conn.execute("PRAGMA table_info(local_sessions);")}
+            for column in ("end_synced_at", "sync_last_attempt_at", "sync_error"):
+                if column not in session_columns:
+                    conn.execute(f"ALTER TABLE local_sessions ADD COLUMN {column} TEXT;")
             scan_columns = {r[1] for r in conn.execute("PRAGMA table_info(local_scans);")}
             if "evidence_json" not in scan_columns:
                 conn.execute("ALTER TABLE local_scans ADD COLUMN evidence_json TEXT;")
@@ -323,15 +326,51 @@ class LocalDatabaseManager:
             row = conn.execute("SELECT state_json FROM machine_journal WHERE device_id=?;", (device_id,)).fetchone()
             return json.loads(row[0]) if row else None
 
-    def get_uncommitted_scans(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_pending_scan_sessions(self, limit=5):
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute("""
+                SELECT s.* FROM local_sessions s WHERE EXISTS (
+                    SELECT 1 FROM local_scans c WHERE c.session_id=s.session_id AND c.is_synced=0)
+                ORDER BY s.sync_last_attempt_at, s.started_at, s.session_id LIMIT ?;
+            """, (limit,))]
+
+    def get_pending_session_ends(self, limit=5):
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute("""
+                SELECT s.* FROM local_sessions s
+                WHERE s.ended_at IS NOT NULL AND s.ended_at<>'' AND s.end_synced_at IS NULL
+                  AND NOT EXISTS (SELECT 1 FROM local_scans c
+                    WHERE c.session_id=s.session_id AND c.is_synced=0)
+                ORDER BY s.sync_last_attempt_at, s.started_at, s.session_id LIMIT ?;
+            """, (limit,))]
+
+    def mark_session_sync_attempt(self, session_id, error=None):
+        with self._get_connection() as conn:
+            conn.execute("UPDATE local_sessions SET sync_last_attempt_at=?, sync_error=? WHERE session_id=?;",
+                (datetime.now(timezone.utc).isoformat(), error, session_id))
+            conn.commit()
+
+    def mark_session_end_synced(self, session_id, ended_at):
+        with self._get_connection() as conn:
+            conn.execute("""UPDATE local_sessions SET end_synced_at=?, sync_error=NULL
+                WHERE session_id=? AND ended_at=?;""",
+                (datetime.now(timezone.utc).isoformat(), session_id, ended_at))
+            conn.commit()
+
+    def get_pending_session_end_count(self):
+        with self._get_connection() as conn:
+            return conn.execute("""SELECT COUNT(*) FROM local_sessions
+                WHERE ended_at IS NOT NULL AND ended_at<>'' AND end_synced_at IS NULL;""").fetchone()[0]
+
+    def get_uncommitted_scans(self, limit: int = 50, session_id=None) -> List[Dict[str, Any]]:
         """Fetch pending unsynced scans for the background network worker."""
         with self._get_connection() as conn:
             cursor = conn.execute("""
                 SELECT * FROM local_scans
-                WHERE is_synced = 0
+                WHERE is_synced = 0 AND (? IS NULL OR session_id=?)
                 ORDER BY sequence_number ASC
                 LIMIT ?;
-            """, (limit,))
+            """, (session_id, session_id, limit))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 

@@ -166,8 +166,12 @@ export const apiClient = {
 
   // Sessions
   getSessions: async (batchId?: string): Promise<CandlingSession[]> => {
-    const res = await api.get<CandlingSession[]>('/sessions', { params: { batch_id: batchId } });
-    return res.data;
+    const sessions: CandlingSession[] = [];
+    for (let offset = 0; ; offset += 200) {
+      const res = await api.get<CandlingSession[]>('/sessions', { params: { batch_id: batchId, limit: 200, offset } });
+      sessions.push(...res.data);
+      if (res.data.length < 200) return sessions;
+    }
   },
 
   // Scans

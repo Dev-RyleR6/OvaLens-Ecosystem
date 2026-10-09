@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.core.database import get_db
 from app.models.session import CandlingSessionModel, CandlingStage
-from app.models.batch import BatchModel, BatchStage
+from app.models.batch import BatchModel, BatchStage, BatchStatus
 from app.schemas.session import SessionCreate, SessionEnd, SessionResponse
 from app.api.deps import verify_api_key, get_current_user
 
@@ -53,7 +53,10 @@ def create_session(
         started_at=payload.started_at
     )
     # Update batch current stage
-    if payload.stage == CandlingStage.DAY_10:
+    # Offline history can arrive after hatch finalization. Only advance a live
+    # setting batch; replay must never move an older batch back to Day 10.
+    if (payload.stage == CandlingStage.DAY_10 and batch.current_stage == BatchStage.SETTING
+            and batch.status not in (BatchStatus.COMPLETED, BatchStatus.ARCHIVED)):
         batch.current_stage = BatchStage.DAY_10
 
     db.add(session)

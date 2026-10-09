@@ -160,6 +160,26 @@ Errors appear in Recent activity and, when open, the camera panel.
 
 ## Saved scan photos and backend sync
 
+First create the incubation batch in **Dashboard > Batches**, then select that
+exact batch under Edge **Batch setup > Saved Office Batches**. The quick builder
+and custom code only select a local identifier; they do not create an incubation
+record. A missing server batch prevents session registration. Edge reports the
+missing code and retains all scans for automatic retry after the batch is created.
+Use the real incubation set date, incubator and original egg count when creating
+it; a scan target or the number of repeated captures is not the initial inventory.
+
+After local finalization, the worker queues the original session completion time
+in SQLite and sends it to `PUT /api/v1/sessions/<id>/end` once every scan record
+has been acknowledged. Failed or lost completion acknowledgements retry across
+restart, including older finished local runs. One missing batch cannot starve
+other sessions. Photos retry independently. Keep Edge running while its queue
+drains; network requests never run on the conveyor or GUI thread.
+
+The dashboard's batch list and open session drawer refresh at the configured
+polling interval. Finished candling runs show **Finished** in the session list.
+Finishing Day 10 sorting does not mark the 28-day incubation batch as completed;
+the incubation batch remains active until its hatch outcome is finalized.
+
 Real automatic scans and manual Single Scan captures save the exact classified
 camera snapshot as a quality-95 JPEG beside SQLite, in
 `edge/db/local_scans/<scan-id>.jpg`. Preview frames and simulation are not saved.

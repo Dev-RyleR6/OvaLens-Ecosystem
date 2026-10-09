@@ -1,5 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Plus,
   Search,
@@ -29,6 +29,7 @@ import { BatchAnalyticsModal } from '../components/BatchAnalyticsModal';
 import { FinalizeHatchModal } from '../components/FinalizeHatchModal';
 import { DataUnavailableState } from '../components/ui/DataUnavailableState';
 import { EmptyState } from '../components/ui/EmptyState';
+import { usePreferences } from '../hooks/usePreferences';
 import { Activity, Trash2, CheckCircle2, RefreshCw } from 'lucide-react';
 
 type ViewMode = 'TABLE' | 'GRID';
@@ -38,6 +39,8 @@ type SortOrder = 'asc' | 'desc';
 export const BatchesPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const requestedBatch = searchParams.get("batch");
+  const { pollingInterval } = usePreferences();
+  const batchRequest = useRef(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [sessionError, setSessionError] = useState(false);
@@ -85,31 +88,54 @@ export const BatchesPage: React.FC = () => {
   });
   const [notes, setNotes] = useState('');
 
-  const fetchBatches = async () => {
-    setIsLoading(true);
+  const fetchBatches = useCallback(async (background = false) => {
+    const request = ++batchRequest.current;
+    if (!background) setIsLoading(true);
     setIsError(false);
     try {
-      const data = await apiClient.getBatches();
+      const data = await apiClient.getAllBatches();
+      if (request !== batchRequest.current) return;
       setBatches(data || []);
+      setSelectedBatch(current => current ? data.find(batch => batch.batch_id === current.batch_id) ?? current : null);
     } catch (err) {
+      if (request !== batchRequest.current) return;
       console.error('Failed to fetch batches:', err);
       setIsError(true);
     } finally {
-      setIsLoading(false);
+      if (request === batchRequest.current) setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchBatches();
   }, []);
 
-  const handleSelectBatch = async (b: BatchSummary) => {
+  useEffect(() => {
+    void fetchBatches();
+    const timer = pollingInterval > 0 ? setInterval(() => { void fetchBatches(true); }, pollingInterval * 1000) : undefined;
+    return () => { clearInterval(timer); batchRequest.current++; };
+  }, [fetchBatches, pollingInterval]);
+
+  const selectedBatchId = selectedBatch?.batch_id;
+  useEffect(() => {
+    if (!isDrawerOpen || !selectedBatchId) return;
+    let active = true, busy = false;
+    const refreshSessions = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const sessions = await apiClient.getSessions(selectedBatchId);
+        if (active) { setBatchSessions(sessions); setSessionError(false); }
+      } catch {
+        if (active) setSessionError(true);
+      } finally { busy = false; }
+    };
+    void refreshSessions();
+    const timer = pollingInterval > 0 ? setInterval(() => { void refreshSessions(); }, pollingInterval * 1000) : undefined;
+    return () => { active = false; clearInterval(timer); };
+  }, [isDrawerOpen, selectedBatchId, pollingInterval]);
+
+  const handleSelectBatch = (b: BatchSummary) => {
     setSelectedBatch(b);
     setIsDrawerOpen(true);
     setBatchSessions([]);
     setSessionError(false);
-    try { setBatchSessions(await apiClient.getSessions(b.batch_id)); }
-    catch { setSessionError(true); }
   };
 
   const handleOpenCertificate = (b: BatchSummary, e?: React.MouseEvent) => {
@@ -802,7 +828,7 @@ export const BatchesPage: React.FC = () => {
                   {batchSessions.map((s) => (
                     <div key={s.session_id} className="p-2.5 bg-card rounded-lg border border-slate-200 space-y-1.5 ">
                       <div className="flex flex-wrap items-center justify-between gap-2 font-medium">
-                        <span className="font-bold text-foreground">{s.stage} Candling Run</span>
+                        <span className="font-bold text-foreground">{s.stage} Candling Run · {s.ended_at ? 'Finished' : 'In progress'}</span>
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded">
                           <Zap aria-hidden="true" className="w-3 h-3 text-emerald-600" />
                           {s.total_scanned} eggs candled

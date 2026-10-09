@@ -522,12 +522,14 @@ def test_offline_cycle_replays_after_lost_ack_without_duplicate_ids(tmp_path, mo
         return SimpleNamespace(status_code=200, json=lambda: {"status": "success", "total_received": len(incoming),
             "synced_count": len(incoming) - duplicates, "duplicates_ignored": duplicates})
     monkeypatch.setattr("src.sync.sync_worker.requests.post", post)
+    monkeypatch.setattr("src.sync.sync_worker.requests.put", lambda *a, **k:
+        SimpleNamespace(status_code=200, json=lambda: db.get_session_stats(cycle.session_id)))
     monkeypatch.setattr("src.sync.sync_worker.requests.get", lambda *a, **k: SimpleNamespace(status_code=200))
     worker._perform_sync()
     assert db.get_unsynced_count() == 50
     phase["offline"] = False
-    with pytest.raises(OSError, match="acknowledgement lost"):
-        worker._perform_sync()
+    worker._perform_sync()
+    assert worker.last_error and "OSError" in worker.last_error
     assert len(stored) == db.get_unsynced_count() == 50
     worker._perform_sync()
     assert db.get_unsynced_count() == 45 and not db.get_uncommitted_scans()

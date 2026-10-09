@@ -9,6 +9,7 @@ import threading
 import os
 import hashlib
 from pathlib import Path
+from datetime import datetime
 from uuid import UUID
 from urllib.parse import quote
 from typing import Optional, List, Dict, Any
@@ -33,6 +34,7 @@ class BackgroundSyncWorker:
         self._last_sync_time: Optional[float] = None
         self._total_synced = 0
         self.last_error = None
+        self.pending_session_ends = 0
         self._stop_event = threading.Event()
         self._registered_sessions = set()
         self.device_id = device_id
@@ -97,11 +99,37 @@ class BackgroundSyncWorker:
             self.last_error = "API_KEY is not configured; scans remain local."
             self._is_online = False
             return
-        self._sync_scan_records()
+        errors = []
+        pending = self.db.get_pending_scan_sessions(limit=5)
+        if not pending:
+            self._check_health()
+        for session in pending:
+            if self._stop_event.is_set():
+                break
+            session_id = session["session_id"]
+            self.db.mark_session_sync_attempt(session_id)
+            self.last_error = None
+            try:
+                self._sync_scan_records(session_id)
+            except Exception as exc:
+                self._is_online = False
+                self.last_error = f"Scan sync failed: {type(exc).__name__}; saved locally for retry."
+            if self.last_error:
+                self.db.mark_session_sync_attempt(session_id, self.last_error)
+                errors.append(self.last_error)
+        self.last_error = None
         self._sync_images()
+        if self.last_error:
+            errors.append(self.last_error)
+        self.last_error = None
+        self._sync_session_ends()
+        if self.last_error:
+            errors.append(self.last_error)
+        self.last_error = " | ".join(dict.fromkeys(errors)) or None
+        self.pending_session_ends = self.db.get_pending_session_end_count()
 
-    def _sync_scan_records(self):
-        uncommitted = self.db.get_uncommitted_scans(limit=50)
+    def _sync_scan_records(self, session_id=None):
+        uncommitted = self.db.get_uncommitted_scans(limit=50, session_id=session_id)
         if not uncommitted:
             # Still ping health to update online status
             self._check_health()
@@ -215,6 +243,51 @@ class BackgroundSyncWorker:
         if failures:
             self.last_error = f"{failures} scan photo upload(s) pending; saved locally for retry."
 
+    @staticmethod
+    def _session_payload(session):
+        return {key: session[key] for key in (
+            "session_id", "batch_id", "device_id", "stage", "operator_name", "started_at")}
+
+    def _sync_session_ends(self):
+        """Replay closed runs, including pre-upgrade runs, after every scan is acknowledged."""
+        errors = []
+        for session in self.db.get_pending_session_ends(limit=5):
+            if self._stop_event.is_set():
+                break
+            session_id = session["session_id"]
+            self.db.mark_session_sync_attempt(session_id)
+            self.last_error = None
+            try:
+                if session_id not in self._registered_sessions:
+                    if not self.register_session(self._session_payload(session)):
+                        raise RuntimeError(self.last_error)
+                    self._registered_sessions.add(session_id)
+                response = requests.put(f"{self.api_base_url}/api/v1/sessions/{session_id}/end",
+                    json={"ended_at": session["ended_at"]}, headers={"X-API-Key": self.api_key}, timeout=4.0)
+                if response.status_code != 200:
+                    if response.status_code == 404:
+                        self._registered_sessions.discard(session_id)
+                    raise ValueError(f"Session completion rejected (HTTP {response.status_code})")
+                body = response.json()
+                expected = self._session_payload(session)
+                matches = all(str(body.get(key)) == str(expected[key]) for key in (
+                    "session_id", "batch_id", "device_id", "stage", "operator_name"))
+                if (not matches or type(body.get("total_scanned")) is not int
+                        or body["total_scanned"] != session["total_scanned"]
+                        or datetime.fromisoformat(body.get("ended_at") or "") != datetime.fromisoformat(session["ended_at"])):
+                    raise ValueError("Session completion acknowledgement does not match local records")
+                self.db.mark_session_end_synced(session_id, session["ended_at"])
+                self._last_sync_time = time.time()
+            except Exception as exc:
+                if isinstance(exc, requests.RequestException):
+                    self._is_online = False
+                    error = f"Session completion failed: {type(exc).__name__}; saved locally for retry."
+                else:
+                    error = str(exc)
+                self.db.mark_session_sync_attempt(session_id, error)
+                errors.append(error)
+        self.last_error = " | ".join(dict.fromkeys(errors)) or None
+
     def _check_health(self):
         try:
             url = f"{self.api_base_url}/api/v1/health"
@@ -254,7 +327,9 @@ class BackgroundSyncWorker:
                 self.last_error = "Session acknowledgement does not match local identity."
                 self._is_online = False
                 return False
-            self.last_error = f"Session registration rejected (HTTP {resp.status_code})."
+            self.last_error = (f"Batch {session_data['batch_id']} is missing on the backend (HTTP 404). "
+                "Create it in Dashboard > Batches with this exact code, then sync retries automatically."
+                if resp.status_code == 404 else f"Session registration rejected (HTTP {resp.status_code}).")
             self._is_online = False
             return False
         except Exception as exc:
