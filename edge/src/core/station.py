@@ -5,7 +5,7 @@ import uuid
 from .settings import EdgeSettings, SettingsStore
 from .sorting_cycle import SortingCycle
 from .operator_flow import validate_batch_config
-from ..iot.dual_board import DualBoardController
+from ..iot.dual_board import BoardLink, DualBoardController
 from ..iot.three_board import ThreeBoardController, discover_boards
 from .three_board_cycle import ThreeBoardCycle
 
@@ -27,6 +27,110 @@ class EdgeStation:
         self._lock = threading.RLock()
         self._setup_cancel = threading.Event()
         self._camera_alignment_boards = None
+        self._manual_light_link = None
+        self._manual_light_cancel = threading.Event()
+        self._manual_light_cancel.set()
+        self._manual_light_interval = 5.0
+
+    @property
+    def light_link(self):
+        return getattr(self.boards, "light", None) if self.boards else self._manual_light_link
+
+    def set_manual_light(self, enabled, cancel=None):
+        """Idle lamp-only action; connecting it never opens the motor/servo ports."""
+        if type(enabled) is not bool:
+            raise ValueError("Choose light on or off")
+        self.require_idle()
+        self._manual_light_cancel.set()
+        cancel = cancel if cancel is not None else threading.Event()
+        self._manual_light_cancel = cancel
+        with self._lock:
+            self.require_idle()
+            self._check_setup_cancel(cancel)
+            if self.settings.rig_profile != "three_v3":
+                raise RuntimeError("Manual light requires the three-board v3 light controller")
+            if self.boards and self.boards.conveyor.snapshot().telemetry.get("BUSY") != "0":
+                raise RuntimeError("Stop the conveyor before switching the light")
+            link = self.light_link
+            try:
+                if link is not None and link is self._manual_light_link:
+                    state = link.snapshot()
+                    if not state.connected or state.error:
+                        link.stop()
+                        self._manual_light_link = link = None
+                if link is None:
+                    link = self._manual_light_link = BoardLink("LIGHT_CONTROLLER",
+                        self.settings.light_port or "COM9", lambda reason: self._manual_light_cancel.set(), protocol=3)
+                    link.start()
+                    deadline = time.monotonic() + 5
+                    while not link._status_complete:
+                        self._check_setup_cancel(cancel)
+                        state = link.snapshot()
+                        if state.error or time.monotonic() >= deadline:
+                            raise RuntimeError(state.error or "Light controller identification timed out")
+                        cancel.wait(.02)
+                self._check_setup_cancel(cancel)
+                state = link.snapshot()
+                if not state.connected or not state.identified or state.error:
+                    raise RuntimeError(state.error or "Light controller is disconnected")
+                if enabled:
+                    fault = state.telemetry.get("FAULT")
+                    if fault not in {"NONE", "STARTUP_ACK_REQUIRED", "EMERGENCY_STOP", "LIGHT_AUTO_OFF_TIMEOUT"}:
+                        raise RuntimeError("Inspect the light controller fault before turning it on")
+                    if fault != "NONE":
+                        link.command("ACK_FAULT").result(3.5)
+                self._check_setup_cancel(cancel)
+                reply = link.command("LIGHT_ON" if enabled else "LIGHT_OFF").result(3.5)
+                self._check_setup_cancel(cancel)
+                if reply.get("LIGHT") != ("1" if enabled else "0"):
+                    raise RuntimeError("Light controller did not confirm the requested state")
+                if enabled:
+                    threading.Thread(target=self._renew_manual_light, args=(link, cancel),
+                        daemon=True, name="OvaLens-ManualLight").start()
+                else:
+                    cancel.set()
+                return "Candling light on." if enabled else "Candling light off."
+            except Exception:
+                cancel.set()
+                if link:
+                    link.halt()
+                if link and link is self._manual_light_link:
+                    link.stop()
+                    self._manual_light_link = None
+                raise
+
+    def _renew_manual_light(self, link, cancel):
+        # Keep the firmware's 15s watchdog intact if the app or USB link fails.
+        while not cancel.wait(self._manual_light_interval):
+            with self._lock:
+                if cancel.is_set() or self.active or link is not self.light_link:
+                    return
+                try:
+                    state = link.snapshot()
+                    if state.error or state.telemetry.get("FAULT") != "NONE":
+                        raise RuntimeError("Light controller is unavailable")
+                    if link.command("LIGHT_ON").result(3.5).get("LIGHT") != "1":
+                        raise RuntimeError("Light controller did not confirm ON")
+                    if cancel.is_set():
+                        link.halt()
+                except Exception:
+                    cancel.set()
+                    link.halt()
+                    return
+
+    def release_manual_light(self):
+        """Release COM ownership before discovery/preparation or a new batch."""
+        with self._lock:
+            owned = not self._manual_light_cancel.is_set()
+            self._manual_light_cancel.set()
+            if self._manual_light_link:
+                self._manual_light_link.stop()
+                self._manual_light_link = None
+            elif owned and self.light_link:
+                link = self.light_link
+                if link.command("LIGHT_OFF").result(3.5).get("LIGHT") != "0":
+                    link.halt()
+                    raise RuntimeError("Light controller did not confirm OFF")
 
     @property
     def active(self):
@@ -39,6 +143,7 @@ class EdgeStation:
     def apply(self, settings, save=False, confirm_camera=False):
         with self._lock:
             self.require_idle()
+            self.release_manual_light()
             self.calibrated = False
             settings = EdgeSettings.from_dict(settings.snapshot())
             if (settings.camera.index != self.settings.camera.index or settings.rig_profile != self.settings.rig_profile) and not confirm_camera:
@@ -94,6 +199,7 @@ class EdgeStation:
     def connect(self, cancel=None):
         with self._lock:
             self.require_idle()
+            self.release_manual_light()
             self._camera_alignment_boards = None
             self.calibrated = False
             if self.boards:
@@ -125,6 +231,7 @@ class EdgeStation:
         """Explicit operator action: detect, apply and save; leave faults latched."""
         with self._lock:
             self.require_idle()
+            self.release_manual_light()
             self._setup_cancel.clear()
             self.calibrated = False
             if self.boards:
@@ -217,6 +324,7 @@ class EdgeStation:
             self.calibrated = False
             if not inspected:
                 raise RuntimeError("Confirm the conveyor is empty, aligned and the gate checked.")
+            self.release_manual_light()
             if self.settings.rig_profile != "three_v3" or not self.boards:
                 raise RuntimeError("Use defaults & detect first.")
             if self.camera.is_mock_mode or self.camera.last_error or self.camera.snapshot() is None:
@@ -258,6 +366,7 @@ class EdgeStation:
     def discover(self):
         with self._lock:
             self.require_idle()
+            self.release_manual_light()
             self.calibrated = False
             if self.boards:
                 self.boards.stop()
@@ -269,6 +378,7 @@ class EdgeStation:
             self.require_idle()
             if not self.boards:
                 raise RuntimeError("Connect and identify the required boards first")
+            self.release_manual_light()
             links = {link.role: link for link in self.board_links()}
             links["SERVO"] = self.boards.servo
             if role not in links:
@@ -369,6 +479,7 @@ class EdgeStation:
         with self._lock:
             if self._camera_alignment_boards is None:
                 return
+            self._manual_light_cancel.set()
             self._camera_alignment_boards = None
             self.calibrated = False
             try:
@@ -386,6 +497,7 @@ class EdgeStation:
             self.calibrated = False
             if not inspected or not self.boards:
                 raise RuntimeError("Confirm holder alignment and an empty downstream conveyor")
+            self.release_manual_light()
             self.settings.validate()
             self.recovery = self.db.load_machine_state(self.device_id)
             self.boards.require_ready()
@@ -422,6 +534,7 @@ class EdgeStation:
     def start_cycle(self, batch_id, target, operator):
         with self._lock:
             self.require_idle()
+            self.release_manual_light()
             if self._camera_alignment_boards is not None:
                 raise RuntimeError("Finish camera alignment before sorting")
             batch_id, operator, target = validate_batch_config(batch_id, operator, target, "DAY_10")
@@ -440,6 +553,9 @@ class EdgeStation:
             return self.cycle
 
     def halt(self):
+        self._manual_light_cancel.set()
+        if self._manual_light_link:
+            self._manual_light_link.halt()
         self._setup_cancel.set()
         self._camera_alignment_boards = None
         self.calibrated = False
@@ -450,6 +566,9 @@ class EdgeStation:
 
     def stop(self):
         self.halt()
+        if self._manual_light_link:
+            self._manual_light_link.stop()
+            self._manual_light_link = None
         if self.cycle and self.cycle._thread:
             self.cycle._thread.join(timeout=3)
         if self.boards:

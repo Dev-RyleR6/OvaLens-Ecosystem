@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-MANUAL-LIGHT-01**: Add a visible manual candling light switch with confirmed board state, lamp-only connection, automatic-mode locks, watchdog renewal, STOP/shutdown cancellation and hardware-free operator tests.
+
 - [x] **TASK-NEW-EDGE-IMAGE-SYNC-01**: Save paired scan photos locally and synchronize them through a durable independent image outbox; verify retry acknowledgements, backend JPEG storage, scan history image routing and persistent container storage without hardware.
 
 - [x] **TASK-NEW-EDGE-CAMERA-LIVE-01**: Apply camera edits live with bounded latest-value coalescing, responsive controls, separate persistence, continuous preview frames and cancellation around cradle work, STOP and panel shutdown; verify with fake camera/board adapters.

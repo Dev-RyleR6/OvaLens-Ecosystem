@@ -50,3 +50,9 @@ Explicit save remains separate. Stop, cradle operations and closing cancel
 scheduled edits; completion must not restart camera work during those operations.
 Live preview avoids restarting the frame-discard period on every slider update;
 sorting retains its stopped evidence capture and settling rules.
+
+The footer's neutral Turn light on/off control stays beside STOP and remains
+reachable during camera tuning. Its action follows confirmed lamp telemetry;
+pending requests show Switching light and disable competing operation starts.
+Automatic sorting displays the lamp state with manual changes disabled. Keep
+serial work and manual watchdog renewal off the Tk thread.

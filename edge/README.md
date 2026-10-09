@@ -114,6 +114,23 @@ Forward follows the configured conveyor direction. No home reference is reset
 by these controls. **STOP [R]** cancels motion; reconnect explicitly after
 inspection. Automatic scans and sorting stay blocked while this panel is open.
 
+## Manual candling light
+
+Use **Turn light on / Turn light off** beside **STOP [R]**, including while the
+Camera controls panel is open. The button updates after the light controller
+confirms its state. If the station is disconnected, this action connects only
+the saved light port (COM9 by default); it does not connect or move the stepper
+or sorting servo. Supported startup/STOP/lamp-timeout faults are acknowledged
+only on the light controller by this explicit action.
+
+Manual mode refreshes the light command every five seconds so it remains on
+while the application is operating. The firmware's existing 15-second lamp
+watchdog and connection watchdog remain enabled. **STOP**, shutdown and starting
+station preparation cancel manual control and turn the lamp off. The switch is
+disabled during sorting, capture, setup and cradle movement; automatic sorting
+retains control of its own lighting. Switch state is not saved across restarts.
+Errors appear in Recent activity and, when open, the camera panel.
+
 ## Saved scan photos and backend sync
 
 Real automatic scans and manual Single Scan captures save the exact classified

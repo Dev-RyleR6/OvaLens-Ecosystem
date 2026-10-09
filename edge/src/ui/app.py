@@ -777,6 +777,12 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         self.eject_btn.pack(side="left", padx=6, pady=13)
 
+        self.light_btn = ctk.CTkButton(self.footer_frame, text="Turn light on", width=125, height=44,
+            font=(FUTheme.FONT_FAMILY, 13), fg_color=FUTheme.PANEL_LIGHT_ALT,
+            hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER,
+            text_color=FUTheme.TEXT_PRIMARY, command=self.toggle_manual_light)
+        self.light_btn.pack(side="left", padx=6, pady=13)
+
         # Batch Setup Quick Button
         self.batch_setup_btn = ctk.CTkButton(
             self.footer_frame, text="Batch setup", font=(FUTheme.FONT_FAMILY, 14, "bold"),
@@ -803,12 +809,72 @@ class OvaLensOperatorApp(ctk.CTk):
         self.tools_menu.add_command(label="Retry camera preview", command=self._start_preview)
         self.tools_menu.add_command(label="Camera controls", command=self.open_camera_controls)
 
+    def _manual_light_allowed(self):
+        station = getattr(self, "station", None)
+        panel = getattr(self, "_camera_panel", None)
+        profile = getattr(getattr(station, "settings", None), "rig_profile", None)
+        return (station is not None and profile == "three_v3"
+                and not self.simulation and not self._closing and not self._stopping
+                and not self._scan_busy and not self.is_auto_cycle_running and not station.active
+                and not getattr(self, "_setup_busy", False) and not getattr(self, "_light_busy", False)
+                and not (panel is not None and panel.pending) and self.grab_current() is None)
+
+    def _refresh_light_control(self):
+        if not hasattr(self, "light_btn"):
+            return
+        station = getattr(self, "station", None)
+        link = getattr(station, "light_link", None)
+        report = link.snapshot() if link is not None else None
+        available = report is not None and report.connected and report.identified and not report.error
+        value = report.telemetry.get("LIGHT") if available else None
+        allowed = OvaLensOperatorApp._manual_light_allowed(self)
+        busy = getattr(self, "_light_busy", False)
+        text = "Switching light..." if busy else "Turn light off" if value == "1" else "Turn light on"
+        if link is not None and not available and not busy:
+            text = "Retry light"
+        if station is not None and station.active:
+            text = "Light: ON" if value == "1" else "Light: OFF"
+        signature = text, allowed
+        if signature != getattr(self, "_light_signature", None):
+            self._light_signature = signature
+            self.light_btn.configure(text=text, state="normal" if allowed else "disabled")
+
+    def toggle_manual_light(self):
+        if not self._manual_light_allowed():
+            return
+        link = self.station.light_link
+        report = link.snapshot() if link is not None else None
+        enabled = report is None or not report.connected or not report.identified or bool(report.error) or report.telemetry.get("LIGHT") != "1"
+        cancel = self._light_request_cancel = threading.Event()
+        generation = self._operation_generation
+        self._light_busy = True
+        self._set_session_active_state(self.is_session_active)
+        self._log("[LIGHT] Switching candling light " + ("on..." if enabled else "off..."))
+        def work():
+            if cancel.is_set() or generation != self._operation_generation:
+                return None
+            return self.station.set_manual_light(enabled, cancel=cancel)
+        def finished(message, failed=False):
+            self._light_busy = False
+            if self._closing:
+                return
+            if message and generation == self._operation_generation:
+                self._log("[LIGHT] " + ("Could not switch light: " if failed else "") + str(message))
+                panel = getattr(self, "_camera_panel", None)
+                if failed and panel is not None:
+                    panel.notice.configure(text="Could not switch light: " + str(message))
+            self._set_session_active_state(self.is_session_active)
+        try:
+            self._jobs.submit(work, finished, lambda message: finished(message, True))
+        except (queue.Full, RuntimeError) as exc:
+            finished(str(exc), True)
+
     def _camera_tuning_allowed(self):
         return (self.station is not None and not self.simulation and not self._closing
                 and not self._stopping and not self._scan_busy and not self.current_session_id
                 and not self.is_session_active and not self.is_auto_cycle_running
                 and not self._finalization_failed and not self._pending_finalization_id
-                and not getattr(self, "_setup_busy", False) and not self.station.active
+                and not getattr(self, "_setup_busy", False) and not getattr(self, "_light_busy", False) and not self.station.active
                 and self.grab_current() is None)
 
     def open_camera_controls(self):
@@ -859,6 +925,7 @@ class OvaLensOperatorApp(ctk.CTk):
         station = getattr(self, "station", None)
         cycle = station.cycle if station is not None else None
         tuning = getattr(self, "_camera_panel", None) is not None
+        OvaLensOperatorApp._refresh_light_control(self)
         signature = (is_active, self.current_session_id, self.is_auto_cycle_running,
                      self._scan_busy, self._stopping, self._closing,
                      self._pending_finalization_id, self._finalization_failed,
@@ -867,7 +934,7 @@ class OvaLensOperatorApp(ctk.CTk):
                      bool(getattr(self, "_batch_complete", False)),
                      bool(self.setup_inspected.get()) if hasattr(self, "setup_inspected") else False,
                      getattr(self, "_setup_busy", False), bool(getattr(station, "calibrated", False)),
-                     bool(getattr(station, "boards", None)), tuning)
+                     bool(getattr(station, "boards", None)), tuning, getattr(self, "_light_busy", False))
         if hasattr(self, "setup_row"):
             self._refresh_setup_controls(is_active)
         if signature == getattr(self, "_controls_signature", None):
@@ -892,7 +959,7 @@ class OvaLensOperatorApp(ctk.CTk):
                 hover_color=FUTheme.HOVER_MAROON
             )
         blocked = self._pending_finalization_id is not None or self._finalization_failed
-        setup_busy = getattr(self, "_setup_busy", False)
+        setup_busy = getattr(self, "_setup_busy", False) or getattr(self, "_light_busy", False)
         state = "disabled" if is_active or self._scan_busy or self._stopping or blocked or setup_busy or tuning else "normal"
         self.batch_setup_btn.configure(state=state)
         self.settings_btn.configure(state=state)
@@ -1074,13 +1141,17 @@ class OvaLensOperatorApp(ctk.CTk):
         if self._stopping:
             return
         station = getattr(self, "station", None)
+        light_cancel = getattr(self, "_light_request_cancel", None)
+        if light_cancel is not None:
+            light_cancel.set()
         request = getattr(self, "_setup_request", None)
         panel = getattr(self, "_camera_panel", None)
         if panel is not None:
             panel.cancel_alignment()
         if request:
             request["cancel"].set()
-        if station and (station.active or getattr(self, "_setup_busy", False) or getattr(self, "_camera_panel", None) is not None):
+        if station and (station.active or getattr(self, "_setup_busy", False) or getattr(self, "_camera_panel", None) is not None
+                        or getattr(station, "light_link", None) is not None):
             station.halt()
         completed = getattr(self, "_automatic_complete_cycle", None)
         if completed is not None and self.current_session_id == completed.session_id:
@@ -1192,6 +1263,7 @@ class OvaLensOperatorApp(ctk.CTk):
         station = getattr(self, "station", None)
         if station is None:
             return
+        OvaLensOperatorApp._refresh_light_control(self)
         now = time.monotonic()
         self._ui_tick_ms = (now - getattr(self, "_last_station_poll", now)) * 1000
         self._last_station_poll = now
@@ -1209,6 +1281,11 @@ class OvaLensOperatorApp(ctk.CTk):
                 parts.append("IR: " + boards.conveyor.snapshot().telemetry.get("IR_ACTIVE", "unknown"))
         else:
             parts.append("Boards disconnected")
+            lamp = getattr(station, "light_link", None)
+            if lamp is not None:
+                state = lamp.snapshot()
+                value = state.telemetry.get("LIGHT") if state.connected and not state.error else None
+                parts.append("Candling light: " + ("ON" if value == "1" else "OFF" if value == "0" else "unknown"))
         recovery = getattr(station, "recovery", None)
         if recovery and recovery.get("state") not in {"COMPLETE", "CLEARED"}:
             parts.append("Recovery: inspect interrupted eggs before validating")
@@ -1269,7 +1346,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
     def toggle_auto_session(self):
         """One inspected action connects, prepares and starts the normal station."""
-        if getattr(self, "_setup_busy", False) or self._stopping or self._closing or getattr(self, "_camera_panel", None) is not None:
+        if getattr(self, "_setup_busy", False) or getattr(self, "_light_busy", False) or self._stopping or self._closing or getattr(self, "_camera_panel", None) is not None:
             return
         if self.is_session_active or self.is_auto_cycle_running:
             self.stop_or_cancel_session()
@@ -1602,7 +1679,7 @@ class OvaLensOperatorApp(ctk.CTk):
         if getattr(self, "_camera_panel", None) is not None:
             self._log("[CAMERA] Finish camera tuning before scanning.")
             return
-        if self._closing or self._scan_busy or self._stopping or self.is_auto_cycle_running or getattr(self, "_setup_busy", False):
+        if self._closing or self._scan_busy or self._stopping or self.is_auto_cycle_running or getattr(self, "_setup_busy", False) or getattr(self, "_light_busy", False):
             return
         station = getattr(self, "station", None)
         if station and station.cycle and self.current_session_id == station.cycle.session_id:
@@ -1679,6 +1756,9 @@ class OvaLensOperatorApp(ctk.CTk):
                           OperatorState.REVIEW)
 
     def trigger_manual_eject(self):
+        light_cancel = getattr(self, "_light_request_cancel", None)
+        if light_cancel is not None:
+            light_cancel.set()
         panel = getattr(self, "_camera_panel", None)
         if panel is not None:
             panel.cancel_alignment()
