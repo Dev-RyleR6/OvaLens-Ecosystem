@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-STEPPER-TEST-01**: Provide a standalone COM5 stepper diagnostic with bounded slow jogs, versioned role verification, pause-interlock enforcement, position/completion checks and stop/close cleanup; verify with simulated serial hardware without accessing the physical rig.
+
 - [x] **TASK-NEW-EDGE-READINESS-01**: Separate empty-conveyor preparation from final Start, expose configuration/camera/model/storage/IoT readiness, recheck and invalidate stale preparation, retain offline operation and explicit fault recovery, and verify cancellation and native controls without hardware.
 
 - [x] **TASK-NEW-EDGE-BATCH-CREATE-01**: Implement worker-led offline batch creation with complete SQLite records, stable IDs, cached selection and remembered defaults; register batches idempotently before sessions/scans, report conflicts, repair legacy missing metadata without reassigning evidence, and verify worker permissions, retry ordering and native setup controls without hardware.
