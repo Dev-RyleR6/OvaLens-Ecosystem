@@ -43,3 +43,30 @@ workflow for a coordinated test instead of expecting a COM5-only jog to work.
 After any serial test, inspect and Prepare station again before sorting.
 The reported step count confirms controller pulses, not actual motor movement;
 watch the unloaded conveyor to verify smooth physical operation.
+
+## Servo-only diagnostic (COM7)
+
+Close Edge and Arduino Serial Monitor and clear the entire gate path. From the
+repository root run:
+
+```powershell
+.venv\Scripts\python.exe scripts\test_servo.py
+```
+
+Confirm with **y** before any connection. Opening COM7 can reset the ESP32 and
+move its servo to the firmware boot angle (90°), including in `--check` mode.
+The default sequence is **90° → 100° → 90°**, with one second to observe each
+intermediate position. Each command waits for reported completion; the conveyor
+pause stays held. COM5 and COM9 are never opened and no RESUME is issued.
+
+Use `--angles 90 120 90` for a custom sequence within the gate's clear mechanical
+range, or `--check` to display status without sending angle commands. Angles must
+be 0–180° with at most ten per invocation. `--hold-ms 2000` changes observation
+time between confirmed positions; it does not change the servo's physical speed.
+The script does not change saved settings or firmware sorting presets.
+
+Ctrl+C, blocked IR, faults, lost pause or incorrect angle feedback stops the
+sequence without retry or an automatic return movement. Cleanup requests ESTOP,
+holds the last angle and closes COM7. Inspect the gate and Prepare station again
+before sorting. Controller-reported angles are commanded targets, not independent
+position feedback; observe that the servo actually moves smoothly.

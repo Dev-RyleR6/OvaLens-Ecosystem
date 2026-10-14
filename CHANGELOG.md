@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Firmware**: [TASK-NEW-FW-APP-01] preserve explicit egg/servo port assignments, add the COM5/COM7 hardware launcher, and display deployed controller status replies (2026-10-02).
 
 ### Added
+- **Edge**: [TASK-NEW-EDGE-SERVO-TEST-01] add standalone COM7 servo diagnostic (2026-10-14)
 - **Edge**: [TASK-NEW-EDGE-STEPPER-TEST-01] add standalone COM5 stepper diagnostic (2026-10-14)
 - **Edge**: [TASK-NEW-EDGE-READINESS-01] prepare and verify station before sorting (2026-10-14)
 - **Edge**: [TASK-NEW-EDGE-BATCH-CREATE-01] create and sync complete batches offline (2026-10-14)
