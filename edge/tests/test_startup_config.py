@@ -122,6 +122,8 @@ def test_station_settings_builds_without_camera_or_board_access(hidden_ui, tmp_p
                               store=SettingsStore(tmp_path / "defaults.json"), active=False,
                               calibrated=False,
                               halt=Mock(), stop=Mock())
+    station.readiness = SimpleNamespace(ready=False, reason="Prepare station", rows=lambda: (),
+                                        software_checks=Mock(return_value=()))
     camera = SimpleNamespace(is_running=False, current_fps=0., last_error=None, is_mock_mode=False, stop=Mock())
     sync = SimpleNamespace(last_error=None, heartbeat_error=None, is_online=False, stop=Mock())
     db = Mock()
@@ -203,16 +205,22 @@ def test_simple_setup_main_screen_without_hardware(hidden_ui):
         status={"state": "SEARCHING", "holder": 1, "reason": "Gate clear"}, count=0, routed=0)
     station = SimpleNamespace(cycle=None, boards=None, calibrated=False, recovery=None,
         active=False, halt=Mock(), stop=Mock(), start_cycle=Mock(return_value=cycle))
-    def prepare(inspected, cancel, progress):
+    def prepare(inspected, cancel, progress, **kwargs):
         assert inspected
         entered.set()
         assert release.wait(3)
         assert not cancel.is_set()
         progress("Station ready")
         station.calibrated = True
-        station.cycle = cycle
+        station.readiness.ready = True
         return "Ready"
-    station.prepare_for_sorting = Mock(side_effect=prepare)
+    station.settings = SimpleNamespace(rig_profile="three_v3")
+    station.readiness = SimpleNamespace(ready=False, reason="Prepare station", rows=lambda: (),
+        prepare=Mock(side_effect=prepare), software_checks=Mock(return_value=()))
+    def start(*args):
+        station.cycle = cycle
+        return station.start_cycle(*args[:3])
+    station.readiness.start = Mock(side_effect=start)
     camera = SimpleNamespace(is_running=False, current_fps=0., last_error=None,
                              is_mock_mode=False, stop=Mock())
     sync = SimpleNamespace(last_error=None, heartbeat_error=None, is_online=False, stop=Mock())
@@ -232,7 +240,7 @@ def test_simple_setup_main_screen_without_hardware(hidden_ui):
             app.update()
             app._set_session_active_state(False)
             app.update_idletasks()
-            for control in (app.session_btn, app.setup_check, app.eject_btn, app.settings_btn):
+            for control in (app.session_btn, app.prepare_btn, app.setup_check, app.eject_btn, app.settings_btn):
                 assert control.winfo_ismapped()
                 assert control.winfo_rootx() + control.winfo_width() <= app.winfo_rootx() + app.winfo_width()
             assert app.video_container.winfo_height() > 200
@@ -241,7 +249,7 @@ def test_simple_setup_main_screen_without_hardware(hidden_ui):
         assert app.session_btn.cget("state") == "disabled"
         app.setup_inspected.set(True)
         app._set_session_active_state(False)
-        app.session_btn.invoke()
+        app.prepare_btn.invoke()
         assert entered.wait(1)
         assert app._setup_busy and app.session_btn.cget("text") == "Preparing..."
         assert app.eject_btn.cget("state") == "normal"
@@ -250,7 +258,15 @@ def test_simple_setup_main_screen_without_hardware(hidden_ui):
         while app._setup_busy and time.monotonic() < deadline:
             app.update()
             time.sleep(.005)
-        assert not app._setup_busy and app.is_auto_cycle_running
+        assert not app._setup_busy and not app.is_auto_cycle_running
+        station.start_cycle.assert_not_called()
+        assert app.session_btn.cget("state") == "normal"
+        app.session_btn.invoke()
+        deadline = time.monotonic() + 3
+        while app._setup_busy and time.monotonic() < deadline:
+            app.update()
+            time.sleep(.005)
+        assert app.is_auto_cycle_running
         station.start_cycle.assert_called_once()
         app._poll_station()
         assert app.cycle_status_label.cget("text") == "Feed next egg"

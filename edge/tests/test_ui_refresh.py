@@ -69,6 +69,7 @@ def test_setup_locks_scanning_and_start_until_preparation_completes():
         assert button.configure.call_args.kwargs['state'] == 'disabled'
     app._setup_busy = False
     app.station.calibrated = True
+    app._station_prepared = app._batch_record_ready = True
     app.setup_inspected = SimpleNamespace(get=lambda: True)
     refresh()
     assert app.session_btn.configure.call_args.kwargs['state'] == 'normal'

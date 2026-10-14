@@ -19,8 +19,16 @@ image. A single side panel groups the latest classification, aligned batch
 counts and recent events with spacing and thin dividers. Counts are rows rather
 than coloured metric cards. The empty camera well explains setup directly.
 
-Daily operation uses one inspected Start sorting action. Camera preview starts
-on opening; discovery and preparation run in the background with saved settings.
+Daily operation uses Batch setup, empty-conveyor confirmation, Prepare station,
+then a separate Start sorting action. Camera preview and passive software/storage
+checks start on opening; serial discovery waits for explicit empty-rig preparation.
+Show an inline scrollable readiness checklist in the idle right panel, retaining
+the camera preview and fixed STOP/footer controls at 1024×720. Backend offline is
+a warning; local storage, model and controller faults block Start. Preparation
+never starts a session or releases the belt. Final Start rechecks fresh status
+and storage in the background without discovery or preset replay. Settings,
+camera/control changes, resets, position changes and STOP invalidate preparation;
+readiness is session-only and requires explicit reinspection after a fault.
 The cycle heading gives a short feeding instruction, with an explanation below.
 Only a clear gate invites the next egg. Completed batches show totals and a
 Start next batch action inline. Tools groups Single scan, Settings and camera

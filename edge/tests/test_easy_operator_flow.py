@@ -26,28 +26,46 @@ def simple_operator(tmp_path):
     app = operator(tmp_path)
     app.setup_inspected = Flag()
     app.setup_notice = Mock()
+    app.iot_status_badge = Mock()
     app._ui_events = queue.Queue()
     app._setup_busy = app._batch_complete = app.simulation = False
     app._setup_request = app._automatic_complete_cycle = None
+    app._batch_record_ready = True
+    app.refresh_readiness = Mock()
     app.station = SimpleNamespace(active=False, cycle=None, halt=Mock(),
         prepare_for_sorting=Mock(return_value="Ready"),
         start_cycle=Mock(return_value=SimpleNamespace(session_id="cycle")))
+    app.station.settings = SimpleNamespace(rig_profile="three_v3")
+    readiness = SimpleNamespace(ready=False, reason="Prepare station", prepare=Mock(), start=Mock())
+    def prepare(*args, **kwargs):
+        app.station.prepare_for_sorting(*args)
+        readiness.ready = True
+    readiness.prepare.side_effect = prepare
+    readiness.start.side_effect = lambda batch, target, operator, cancel: app.station.start_cycle(batch, target, operator)
+    app.station.readiness = readiness
     app._set_session_active_state = Mock()
     app.open_batch_setup_dialog = Mock()
     from src.ui.app import OvaLensOperatorApp
-    for name in ("toggle_auto_session", "_activate_cycle", "_finalize_automatic_batch", "trigger_manual_eject"):
+    for name in ("toggle_auto_session", "_activate_cycle", "_finalize_automatic_batch", "trigger_manual_eject", "prepare_station", "_submit_station_request"):
         setattr(app, name, MethodType(getattr(OvaLensOperatorApp, name), app))
     return app
 
 
-def test_one_click_prepares_and_starts_only_after_success(tmp_path):
+def test_prepare_finishes_without_starting_then_final_start_reuses_it(tmp_path):
     app = simple_operator(tmp_path)
     app.toggle_auto_session()
-    app.toggle_auto_session()
+    assert not app._jobs.work
+    app.prepare_station()
+    app.prepare_station()
     assert app._setup_busy and len(app._jobs.work) == 1
     app.station.start_cycle.assert_not_called()
     app._jobs.finish()
-    assert not app._setup_busy and app.is_auto_cycle_running
+    assert not app._setup_busy and not app.is_auto_cycle_running
+    app.station.prepare_for_sorting.assert_called_once()
+    app.toggle_auto_session()
+    app.toggle_auto_session()
+    app._jobs.finish()
+    assert app.is_auto_cycle_running
     app.station.prepare_for_sorting.assert_called_once()
     app.station.start_cycle.assert_called_once_with(app.current_batch_id, app.target_egg_count, app.operator_name)
     assert app.current_session_id == "cycle"
@@ -66,7 +84,7 @@ def test_unknown_batch_prompts_for_details_before_hardware_setup(tmp_path):
 @pytest.mark.parametrize("worker_finished", [False, True])
 def test_stop_during_setup_never_starts_a_late_result(tmp_path, worker_finished):
     app = simple_operator(tmp_path)
-    app.toggle_auto_session()
+    app.prepare_station()
     request = app._setup_request
     work, success, failure = app._jobs.work.pop(0)
     result = work() if worker_finished else None
@@ -87,7 +105,7 @@ def test_setup_validation_runs_before_hardware(tmp_path, invalid):
         app.setup_inspected.set(False)
     else:
         app.operator_name = ""
-    app.toggle_auto_session()
+    app.prepare_station()
     assert not app._jobs.work
     app.station.prepare_for_sorting.assert_not_called()
 
@@ -95,12 +113,15 @@ def test_setup_validation_runs_before_hardware(tmp_path, invalid):
 def test_setup_failure_does_not_start_and_can_retry_after_inspection(tmp_path):
     app = simple_operator(tmp_path)
     app.station.prepare_for_sorting.side_effect = RuntimeError("Camera unavailable")
-    app.toggle_auto_session()
+    app.prepare_station()
     app._jobs.finish()
     assert not app._setup_busy and not app.is_auto_cycle_running
     app.station.start_cycle.assert_not_called()
     app.setup_inspected.set(True)
     app.station.prepare_for_sorting.side_effect = None
+    app.prepare_station()
+    app._jobs.finish()
+    assert not app.is_auto_cycle_running
     app.toggle_auto_session()
     app._jobs.finish()
     assert app.is_auto_cycle_running

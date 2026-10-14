@@ -142,6 +142,12 @@ class LocalDatabaseManager:
                 notes TEXT, device_id TEXT NOT NULL, operator_name TEXT NOT NULL,
                 origin TEXT NOT NULL, created_at TEXT NOT NULL, synced_at TEXT,
                 last_attempt_at TEXT, sync_error TEXT);""")
+            batch_columns = {r[1] for r in conn.execute("PRAGMA table_info(local_batches);")}
+            if "sync_blocked" not in batch_columns:
+                conn.execute("ALTER TABLE local_batches ADD COLUMN sync_blocked INTEGER NOT NULL DEFAULT 0;")
+                conn.execute("""UPDATE local_batches SET sync_blocked=1 WHERE
+                    sync_error LIKE '%conflicts with a backend record%'
+                    OR sync_error LIKE '%acknowledgement does not match%';""")
             conn.execute("""CREATE TABLE IF NOT EXISTS batch_preferences (
                 id INTEGER PRIMARY KEY CHECK(id=1), data_json TEXT NOT NULL);""")
             if "manual_review_count" not in session_columns:
@@ -248,11 +254,14 @@ class LocalDatabaseManager:
             return [dict(row) for row in conn.execute("""SELECT * FROM local_batches WHERE synced_at IS NULL
                 ORDER BY last_attempt_at, created_at, batch_id LIMIT ?;""", (limit,))]
 
-    def mark_batch_attempt(self, batch_id, error=None, synced=False):
+    def mark_batch_attempt(self, batch_id, error=None, synced=False, blocked=None):
         with self._get_connection() as conn:
             now = datetime.now(timezone.utc).isoformat()
             conn.execute("""UPDATE local_batches SET last_attempt_at=?, sync_error=?, synced_at=?
                 WHERE batch_id=?;""", (now, error, now if synced else None, batch_id))
+            if synced or blocked is not None:
+                conn.execute("UPDATE local_batches SET sync_blocked=? WHERE batch_id=?;",
+                             (0 if synced else int(blocked), batch_id))
             conn.commit()
 
     def get_pending_batch_count(self):
@@ -383,6 +392,32 @@ class LocalDatabaseManager:
             "operator_name": operator_name,
             "started_at": started_at
         }
+
+    def check_readiness(self, full=True):
+        """Probe real WAL writes and image storage without altering scan evidence."""
+        import shutil
+        import tempfile
+        directory = os.path.join(os.path.dirname(self.db_path), "local_scans")
+        os.makedirs(directory, exist_ok=True)
+        if shutil.disk_usage(directory).free < 256 * 1024 * 1024:
+            raise OSError("Less than 256 MB free. Free disk space before sorting.")
+        with self._get_connection() as conn:
+            if conn.execute("PRAGMA journal_mode;").fetchone()[0].lower() != "wal":
+                raise OSError("Local scan database requires WAL mode.")
+            if full and conn.execute("PRAGMA quick_check;").fetchone()[0] != "ok":
+                raise OSError("Local database integrity check failed. Preserve the database and contact support.")
+            probe = "readiness-" + str(uuid.uuid4())
+            conn.execute("INSERT INTO machine_journal(device_id, state_json) VALUES (?, ?)", (probe, "{}"))
+            conn.execute("DELETE FROM machine_journal WHERE device_id = ?", (probe,))
+        fd, temporary = tempfile.mkstemp(dir=directory, prefix="readiness-", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(b"OvaLens storage check")
+                stream.flush()
+                os.fsync(stream.fileno())
+        finally:
+            os.unlink(temporary)
+        return True
 
     def save_scan_image(self, scan_id, image):
         """Atomically persist the captured evidence before releasing its egg."""

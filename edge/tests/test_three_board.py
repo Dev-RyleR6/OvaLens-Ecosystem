@@ -39,6 +39,7 @@ class Wire:
         self.inbox, self.writes, self.closed = queue.Queue(), [], False
         self.fault, self.last_id = "STARTUP_ACK_REQUIRED", 0
         self.reference, self.light = "0", "0"
+        self.angle, self.neutral = "90", "90"
         self.emit(f"BOOT:{role}_V{version}\nREADY:{role}_V{version}:PROTOCOL={version}\n" + self.report())
 
     def emit(self, text):
@@ -46,7 +47,7 @@ class Wire:
 
     def report(self, ident=None):
         prefix = f"ID:{ident}:" if ident is not None else ""
-        fields = ["POSITION:0", "SENSOR:0", "EGG_SEQ:0", "PAUSED:1", "BUSY:0", f"LIGHT:{self.light}",
+        fields = ["POSITION:0", "SENSOR:0", "EGG_SEQ:0", "PAUSED:1", "BUSY:0", f"LIGHT:{self.light}", f"ANGLE:{self.angle}",
                   f"REFERENCE_VALID:{self.reference}", f"FAULT:{self.fault}", f"LAST_ID:{self.last_id}", "STATE:WAITING"]
         return "".join(prefix + field + "\n" for field in fields)
 
@@ -69,6 +70,10 @@ class Wire:
                 self.reference, ok = "1", "OK:HOME_SET"
             elif command in {"LIGHT_ON", "LIGHT_OFF"}:
                 self.light, ok = str(int(command == "LIGHT_ON")), "OK:" + command
+            elif command.startswith("SET_NEUTRAL:"):
+                self.neutral = command.split(":", 1)[1]
+            elif command == "RESET":
+                self.angle = self.neutral
             self.emit(f"ID:{ident}:{ok}\n" + self.report(int(ident)))
         return len(data)
 

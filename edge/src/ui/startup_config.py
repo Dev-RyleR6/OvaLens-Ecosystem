@@ -29,7 +29,7 @@ class StartupConfigWindow(ctk.CTk):
         self._operator_entry.pack(fill="x", padx=20)
         ctk.CTkLabel(body, text="Choose a saved batch or create one in Batch setup.\n"
                      "Batch details and scans save locally, including while offline.\n"
-                     "Check the empty conveyor before Start sorting.", wraplength=520,
+                     "Prepare the empty conveyor, then Start sorting.", wraplength=520,
                      justify="left", text_color=T.TEXT_SECONDARY,
                      font=(T.FONT_FAMILY, 13)).pack(anchor="w", padx=20, pady=(16, 8))
         ctk.CTkCheckBox(body, text="Simulation preview only", variable=self._simulation_var,

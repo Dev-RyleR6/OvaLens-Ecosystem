@@ -151,11 +151,13 @@ class InferenceEngine:
 
     def _warmup(self, passes: int = 3):
         """Execute dummy warmup passes to preload weights into CPU cache."""
+        self.warmup_complete = False
         dummy = np.zeros((self.imgsz, self.imgsz, 3), dtype=np.uint8)
         print(f"[*] Warming up {self.engine_type} engine ({passes} passes)...")
         for _ in range(passes):
             self.predict(dummy)
         print("[OK] Warmup complete.")
+        self.warmup_complete = passes >= 3
 
     def predict(self, frame: np.ndarray) -> Dict[str, Any]:
         """

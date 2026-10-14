@@ -1,5 +1,40 @@
 # OvaLens Edge — Computer Vision Candling & Conveyor Controller
 
+## Daily station readiness
+
+1. Open the station. Camera preview and passive configuration, model/warmup and
+   local storage checks run in the background. Startup does not connect serial boards.
+2. Create/select a complete batch in **Batch setup**, including while offline.
+3. Empty and align the conveyor, inspect the gate, tick the confirmation, and
+   press **Prepare station**. Remembered ports are tried first (COM5 stepper,
+   COM7 gate/IR, COM9 lamp); firmware roles are verified independently of port order.
+   Connecting can reset an ESP32 and move its servo. Preparation acknowledges
+   inspected faults, establishes the software reference and returns the gate to
+   neutral while holding the conveyor. It does not start a session or move the belt.
+4. Review the inline checklist, then press **Start sorting**. Final Start checks
+   fresh controller STATUS, camera/model, local batch and storage on a worker;
+   it does not repeat discovery or calibration. Feed only when instructed.
+
+Readiness is never persisted across launches. Camera/configuration changes,
+board resets/disconnection, position changes and STOP invalidate preparation.
+Clear the problem, inspect the empty rig and prepare again; reconnecting alone
+never resumes sorting. During a run, existing camera/serial/fault checks hold
+or stop the cycle and preserve recorded evidence. Pause/Resume remains available.
+
+Offline backend access and pending sync are warnings. Complete local batches
+remain usable; known identity/metadata conflicts block that batch until a matching
+backend acknowledgement resolves them. Conflict state survives failed retries.
+SQLite WAL integrity and real write checks run during startup/preparation; final
+Start rechecks writes without repeating the full integrity scan. Image storage
+must be writable with at least 256 MiB free. Scans/photos are not erased by checks.
+Use **Recheck software** for software/storage problems and **Tools ? Settings**
+for advanced configuration; use **Prepare station** to retry controller preparation.
+
+Controller acknowledgements verify communication and reported outputs, not actual
+motor travel, servo position or lamp illumination. Physical inspection remains
+required; sensor feedback would be needed to prove those actions automatically.
+
+
 > **Subsystem**: `edge/`  
 > **Platform**: Raspberry Pi 5 / Industrial Edge PC / Desktop  
 > **License**: Apache License 2.0  
@@ -33,8 +68,9 @@ Run `python edge/launcher.py`, confirm the operator name and open the station.
 The last saved batch/target is restored; use **Batch setup** to create or select
 a different batch. The saved camera starts its preview automatically.
 Check the empty conveyor, alignment and gate, tick
-the inspection box, then click **Start sorting**. This checks the camera, connects
-the boards, prepares the empty station and starts the batch in the background.
+the inspection box, then click **Prepare station**. This checks the camera and
+storage, connects the boards and prepares the empty station in the background.
+When readiness passes, press **Start sorting** to begin the batch.
 **STOP** remains available during preparation. Saved camera controls, timing and
 gate calibration are retained. New defaults use **COM5 stepper**, **COM7 servo +
 IR**, **COM9 light**, and **camera 0**. Discovery verifies firmware roles if USB
@@ -121,7 +157,7 @@ so supported controls and ranges depend on the webcam. Readback shows verified,
 unverified or rejected requests. A verified readback does not establish optical
 sharpness: inspect a stationary egg in the preview. Camera tuning is locked
 during sessions and scans. Applying changes clears the inspection confirmation;
-check the rig again before Start sorting. Preview-only changes remain in memory
+inspect and Prepare station again before Start sorting. Preview-only changes remain in memory
 until restart; Save as default keeps them for the next launch.
 
 Live updates combine rapid slider changes into the newest value, with at most

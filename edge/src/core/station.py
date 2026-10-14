@@ -8,6 +8,7 @@ from .operator_flow import validate_batch_config
 from ..iot.dual_board import BoardLink, DualBoardController
 from ..iot.three_board import ThreeBoardController, discover_boards
 from .three_board_cycle import ThreeBoardCycle
+from .readiness import StationReadiness
 
 
 class EdgeStation:
@@ -31,6 +32,7 @@ class EdgeStation:
         self._manual_light_cancel = threading.Event()
         self._manual_light_cancel.set()
         self._manual_light_interval = 5.0
+        self.readiness = StationReadiness(self)
 
     @property
     def light_link(self):
@@ -169,6 +171,7 @@ class EdgeStation:
             self.camera.initial_settings = settings.camera
             if save:
                 self.store.save(settings)
+            self.settings_error = ""
             return report
 
     def apply_camera_controls(self, camera_settings, save=False, live_preview=False):

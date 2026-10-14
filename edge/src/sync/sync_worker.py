@@ -141,16 +141,23 @@ class BackgroundSyncWorker:
                 break
             batch_id = batch["batch_id"]
             self.db.mark_batch_attempt(batch_id)
+            blocked = None
             try:
                 payload = {key: batch[key] for key in (*BATCH_FIELDS, "device_id", "operator_name")}
                 response = requests.post(f"{self.api_base_url}/api/v1/batches/register", json=payload,
                     headers={"X-API-Key": self.api_key}, timeout=4.0)
                 if response.status_code == 409:
+                    blocked = True
                     raise ValueError(f"Batch {batch['batch_code']} conflicts with a backend record. Saved scans retained; ask a manager to check the batch details.")
                 if response.status_code != 200:
                     raise ValueError(f"Batch {batch['batch_code']} registration rejected (HTTP {response.status_code}); saved locally for retry.")
                 acknowledgement = response.json()
-                if not isinstance(acknowledgement, dict) or not same_batch(batch, acknowledgement):
+                try:
+                    matches = isinstance(acknowledgement, dict) and same_batch(batch, acknowledgement)
+                except (ValueError, TypeError):
+                    matches = False
+                if not matches:
+                    blocked = True
                     raise ValueError(f"Batch {batch['batch_code']} acknowledgement does not match saved details.")
                 self.db.mark_batch_attempt(batch_id, synced=True)
                 self._is_online, self._last_sync_time = True, time.time()
@@ -160,7 +167,7 @@ class BackgroundSyncWorker:
                     error = f"Batch {batch['batch_code']} registration failed: {type(exc).__name__}; saved locally for retry."
                 else:
                     error = str(exc)
-                self.db.mark_batch_attempt(batch_id, error)
+                self.db.mark_batch_attempt(batch_id, error, blocked=blocked)
                 errors.append(error)
         self.last_error = " | ".join(dict.fromkeys(errors)) or None
 

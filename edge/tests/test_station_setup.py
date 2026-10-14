@@ -31,8 +31,9 @@ def station_fixture(tmp_path, monkeypatch, roles=None):
         applied.append(settings)
         return {"identity": f"opencv:{settings.index}:DSHOW", "properties": {}}
     camera = SimpleNamespace(apply_settings=apply, is_mock_mode=False, last_error=None,
-                             snapshot=lambda: object())
-    inference = SimpleNamespace(engine=SimpleNamespace(model_contract_verified=True),
+                             snapshot=lambda **kwargs: object())
+    inference = SimpleNamespace(engine=SimpleNamespace(model_contract_verified=True,
+                                engine_type="ONNX test", warmup_complete=True),
                                 predict=lambda work, **kwargs: work())
     db = LocalDatabaseManager(str(tmp_path / "scans.db"))
     station = EdgeStation(camera, inference, db, "station", SettingsStore(tmp_path / "settings.json"))
