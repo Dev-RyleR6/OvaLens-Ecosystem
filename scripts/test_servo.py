@@ -1,7 +1,8 @@
 r"""Test the COM7 sorting servo using the installed three-board v3 firmware.
 
 Run .venv\Scripts\python.exe scripts\test_servo.py from the repository root.
-Default sequence: 90 -> 100 -> 90 degrees. COM5 and COM9 are never opened.
+Default sequence: 90 -> 120 -> 90 degrees. No IR sensor is needed.
+COM5 and COM9 are never opened.
 Opening COM7 may reset its ESP32 and move the servo to its boot angle (90).
 """
 import argparse
@@ -12,8 +13,8 @@ import time
 
 def arguments(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--angles", nargs="+", type=int, default=[90, 100, 90],
-                        help="1-10 angles, each 0-180 degrees (default: 90 100 90)")
+    parser.add_argument("--angles", nargs="+", type=int, default=[90, 120, 90],
+                        help="1-10 angles, each 0-180 degrees (default: 90 120 90)")
     parser.add_argument("--hold-ms", type=int, default=1000,
                         help="Observation time between confirmed positions, 0-5000 ms (default: 1000)")
     parser.add_argument("--check", action="store_true", help="Display controller status without sending an angle command; connection may still cause a boot movement")
@@ -30,10 +31,6 @@ def safe_status(status):
         raise RuntimeError("Servo is busy or status is incomplete.")
     if status.get("PAUSED") != "1":
         raise RuntimeError("Conveyor hold is not confirmed. No servo movement requested.")
-    if status.get("SENSOR") != "0":
-        raise RuntimeError("Clear the IR beam and empty the conveyor before testing.")
-    if status.get("FAULT") == "NONE" and status.get("STATE") != "WAITING":
-        raise RuntimeError("Egg controller is not idle. Inspect and empty the conveyor before testing.")
     try:
         angle = int(status["ANGLE"])
     except (KeyError, ValueError, TypeError):
@@ -44,10 +41,10 @@ def safe_status(status):
 
 
 def test_servo(args, *, factory=None, prompt=input, output=print):
-    output("Servo only: COM7, 115200 baud, three-board v3 firmware. COM5 and COM9 stay unopened.")
+    output("Servo test on COM7. No IR sensor needed. COM5 and COM9 stay unopened.")
     output("Close OvaLens Edge and Arduino Serial Monitor. Opening COM7 can move the servo to its boot angle (90 degrees).")
     description = "check status" if args.check else "test angles " + " -> ".join(map(str, args.angles))
-    answer = prompt(f"Empty the conveyor and clear the gate's entire movement path. Connect and {description}? [y/N] ")
+    answer = prompt(f"Clear the servo's movement path. Connect and {description}? [y/N] ")
     if answer.strip().lower() not in {"y", "yes"}:
         output("Cancelled. No serial port opened.")
         return False
@@ -66,8 +63,8 @@ def test_servo(args, *, factory=None, prompt=input, output=print):
                 raise RuntimeError(state.error or "Servo identification/boot settling timed out. Check COM7 and v3 firmware.")
             time.sleep(.02)
         status = link.command("STATUS").result(3.5)
-        output(" | ".join(f"{key}={status.get(key, '?')}" for key in ("FAULT", "BUSY", "PAUSED", "SENSOR", "ANGLE")))
         if args.check:
+            output(" | ".join(f"{key}={status.get(key, '?')}" for key in ("FAULT", "BUSY", "PAUSED", "ANGLE")))
             return True
         safe_status(status)
         fault = status.get("FAULT")
@@ -84,12 +81,11 @@ def test_servo(args, *, factory=None, prompt=input, output=print):
             safe_status(status)
             if status.get("FAULT") != "NONE":
                 raise RuntimeError("Controller faulted before movement. No retry issued.")
-            output(f"Requesting {angle} degrees. Press Ctrl+C to stop.")
+            output(f"Moving to {angle} degrees. Ctrl+C stops the test.")
             reply = link.command(f"SERVO:{angle}").result(3.5)
             actual = safe_status(reply)
             if reply.get("FAULT") != "NONE" or actual != angle:
                 raise RuntimeError("Servo completion did not match the requested position. No retry issued.")
-            output(f"Controller confirmed {actual} degrees. Observe the physical gate.")
             if index < len(args.angles) - 1:
                 # The serial worker continues heartbeat/status traffic during observation.
                 deadline = time.monotonic() + args.hold_ms / 1000
@@ -99,7 +95,7 @@ def test_servo(args, *, factory=None, prompt=input, output=print):
                     if state.error or state.telemetry.get("FAULT") != "NONE":
                         raise RuntimeError(state.error or "Servo controller faulted while holding.")
                     time.sleep(min(.05, max(0, deadline - time.monotonic())))
-        output("Sequence completed. Reported angles do not prove the servo physically moved; check for smooth movement.")
+        output("Done. If the servo moved back and forth, it is responding. Reported angles do not prove physical movement.")
         return True
     finally:
         link.stop()  # Requests ESTOP (holds pause/current angle) and closes COM7.

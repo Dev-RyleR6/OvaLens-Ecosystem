@@ -53,7 +53,7 @@ def commands(wire):
     return [w.split(" ", 1)[1] for w in wire.writes if w.startswith("@")]
 
 
-@pytest.mark.parametrize("angles", [[90, 100, 90], [120], [0, 180, 90]])
+@pytest.mark.parametrize("angles", [[90, 120, 90], [120], [0, 180, 90]])
 def test_servo_sequence_uses_only_com7_and_keeps_pause_held(angles):
     wire = ServoWire()
     factory, opened, links = fixture_link(wire)
@@ -101,7 +101,7 @@ def test_startup_busy_is_allowed_to_settle_before_fault_acknowledgement():
     assert "ACK_FAULT" in commands(wire) and wire.closed
 
 
-def test_ir_blocked_during_observation_prevents_next_angle():
+def test_ir_changes_during_observation_do_not_interrupt_servo_test():
     wire = ServoWire()
     timers = []
     original = wire.write
@@ -110,6 +110,7 @@ def test_ir_blocked_during_observation_prevents_next_angle():
         if b" SERVO:" in data and not timers:
             def blocked():
                 wire.sensor = True
+                wire.egg_state = "HOLDING"
                 wire.emit(wire.report())
             timer = threading.Timer(.06, blocked)
             timers.append(timer)
@@ -118,27 +119,40 @@ def test_ir_blocked_during_observation_prevents_next_angle():
     wire.write = write
     factory, opened, _ = fixture_link(wire)
     try:
-        with pytest.raises(RuntimeError, match="Clear the IR"):
-            diagnostic.test_servo(diagnostic.arguments(["--hold-ms", "300"]), factory=factory,
-                                  prompt=lambda _: "y", output=lambda _: None)
+        assert diagnostic.test_servo(diagnostic.arguments(["--hold-ms", "300"]), factory=factory,
+                                     prompt=lambda _: "y", output=lambda _: None)
     finally:
         for timer in timers:
             timer.join()
     assert opened == ["COM7"] and wire.closed and "ESTOP" in wire.writes
-    assert [c for c in commands(wire) if c.startswith("SERVO:")] == ["SERVO:90"]
+    assert [c for c in commands(wire) if c.startswith("SERVO:")] == ["SERVO:90", "SERVO:120", "SERVO:90"]
 
 
-@pytest.mark.parametrize("failure", ["sensor", "pause", "role", "fault", "state", "wrong-angle", "lost-pause", "move-fault", "interrupt"])
+@pytest.mark.parametrize("sensor,state", [(True, "HOLDING"), (False, "CLEARING"), (None, None)])
+def test_servo_works_with_blocked_or_absent_ir_and_any_egg_cycle_state(sensor, state):
+    wire = ServoWire(sensor=bool(sensor), state=state or "WAITING")
+    if sensor is None:
+        report = wire.report
+        wire.report = lambda ident=None: "\n".join(line for line in report(ident).splitlines()
+                                                   if "SENSOR:" not in line) + "\n"
+        # Discard the simulated boot report so absence applies from identification onward.
+        while not wire.inbox.empty():
+            wire.inbox.get_nowait()
+    factory, opened, _ = fixture_link(wire)
+    assert diagnostic.test_servo(diagnostic.arguments(["--hold-ms", "0"]), factory=factory,
+                                 prompt=lambda _: "y", output=lambda _: None)
+    assert opened == ["COM7"] and wire.closed
+    assert [c for c in commands(wire) if c.startswith("SERVO:")] == ["SERVO:90", "SERVO:120", "SERVO:90"]
+
+
+@pytest.mark.parametrize("failure", ["pause", "role", "fault", "wrong-angle", "lost-pause", "move-fault", "interrupt"])
 def test_unsafe_or_failed_test_stops_without_retry_or_later_angles(failure):
-    wire = ServoWire(sensor=failure == "sensor", paused=failure != "pause",
+    wire = ServoWire(paused=failure != "pause",
                      role="CONVEYOR" if failure == "role" else "EGG_CONTROLLER",
-                     state="HOLDING" if failure == "state" else "WAITING",
                      wrong_angle=failure == "wrong-angle", lose_pause=failure == "lost-pause",
                      fault_on_move=failure == "move-fault")
     if failure == "fault":
         wire.fault = "SERVO_ATTACH"
-    if failure == "state":
-        wire.fault = "NONE"
     factory, opened, links = fixture_link(wire)
     if failure == "interrupt":
         original = factory

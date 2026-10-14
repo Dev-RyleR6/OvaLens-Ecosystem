@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-SERVO-SIMPLE-01**: Simplify the COM7 servo diagnostic to a visible 90/120/90 test independent of IR presence/readings and egg-cycle state, retaining controller identity, bounded angles, held pause and cleanup; verify without physical hardware.
+
 - [x] **TASK-NEW-EDGE-SERVO-TEST-01**: Provide a separate COM7 servo diagnostic with a bounded angle sequence, clear-path confirmation before connection, v3 identity and completion checks, held conveyor pause, and error/Ctrl+C cleanup; verify with simulated serial hardware without opening physical ports.
 
 - [x] **TASK-NEW-EDGE-STEPPER-TEST-01**: Provide a standalone COM5 stepper diagnostic with bounded slow jogs, versioned role verification, pause-interlock enforcement, position/completion checks and stop/close cleanup; verify with simulated serial hardware without accessing the physical rig.

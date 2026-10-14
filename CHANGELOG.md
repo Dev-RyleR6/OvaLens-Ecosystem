@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Edge**: [TASK-NEW-EDGE-SERVO-SIMPLE-01] remove IR requirements from servo test (2026-10-14)
 - **Edge**: [TASK-NEW-EDGE-OFFCENTER-01] allow stable off-centre automatic sorting (2026-10-09)
 - **Edge**: [TASK-NEW-EDGE-SESSION-SYNC-01] replay completed sessions and unblock sync (2026-10-09)
 - **Edge**: [TASK-NEW-EDGE-CONFIDENCE-70-01] allow automatic sorting at 70 percent confidence (2026-10-09)

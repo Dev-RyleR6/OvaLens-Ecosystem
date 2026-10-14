@@ -55,9 +55,11 @@ repository root run:
 
 Confirm with **y** before any connection. Opening COM7 can reset the ESP32 and
 move its servo to the firmware boot angle (90°), including in `--check` mode.
-The default sequence is **90° → 100° → 90°**, with one second to observe each
+The default sequence is **90° → 120° → 90°**, with one second to observe each
 intermediate position. Each command waits for reported completion; the conveyor
 pause stays held. COM5 and COM9 are never opened and no RESUME is issued.
+No IR sensor is required: missing or blocked IR readings and egg-cycle state
+do not prevent this standalone servo test. Normal sorting keeps its IR checks.
 
 Use `--angles 90 120 90` for a custom sequence within the gate's clear mechanical
 range, or `--check` to display status without sending angle commands. Angles must
@@ -65,7 +67,7 @@ be 0–180° with at most ten per invocation. `--hold-ms 2000` changes observati
 time between confirmed positions; it does not change the servo's physical speed.
 The script does not change saved settings or firmware sorting presets.
 
-Ctrl+C, blocked IR, faults, lost pause or incorrect angle feedback stops the
+Ctrl+C, controller faults, lost pause or incorrect angle feedback stops the
 sequence without retry or an automatic return movement. Cleanup requests ESTOP,
 holds the last angle and closes COM7. Inspect the gate and Prepare station again
 before sorting. Controller-reported angles are commanded targets, not independent
