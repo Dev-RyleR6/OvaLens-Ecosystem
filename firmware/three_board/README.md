@@ -55,6 +55,10 @@ repository root run:
 
 Confirm with **y** before any connection. Opening COM7 can reset the ESP32 and
 move its servo to the firmware boot angle (90°), including in `--check` mode.
+The diagnostic waits two seconds for boot, clears startup replies and terminates
+any partial serial input line before requesting fresh v3 identity/status. If
+`ERROR:INVALID_LINE` persists after this synchronization, the test stops; close
+other serial applications and check the installed firmware and USB connection.
 The default sequence is **90° → 120° → 90°**, with one second to observe each
 intermediate position. Each command waits for reported completion; the conveyor
 pause stays held. COM5 and COM9 are never opened and no RESUME is issued.

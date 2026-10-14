@@ -40,6 +40,40 @@ def safe_status(status):
     return angle
 
 
+def open_servo_port(*args, stop_event=None, **kwargs):
+    """Settle boot and terminate a partial input line before BoardLink's handshake.
+
+    Runs in the serial worker, before any correlated or movement command. Runtime
+    replies are left to BoardLink unchanged, including ERROR:INVALID_LINE.
+    """
+    import serial
+    connection = serial.Serial(*args, **kwargs)
+    try:
+        # ESP32 USB reset/boot; no commands sent during this wait.
+        if stop_event is None:
+            time.sleep(2)
+        elif stop_event.wait(2):
+            raise RuntimeError("Servo test stopped during serial startup")
+        connection.reset_input_buffer()
+        if connection.write(b"\n") != 1:
+            raise RuntimeError("Incomplete serial startup delimiter write")
+        # An old partial/invalid command may answer the delimiter with an error.
+        # Drain only this pre-handshake traffic, requiring a quiet receive window.
+        deadline = time.monotonic() + 1
+        quiet_since = time.monotonic()
+        while time.monotonic() - quiet_since < .2:
+            if stop_event is not None and stop_event.is_set():
+                raise RuntimeError("Servo test stopped during serial startup")
+            if time.monotonic() >= deadline:
+                raise RuntimeError("COM7 startup input did not settle; check firmware and USB connection")
+            if connection.read(256):
+                quiet_since = time.monotonic()
+        return connection
+    except BaseException:
+        connection.close()
+        raise
+
+
 def test_servo(args, *, factory=None, prompt=input, output=print):
     output("Servo test on COM7. No IR sensor needed. COM5 and COM9 stay unopened.")
     output("Close OvaLens Edge and Arduino Serial Monitor. Opening COM7 can move the servo to its boot angle (90 degrees).")
@@ -51,7 +85,12 @@ def test_servo(args, *, factory=None, prompt=input, output=print):
     if factory is None:
         sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "edge"))
         from src.iot.dual_board import BoardLink
-        factory = BoardLink
+        def factory(*args, **kwargs):
+            def open_port(*port_args, **port_options):
+                return open_servo_port(*port_args, stop_event=link._stop, **port_options)
+            link = BoardLink(*args, serial_factory=open_port, **kwargs)
+            return link
+        output("Waiting for COM7 to finish booting, then checking the servo controller...")
     link = factory("EGG_CONTROLLER", "COM7", protocol=3)
     try:
         link.start()

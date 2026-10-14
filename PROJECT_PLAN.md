@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-SERVO-STARTUP-01**: Synchronize the standalone COM7 servo diagnostic after ESP32 boot before identifying the controller; discard only startup input, terminate any partial command, retain fatal runtime errors and verify cleanup without physical hardware.
+
 - [x] **TASK-NEW-EDGE-SERVO-SIMPLE-01**: Simplify the COM7 servo diagnostic to a visible 90/120/90 test independent of IR presence/readings and egg-cycle state, retaining controller identity, bounded angles, held pause and cleanup; verify without physical hardware.
 
 - [x] **TASK-NEW-EDGE-SERVO-TEST-01**: Provide a separate COM7 servo diagnostic with a bounded angle sequence, clear-path confirmation before connection, v3 identity and completion checks, held conveyor pause, and error/Ctrl+C cleanup; verify with simulated serial hardware without opening physical ports.
