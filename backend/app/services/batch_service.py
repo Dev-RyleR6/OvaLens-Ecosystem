@@ -3,11 +3,13 @@ from typing import List, Optional, Tuple, Dict, Any
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
+from sqlalchemy.dialects.postgresql import insert
 
 from app.models.batch import BatchModel, BatchStage, BatchStatus, DuckBreed
 from app.models.session import CandlingSessionModel, CandlingStage
 from app.models.scan import EggScanModel, FertilityClass
 from app.models.settings import HatcherySettingsModel
+from app.models.audit import AuditLogModel
 from app.services.scan_metrics import scan_totals
 from app.schemas.batch import (
     BatchCreate, BatchUpdate, BatchSummaryResponse,
@@ -17,6 +19,27 @@ from app.core.exceptions import DuplicateEntityException, EntityNotFoundExceptio
 
 
 class BatchService:
+    @staticmethod
+    def register_edge_batch(db: Session, payload) -> BatchModel:
+        """Create once by permanent Edge ID; conflicting retries never overwrite inventory."""
+        values = payload.model_dump(exclude={"device_id", "operator_name"})
+        values.update(target_hatch_date=payload.set_date + timedelta(days=28),
+                      current_stage=BatchStage.SETTING, status=BatchStatus.INCUBATING)
+        inserted = db.execute(insert(BatchModel).values(**values).on_conflict_do_nothing()
+                              .returning(BatchModel.batch_id)).scalar_one_or_none()
+        batch = db.get(BatchModel, payload.batch_id)
+        matches = batch is not None and all(getattr(batch, key) == getattr(payload, key)
+            for key in ("batch_code", "breed", "incubator_id", "initial_egg_count", "set_date", "notes"))
+        if not matches:
+            db.rollback()
+            raise DuplicateEntityException("Batch ID or code already exists with different details; saved Edge data must be reviewed.")
+        if inserted:
+            db.add(AuditLogModel(action="BATCH_CREATED", entity_type="BATCH", entity_id=batch.batch_id,
+                details={"source": "EDGE", "device_id": payload.device_id, "operator_name": payload.operator_name}))
+        db.commit()
+        db.refresh(batch)
+        return batch
+
     @staticmethod
     def _compute_milestone(set_date: datetime, current_stage: BatchStage) -> Tuple[int, Optional[str]]:
         now = datetime.now(timezone.utc)

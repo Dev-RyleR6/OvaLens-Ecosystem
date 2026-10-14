@@ -53,6 +53,16 @@ def test_one_click_prepares_and_starts_only_after_success(tmp_path):
     assert app.current_session_id == "cycle"
 
 
+def test_unknown_batch_prompts_for_details_before_hardware_setup(tmp_path):
+    app = simple_operator(tmp_path)
+    app._batch_record_ready = False
+    app.toggle_auto_session()
+    app.open_batch_setup_dialog.assert_called_once()
+    app.station.prepare_for_sorting.assert_not_called()
+    app.station.start_cycle.assert_not_called()
+    assert not app._jobs.work
+
+
 @pytest.mark.parametrize("worker_finished", [False, True])
 def test_stop_during_setup_never_starts_a_late_result(tmp_path, worker_finished):
     app = simple_operator(tmp_path)

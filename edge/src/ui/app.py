@@ -98,7 +98,10 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Batch & Session Configuration (from startup config)
         self.current_session_id: Optional[str] = None
-        self.current_batch_id: str = str(cfg.get("batch_id", "BATCH-2026-08-KAY-01"))
+        self._batch_record_ready = False
+        self.current_batch_id: str = str(cfg.get("batch_id", ""))
+        self.current_batch_code = str(cfg.get("batch_code", self.current_batch_id or "Choose a batch"))
+        self._startup_operator = cfg.get("operator")
         self.current_breed: str = str(cfg.get("breed", "KAYUMANGGI"))
         self.current_stage: str = str(cfg.get("stage", "DAY_10"))
         self.target_egg_count: int = int(cfg.get("egg_count", 500))
@@ -189,6 +192,7 @@ class OvaLensOperatorApp(ctk.CTk):
         self._drain_operation_events()
         self._set_operation_state(OperatorState.READY, "Check the empty conveyor, then Start sorting")
         self.after(0, self._start_preview)
+        self.after(0, self._restore_batch_selection)
 
         # Auto-start operation if invoked with startup configuration
         if startup_config is not None:
@@ -378,7 +382,7 @@ class OvaLensOperatorApp(ctk.CTk):
         # Center: Interactive Active Batch Setup Button with High Contrast
         self.batch_btn = ctk.CTkButton(
             navigation,
-            text=f"Batch: {self.current_batch_id}  ({self.current_stage})  ▾",
+            text=f"Batch: {self.current_batch_code}  ({self.current_stage})  ▾",
             font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT,
             text_color=FUTheme.TEXT_PRIMARY,
@@ -1082,7 +1086,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         ctk.CTkLabel(
             card,
-            text=f"Batch: {self.current_batch_id}  •  Breed: {self.current_breed}  •  Stage: {self.current_stage}\nOperator: {self.operator_name}  •  Device: {self.device_id}",
+            text=f"Batch: {self.current_batch_code}  •  Breed: {self.current_breed}  •  Stage: {self.current_stage}\nOperator: {self.operator_name}  •  Device: {self.device_id}",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED, justify="left"
         ).pack(anchor="w", padx=16, pady=(2, 12))
 
@@ -1406,6 +1410,10 @@ class OvaLensOperatorApp(ctk.CTk):
         if (not self.station or self.simulation or self.grab_current() is not None
                 or self._scan_busy or self.current_session_id or self._finalization_failed):
             self._log("[BLOCKED] Finish the current operation before starting sorting.")
+            return
+        if not getattr(self, "_batch_record_ready", True):
+            self.setup_notice.configure(text="Choose or create a batch with its incubation details first.")
+            self.open_batch_setup_dialog()
             return
         inspected = self.setup_inspected.get()
         if not inspected:
@@ -1746,6 +1754,10 @@ class OvaLensOperatorApp(ctk.CTk):
         if self.grab_current() is not None:
             self._log("[BLOCKED] Close the dialog before scanning.")
             return
+        if not self.simulation and not getattr(self, "_batch_record_ready", True):
+            self._log("[BATCH] Choose or create a batch with its incubation details before saving scans.")
+            self.open_batch_setup_dialog()
+            return
         if not OvaLensOperatorApp._diagnostic_stationary(self):
             self._log("[BLOCKED] Stop the conveyor before a diagnostic scan.")
             return
@@ -2058,6 +2070,9 @@ class OvaLensOperatorApp(ctk.CTk):
         pending_ends = getattr(self.sync_worker, "pending_session_ends", 0)
         if count is not None and type(pending_ends) is int:
             count += pending_ends
+        pending_batches = getattr(self.sync_worker, "pending_batches", 0)
+        if count is not None and type(pending_batches) is int:
+            count += pending_batches
         error = self.sync_worker.last_error or self.sync_worker.heartbeat_error
         if error:
             text, color = "SYNC: ATTENTION", FUTheme.INFERTILE_AMBER
@@ -2159,310 +2174,46 @@ class OvaLensOperatorApp(ctk.CTk):
 
     @_building_dialog
     def open_batch_setup_dialog(self):
-        """Modal for batch creation, selection, and candling stage setup."""
         if getattr(self, "_camera_panel", None) is not None:
             return
         if self.current_session_id or self.is_session_active or self._scan_busy or self._stopping or self._finalization_failed or getattr(self, "_setup_busy", False):
             self._log("[BLOCKED] Finish the current session before changing batch parameters.")
             return
+        from .batch_setup import BatchSetupWindow
+        if getattr(self, "_batch_setup_window", None) is not None and self._batch_setup_window.winfo_exists():
+            self._batch_setup_window.lift()
+            return
+        self._batch_setup_window = BatchSetupWindow(self)
 
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("Egg Batch & Candling Setup")
-        dialog.geometry("520x660")
-        dialog.configure(fg_color=FUTheme.BG_LIGHT)
-        dialog.transient(self)
-        dialog.grab_set()
-        self._center_window(dialog, 520, 660)
+    def _apply_batch_selection(self, batch, operator, target):
+        self.current_batch_id, self.current_breed = batch["batch_id"], batch["breed"]
+        self.current_batch_code = batch["batch_code"]
+        self.incubator_id, self.current_stage = batch["incubator_id"], "DAY_10"
+        self.operator_name, self.target_egg_count = operator, target
+        self._batch_record_ready = True
+        self._batch_original_count = batch["initial_egg_count"]
+        self._diagnostics_complete = self._batch_complete = False
+        self.setup_inspected.set(False)
+        self.total_count = self.fertile_count = self.infertile_count = self.review_count = self.scan_sequence = 0
+        self.batch_btn.configure(text=f"Batch: {batch['batch_code']}  (DAY_10)  ▾")
+        self._update_counters_ui()
+        self._render_standby_hud()
+        self._set_operation_state(OperatorState.READY, "Check the empty conveyor, then Start sorting")
+        self._log(f"[BATCH] {batch['batch_code']} selected · {target} eggs this run · saved locally")
 
-        ctk.CTkLabel(
-            dialog, text="Egg Batch & Candling Setup",
-            font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.TEXT_PRIMARY
-        ).pack(pady=(16, 2))
-        ctk.CTkLabel(
-            dialog, text="Builder codes are local. Create matching batches in Dashboard > Batches.",
-            font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
-        ).pack(pady=(0, 12))
-
-        content = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
-        content.pack(fill="both", expand=True, padx=20, pady=(0, 14))
-
-        # Mode Switcher (Quick Batch Builder vs Office Batches vs Custom)
-        mode_var = ctk.StringVar(value="BUILDER")
-
-        mode_segmented = ctk.CTkSegmentedButton(
-            content, values=["⚡ Quick Batch Builder", "🌐 Saved Office Batches", "✏️ Custom Code"],
-            selected_color=FUTheme.PRIMARY_MAROON, selected_hover_color=FUTheme.HOVER_MAROON,
-            unselected_color=FUTheme.PANEL_LIGHT_ALT, unselected_hover_color=FUTheme.PANEL_ACCENT,
-            text_color=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 11, "bold"), height=32
-        )
-        mode_segmented.set("⚡ Quick Batch Builder")
-        mode_segmented.pack(fill="x", padx=16, pady=(12, 10))
-
-        # Dynamic Container Frames
-        builder_frame = ctk.CTkFrame(content, fg_color="transparent")
-        server_frame = ctk.CTkFrame(content, fg_color="transparent")
-        custom_frame = ctk.CTkFrame(content, fg_color="transparent")
-
-        # 1. QUICK BATCH BUILDER CONTROLS
-        # Current Year-Month default
-        now = datetime.now()
-        cur_year_month = now.strftime("%Y-%m")
-        months_opts = [
-            cur_year_month,
-            now.replace(month=(now.month % 12) + 1 if now.month < 12 else 1).strftime("%Y-%m"),
-            now.replace(month=max(1, now.month - 1)).strftime("%Y-%m"),
-        ]
-
-        ym_row = ctk.CTkFrame(builder_frame, fg_color="transparent")
-        ym_row.pack(fill="x", pady=(0, 8))
-
-        # Year-Month
-        ym_col = ctk.CTkFrame(ym_row, fg_color="transparent")
-        ym_col.pack(side="left", fill="x", expand=True, padx=(0, 4))
-        ctk.CTkLabel(ym_col, text="Setting Month:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        ym_dropdown = ctk.CTkOptionMenu(
-            ym_col, values=months_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
-            height=34, corner_radius=8
-        )
-        ym_dropdown.set(cur_year_month)
-        ym_dropdown.pack(fill="x")
-
-        # Batch Number (Group #)
-        batch_col = ctk.CTkFrame(ym_row, fg_color="transparent")
-        batch_col.pack(side="right", fill="x", expand=True, padx=(4, 0))
-        ctk.CTkLabel(batch_col, text="Batch #:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        batch_num_opts = [f"{i:02d}" for i in range(1, 13)]
-        batch_num_dropdown = ctk.CTkOptionMenu(
-            batch_col, values=batch_num_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
-            height=34, corner_radius=8
-        )
-        batch_num_dropdown.set("01")
-        batch_num_dropdown.pack(fill="x")
-
-        # Breed Dropdown
-        ctk.CTkLabel(builder_frame, text="Duck Breed:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(2, 2))
-        breed_map = {
-            "KAY (Kayumanggi / Itik Pinas)": ("KAY", "KAYUMANGGI"),
-            "ITM (Itim / Native Black)": ("ITM", "ITIM"),
-            "KHK (Khaki Campbell Layer)": ("KHK", "KHAKI_CAMPBELL"),
-            "PEK (Pekin Cherry Valley)": ("PEK", "PEKIN"),
-            "MUS (Muscovy Pato)": ("MUS", "MUSCOVY"),
-        }
-        breed_builder_dropdown = ctk.CTkOptionMenu(
-            builder_frame, values=list(breed_map.keys()), fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
-            height=34, corner_radius=8
-        )
-        breed_builder_dropdown.set("KAY (Kayumanggi / Itik Pinas)")
-        breed_builder_dropdown.pack(fill="x", pady=(0, 8))
-
-        # Live Code Preview Box with Rich Light Maroon Color Fill & Green Status
-        preview_frame = ctk.CTkFrame(
-            builder_frame, fg_color=FUTheme.PRIMARY_MAROON_BG, corner_radius=10,
-            border_width=1, border_color=FUTheme.PRIMARY_MAROON_BORDER
-        )
-        preview_frame.pack(fill="x", pady=(2, 10), ipady=4)
-
-        p_top = ctk.CTkFrame(preview_frame, fg_color="transparent")
-        p_top.pack(fill="x", padx=12, pady=(6, 0))
-        ctk.CTkLabel(p_top, text="LIVE BATCH CODE:", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(side="left")
-        ctk.CTkLabel(p_top, text="LOCAL CODE", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(side="right")
-
-        preview_label = ctk.CTkLabel(preview_frame, text="BATCH-2026-08-KAY-01", font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.TEXT_PRIMARY)
-        preview_label.pack(anchor="w", padx=12, pady=(0, 6))
-
-        def update_preview(*args):
-            ym = ym_dropdown.get()
-            b_key = breed_builder_dropdown.get()
-            b_code = breed_map.get(b_key, ("KAY", "KAYUMANGGI"))[0]
-            b_num = batch_num_dropdown.get()
-            preview_label.configure(text=f"BATCH-{ym}-{b_code}-{b_num}")
-
-        ym_dropdown.configure(command=update_preview)
-        breed_builder_dropdown.configure(command=update_preview)
-        batch_num_dropdown.configure(command=update_preview)
-        update_preview()
-
-        # 2. SAVED OFFICE BATCHES CONTROLS
-        ctk.CTkLabel(server_frame, text="Active Incubator Batches (from Office):", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        server_dropdown = ctk.CTkOptionMenu(
-            server_frame, values=["Loading active batches from server..."], fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
-            height=36, corner_radius=8
-        )
-        server_dropdown.pack(fill="x", pady=(0, 10))
-
-        server_batches_cache = []
-
-
-        def apply_server_batches(data):
-            if not dialog.winfo_exists():
+    def _restore_batch_selection(self):
+        def load():
+            prefs = self.db.get_batch_preferences()
+            return prefs, self.db.get_local_batch(prefs.get("batch_id", self.current_batch_id))
+        def restored(result):
+            prefs, batch = result
+            if (not isinstance(batch, dict) or self.current_session_id or self._closing
+                    or getattr(self, "_batch_setup_window", None) is not None):
                 return
-            if data:
-                server_batches_cache[:] = data
-                opts = [f"{b.get('batch_code', b.get('batch_id'))} ({b.get('breed')})" for b in data]
-            else:
-                opts = ["(Offline — Use Format Builder tab)"]
-            server_dropdown.configure(values=opts)
-            server_dropdown.set(opts[0])
+            self._apply_batch_selection(batch, self._startup_operator or prefs.get("operator", self.operator_name),
+                                        prefs.get("egg_count", min(self.target_egg_count, batch["initial_egg_count"])))
+        self._jobs.submit(load, restored, lambda error: self._log("[BATCH] " + error))
 
-        def fetch_server_batches():
-            data = self.sync_worker.fetch_active_batches()
-            self._ui_events.put(lambda: apply_server_batches(data))
-
-        threading.Thread(target=fetch_server_batches, daemon=True).start()
-
-        # 3. CUSTOM CODE CONTROLS
-        ctk.CTkLabel(custom_frame, text="Custom / Experimental Batch Code:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        custom_entry = ctk.CTkEntry(custom_frame, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=36)
-        custom_entry.insert(0, self.current_batch_id)
-        custom_entry.pack(fill="x", pady=(0, 10))
-
-        # Mode visibility controller
-        def on_mode_change(selected_mode):
-            builder_frame.pack_forget()
-            server_frame.pack_forget()
-            custom_frame.pack_forget()
-            if "Builder" in selected_mode:
-                builder_frame.pack(fill="x", padx=16, pady=(0, 6))
-            elif "Office" in selected_mode:
-                server_frame.pack(fill="x", padx=16, pady=(0, 6))
-            else:
-                custom_frame.pack(fill="x", padx=16, pady=(0, 6))
-
-        mode_segmented.configure(command=on_mode_change)
-        builder_frame.pack(fill="x", padx=16, pady=(0, 6))
-
-        # COMMON PARAMETERS: Candling Stage
-        ctk.CTkLabel(content, text="Candling Stage:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=16, pady=(4, 2))
-        stage_opts = ["DAY_10 (Primary Penoy Salvage @ ₱14.00)"]
-        stage_dropdown = ctk.CTkOptionMenu(
-            content, values=stage_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
-            height=34, corner_radius=8
-        )
-        for s in stage_opts:
-            if self.current_stage in s:
-                stage_dropdown.set(s)
-                break
-        stage_dropdown.pack(fill="x", padx=16, pady=(0, 8))
-
-        # Target Quantity & Operator
-        qty_row = ctk.CTkFrame(content, fg_color="transparent")
-        qty_row.pack(fill="x", padx=16, pady=(0, 4))
-
-        col1 = ctk.CTkFrame(qty_row, fg_color="transparent")
-        col1.pack(side="left", fill="x", expand=True, padx=(0, 4))
-        ctk.CTkLabel(col1, text="Total Eggs in Batch:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        qty_entry = ctk.CTkEntry(col1, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=34)
-        qty_entry.insert(0, str(self.target_egg_count))
-        qty_entry.pack(fill="x")
-
-        col2 = ctk.CTkFrame(qty_row, fg_color="transparent")
-        col2.pack(side="right", fill="x", expand=True, padx=(4, 0))
-        ctk.CTkLabel(col2, text="Operator Name:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        op_entry = ctk.CTkEntry(col2, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=34)
-        op_entry.insert(0, self.operator_name)
-        op_entry.pack(fill="x")
-
-        # Quantity Quick Preset Chips
-        chips_frame = ctk.CTkFrame(content, fg_color="transparent")
-        chips_frame.pack(fill="x", padx=16, pady=(0, 10))
-
-        validation_error = ctk.CTkLabel(content, text="", text_color=FUTheme.REJECT_RED_TEXT,
-                                       wraplength=420)
-        validation_error.pack(fill="x", padx=16, pady=4)
-
-        def set_preset_qty(q: int):
-            qty_entry.delete(0, "end")
-            qty_entry.insert(0, str(q))
-
-        for q_label, q_val in [("500 (12 Trays)", 500), ("250 (6 Trays)", 250), ("100 Eggs", 100), ("42 (1 Tray)", 42)]:
-            ctk.CTkButton(
-                chips_frame, text=q_label, font=(FUTheme.FONT_FAMILY, 9, "bold"),
-                fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_SECONDARY,
-                hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER,
-                height=26, corner_radius=6, command=lambda v=q_val: set_preset_qty(v)
-            ).pack(side="left", padx=(0, 4), expand=True, fill="x")
-
-        def apply_batch():
-            mode = mode_segmented.get()
-            if "Builder" in mode:
-                ym = ym_dropdown.get()
-                b_key = breed_builder_dropdown.get()
-                b_code, full_breed = breed_map.get(b_key, ("KAY", "KAYUMANGGI"))
-                b_num = batch_num_dropdown.get()
-                final_batch_id = f"BATCH-{ym}-{b_code}-{b_num}"
-                final_breed = full_breed
-            elif "Office" in mode:
-                sel = server_dropdown.get()
-                matched = next((b for b in server_batches_cache
-                    if f"{b.get('batch_code', b.get('batch_id'))} ({b.get('breed')})" == sel), None)
-                if matched is None:
-                    validation_error.configure(text="Select a saved office batch, or use a local code while offline.")
-                    return
-                final_batch_id = matched["batch_id"]
-                final_breed = matched.get("breed", "KAYUMANGGI")
-            else:
-                final_batch_id = custom_entry.get().strip() or self.current_batch_id
-                final_breed = self.current_breed
-
-            raw_qty = qty_entry.get().strip()
-            raw_op = op_entry.get().strip()
-            raw_stage = stage_dropdown.get().split(" ")[0]
-
-            try:
-                final_batch_id, raw_op, parsed_qty = validate_batch_config(
-                    final_batch_id, raw_op, raw_qty, raw_stage)
-            except ValueError as exc:
-                validation_error.configure(text=str(exc))
-                return
-
-            self.current_batch_id = final_batch_id
-            self.current_breed = final_breed
-            self.current_stage = raw_stage
-            self.target_egg_count = parsed_qty
-            self.operator_name = raw_op
-            self._diagnostics_complete = False
-            self._batch_complete = False
-            self.setup_inspected.set(False)
-            self.scan_sequence = 0
-
-            if not self.is_session_active:
-                self.total_count = 0
-                self.fertile_count = 0
-                self.infertile_count = 0
-                self.review_count = 0
-                self._render_standby_hud()
-
-            self.batch_btn.configure(text=f"Batch: {self.current_batch_id}  ({self.current_stage})  ▾")
-            self._update_counters_ui()
-            self._set_operation_state(OperatorState.READY, "Check the empty conveyor, then Start sorting")
-            self._log(f"[BATCH] Configured: {self.current_batch_id} | Breed: {self.current_breed} | Stage: {self.current_stage} | Target: {self.target_egg_count} eggs")
-            self._animate_modal_close(dialog)
-
-        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
-        btn_row.pack(fill="x", padx=20, pady=(0, 16))
-
-        ctk.CTkButton(
-            btn_row, text="Cancel", fg_color="transparent", border_width=1, border_color=FUTheme.BORDER,
-            text_color=FUTheme.TEXT_MUTED, hover_color=FUTheme.PANEL_ACCENT,
-            command=lambda: self._animate_modal_close(dialog),
-            width=100, height=38
-        ).pack(side="left")
-
-        ctk.CTkButton(
-            btn_row, text="Save & Set Active Batch", fg_color=FUTheme.PRIMARY_MAROON,
-            hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE,
-            font=(FUTheme.FONT_FAMILY, 12, "bold"), command=apply_batch, height=38
-        ).pack(side="right", fill="x", expand=True, padx=(10, 0))
 
     @_building_dialog
     def open_onboarding_guide(self):
@@ -2686,7 +2437,7 @@ class OvaLensOperatorApp(ctk.CTk):
         ).pack(pady=(16, 2))
 
         ctk.CTkLabel(
-            card, text=f"Batch: {self.current_batch_id}  •  Stage: {self.current_stage}  •  Operator: {self.operator_name}",
+            card, text=f"Batch: {self.current_batch_code}  •  Stage: {self.current_stage}  •  Operator: {self.operator_name}",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
         ).pack(pady=(0, 14))
 

@@ -74,6 +74,7 @@ edge/db/prototype-test-temp/
 edge/db/edge_settings.json
 edge/db/*.tmp
 .flow_tests/
+*.db.lock
 
 # Locally installed AI tooling and Impeccable integration files
 /.codex/

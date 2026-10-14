@@ -40,7 +40,8 @@ def main():
     print("   OVALENS EDGE OPERATOR SYSTEM — FOUNDATION UNIVERSITY")
     print("=" * 65)
     device_id = os.getenv("DEVICE_ID", "STATION-01-RP5")
-    config = show_startup_config(device_id=device_id)
+    db = LocalDatabaseManager()
+    config = show_startup_config(device_id=device_id, operator_name=db.get_batch_preferences().get("operator", ""))
     if config is None:
         print("[EXIT] Startup cancelled.")
         return
@@ -51,7 +52,6 @@ def main():
 
     # Register cleanup as soon as each worker exists, including UI-build failures.
     with ExitStack() as resources:
-        db = LocalDatabaseManager()
         camera = CameraGrabber(camera_index=camera_index,
                                allow_mock=bool(config.get("simulation", False)))
         resources.callback(_stop_resource, camera)

@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-BATCH-CREATE-01**: Implement worker-led offline batch creation with complete SQLite records, stable IDs, cached selection and remembered defaults; register batches idempotently before sessions/scans, report conflicts, repair legacy missing metadata without reassigning evidence, and verify worker permissions, retry ordering and native setup controls without hardware.
+
 - [x] **TASK-NEW-EDGE-OFFCENTER-01**: Permit stable single-egg automatic sorting anywhere in the camera frame at the configured confidence threshold; remove the fixed central-position veto while retaining geometry validation, fresh agreeing captures, durable scan evidence and confirmed gate-before-release ordering. Replay the recorded off-centre capture with simulated hardware.
 
 - [x] **TASK-NEW-EDGE-SESSION-SYNC-01**: Diagnose missing dashboard batches, replay completed session timestamps durably after scan acknowledgements, report missing batches explicitly, prevent one blocked session from starving other scans, and refresh/display candling completion in the dashboard. Preserve pending evidence and verify offline/restart recovery without hardware.

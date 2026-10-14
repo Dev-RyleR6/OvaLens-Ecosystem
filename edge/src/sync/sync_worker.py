@@ -16,6 +16,7 @@ from typing import Optional, List, Dict, Any
 import requests
 
 from ..db.local_db import LocalDatabaseManager
+from ..core.batches import BATCH_FIELDS, same_batch
 
 
 class BackgroundSyncWorker:
@@ -35,6 +36,7 @@ class BackgroundSyncWorker:
         self._total_synced = 0
         self.last_error = None
         self.pending_session_ends = 0
+        self.pending_batches = 0
         self._stop_event = threading.Event()
         self._registered_sessions = set()
         self.device_id = device_id
@@ -100,6 +102,9 @@ class BackgroundSyncWorker:
             self._is_online = False
             return
         errors = []
+        self._sync_batches()
+        if self.last_error:
+            errors.append(self.last_error)
         pending = self.db.get_pending_scan_sessions(limit=5)
         if not pending:
             self._check_health()
@@ -127,6 +132,37 @@ class BackgroundSyncWorker:
             errors.append(self.last_error)
         self.last_error = " | ".join(dict.fromkeys(errors)) or None
         self.pending_session_ends = self.db.get_pending_session_end_count()
+        self.pending_batches = self.db.get_pending_batch_count()
+
+    def _sync_batches(self):
+        errors = []
+        for batch in self.db.get_pending_batches(limit=5):
+            if self._stop_event.is_set():
+                break
+            batch_id = batch["batch_id"]
+            self.db.mark_batch_attempt(batch_id)
+            try:
+                payload = {key: batch[key] for key in (*BATCH_FIELDS, "device_id", "operator_name")}
+                response = requests.post(f"{self.api_base_url}/api/v1/batches/register", json=payload,
+                    headers={"X-API-Key": self.api_key}, timeout=4.0)
+                if response.status_code == 409:
+                    raise ValueError(f"Batch {batch['batch_code']} conflicts with a backend record. Saved scans retained; ask a manager to check the batch details.")
+                if response.status_code != 200:
+                    raise ValueError(f"Batch {batch['batch_code']} registration rejected (HTTP {response.status_code}); saved locally for retry.")
+                acknowledgement = response.json()
+                if not isinstance(acknowledgement, dict) or not same_batch(batch, acknowledgement):
+                    raise ValueError(f"Batch {batch['batch_code']} acknowledgement does not match saved details.")
+                self.db.mark_batch_attempt(batch_id, synced=True)
+                self._is_online, self._last_sync_time = True, time.time()
+            except Exception as exc:
+                if isinstance(exc, requests.RequestException):
+                    self._is_online = False
+                    error = f"Batch {batch['batch_code']} registration failed: {type(exc).__name__}; saved locally for retry."
+                else:
+                    error = str(exc)
+                self.db.mark_batch_attempt(batch_id, error)
+                errors.append(error)
+        self.last_error = " | ".join(dict.fromkeys(errors)) or None
 
     def _sync_scan_records(self, session_id=None):
         uncommitted = self.db.get_uncommitted_scans(limit=50, session_id=session_id)
@@ -299,20 +335,24 @@ class BackgroundSyncWorker:
             self._is_online = False
 
     def fetch_active_batches(self) -> List[Dict[str, Any]]:
-        """Fetch list of actively incubating batches from central server."""
+        """Refresh the offline cache; local pending batches and legacy references remain selectable."""
         try:
             url = f"{self.api_base_url}/api/v1/batches/active"
             headers = {"X-API-Key": self.api_key}
             resp = requests.get(url, headers=headers, timeout=3.0)
             if resp.status_code == 200:
-                return resp.json()
-            return []
+                self.db.cache_batches(resp.json())
         except Exception:
-            return []
+            pass
+        return self.db.list_available_batches()
 
     def register_session(self, session_data: Dict[str, Any]) -> bool:
         """Register newly started session with central backend."""
         try:
+            batch = self.db.get_local_batch(session_data["batch_id"])
+            if batch is not None and batch["synced_at"] is None:
+                self.last_error = batch["sync_error"] or f"Batch {batch['batch_code']} saved locally; registration pending."
+                return False
             url = f"{self.api_base_url}/api/v1/sessions"
             headers = {
                 "Content-Type": "application/json",
@@ -328,7 +368,7 @@ class BackgroundSyncWorker:
                 self._is_online = False
                 return False
             self.last_error = (f"Batch {session_data['batch_id']} is missing on the backend (HTTP 404). "
-                "Create it in Dashboard > Batches with this exact code, then sync retries automatically."
+                "Complete its details in Edge > Batch setup, or create it in Dashboard > Batches with this exact code. Sync retries automatically."
                 if resp.status_code == 404 else f"Session registration rejected (HTTP {resp.status_code}).")
             self._is_online = False
             return False

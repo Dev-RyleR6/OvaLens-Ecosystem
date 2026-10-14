@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Firmware**: [TASK-NEW-FW-APP-01] preserve explicit egg/servo port assignments, add the COM5/COM7 hardware launcher, and display deployed controller status replies (2026-10-02).
 
 ### Added
+- **Edge**: [TASK-NEW-EDGE-BATCH-CREATE-01] create and sync complete batches offline (2026-10-14)
 - **Edge**: [TASK-NEW-EDGE-PAUSE-01] pause and resume active sorting sessions (2026-10-09)
 - **Edge**: [TASK-NEW-EDGE-MANUAL-LIGHT-01] add manual candling light switch (2026-10-09)
 - **Edge**: [TASK-NEW-EDGE-IMAGE-SYNC-01] sync saved scan images to backend (2026-10-09)

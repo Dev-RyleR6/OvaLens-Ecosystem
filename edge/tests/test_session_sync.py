@@ -158,28 +158,25 @@ def test_zero_scan_session_finishes_without_fabricating_scans(tmp_path, monkeypa
 
 
 def test_saved_office_selection_uses_actual_backend_batch_id(hidden_ui, tmp_path):
-    import customtkinter as ctk
     app, _, _ = preview_app(tmp_path)
-    app.sync_worker.fetch_active_batches = lambda: [{"batch_id": "KAY-SAMPLE-BATCH",
-        "batch_code": "Kay Sample Batch", "breed": "KAYUMANGGI"}]
+    office = {"batch_id": "KAY-SAMPLE-BATCH", "batch_code": "Kay Sample Batch", "breed": "KAYUMANGGI",
+        "incubator_id": "INC-1", "initial_egg_count": 1000, "set_date": "2026-01-01T00:00:00+08:00", "notes": None}
+    def fetch():
+        app.db.cache_batches([office])
+        return app.db.list_available_batches()
+    app.sync_worker.fetch_active_batches = fetch
     app.operator_name = "Tester"
-    def widgets(widget):
-        for child in widget.winfo_children():
-            yield child
-            yield from widgets(child)
     try:
         app.deiconify()
         app.open_batch_setup_dialog()
-        dialog = next(widget for widget in app.winfo_children() if isinstance(widget, ctk.CTkToplevel))
-        pump(app, lambda: any(isinstance(widget, ctk.CTkOptionMenu)
-            and "Kay Sample Batch (KAYUMANGGI)" in widget.cget("values") for widget in widgets(dialog)))
-        office = next(widget for widget in widgets(dialog)
-            if isinstance(widget, ctk.CTkButton) and "Office Batches" in str(widget.cget("text")))
-        office.invoke()
-        save = next(widget for widget in widgets(dialog)
-            if isinstance(widget, ctk.CTkButton) and widget.cget("text") == "Save & Set Active Batch")
+        dialog = app._batch_setup_window
+        pump(app, lambda: dialog.loaded and "KAY-SAMPLE-BATCH" in dialog.records)
+        dialog.mode.set("Existing batch")
+        dialog.change_mode("Existing batch")
+        dialog.choose("Kay Sample Batch")
         app._animate_modal_close = lambda modal: modal.destroy()
-        save.invoke()
+        dialog.save.invoke()
+        pump(app, lambda: app.current_batch_id == "KAY-SAMPLE-BATCH")
         assert app.current_batch_id == "KAY-SAMPLE-BATCH"
         assert app.current_breed == "KAYUMANGGI"
     finally:

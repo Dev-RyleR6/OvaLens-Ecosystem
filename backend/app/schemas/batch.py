@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from app.models.batch import DuckBreed, BatchStage, BatchStatus
 
 
@@ -12,6 +12,36 @@ class BatchCreate(BaseModel):
     initial_egg_count: int = Field(..., gt=0)
     set_date: datetime
     notes: Optional[str] = None
+
+
+class EdgeBatchRegister(BatchCreate):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+    batch_id: str = Field(..., min_length=1, max_length=64)
+    device_id: str = Field(..., min_length=1, max_length=64)
+    operator_name: str = Field(..., min_length=1, max_length=100)
+    initial_egg_count: int = Field(..., gt=0, le=1000000, strict=True)
+    notes: Optional[str] = Field(None, max_length=2000)
+
+    @field_validator("batch_id", "batch_code", "incubator_id", "device_id", "operator_name", mode="before")
+    @classmethod
+    def nonblank(cls, value):
+        if not isinstance(value, str):
+            return value
+        value = value.strip()
+        if not value:
+            raise ValueError("Must not be blank")
+        return value
+
+    @field_validator("set_date")
+    @classmethod
+    def actual_set_date(cls, value):
+        if value.tzinfo is None:
+            raise ValueError("Set date must include its timezone")
+        from datetime import timezone, timedelta
+        farm_zone = timezone(timedelta(hours=8))
+        if value.astimezone(farm_zone).date() > datetime.now(farm_zone).date():
+            raise ValueError("Incubation set date cannot be in the future")
+        return value
 
 
 class BatchUpdate(BaseModel):

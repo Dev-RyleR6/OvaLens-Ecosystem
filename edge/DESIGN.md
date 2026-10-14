@@ -1,5 +1,14 @@
 # Edge operator interface
 
+Batch setup uses Existing batch, New batch and Complete details in one native
+dialog. Keep Save/Use and Cancel fixed below a scrollable form at 1024×720.
+Use plain labels, generated display codes and only the three Itik Pinas breeds.
+Separate original incubation inventory and actual set date from this run's target;
+never prefill either from scan counts or an assumed Day 10 date. Cached batches
+remain selectable offline. Show local/synced/conflict states and preserve entered
+fields during remote refresh. Saving activates a batch only after local commit,
+with no motion. STOP cancels late activation while retaining the saved record.
+
 Mode: **Operate**. The operator needs to see the egg, understand why the conveyor
 is stopped, and act safely. Foundation University maroon, green, red and slate
 are binding. Segoe UI is the native Windows typeface; labels use 12–14 px and

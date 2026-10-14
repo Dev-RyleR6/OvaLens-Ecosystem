@@ -226,13 +226,18 @@ def test_legacy_cycle_cannot_issue_motor_commands():
 
 
 @pytest.mark.parametrize("count,operator", [("0", "Tester"), ("100001", "Tester"), ("10", "")])
-def test_startup_rejects_invalid_batch_configuration(count, operator):
+def test_batch_setup_rejects_invalid_run_configuration(count, operator):
+    from src.core.operator_flow import validate_batch_config
+    with pytest.raises(ValueError):
+        validate_batch_config("TEST-BATCH", operator, count, "DAY_10")
+
+
+@pytest.mark.parametrize("operator", ["", "   ", "x" * 101])
+def test_startup_rejects_invalid_operator_name(operator):
     app = SimpleNamespace(result=None, _status_label=Mock(),
-        _count_entry=SimpleNamespace(get=lambda: count),
         _operator_entry=SimpleNamespace(get=lambda: operator))
     StartupConfigWindow._on_start(app)
-    assert app.result is None
-    assert app._status_label.configure.called
+    assert app.result is None and app._status_label.configure.called
 
 
 @pytest.mark.parametrize("ack,status", [({}, 200), ({"status": "success", "total_received": 1,

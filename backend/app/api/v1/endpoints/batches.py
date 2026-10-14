@@ -2,16 +2,16 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.models.batch import DuckBreed, BatchStatus
+from app.models.batch import DuckBreed, BatchStatus, BatchModel
 from app.models.user import UserModel
 from app.models.audit import AuditLogModel
 from app.schemas.batch import (
     BatchCreate, BatchUpdate, BatchResponse, BatchSummaryResponse, AdvanceStagePayload,
-    BatchAnalyticsResponse, FinalizeHatchPayload, MilestoneCheckResponse, BatchForecastResponse
+    BatchAnalyticsResponse, FinalizeHatchPayload, MilestoneCheckResponse, BatchForecastResponse, EdgeBatchRegister
 )
 from app.services.batch_service import BatchService
 from app.services.forecast_service import ForecastService
-from app.api.deps import get_current_user, require_manager_or_admin
+from app.api.deps import get_current_user, require_manager_or_admin, verify_api_key
 
 router = APIRouter(prefix="/batches", tags=["Incubation Batches"])
 
@@ -30,7 +30,13 @@ def list_batches(
 
 @router.get("/active", response_model=List[BatchResponse], summary="List active incubation batches for Edge selection")
 def list_active_batches(db: Session = Depends(get_db)):
-    return BatchService.list_batches(db, status=BatchStatus.INCUBATING)
+    return db.query(BatchModel).filter(BatchModel.status.in_(
+        [BatchStatus.INCUBATING, BatchStatus.CANDLING_DUE])).all()
+
+
+@router.post("/register", response_model=BatchResponse, summary="Register an offline batch from an authenticated Edge station")
+def register_edge_batch(payload: EdgeBatchRegister, db: Session = Depends(get_db), api_key=Depends(verify_api_key)):
+    return BatchService.register_edge_batch(db, payload)
 
 
 @router.post("/check-milestones", response_model=MilestoneCheckResponse, summary="Evaluate elapsed incubation days and flag due candling/transfer milestones")
@@ -42,7 +48,7 @@ def check_milestones(db: Session = Depends(get_db)):
 def create_batch(
     payload: BatchCreate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(require_manager_or_admin)
+    current_user: UserModel = Depends(get_current_user)
 ):
     return BatchService.create_batch(db, payload, user_id=current_user.user_id)
 

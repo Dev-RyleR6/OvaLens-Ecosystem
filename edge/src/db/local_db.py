@@ -9,31 +9,81 @@ import json
 import math
 import re
 import uuid
+import threading
+import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
 
 class LocalDatabaseManager:
+    _locks_guard = threading.Lock()
+    _file_locks = {}
+
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
             db_path = os.path.join(base_dir, "db", "local_scans.db")
 
-        self.db_path = db_path
+        self.db_path = os.path.realpath(os.fspath(db_path))
+        with self._locks_guard:
+            self._access_lock = self._file_locks.setdefault(os.path.normcase(os.path.realpath(db_path)), threading.RLock())
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._init_db()
 
-    def _get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=10.0)
-        conn.row_factory = sqlite3.Row
-        # Enable WAL mode and memory cache pragmas for zero-lag high-throughput recording
-        conn.execute("PRAGMA journal_mode = WAL;")
-        conn.execute("PRAGMA synchronous = NORMAL;")
-        conn.execute("PRAGMA foreign_keys = ON;")
-        conn.execute("PRAGMA cache_size = -8000;")       # 8MB memory cache
-        conn.execute("PRAGMA mmap_size = 268435456;")     # 256MB memory map
-        conn.execute("PRAGMA temp_store = MEMORY;")
-        return conn
+    @contextmanager
+    def _get_connection(self):
+        # Serialize connection lifetimes, including close/checkpoint, across
+        # station threads/processes. Older SQLite WAL runtimes have a reset race.
+        # Network and photo I/O are outside this short storage critical section.
+        with self._access_lock, self._process_access():
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            try:
+                conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA journal_mode = WAL;")
+                conn.execute("PRAGMA synchronous = NORMAL;")
+                conn.execute("PRAGMA foreign_keys = ON;")
+                conn.execute("PRAGMA cache_size = -8000;")
+                conn.execute("PRAGMA mmap_size = 268435456;")
+                conn.execute("PRAGMA temp_store = MEMORY;")
+                with conn:
+                    yield conn
+            finally:
+                conn.close()
+
+    @contextmanager
+    def _process_access(self):
+        with open(self.db_path + ".lock", "a+b") as handle:
+            deadline = time.monotonic() + 10
+            if os.name == "nt":
+                import msvcrt
+                def lock():
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                def unlock():
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                def lock():
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                def unlock():
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            while True:
+                try:
+                    lock()
+                    break
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("Local storage is busy; scan retained for inspection.") from None
+                    time.sleep(.01)
+            try:
+                if os.fstat(handle.fileno()).st_size == 0:
+                    handle.write(b"\0")
+                    handle.flush()
+                yield
+            finally:
+                unlock()
 
     def _init_db(self):
         with self._get_connection() as conn:
@@ -86,6 +136,14 @@ class LocalDatabaseManager:
                 if column not in scan_columns:
                     conn.execute(f"ALTER TABLE local_scans ADD COLUMN {column} TEXT;")
             conn.execute("CREATE TABLE IF NOT EXISTS machine_journal (device_id TEXT PRIMARY KEY, state_json TEXT NOT NULL);")
+            conn.execute("""CREATE TABLE IF NOT EXISTS local_batches (
+                batch_id TEXT PRIMARY KEY, batch_code TEXT NOT NULL UNIQUE, breed TEXT NOT NULL,
+                incubator_id TEXT NOT NULL, initial_egg_count INTEGER NOT NULL, set_date TEXT NOT NULL,
+                notes TEXT, device_id TEXT NOT NULL, operator_name TEXT NOT NULL,
+                origin TEXT NOT NULL, created_at TEXT NOT NULL, synced_at TEXT,
+                last_attempt_at TEXT, sync_error TEXT);""")
+            conn.execute("""CREATE TABLE IF NOT EXISTS batch_preferences (
+                id INTEGER PRIMARY KEY CHECK(id=1), data_json TEXT NOT NULL);""")
             if "manual_review_count" not in session_columns:
                 conn.execute("ALTER TABLE local_sessions ADD COLUMN manual_review_count INTEGER DEFAULT 0;")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_sync ON local_scans(is_synced);")
@@ -123,6 +181,104 @@ class LocalDatabaseManager:
             conn.execute("UPDATE local_sessions SET stage = 'DAY_10' WHERE stage <> 'DAY_10';")
         conn.execute("UPDATE local_scans SET final_class = 'INFERTILE' WHERE final_class = 'ABNORMAL';")
         conn.execute("INSERT INTO local_schema_migrations (version) VALUES (?);", ("two_class_v1",))
+
+    def save_local_batch(self, record, device_id, operator_name):
+        from ..core.batches import validate_batch_record, same_batch
+        values = validate_batch_record(record)
+        if not isinstance(device_id, str) or not device_id.strip() or len(device_id) > 64:
+            raise ValueError("A station ID is required to create a batch.")
+        if not isinstance(operator_name, str) or not operator_name.strip() or len(operator_name.strip()) > 100:
+            raise ValueError("Enter the operator name (1–100 characters).")
+        with self._get_connection() as conn:
+            existing = conn.execute("SELECT * FROM local_batches WHERE batch_id=?;", (values["batch_id"],)).fetchone()
+            if existing:
+                if not same_batch(dict(existing), values):
+                    raise ValueError("This batch already exists with different details. Choose it under Existing batch.")
+                return dict(existing)
+            try:
+                conn.execute("""INSERT INTO local_batches
+                    (batch_id,batch_code,breed,incubator_id,initial_egg_count,set_date,notes,
+                     device_id,operator_name,origin,created_at)
+                    VALUES (:batch_id,:batch_code,:breed,:incubator_id,:initial_egg_count,:set_date,:notes,
+                            :device_id,:operator_name,'LOCAL',:created_at);""",
+                    {**values, "device_id": device_id.strip(), "operator_name": operator_name.strip(),
+                     "created_at": datetime.now(timezone.utc).isoformat()})
+            except sqlite3.IntegrityError:
+                raise ValueError("Batch code already exists. Select the existing batch instead.") from None
+            conn.commit()
+        return self.get_local_batch(values["batch_id"])
+
+    def get_local_batch(self, batch_id):
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT * FROM local_batches WHERE batch_id=?;", (batch_id,)).fetchone()
+            return dict(row) if row else None
+
+    def cache_batches(self, records):
+        from ..core.batches import validate_batch_record
+        with self._get_connection() as conn:
+            for record in records:
+                values = validate_batch_record(record)
+                if conn.execute("SELECT 1 FROM local_batches WHERE batch_code=? AND batch_id<>?;",
+                                (values["batch_code"], values["batch_id"])).fetchone():
+                    continue  # A conflicting server code cannot hide other available batches.
+                conn.execute("""INSERT INTO local_batches
+                    (batch_id,batch_code,breed,incubator_id,initial_egg_count,set_date,notes,
+                     device_id,operator_name,origin,created_at,synced_at)
+                    VALUES (:batch_id,:batch_code,:breed,:incubator_id,:initial_egg_count,:set_date,:notes,
+                            '', '', 'CACHED', :now, :now)
+                    ON CONFLICT(batch_id) DO UPDATE SET batch_code=excluded.batch_code, breed=excluded.breed,
+                        incubator_id=excluded.incubator_id, initial_egg_count=excluded.initial_egg_count,
+                        set_date=excluded.set_date, notes=excluded.notes
+                    WHERE local_batches.synced_at IS NOT NULL;""",
+                    {**values, "now": datetime.now(timezone.utc).isoformat()})
+            conn.commit()
+
+    def list_available_batches(self):
+        with self._get_connection() as conn:
+            records = [dict(row) for row in conn.execute("SELECT * FROM local_batches ORDER BY created_at DESC, batch_id;")]
+            # Legacy references remain untouched until the worker supplies their real metadata.
+            records.extend(dict(row) for row in conn.execute("""SELECT s.batch_id,
+                s.batch_id AS batch_code, 1 AS needs_details FROM local_sessions s
+                WHERE NOT EXISTS (SELECT 1 FROM local_batches b WHERE b.batch_id=s.batch_id)
+                GROUP BY s.batch_id ORDER BY MAX(s.started_at) DESC;"""))
+            return records
+
+    def get_pending_batches(self, limit=5):
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute("""SELECT * FROM local_batches WHERE synced_at IS NULL
+                ORDER BY last_attempt_at, created_at, batch_id LIMIT ?;""", (limit,))]
+
+    def mark_batch_attempt(self, batch_id, error=None, synced=False):
+        with self._get_connection() as conn:
+            now = datetime.now(timezone.utc).isoformat()
+            conn.execute("""UPDATE local_batches SET last_attempt_at=?, sync_error=?, synced_at=?
+                WHERE batch_id=?;""", (now, error, now if synced else None, batch_id))
+            conn.commit()
+
+    def get_pending_batch_count(self):
+        with self._get_connection() as conn:
+            return conn.execute("SELECT COUNT(*) FROM local_batches WHERE synced_at IS NULL;").fetchone()[0]
+
+    def get_batch_preferences(self):
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT data_json FROM batch_preferences WHERE id=1;").fetchone()
+            return json.loads(row[0]) if row else {}
+
+    def remember_batch_selection(self, batch_id, operator_name, target):
+        from ..core.operator_flow import validate_batch_config
+        batch_id, operator_name, target = validate_batch_config(batch_id, operator_name, target, "DAY_10")
+        batch = self.get_local_batch(batch_id)
+        if batch is None:
+            raise ValueError("Complete this batch's incubation details before selecting it.")
+        if target > batch["initial_egg_count"]:
+            raise ValueError("This run's scan target cannot exceed the original egg count.")
+        values = {"batch_id": batch_id, "breed": batch["breed"], "incubator_id": batch["incubator_id"],
+                  "operator": operator_name, "egg_count": target}
+        with self._get_connection() as conn:
+            conn.execute("INSERT INTO batch_preferences VALUES (1,?) ON CONFLICT(id) DO UPDATE SET data_json=excluded.data_json;",
+                         (json.dumps(values),))
+            conn.commit()
+        return batch
 
     def get_distinct_batches(self) -> List[Dict[str, Any]]:
         """Fetch all unique batches stored in local SQLite with scan counts and latest timestamp."""

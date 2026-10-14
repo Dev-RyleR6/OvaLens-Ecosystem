@@ -29,8 +29,10 @@ mask the project's PySerial. Close and reopen an already-running app after an
 environment fix. Check imports without hardware using
 `python edge/launcher.py --check-runtime`.
 
-Run `python edge/launcher.py` and enter the batch details. The saved camera starts
-its preview automatically. Check the empty conveyor, alignment and gate, tick
+Run `python edge/launcher.py`, confirm the operator name and open the station.
+The last saved batch/target is restored; use **Batch setup** to create or select
+a different batch. The saved camera starts its preview automatically.
+Check the empty conveyor, alignment and gate, tick
 the inspection box, then click **Start sorting**. This checks the camera, connects
 the boards, prepares the empty station and starts the batch in the background.
 **STOP** remains available during preparation. Saved camera controls, timing and
@@ -168,13 +170,43 @@ Errors appear in Recent activity and, when open, the camera panel.
 
 ## Saved scan photos and backend sync
 
-First create the incubation batch in **Dashboard > Batches**, then select that
-exact batch under Edge **Batch setup > Saved Office Batches**. The quick builder
-and custom code only select a local identifier; they do not create an incubation
-record. A missing server batch prevents session registration. Edge reports the
-missing code and retains all scans for automatic retry after the batch is created.
-Use the real incubation set date, incubator and original egg count when creating
-it; a scan target or the number of repeated captures is not the initial inventory.
+Use **Batch setup > New batch** on Edge. Enter one of the three Itik Pinas breeds,
+the incubator, actual incubation set date and original egg count. Enter the scan
+target separately under **Day 10 candling run**; it may be smaller than the original
+inventory. The operator name is an entered attribution, remembered with the last
+selection; it is not a dashboard login. Creating/selecting a batch does not start
+motion. The complete batch record and selection are saved locally before sorting.
+Each new batch gets a permanent UUID and a generated display code. A later run,
+pause/resume or restart keeps that batch identity; another run has its own session.
+
+**Existing batch** includes locally created records and cached active office
+batches, including batches marked candling due. It works offline. Batch selection,
+breed, incubator, operator and run target are remembered. Original egg count and
+set date are never guessed from a target, scan history or the current day.
+**Complete details** fills those missing fields for older local batch references,
+preserving every original batch, session and scan ID. Resolve/stop the current
+session before changing batches. Legacy records retain their old display codes.
+
+The worker first registers complete pending batches at `POST /api/v1/batches/register`
+using the station API key, then registers sessions and sends scan records. Batch
+registration is idempotent across retries and concurrent requests. ID/code conflicts
+with different details show an error and retain the local queue; they never overwrite
+the backend's inventory. Batch registration and the SQLite queue survive restarts.
+Batch-only records sync even before scanning. API/network failures never block sorting.
+The sync badge includes pending batch registrations and session completions.
+
+SQLite remains in WAL mode. Storage operations serialize connection lifetimes
+through a per-file thread/process lock (`*.db.lock`) and close each connection
+explicitly. Network requests and photo I/O remain outside that lock. This avoids
+concurrent writer/checkpoint races on the installed older SQLite runtime; see
+[SQLite's WAL-reset bug documentation](https://www.sqlite.org/wal.html).
+
+Signed-in operator accounts may create batches through the existing dashboard API;
+editing, stage changes, hatch finalization and deletion retain their manager/admin
+permissions. The dedicated Edge route authorizes create/replay only and records the
+station and entered operator in a creation audit; it does not impersonate a user.
+The dashboard continues to read the central PostgreSQL records. Restart the backend
+and Edge after updating; both must use the matching API key and reachable API URL.
 
 After local finalization, the worker queues the original session completion time
 in SQLite and sends it to `PUT /api/v1/sessions/<id>/end` once every scan record

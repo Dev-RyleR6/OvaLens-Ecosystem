@@ -107,6 +107,7 @@ def test_startup_window_confirms_fullscreen_config(hidden_ui):
         window._on_start()
         assert window.result is not None
         assert window.result.get("fullscreen") is True
+        assert "batch_id" not in window.result  # Batch setup creates the durable record once in the operator app.
     finally:
         try:
             window.destroy()
@@ -220,6 +221,8 @@ def test_simple_setup_main_screen_without_hardware(hidden_ui):
     worker = SimpleNamespace(busy=False, result_queue=queue.Queue(), stop=Mock())
     app = OvaLensOperatorApp(camera, Mock(), None, db, sync, fullscreen=False,
                              inference_worker=worker, station=station)
+    app.current_batch_id = "TEST-BATCH"
+    app._batch_record_ready = True  # This layout test starts with a selected complete batch.
     errors = []
     app.report_callback_exception = lambda *args: errors.append(args)
     try:

@@ -45,6 +45,149 @@ def jpeg_bytes(color="red"):
     return stream.getvalue()
 
 
+@pytest.fixture
+def edge_batch():
+    from uuid import uuid4
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.models.batch import BatchModel
+    from app.models.scan import EggScanModel
+    from app.models.session import CandlingSessionModel
+    from app.models.audit import AuditLogModel
+    payload = {"batch_id": str(uuid4()), "batch_code": f"EDGE-TEST-{uuid4()}", "breed": "KAYUMANGGI",
+        "incubator_id": "TEST-INC-7", "initial_egg_count": 100, "set_date": "2026-01-01T00:00:00+08:00",
+        "notes": None, "device_id": "STATION-01-RP5", "operator_name": "Worker Test"}
+    try:
+        yield payload, {"X-API-Key": settings.API_KEY}
+    finally:
+        with SessionLocal() as db:
+            ids = [b.batch_id for b in db.query(BatchModel).filter(BatchModel.batch_code == payload["batch_code"])]
+            if ids:
+                db.query(EggScanModel).filter(EggScanModel.batch_id.in_(ids)).delete(synchronize_session=False)
+                db.query(CandlingSessionModel).filter(CandlingSessionModel.batch_id.in_(ids)).delete(synchronize_session=False)
+                db.query(AuditLogModel).filter(AuditLogModel.entity_id.in_(ids)).delete(synchronize_session=False)
+                db.query(BatchModel).filter(BatchModel.batch_id.in_(ids)).delete(synchronize_session=False)
+            db.commit()
+
+
+def test_edge_batch_registration_auth_idempotency_and_audit(edge_batch):
+    from datetime import datetime
+    from app.core.database import SessionLocal
+    from app.models.audit import AuditLogModel
+    payload, headers = edge_batch
+    assert client.post("/api/v1/batches/register", json=payload).status_code == 401
+    assert client.post("/api/v1/batches/register", headers={"X-API-Key": "wrong"}, json=payload).status_code == 401
+    for _ in range(2):
+        response = client.post("/api/v1/batches/register", headers=headers, json=payload)
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["batch_id"] == payload["batch_id"] and body["initial_egg_count"] == 100
+        assert datetime.fromisoformat(body["set_date"]) == datetime.fromisoformat(payload["set_date"])
+        assert body["created_by"] is None  # An entered operator name is not an authenticated user account.
+    with SessionLocal() as db:
+        audit = db.query(AuditLogModel).filter(AuditLogModel.entity_id == payload["batch_id"]).all()
+        assert len(audit) == 1 and audit[0].details["operator_name"] == "Worker Test"
+        assert audit[0].details["device_id"] == payload["device_id"]
+
+
+@pytest.mark.parametrize("field,value", [("initial_egg_count", 99), ("incubator_id", "OTHER"),
+    ("breed", "ITIM"), ("set_date", "2026-01-02T00:00:00+08:00"), ("batch_code", "OTHER-CODE")])
+def test_edge_batch_conflicts_never_overwrite_saved_inventory(edge_batch, field, value):
+    payload, headers = edge_batch
+    assert client.post("/api/v1/batches/register", headers=headers, json=payload).status_code == 200
+    rejected = client.post("/api/v1/batches/register", headers=headers, json={**payload, field: value})
+    assert rejected.status_code == 409
+    assert client.get(f"/api/v1/batches/{payload['batch_id']}").json()["initial_egg_count"] == 100
+
+
+def test_edge_batch_duplicate_code_and_concurrent_replay_create_one_record(edge_batch):
+    from concurrent.futures import ThreadPoolExecutor
+    from uuid import uuid4
+    payload, headers = edge_batch
+    def send(_):
+        return client.post("/api/v1/batches/register", headers=headers, json=payload)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(send, range(2)))
+    assert all(r.status_code == 200 for r in responses)
+    assert client.post("/api/v1/batches/register", headers=headers,
+        json={**payload, "batch_id": str(uuid4())}).status_code == 409
+
+
+@pytest.mark.parametrize("field,value", [("initial_egg_count", True), ("incubator_id", " "),
+    ("set_date", "2026-01-01T00:00:00"), ("set_date", "2999-01-01T00:00:00+08:00"), ("breed", "PEKIN")])
+def test_edge_batch_requires_real_valid_incubation_details(edge_batch, field, value):
+    payload, headers = edge_batch
+    assert client.post("/api/v1/batches/register", headers=headers, json={**payload, field: value}).status_code == 422
+
+
+def test_worker_can_create_batch_but_cannot_edit_or_delete(edge_batch):
+    from uuid import uuid4
+    from app.core.database import SessionLocal
+    from app.core.security import create_access_token
+    from app.models.user import UserModel
+    payload, _ = edge_batch
+    user_id = uuid4()
+    with SessionLocal() as db:
+        db.add(UserModel(user_id=user_id, email=f"{user_id}@test.invalid", full_name="Worker Test",
+                         hashed_password="unused-test-fixture", role="OPERATOR", is_active=True))
+        db.commit()
+    try:
+        headers = {"Authorization": "Bearer " + create_access_token(user_id, "OPERATOR")}
+        body = {key: payload[key] for key in ("batch_code", "breed", "incubator_id", "initial_egg_count", "set_date", "notes")}
+        created = client.post("/api/v1/batches", headers=headers, json=body)
+        assert created.status_code == 200, created.text
+        batch_id = created.json()["batch_id"]
+        assert created.json()["created_by"] == str(user_id)
+        assert client.put(f"/api/v1/batches/{batch_id}", headers=headers, json={"incubator_id": "OTHER"}).status_code == 403
+        assert client.delete(f"/api/v1/batches/{batch_id}", headers=headers).status_code == 403
+        with SessionLocal() as db:
+            user = db.get(UserModel, user_id)
+            user.is_active = False
+            db.commit()
+        assert client.post("/api/v1/batches", headers=headers, json=body).status_code == 404
+    finally:
+        with SessionLocal() as db:
+            db.delete(db.get(UserModel, user_id))
+            db.commit()
+
+
+def test_offline_batch_to_real_backend_replays_lost_ack_then_session_scan_and_end(edge_batch, tmp_path, monkeypatch):
+    import sys
+    from pathlib import Path
+    from uuid import uuid4
+    import requests
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "edge"))
+    from src.db.local_db import LocalDatabaseManager
+    from src.sync.sync_worker import BackgroundSyncWorker
+    payload, headers = edge_batch
+    db = LocalDatabaseManager(str(tmp_path / "edge.db"))
+    db.save_local_batch(payload, payload["device_id"], payload["operator_name"])
+    session_id, scan_id = str(uuid4()), str(uuid4())
+    db.create_session(session_id, payload["batch_id"], payload["device_id"], "DAY_10", payload["operator_name"])
+    db.record_scan(scan_id, session_id, payload["batch_id"], 1, "FERTILE", .81, 8, "ACCEPT", [])
+    db.complete_session(session_id)
+    worker = BackgroundSyncWorker(db, api_key=headers["X-API-Key"])
+    phase, calls = {"lose_ack": True}, []
+    def post(url, **kwargs):
+        path = url.replace(worker.api_base_url, "")
+        calls.append(path)
+        response = client.post(path, **kwargs)
+        if path.endswith("/batches/register") and phase["lose_ack"]:
+            phase["lose_ack"] = False
+            raise requests.ConnectionError("Backend committed; reply lost")
+        return response
+    monkeypatch.setattr("src.sync.sync_worker.requests.post", post)
+    monkeypatch.setattr("src.sync.sync_worker.requests.put", lambda url, **k: client.put(url.replace(worker.api_base_url, ""), **k))
+    worker._perform_sync()
+    assert db.get_pending_batch_count() == db.get_unsynced_count() == 1
+    assert calls == ["/api/v1/batches/register"]
+    restarted = BackgroundSyncWorker(LocalDatabaseManager(db.db_path), api_key=headers["X-API-Key"])
+    restarted._perform_sync()
+    assert db.get_pending_batch_count() == db.get_unsynced_count() == 0, restarted.last_error
+    assert db.get_session_stats(session_id)["end_synced_at"]
+    assert client.get(f"/api/v1/scans/{scan_id}").json()["batch_id"] == payload["batch_id"]
+
+
 def test_scan_photo_upload_replay_detail_and_public_image(image_scan):
     import hashlib
     scan_id, headers, storage, payload = image_scan
