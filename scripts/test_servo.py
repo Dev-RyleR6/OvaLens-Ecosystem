@@ -41,37 +41,10 @@ def safe_status(status):
 
 
 def open_servo_port(*args, stop_event=None, **kwargs):
-    """Settle boot and terminate a partial input line before BoardLink's handshake.
-
-    Runs in the serial worker, before any correlated or movement command. Runtime
-    replies are left to BoardLink unchanged, including ERROR:INVALID_LINE.
-    """
-    import serial
-    connection = serial.Serial(*args, **kwargs)
-    try:
-        # ESP32 USB reset/boot; no commands sent during this wait.
-        if stop_event is None:
-            time.sleep(2)
-        elif stop_event.wait(2):
-            raise RuntimeError("Servo test stopped during serial startup")
-        connection.reset_input_buffer()
-        if connection.write(b"\n") != 1:
-            raise RuntimeError("Incomplete serial startup delimiter write")
-        # An old partial/invalid command may answer the delimiter with an error.
-        # Drain only this pre-handshake traffic, requiring a quiet receive window.
-        deadline = time.monotonic() + 1
-        quiet_since = time.monotonic()
-        while time.monotonic() - quiet_since < .2:
-            if stop_event is not None and stop_event.is_set():
-                raise RuntimeError("Servo test stopped during serial startup")
-            if time.monotonic() >= deadline:
-                raise RuntimeError("COM7 startup input did not settle; check firmware and USB connection")
-            if connection.read(256):
-                quiet_since = time.monotonic()
-        return connection
-    except BaseException:
-        connection.close()
-        raise
+    """Use the same pre-handshake boot synchronization as the light diagnostic."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "edge"))
+    from src.iot.diagnostic_serial import open_diagnostic_port
+    return open_diagnostic_port(*args, stop_event=stop_event, **kwargs)
 
 
 def test_servo(args, *, factory=None, prompt=input, output=print):
@@ -103,7 +76,7 @@ def test_servo(args, *, factory=None, prompt=input, output=print):
             time.sleep(.02)
         status = link.command("STATUS").result(3.5)
         if args.check:
-            output(" | ".join(f"{key}={status.get(key, '?')}" for key in ("FAULT", "BUSY", "PAUSED", "ANGLE")))
+            output(" | ".join(f"{key}={status.get(key, '?')}" for key in ("FAULT", "BUSY", "PAUSED", "ANGLE", "SENSOR")))
             return True
         safe_status(status)
         fault = status.get("FAULT")

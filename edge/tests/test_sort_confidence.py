@@ -22,7 +22,7 @@ def test_seventy_percent_defaults_and_saved_custom_threshold(tmp_path):
         settings.validate()
 
 
-@pytest.mark.parametrize("kind,angle,action", [("FERTILE", "180", "ACCEPT"), ("INFERTILE", "120", "REJECT")])
+@pytest.mark.parametrize("kind,angle,action", [("FERTILE", "180", "ACCEPT"), ("INFERTILE", "50", "REJECT")])
 @pytest.mark.parametrize("confidence", [.70, .72, .7499])
 def test_seventy_percent_stable_decision_saves_before_gate_release(tmp_path, kind, angle, action, confidence):
     cycle, db, rig = fixture(tmp_path, count=1)

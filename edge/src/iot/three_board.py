@@ -5,6 +5,7 @@ import serial
 from .dual_board import BoardLink
 
 ROLES = ("CONVEYOR", "EGG_CONTROLLER", "LIGHT_CONTROLLER")
+SerialException = getattr(serial, "SerialException", OSError)
 
 
 def discover_boards(ports=None, serial_factory=None, timeout=4, cancel=None, preferred=None):
@@ -12,6 +13,7 @@ def discover_boards(ports=None, serial_factory=None, timeout=4, cancel=None, pre
     if factory is None:
         raise RuntimeError("PySerial unavailable; install pyserial, not the unrelated serial package")
     found = {}
+    port_errors = {}
     automatic = ports is None
     candidates = list(ports) if ports is not None else list(preferred or ("COM5", "COM7", "COM9")) + [p.device for p in list_ports.comports()]
     unique_ports = {}
@@ -22,8 +24,31 @@ def discover_boards(ports=None, serial_factory=None, timeout=4, cancel=None, pre
         if cancel is not None and cancel.is_set():
             raise RuntimeError("Setup stopped. Retry detection when ready.")
         connection = None
+        for attempt in range(3):
+            try:
+                connection = factory(port, 115200, timeout=.02, write_timeout=.2)
+                if hasattr(connection, "dtr"):
+                    try:
+                        connection.dtr = False
+                        connection.rts = False
+                    except Exception:
+                        pass
+                if hasattr(connection, "reset_input_buffer"):
+                    try:
+                        connection.reset_input_buffer()
+                    except Exception:
+                        pass
+                break
+            except Exception as exc:
+                err_msg = str(exc)
+                if attempt < 2 and ("denied" in err_msg.lower() or "busy" in err_msg.lower() or "permission" in err_msg.lower()):
+                    time.sleep(0.3)
+                    continue
+                port_errors[port] = err_msg
+                break
+        if connection is None:
+            continue
         try:
-            connection = factory(port, 115200, timeout=.02, write_timeout=.2)
             deadline, sent = time.monotonic() + timeout, 0.0
             buffer = bytearray()
             pong, version = None, None
@@ -38,7 +63,7 @@ def discover_boards(ports=None, serial_factory=None, timeout=4, cancel=None, pre
                     sent = now
                 for byte in connection.read(256):
                     if byte == 10:
-                        line = buffer.decode("ascii", errors="strict").strip()
+                        line = buffer.decode("ascii", errors="ignore").strip()
                         buffer.clear()
                         if line.startswith("PONG:"):
                             pong = line[5:]
@@ -47,21 +72,33 @@ def discover_boards(ports=None, serial_factory=None, timeout=4, cancel=None, pre
                     elif byte != 13:
                         buffer.append(byte)
                         if len(buffer) > 256:
-                            raise RuntimeError("Oversized discovery reply")
+                            buffer.clear()
+                if version and not pong:
+                    role_cand = version.partition("_V3")[0]
+                    if role_cand in ROLES and version == f"{role_cand}_V3:PROTOCOL=3":
+                        pong = role_cand
                 if pong in ROLES and version == f"{pong}_V3:PROTOCOL=3":
                     if pong in found:
                         raise ValueError(f"Duplicate {pong} boards: {found[pong]} and {port}")
                     found[pong] = port
                     break
-        except (OSError, serial.SerialException, UnicodeError):
+        except (OSError, SerialException, UnicodeError):
             continue
         finally:
             if connection is not None:
-                connection.close()
+                try:
+                    connection.close()
+                except Exception:
+                    pass
         if automatic and len(found) == len(ROLES):
             break
     missing = set(ROLES) - set(found)
     if missing:
+        access_errors = [f"{p} (access denied / in use)" for p, err in port_errors.items()
+                         if "denied" in err.lower() or "permission" in err.lower()]
+        if access_errors:
+            raise RuntimeError(f"Missing v3 boards: {', '.join(sorted(missing))}. "
+                               f"Port locked: {', '.join(access_errors)}. Close other OvaLens instances or Arduino Serial Monitor.")
         raise RuntimeError("Missing v3 boards: " + ", ".join(sorted(missing))
                            + ". Check USB cables and install the matching firmware/three_board sketches.")
     return found

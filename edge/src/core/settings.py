@@ -80,6 +80,7 @@ class EdgeSettings:
         settings.calibration.settle_ms = 1500
         settings.calibration.hold_ms = 300
         settings.calibration.fertile_angle = 180
+        settings.calibration.infertile_angle = 50
         # 2.5 s at 3000 us half-period is about 417 steps to gate exit.
         settings.calibration.sorter_steps = 367
         settings.calibration.gate_clearance_steps = 50

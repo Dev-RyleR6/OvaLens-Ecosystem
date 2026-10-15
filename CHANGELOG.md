@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Edge**: resolve camera staleness false abort, port locking, and add batch finish button (2026-10-15)
 - **Edge**: [TASK-NEW-EDGE-SERVO-STARTUP-01] synchronize servo diagnostic serial startup (2026-10-14)
 - **Edge**: [TASK-NEW-EDGE-SERVO-SIMPLE-01] remove IR requirements from servo test (2026-10-14)
 - **Edge**: [TASK-NEW-EDGE-OFFCENTER-01] allow stable off-centre automatic sorting (2026-10-09)

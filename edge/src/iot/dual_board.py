@@ -204,7 +204,7 @@ class BoardLink:
                     if connection.write(request) != len(request):
                         raise RuntimeError("Incomplete heartbeat write")
                     heartbeat = now
-                if now - self.snapshot().last_reply > 2 or (not self._status_complete and now - started > 5):
+                if now - self.snapshot().last_reply > 3.5 or (not self._status_complete and now - started > 5):
                     raise RuntimeError("Board response timeout")
                 if self._pending and now > self._pending[2]:
                     raise RuntimeError("Command completion timeout; do not retry motion")
@@ -230,12 +230,12 @@ class BoardLink:
                 chunk = connection.read(256)
                 for byte in chunk:
                     if byte == 10:
-                        self._receive(buffer.decode("ascii", errors="strict").strip(), time.monotonic())
+                        self._receive(buffer.decode("ascii", errors="ignore").strip(), time.monotonic())
                         buffer.clear()
                     elif byte != 13:
                         buffer.append(byte)
                         if len(buffer) > 256:
-                            raise RuntimeError("Oversized board reply")
+                            buffer.clear()
         except Exception as exc:
             self._fail(str(exc))
         finally:

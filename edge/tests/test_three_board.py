@@ -257,7 +257,7 @@ class FakeLink:
                     if rig.duplicate:
                         rig.egg.events.put(("EGG_DETECTED", seq))
             elif command.startswith("SORT:") or command == "RESET":
-                self.values["ANGLE"] = "180" if command == "SORT:FERTILE" else "120" if command == "SORT:INFERTILE" else "90"
+                self.values["ANGLE"] = "180" if command == "SORT:FERTILE" else "50" if command == "SORT:INFERTILE" else "90"
             elif command == "RESUME":
                 self.values.update(PAUSED="0", SENSOR="0", STATE="WAITING")
                 rig.conveyor.values["PAUSED"] = "0"

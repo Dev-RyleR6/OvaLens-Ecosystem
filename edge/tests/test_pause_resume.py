@@ -38,7 +38,7 @@ def test_repeated_pause_preserves_session_gate_images_counts_and_sequences(tmp_p
     cycle._capture = saved_capture
     cycle.start()
     try:
-        for number, angle in ((1, "180"), (2, "120")):
+        for number, angle in ((1, "180"), (2, str(cycle.settings.calibration.infertile_angle))):
             wait_for(lambda: cycle.status["state"] == "PAUSED" and cycle.count == number)
             checkpoint = db.load_machine_state("station")
             assert checkpoint["state"] == "PAUSED" and checkpoint["count"] == number

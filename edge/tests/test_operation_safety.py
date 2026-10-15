@@ -83,7 +83,7 @@ def test_camera_stale_frame_cannot_be_used_for_a_scan():
     camera = CameraGrabber()
     camera._is_running = True
     camera._latest_frame = np.zeros((2, 2, 3), dtype=np.uint8)
-    camera._last_frame_at = time.monotonic() - 1
+    camera._last_frame_at = time.monotonic() - 2.0
     assert camera.get_latest_frame() is None
 
 

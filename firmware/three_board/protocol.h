@@ -16,6 +16,7 @@ struct Protocol {
   bool consume(uint32_t id) {
     if (id && id <= lastId) { reply(id, "ERROR:ID_REUSED"); return false; }
     if (id) lastId = id;
+    lastHeartbeat = millis(); armed = true;
     return true;
   }
   bool read(const char *cmd, uint32_t id) {

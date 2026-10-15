@@ -236,9 +236,7 @@ class ThreeBoardCycle(SortingCycle):
         if not 0 < delta <= 100000:
             raise RuntimeError("Invalid position event order or movement bound")
         self._checkpoint("MOVE_IN_FLIGHT")
-        timeout = max(3, delta * 2 * k.speed_us / 1000000 + 2)
-        if self.count < self.target and self._search_deadline is not None:
-            timeout = min(timeout, max(.01, self._search_deadline - time.monotonic()))
+        timeout = max(3.0, delta * 2 * k.speed_us / 1000000.0 + 3.0)
         reply = self._command(self.boards.conveyor, f"ADVANCE:{delta * k.direction}", timeout)
         actual = (int(reply["POSITION"]) - self._origin) * k.direction
         if actual < self.travel or actual > destination:

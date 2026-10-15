@@ -295,6 +295,7 @@ class EdgeStation:
                     if self.boards:
                         self.boards.stop()
                         self.boards = None
+                        time.sleep(0.4)
                     progress("Connecting stepper, sorting gate and light")
                     ports = discover_boards(cancel=cancel, preferred=(settings.conveyor_port,
                         settings.servo_port, settings.light_port, "COM5", "COM7", "COM9"))

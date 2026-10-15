@@ -185,7 +185,7 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
         self.bind("C", self.toggle_crosshairs)
         self.bind("s", lambda event: self.open_scan_history_modal())
         self.bind("S", lambda event: self.open_scan_history_modal())
-        self.bind("<Escape>", lambda event: self.open_end_session_modal() if (self.is_session_active or self.camera.is_running) else None)
+        self.bind("<Escape>", lambda event: self.open_end_session_modal() if (self.is_session_active or self.camera.is_running) else (self.finish_current_batch() if (getattr(self, "_batch_complete", False) or getattr(self, "_diagnostics_complete", False)) else None))
 
         # Start Standby Display & Status Loop
         self._render_standby_hud()
@@ -298,6 +298,7 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
 
     def _set_operation_state(self, state, message):
         self._operator_state = state
+        self._operator_state_msg = message
         color = (FUTheme.INFERTILE_AMBER if state in
                  {OperatorState.REVIEW, OperatorState.ERROR, OperatorState.RECOVERY}
                  else FUTheme.TEXT_MUTED)
@@ -799,6 +800,14 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
             hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER,
             text_color=FUTheme.TEXT_PRIMARY, command=self.toggle_sorting_pause)
 
+        # Dedicated Finish Batch Button (prominently revealed when batch/diagnostics complete)
+        self.finish_btn = ctk.CTkButton(
+            self.footer_frame, text="✓ Finish Batch", font=(FUTheme.FONT_FAMILY, 13, "bold"),
+            fg_color=FUTheme.FERTILE_GREEN, hover_color=FUTheme.FERTILE_GREEN_HOVER,
+            text_color=FUTheme.TEXT_WHITE, command=self.finish_current_batch,
+            width=140, height=44, corner_radius=8
+        )
+
         # Batch Setup Quick Button
         self.batch_setup_btn = ctk.CTkButton(
             self.footer_frame, text="Batch setup", font=(FUTheme.FONT_FAMILY, 14, "bold"),
@@ -961,17 +970,25 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
             except Exception as exc:
                 self._set_operation_state(OperatorState.ERROR, str(exc))
                 return
-        deadline = time.monotonic() + 3
+        deadline = time.monotonic() + 6
         def ready():
             if self._closing or self._stopping:
                 return
             snapshot = getattr(self.camera, "snapshot", None)
             if callable(snapshot) and snapshot(copy=False) is not None:
                 self.standby_frame.place_forget()
+                if getattr(self, "_operator_state", None) == OperatorState.ERROR and "camera 0" in getattr(self, "_operator_state_msg", ""):
+                    self._set_operation_state(OperatorState.READY, "Choose a batch, then prepare the empty conveyor")
             elif time.monotonic() < deadline and not self.camera.last_error:
                 self.after(50, ready)
             elif not getattr(self, "_setup_busy", False) and not self.is_auto_cycle_running:
-                self._set_operation_state(OperatorState.ERROR, "Check camera 0; use Tools to retry the preview")
+                snapshot = getattr(self.camera, "snapshot", None)
+                if callable(snapshot) and snapshot(copy=False) is not None:
+                    self.standby_frame.place_forget()
+                    if getattr(self, "_operator_state", None) == OperatorState.ERROR and "camera 0" in getattr(self, "_operator_state_msg", ""):
+                        self._set_operation_state(OperatorState.READY, "Choose a batch, then prepare the empty conveyor")
+                else:
+                    self._set_operation_state(OperatorState.ERROR, "Check camera 0; use Tools to retry the preview")
         ready()
 
     def _set_session_active_state(self, is_active: bool):
@@ -1015,6 +1032,12 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
                 text="Start next batch" if getattr(self, "_batch_complete", False) else "Start sorting", fg_color=FUTheme.PRIMARY_MAROON,
                 hover_color=FUTheme.HOVER_MAROON
             )
+        is_complete = bool(getattr(self, "_batch_complete", False) or getattr(self, "_diagnostics_complete", False))
+        if hasattr(self, "finish_btn"):
+            if is_complete and not is_active:
+                self.finish_btn.pack(side="left", padx=6, pady=13, after=self.session_btn)
+            else:
+                self.finish_btn.pack_forget()
         blocked = self._pending_finalization_id is not None or self._finalization_failed
         setup_busy = getattr(self, "_setup_busy", False) or getattr(self, "_light_busy", False)
         state = "disabled" if is_active or self._scan_busy or self._stopping or blocked or setup_busy or tuning else "normal"
@@ -1057,11 +1080,18 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
             self.setup_row.pack(fill="x", padx=16)
         else:
             self.setup_row.pack_forget()
+        batch_ready = getattr(self, "_batch_record_ready", False)
         self.setup_check.configure(state="disabled" if busy or self._scan_busy or self._stopping else "normal")
-        self.prepare_btn.configure(state="normal" if allowed and self.setup_inspected.get()
-                                   and getattr(self, "_batch_record_ready", False) else "disabled",
+        self.prepare_btn.configure(state="normal" if allowed and self.setup_inspected.get() else "disabled",
                                    text="Preparing..." if busy else "Prepare again" if getattr(self, "_station_prepared", False) else "Prepare station",
                                    fg_color=FUTheme.PANEL_LIGHT_ALT if getattr(self, "_station_prepared", False) else FUTheme.PRIMARY_MAROON)
+        if not batch_ready:
+            self.setup_notice.configure(text="Choose or create a batch in Batch setup first, then Prepare station.")
+        elif not self.setup_inspected.get():
+            self.setup_notice.configure(text="Confirm the conveyor is empty, aligned and the gate checked.")
+        else:
+            self.setup_notice.configure(text="Confirm an empty conveyor, then Prepare station. Connection can reset boards and move the gate to neutral; the belt stays stopped.")
+
 
     @_building_dialog
     def open_end_session_modal(self, event=None):
@@ -1513,6 +1543,8 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
             self.result_badge.configure(text="COMPLETE")
             self.result_subtitle.configure(text=f"{self.total_count} scans saved locally. Inspect the output trays.")
             self._log(f"[COMPLETE] {cycle.count} saved scans; {cycle.routed} estimated gate passages.")
+            if not self._closing and self.grab_current() is None:
+                self.after(0, self.open_batch_completion_modal)
         def failed(error):
             if generation != self._operation_generation or self._closing:
                 return
@@ -1913,6 +1945,10 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
                 if view is not None:
                     frame = view.frame.image
                 if frame is not None:
+                    if hasattr(self, "standby_frame") and self.standby_frame.winfo_ismapped():
+                        self.standby_frame.place_forget()
+                    if getattr(self, "_operator_state", None) == OperatorState.ERROR and "camera 0" in getattr(self, "_operator_state_msg", ""):
+                        self._set_operation_state(OperatorState.READY, "Choose a batch, then prepare the empty conveyor")
                     render_key = (("capture", id(view)) if view is not None else ("live", snapshot.sequence), self._cached_container_w, self._cached_container_h)
                     if render_key == getattr(self, "_last_render_key", None):
                         return
@@ -2004,6 +2040,8 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
                     photo = ImageTk.PhotoImage(image=pil_img)
                     self.video_label.configure(image=photo)
                     self._current_photo = photo
+                    if getattr(self, "_operator_state", None) == OperatorState.ERROR and "camera 0" in getattr(self, "_operator_state_msg", ""):
+                        self._set_operation_state(OperatorState.READY, "Choose a batch, then prepare the empty conveyor")
                 else:
                     self._last_render_key = None
                     if self._current_photo is not None:
@@ -2397,6 +2435,10 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
         except Exception:
             pass
 
+    def finish_current_batch(self):
+        """Open the batch completion summary dialog and finalize batch state."""
+        self.open_batch_completion_modal()
+
     @_building_dialog
     def open_batch_completion_modal(self):
         """Interactive Batch Completion Report dialog with 1-click local CSV export."""
@@ -2479,7 +2521,21 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
         btn_row.pack(fill="x", padx=16, pady=(0, 12))
 
         def start_next():
+            self._batch_complete = False
+            self._diagnostics_complete = False
+            self._station_prepared = False
+            self._set_session_active_state(False)
             self._animate_modal_close(dialog, on_close=self.open_batch_setup_dialog)
+
+        def finish_done():
+            self._batch_complete = False
+            self._diagnostics_complete = False
+            self._station_prepared = False
+            self._set_operation_state(OperatorState.READY, "Batch finished. Select next batch or prepare station.")
+            self._set_session_active_state(False)
+            self._animate_modal_close(dialog)
+
+        dialog.protocol("WM_DELETE_WINDOW", finish_done)
 
         ctk.CTkButton(
             btn_row, text="🔁 Setup Next Batch", fg_color=FUTheme.PRIMARY_MAROON,
@@ -2489,10 +2545,10 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
         ).pack(side="left", fill="x", expand=True, padx=(0, 6))
 
         ctk.CTkButton(
-            btn_row, text="Done & Close", fg_color=FUTheme.PANEL_LIGHT_ALT,
-            hover_color=FUTheme.PANEL_ACCENT, text_color=FUTheme.TEXT_SECONDARY,
-            font=(FUTheme.FONT_FAMILY, 11), command=lambda: self._animate_modal_close(dialog),
-            height=38, corner_radius=8, width=110
+            btn_row, text="✓ Finish & Close", fg_color=FUTheme.FERTILE_GREEN,
+            hover_color=FUTheme.FERTILE_GREEN_HOVER, text_color=FUTheme.TEXT_WHITE,
+            font=(FUTheme.FONT_FAMILY, 12, "bold"), command=finish_done,
+            height=38, corner_radius=8, width=130
         ).pack(side="right")
 
     @_building_dialog

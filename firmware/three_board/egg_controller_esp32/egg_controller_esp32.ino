@@ -7,7 +7,7 @@ constexpr uint32_t DETECT_CONFIRM_MS = 40, CLEAR_CONFIRM_MS = 350, SETTLE_MS = 5
 constexpr uint32_t DETECT_LOCKOUT_MS = 600;
 Protocol protocol("EGG_CONTROLLER");
 Servo gate;
-int angle = 90, neutral = 90, fertile = 180, infertile = 120;
+int angle = 90, neutral = 90, fertile = 180, infertile = 50;
 enum EggState { WAITING, HOLDING, CLEARING };
 EggState eggState = WAITING;
 bool paused = true, settling = false, detecting = false, clearing = false;

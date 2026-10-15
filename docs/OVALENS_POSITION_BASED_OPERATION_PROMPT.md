@@ -1,7 +1,5 @@
 # OvaLens Position-Based Conveyor Operation Prompt
 
-> Historical sensorless specification. For the two-board rig with chamber IR, [Edge Station Control](OVALENS_EDGE_STATION_CONTROL.md) supersedes the sensorless assumptions and startup workflow below. Physical wiring, firmware upload and rig validation remain required.
-
 Update the OvaLens Edge application to support automated duck egg candling and sorting using two wired ESP32 boards (stepper and servo), position-based conveyor movement, spaced conveyor holders, and camera-only egg detection.
 
 Task: `TASK-NEW-EDGE-POS-SPEC-01` (specification and database audit).

@@ -24,6 +24,9 @@ class CameraFrame:
     image: np.ndarray
 
 
+FRAME_STALENESS_THRESHOLD_S = 1.5
+
+
 class CameraGrabber:
     def __init__(self, camera_index: int = 0, width: int = 1280, height: int = 720, fps: int = 30,
                  allow_mock: bool = False):
@@ -162,7 +165,7 @@ class CameraGrabber:
 
     def snapshot(self, copy=True):
         with self._lock:
-            if not self._is_running or self._latest_frame is None or time.monotonic() - self._last_frame_at > .5:
+            if not self._is_running or self._latest_frame is None or time.monotonic() - self._last_frame_at > FRAME_STALENESS_THRESHOLD_S:
                 return None
             return CameraFrame(self._sequence, self._last_frame_at, self._latest_revision,
                                self._latest_frame.copy() if copy else self._latest_frame)
@@ -294,7 +297,7 @@ class CameraGrabber:
         if not self._is_running:
             return None
         with self._lock:
-            if self._latest_frame is not None and time.monotonic() - self._last_frame_at <= 0.5:
+            if self._latest_frame is not None and time.monotonic() - self._last_frame_at <= FRAME_STALENESS_THRESHOLD_S:
                 return self._latest_frame.copy() if copy else self._latest_frame
             return None
 

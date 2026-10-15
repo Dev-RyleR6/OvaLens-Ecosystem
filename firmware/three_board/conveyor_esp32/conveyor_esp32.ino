@@ -64,6 +64,7 @@ void moveTo(int32_t destination, uint32_t id) {
   digitalWrite(DIR_PIN, (INVERT_DIR ? !forward : forward) ? HIGH : LOW);
   timerStop(pulseTimer); timerWrite(pulseTimer, 0);
   portENTER_CRITICAL(&motionMux);
+  heartbeatAt = millis();
   target = destination; moving = destination != position; pauseStop = false;
   portEXIT_CRITICAL(&motionMux);
   activeId = id; awaitingCompletion = true; timerStart(pulseTimer);
@@ -77,8 +78,8 @@ void command(char *line) {
     latchFault("EMERGENCY_STOP"); reply(id, "OK:ESTOP"); return;
   }
   if (!protocol.consume(id)) return;
+  portENTER_CRITICAL(&motionMux); heartbeatAt = millis(); portEXIT_CRITICAL(&motionMux);
   if (protocol.read(cmd, id)) {
-    portENTER_CRITICAL(&motionMux); heartbeatAt = millis(); portEXIT_CRITICAL(&motionMux);
     report(id); return;
   }
   if (!protocol.authorize(id)) return;

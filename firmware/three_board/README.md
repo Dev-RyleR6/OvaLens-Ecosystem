@@ -76,3 +76,27 @@ sequence without retry or an automatic return movement. Cleanup requests ESTOP,
 holds the last angle and closes COM7. Inspect the gate and Prepare station again
 before sorting. Controller-reported angles are commanded targets, not independent
 position feedback; observe that the servo actually moves smoothly.
+
+## Standalone light test (COM9 only)
+
+Close OvaLens Edge and Arduino Serial Monitor, then from `scripts/` run:
+
+```powershell
+python test_light.py
+```
+
+Confirm with **y**. The script waits for ESP32 boot, verifies the v3 light
+controller, then switches the lamp **ON for 2 seconds / OFF for 1 second**, twice.
+It uses COM9 at 115200 baud; COM5 and COM7 stay unopened. No IR sensor or camera
+is needed. It does not change station settings, batches or firmware.
+
+Use `python test_light.py --seconds 5 --cycles 3` to change the test, or `--port COM9`
+to select the serial port. Use `--check` to query identification and status without
+switching the light on. ON duration is bounded to 1-10 seconds (below firmware's 15-second auto-off); cycles to 1-5.
+The serial worker keeps heartbeats running while observing the lamp.
+
+Normal completion confirms the OFF output. Ctrl+C, faults or mismatched replies
+stop the sequence without retrying ON; cleanup requests ESTOP/OFF and closes
+COM9. If USB disconnects, an OFF request cannot be confirmed; firmware's link
+watchdog turns off its output. Observe the actual lamp: reported output is not
+independent relay/lamp feedback.

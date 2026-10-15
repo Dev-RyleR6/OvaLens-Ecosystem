@@ -19,7 +19,7 @@ def test_servo_command_precedes_display_hold_and_first_release(tmp_path, kind):
     delay = cycle._delay
     def hold(seconds):
         assert cycle._gate_holder == 1
-        assert rig.egg.values["ANGLE"] == ("180" if kind == "FERTILE" else "120")
+        assert rig.egg.values["ANGLE"] == str(cycle.settings.calibration.fertile_angle if kind == "FERTILE" else cycle.settings.calibration.infertile_angle)
         assert rig.conveyor.values["PAUSED"] == "1"
         assert not any(command == "RESUME" and position == 100 for _, command, position, _ in rig.trace)
         delay(seconds)
