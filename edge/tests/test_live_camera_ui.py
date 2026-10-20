@@ -117,6 +117,9 @@ def test_bad_live_value_retry_restore_stop_and_close_cancel_timers(hidden_ui, tm
 def test_switching_to_cradle_supersedes_scheduled_camera_edits(hidden_ui, tmp_path):
     app, _, applied = preview_app(tmp_path)
     try:
+        # Initialize the native window before teardown enters its event loop.
+        # Otherwise CustomTkinter can initialize its titlebar during shutdown.
+        app.update()
         app.open_camera_controls()
         panel = app._camera_panel
         panel._slider_changed("focus", 30)

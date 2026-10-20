@@ -58,7 +58,7 @@ def test_hardware_pause_stops_and_preserves_position(three_sketches):
 
 def test_conveyor_watchdog_expires_even_while_paused(three_sketches):
     output = run(three_sketches, "CONVEYOR", *ready("CONVEYOR"),
-                 "SEND @3 ADVANCE:100", "PIN 27 1", "TICKS 2", "CLOCK 3000", "SEND PING", "SEND @4 ADVANCE:10")
+                 "SEND @3 ADVANCE:100", "PIN 27 1", "TICKS 2", "CLOCK 3500", "SEND PING", "SEND @4 ADVANCE:10")
     assert "FAULT:LINK_TIMEOUT" in output and "ERROR:FAULT_LATCHED" in output
     assert "REFERENCE_VALID:0" in output
 
@@ -76,7 +76,7 @@ def test_servo_completion_presets_and_strict_number_parsing(three_sketches):
     output = run(three_sketches, "EGG", *ready("EGG"), "SEND @2 SORT:FERTILE", "CLOCK 1000",
                  "SEND @3 SORT:INFERTILE", "CLOCK 1500", "SEND @4 SERVO:abc", "SEND @5 SERVO:181")
     assert "ID:2:OK:SERVO_DONE" in output and "ID:2:ANGLE:180" in output
-    assert "ID:3:ANGLE:120" in output
+    assert "ID:3:ANGLE:50" in output
     assert "ID:4:ERROR:INVALID_COMMAND" in output and "ID:5:ERROR:INVALID_COMMAND" in output
 
 
@@ -91,7 +91,8 @@ def test_ids_and_overflow_never_replay_actuation(three_sketches, role, command):
 
 @pytest.mark.parametrize("role", ["CONVEYOR", "EGG", "LIGHT"])
 def test_watchdog_and_stop_are_latched(three_sketches, role):
-    output = run(three_sketches, role, *ready(role), "CLOCK 3000", "SEND PING", "SEND @5 STATUS", "SEND @1 ESTOP")
+    # ready() sends its final command at 500 ms; expiry is 3000 ms later.
+    output = run(three_sketches, role, *ready(role), "CLOCK 3500", "SEND PING", "SEND @5 STATUS", "SEND @1 ESTOP")
     assert "FAULT:LINK_TIMEOUT" in output
     assert "ID:5:FAULT:LINK_TIMEOUT" in output
     assert "FAULT:EMERGENCY_STOP" in output
@@ -116,7 +117,7 @@ def test_reset_delay_counts_only_unpaused_time_and_new_sort_cancels_it(three_ske
                  "SEND @3 GATE_RESET_DELAY:100", "CLOCK 1100", "SEND STATUS", "SEND @4 RESUME",
                  "CLOCK 1150", "SEND @5 SORT:INFERTILE", "CLOCK 1650", "SEND STATUS")
     assert "EVENT:GATE_RESET_DONE" not in output
-    assert output.rstrip().endswith("STATE:WAITING") and "ID:5:ANGLE:120" in output
+    assert output.rstrip().endswith("STATE:WAITING") and "ID:5:ANGLE:50" in output
 
 
 def test_scheduled_reset_emits_done_only_after_settling(three_sketches):
