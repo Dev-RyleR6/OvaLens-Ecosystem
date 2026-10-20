@@ -1,44 +1,32 @@
+import { usePreferences } from './hooks/usePreferences';
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { LoginPage } from './pages/LoginPage';
-import { OverviewPage } from './pages/OverviewPage';
-import { BatchesPage } from './pages/BatchesPage';
-import { ScanExplorerPage } from './pages/ScanExplorerPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
-import { DevicesPage } from './pages/DevicesPage';
-import { RecordsPage } from './pages/RecordsPage';
-import { ModelsPage } from './pages/ModelsPage';
-import { UsersPage } from './pages/UsersPage';
-import { AuditLogsPage } from './pages/AuditLogsPage';
-import { SettingsPage } from './pages/SettingsPage';
+const OverviewPage = React.lazy(() => import('./pages/OverviewPage').then(module => ({ default: module.OverviewPage })));
+const BatchesPage = React.lazy(() => import('./pages/BatchesPage').then(module => ({ default: module.BatchesPage })));
+const ScanExplorerPage = React.lazy(() => import('./pages/ScanExplorerPage').then(module => ({ default: module.ScanExplorerPage })));
+const AnalyticsPage = React.lazy(() => import('./pages/AnalyticsPage').then(module => ({ default: module.AnalyticsPage })));
+const DevicesPage = React.lazy(() => import('./pages/DevicesPage').then(module => ({ default: module.DevicesPage })));
+const UsersPage = React.lazy(() => import('./pages/UsersPage').then(module => ({ default: module.UsersPage })));
+const SettingsPage = React.lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
 import { RoleProtectedRoute } from './components/RoleProtectedRoute';
 
 const ProtectedLayout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
-  const [isNavigating, setIsNavigating] = React.useState(false);
   const mainRef = React.useRef<HTMLElement>(null);
-
-  // Smooth top loading indicator & scroll to top when changing views
   React.useEffect(() => {
-    setIsNavigating(true);
-    if (mainRef.current) {
-      mainRef.current.scrollTo({ top: 0, behavior: 'instant' });
-    }
-    const timer = setTimeout(() => {
-      setIsNavigating(false);
-    }, 400);
-    return () => clearTimeout(timer);
+    mainRef.current?.scrollTo({ top: 0, behavior: 'instant' });
   }, [location.pathname]);
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#F8FAFC]">
-        <div className="text-center space-y-2 animate-scale-in">
+      <div className="h-screen w-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-2 ">
           <div className="w-8 h-8 border-3 border-[#800000] border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-xs font-semibold text-slate-600">Initializing OvaLens Hatchery...</p>
         </div>
@@ -51,27 +39,20 @@ const ProtectedLayout: React.FC = () => {
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#F8FAFC] text-[#0F172A] flex flex-col font-sans relative">
-      {/* Top Route Navigation Loading Bar */}
-      {isNavigating && (
-        <div className="fixed top-0 left-0 right-0 h-0.5 z-50 overflow-hidden pointer-events-none">
-          <div className="h-full bg-gradient-to-r from-[#800000] via-[#C00000] to-[#357a38] animate-top-loader" />
-        </div>
-      )}
-
-      <Navbar onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)} />
-      <div className="flex flex-1 overflow-hidden relative">
+    <div className="h-[100dvh] w-full overflow-hidden bg-background text-foreground flex flex-col font-sans relative">
+      <a href="#main-content" className="skip-link">Skip to main content</a>
+      <Navbar sidebarOpen={isMobileSidebarOpen} onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)} />
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
         <Sidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} />
-        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 w-full custom-scrollbar">
-          <div key={location.pathname} className="max-w-7xl mx-auto animate-page-smooth">
+        <main ref={mainRef} id="main-content" tabIndex={-1} className="dashboard-content min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 w-full custom-scrollbar">
+          <div key={location.pathname} className={location.pathname === '/batches' ? 'batch-page-shell min-w-0' : 'max-w-7xl mx-auto min-w-0'}>
+            <React.Suspense fallback={<p role="status" className="py-8 text-slate-600">Loading page…</p>}>
             <Routes location={location}>
               <Route path="/" element={<OverviewPage />} />
               <Route path="/batches" element={<BatchesPage />} />
               <Route path="/scans" element={<ScanExplorerPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/devices" element={<DevicesPage />} />
-              <Route path="/records" element={<RecordsPage />} />
-              <Route path="/models" element={<ModelsPage />} />
               
               {/* RBAC Protected Administration Routes */}
               <Route
@@ -83,22 +64,16 @@ const ProtectedLayout: React.FC = () => {
                 }
               />
               <Route
-                path="/logs"
-                element={
-                  <RoleProtectedRoute allowedRoles={['ADMIN', 'MANAGER']} moduleName="Audit Trail Logs">
-                    <AuditLogsPage />
-                  </RoleProtectedRoute>
-                }
-              />
-              <Route
                 path="/settings"
                 element={
-                  <RoleProtectedRoute allowedRoles={['ADMIN', 'MANAGER']} moduleName="Facility Configuration">
+                  <RoleProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'OPERATOR']} moduleName="Settings">
                     <SettingsPage />
                   </RoleProtectedRoute>
                 }
               />
+              <Route path="*" element={<div className="space-y-4"><h1>Page not found</h1><a href="/" className="primary-action">Return to overview</a></div>} />
             </Routes>
+            </React.Suspense>
           </div>
         </main>
       </div>
@@ -107,6 +82,12 @@ const ProtectedLayout: React.FC = () => {
 };
 
 export const App: React.FC = () => {
+  const { theme, tableDensity } = usePreferences();
+  React.useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.density = tableDensity;
+    document.documentElement.style.colorScheme = theme;
+  }, [theme, tableDensity]);
   return (
     <AuthProvider>
       <Routes>

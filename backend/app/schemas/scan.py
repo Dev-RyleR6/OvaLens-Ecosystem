@@ -22,6 +22,9 @@ class ScanSyncItem(BaseModel):
     routing_action: RoutingAction
     image_url: Optional[str] = None
     detections: List[Dict[str, Any]] = Field(default_factory=list)
+    cradle_index: Optional[int] = None
+    aspect_ratio: Optional[float] = None
+    vascular_index: Optional[float] = None
     scanned_at: datetime
 
 
@@ -48,6 +51,12 @@ class ScanListItem(BaseModel):
     confidence: float
     inference_ms: int
     routing_action: RoutingAction
+    cradle_index: Optional[int] = None
+    aspect_ratio: Optional[float] = None
+    vascular_index: Optional[float] = None
+    is_overridden: bool = False
+    override_reason: Optional[str] = None
+    overridden_at: Optional[datetime] = None
     image_url: Optional[str] = None
     thumbnail_url: Optional[str] = None
     detections: List[Dict[str, Any]] = Field(default_factory=list)
@@ -65,11 +74,26 @@ class ScanDetailResponse(BaseModel):
     confidence: float
     inference_ms: int
     routing_action: RoutingAction
+    cradle_index: Optional[int] = None
+    aspect_ratio: Optional[float] = None
+    vascular_index: Optional[float] = None
+    is_overridden: bool = False
+    override_reason: Optional[str] = None
+    overridden_at: Optional[datetime] = None
     image_url: Optional[str]
     thumbnail_url: Optional[str]
     detections: List[Dict[str, Any]]
     scanned_at: datetime
     synced_at: datetime
+
+
+class ScanPage(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    items: List[ScanListItem]
+    total: int
+    limit: int
+    offset: int
 
 
 class ScanOverridePayload(BaseModel):

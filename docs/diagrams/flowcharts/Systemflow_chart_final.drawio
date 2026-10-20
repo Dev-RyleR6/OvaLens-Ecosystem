@@ -92,7 +92,7 @@
         <mxCell id="q6L3rVriri3M4rHHcjm3-8" edge="1" parent="1" source="41NlSeQLLbcihnraF_WZ-575" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="q6L3rVriri3M4rHHcjm3-3">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="41NlSeQLLbcihnraF_WZ-575" parent="1" style="rounded=0;arcSize=12;whiteSpace=wrap;html=1;strokeWidth=1.5;strokeColor=#000000;fillColor=#FFFFFF;fontFamily=Times New Roman;fontSize=13;" value="Divert to Abnormal Tray" vertex="1">
+        <mxCell id="41NlSeQLLbcihnraF_WZ-575" parent="1" style="rounded=0;arcSize=12;whiteSpace=wrap;html=1;strokeWidth=1.5;strokeColor=#000000;fillColor=#FFFFFF;fontFamily=Times New Roman;fontSize=13;" value="Route to Manual Review" vertex="1">
           <mxGeometry height="55" width="250" x="520" y="2268.003333333333" as="geometry" />
         </mxCell>
         <mxCell id="41NlSeQLLbcihnraF_WZ-577" parent="1" style="rounded=0;arcSize=12;whiteSpace=wrap;html=1;strokeWidth=1.5;strokeColor=#000000;fillColor=#FFFFFF;fontFamily=Times New Roman;fontSize=14;" value="Record Segregation Outcome and Update Session Statistics" vertex="1">
@@ -246,7 +246,7 @@
             <mxPoint as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="cY6JGel6CDEZ163f-1jZ-11" parent="1" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.decision;whiteSpace=wrap;" value="Is the Egg Abnormal?" vertex="1">
+        <mxCell id="cY6JGel6CDEZ163f-1jZ-11" parent="1" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.decision;whiteSpace=wrap;" value="Confidence Below 0.75?" vertex="1">
           <mxGeometry height="100" width="100" x="357" y="2150" as="geometry" />
         </mxCell>
         <mxCell id="cY6JGel6CDEZ163f-1jZ-17" edge="1" parent="1" source="41NlSeQLLbcihnraF_WZ-572" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="cY6JGel6CDEZ163f-1jZ-11">

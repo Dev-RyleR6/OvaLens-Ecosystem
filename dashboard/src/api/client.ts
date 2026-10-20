@@ -1,3 +1,4 @@
+import type { ScanPage, ScanSearchParams } from '../types';
 import axios from 'axios';
 import {
   Batch,
@@ -89,30 +90,9 @@ export const apiClient = {
     return res.data;
   },
 
-  getEconomicYield: async (): Promise<EconomicYield> => {
-    const res = await api.get<any>('/analytics/economic-yield');
-    const d = res.data;
-    if (!d) throw new Error('No economic yield telemetry returned');
-    
-    const penoyCount = d.penoy_culled_day_10 ?? 0;
-    const penoyVal = d.salvage_revenue_php ?? d.estimated_penoy_salvage_value_php ?? (penoyCount * 14.00);
-    const kwhSaved = d.incubator_energy_saved_kwh ?? (penoyCount * 18 * 0.015);
-    const powerSaved = d.energy_savings_php ?? d.electricity_saved_estimated_php ?? (kwhSaved * 12.50);
-    const ducklingRev = d.duckling_sales_projected_php ?? d.projected_duckling_revenue_php ?? 0;
-    const totalBenefit = d.total_economic_benefit_php ?? (penoyVal + powerSaved + ducklingRev);
-
-    return {
-      penoy_culled_day_10: penoyCount,
-      penoy_unit_price_php: d.penoy_unit_price_php ?? 14.00,
-      salvage_revenue_php: penoyVal,
-      estimated_penoy_salvage_value_php: penoyVal,
-      incubator_energy_saved_kwh: kwhSaved,
-      energy_savings_php: powerSaved,
-      electricity_saved_estimated_php: powerSaved,
-      total_economic_benefit_php: totalBenefit,
-      duckling_sales_projected_php: ducklingRev,
-      projected_duckling_revenue_php: ducklingRev,
-    };
+  getEconomicYield: async (params?: { batch_id?: string; breed?: string; status?: string }): Promise<EconomicYield> => {
+    const res = await api.get<EconomicYield>('/analytics/economic-yield', { params });
+    return res.data;
   },
 
   getMortalityTrends: async (): Promise<MortalityTrends> => {
@@ -126,6 +106,15 @@ export const apiClient = {
   },
 
   // Batches
+  getAllBatches: async (): Promise<BatchSummary[]> => {
+    const batches: BatchSummary[] = [];
+    for (let offset = 0; ; offset += 200) {
+      const res = await api.get<BatchSummary[]>('/batches', { params: { limit: 200, offset } });
+      batches.push(...res.data);
+      if (res.data.length < 200) return batches;
+    }
+  },
+
   getBatches: async (): Promise<BatchSummary[]> => {
     const res = await api.get<BatchSummary[]>('/batches');
     return res.data;
@@ -177,13 +166,22 @@ export const apiClient = {
 
   // Sessions
   getSessions: async (batchId?: string): Promise<CandlingSession[]> => {
-    const res = await api.get<CandlingSession[]>('/sessions', { params: { batch_id: batchId } });
-    return res.data;
+    const sessions: CandlingSession[] = [];
+    for (let offset = 0; ; offset += 200) {
+      const res = await api.get<CandlingSession[]>('/sessions', { params: { batch_id: batchId, limit: 200, offset } });
+      sessions.push(...res.data);
+      if (res.data.length < 200) return sessions;
+    }
   },
 
   // Scans
   getScans: async (params?: { batch_id?: string; final_class?: string; limit?: number }): Promise<EggScan[]> => {
     const res = await api.get<EggScan[]>('/scans', { params });
+    return res.data;
+  },
+
+  searchScans: async (params: ScanSearchParams, signal?: AbortSignal): Promise<ScanPage> => {
+    const res = await api.get<ScanPage>('/scans/search', { params, signal });
     return res.data;
   },
 
@@ -260,7 +258,12 @@ export const apiClient = {
     return res.data;
   },
 
-  downloadBackupUrl: (filename: string) => `/api/v1/settings/backups/${filename}/download`,
+  downloadBackup: async (filename: string): Promise<Blob> => {
+    const res = await api.get<Blob>(`/settings/backups/${encodeURIComponent(filename)}/download`, { responseType: 'blob' });
+    return res.data;
+  },
+
+  downloadBackupUrl: (filename: string) => `/api/v1/settings/backups/${encodeURIComponent(filename)}/download`,
 
   // Reports
   downloadCSVUrl: (batchId: string) => `/api/v1/reports/batch/${batchId}/csv`,
@@ -273,24 +276,21 @@ export const apiClient = {
       total_training_images: 4800,
       dataset_distribution: {
         fertile: 3200,
-        infertile: 1100,
-        abnormal: 500,
+        infertile: 1600,
       },
       overall_map50: 0.958,
       overall_precision: 0.942,
       overall_recall: 0.961,
       avg_latency_ms: 24.6,
       confusion_matrix: {
-        classes: ['FERTILE', 'INFERTILE', 'ABNORMAL'],
+        classes: ['FERTILE', 'INFERTILE'],
         matrix: [
-          [0.96, 0.03, 0.01],
-          [0.02, 0.95, 0.03],
-          [0.02, 0.04, 0.94],
+          [0.96, 0.04],
+          [0.05, 0.95],
         ],
         raw_counts: [
-          [480, 15, 5],
-          [10, 475, 15],
-          [10, 20, 470],
+          [480, 20],
+          [25, 475],
         ],
       },
     };

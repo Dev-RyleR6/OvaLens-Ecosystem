@@ -77,32 +77,33 @@ class CandlingHeuristics:
             conf = det["confidence"]
             cls_name = det["class"]
 
-            # 1. Aspect ratio check
+            # 1. Biological aspect ratio check (0.65 <= w/h <= 1.45)
             if not cls.validate_aspect_ratio(w, h):
                 continue
 
-            # 2. Optical luminance check
-            lum_info = cls.calculate_candling_luminance(frame, (xc, yc, w, h))
-            if lum_info["mean_luminance"] < cls.MIN_CANDLING_LUMINANCE:
-                continue
+            # 2. Optical candling luminance check
+            lum_info = cls.calculate_candling_luminance(frame, (xc, yc, w, h)) if frame is not None else {}
+            mean_v = lum_info.get("mean_luminance", 0.0)
 
             # Calculate centrality score (closer to center = higher priority)
             dist_from_center = np.sqrt((xc - 0.5) ** 2 + (yc - 0.5) ** 2)
             centrality_weight = max(0.0, 1.0 - dist_from_center)
 
-            total_score = (conf * 0.65) + (centrality_weight * 0.35)
+            # Bonus if active candling lighting is detected
+            lum_bonus = 0.15 if mean_v >= cls.MIN_CANDLING_LUMINANCE else 0.0
+
+            total_score = (conf * 0.55) + (centrality_weight * 0.30) + lum_bonus
 
             valid_candidates.append({
                 **det,
                 "score": total_score,
-                "luminance": lum_info["mean_luminance"],
-                "vascular_index": lum_info["vascular_index"],
-                "area_px": lum_info["area_px"]
+                "luminance": mean_v,
+                "vascular_index": lum_info.get("vascular_index", 0.0),
+                "area_px": lum_info.get("area_px", 0)
             })
 
         if not valid_candidates:
-            # Fall back to highest confidence raw detection if none passed strict filter
-            return max(detections, key=lambda d: d["confidence"])
+            return None
 
         # Return candidate with highest combined score
         return max(valid_candidates, key=lambda d: d["score"])

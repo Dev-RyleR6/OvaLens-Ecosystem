@@ -14,15 +14,14 @@ This document serves as the **Master Source of Truth & Architecture Guide** for 
 2. **Central Monorepo Topology**:
    - Keep all code inside the root monorepo: `edge/`, `backend/`, `dashboard/`, and `firmware/`.
    - Never initialize nested `.git` repositories inside subdirectories.
-3. **Biological Model Classes & Genetic Scope (Strict 3-Class Vision Model)**:
+3. **Biological Model Classes & Genetic Scope (Strict 2-Class Vision Model)**:
    - **Target Breeds**: *Itik Pinas* Pure Lines (`IP-Itim`, `IP-Khaki`) and Commercial Hybrid (`IP-Kayumanggi`).
-   - **Candling Checkpoints**: Day 10, Day 18, and Day 25 of incubation.
+   - **Candling Checkpoint**: Day 10 of incubation only.
    - **Dataset Split**: 70% Training, 15% Validation, 15% Testing.
    - **Classes**:
      - `FERTILE`: Active embryo with spider blood veins or viable shadow (Action: `ACCEPT` $\to$ Incubation Tray).
-     - `INFERTILE`: Clear unfertilized yolk (Action: `REJECT` $\to$ Salvaged on Day 10 as Penoy @ ₱14.00).
-     - `ABNORMAL`: Dead embryo, blood ring, corrupted yolk (Action: `REJECT` $\to$ Discard Tray).
-   - **Fallback State**: Low-confidence captures ($\tau < 0.75$) or synchronization errors MUST trigger `MANUAL_REVIEW`.
+     - `INFERTILE`: Any non-fertile Day 10 result (Action: `REJECT` $\to$ Salvaged as Penoy @ ₱14.00).
+   - **Fallback State**: Automatic sorting uses the saved station confidence threshold (default and minimum `0.70`, per operator configuration). Captures below that threshold or synchronization errors MUST trigger `MANUAL_REVIEW`. Manual diagnostic scans retain their `0.75` review threshold.
 4. **Offline-First Edge Resilience**:
    - The Edge application MUST record every scan to local SQLite (with WAL mode enabled) before syncing over the network.
    - Network dropouts must never block or delay the physical conveyor belt sorting speed.
@@ -130,7 +129,8 @@ Capstone/
 ### D. Firmware (`firmware/`)
 - **Microcontroller**: ESP32 Dev Module (115200 baud).
 - **Timing**: Use hardware timer interrupts and non-blocking state machines. Never call `delay()` inside the main loop during active conveyor operation.
-- **Debounce**: 600ms hardware optical sensor lockout window on GPIO 14.
+- **Rig profiles**: Preserve the existing `dual_v2` wiring (chamber sensor GPIO14, servo GPIO18). The handoff `three_v3` rig uses sensor GPIO26, servo GPIO32, egg pause output GPIO25 -> conveyor pause input GPIO27, and a separate lamp board GPIO27. Never infer a profile from port order.
+- **Debounce**: Retain a 600ms optical detection lockout. The three-board profile additionally confirms detection LOW for 40ms and beam clearance HIGH for 350ms; a too-early new egg faults and holds the conveyor.
 
 ---
 
@@ -224,7 +224,7 @@ All AI agents (including Codex, subagents, and human contributors) operating wit
 2. **Implementation & Accompanying Tests**:
    - Write clean, modular code satisfying the specification contract.
    - Include accompanying pytest unit tests (in `backend/tests/` or `edge/tests/`).
-   - Adhere strictly to the negative constraints (no Firebase, SQLite WAL at edge, 3 biological classes, Foundation University colors).
+   - Adhere strictly to the negative constraints (no Firebase, SQLite WAL at edge, 2 biological classes plus the MANUAL_REVIEW workflow state, Foundation University colors).
 3. **Automated Verification & Checklist Update**:
    - Upon completing the code, run the automated verification utility specifying the `--task` flag:
    ```bash

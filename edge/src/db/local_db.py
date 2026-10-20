@@ -6,31 +6,84 @@ Ensures non-blocking, zero-latency local scan recording on the conveyor edge mac
 import os
 import sqlite3
 import json
+import math
+import re
 import uuid
+import threading
+import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
 
 class LocalDatabaseManager:
+    _locks_guard = threading.Lock()
+    _file_locks = {}
+
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
             db_path = os.path.join(base_dir, "db", "local_scans.db")
 
-        self.db_path = db_path
+        self.db_path = os.path.realpath(os.fspath(db_path))
+        with self._locks_guard:
+            self._access_lock = self._file_locks.setdefault(os.path.normcase(os.path.realpath(db_path)), threading.RLock())
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._init_db()
 
-    def _get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=10.0)
-        conn.row_factory = sqlite3.Row
-        # Enable WAL mode and memory cache pragmas for zero-lag high-throughput recording
-        conn.execute("PRAGMA journal_mode = WAL;")
-        conn.execute("PRAGMA synchronous = NORMAL;")
-        conn.execute("PRAGMA cache_size = -8000;")       # 8MB memory cache
-        conn.execute("PRAGMA mmap_size = 268435456;")     # 256MB memory map
-        conn.execute("PRAGMA temp_store = MEMORY;")
-        return conn
+    @contextmanager
+    def _get_connection(self):
+        # Serialize connection lifetimes, including close/checkpoint, across
+        # station threads/processes. Older SQLite WAL runtimes have a reset race.
+        # Network and photo I/O are outside this short storage critical section.
+        with self._access_lock, self._process_access():
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            try:
+                conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA journal_mode = WAL;")
+                conn.execute("PRAGMA synchronous = NORMAL;")
+                conn.execute("PRAGMA foreign_keys = ON;")
+                conn.execute("PRAGMA cache_size = -8000;")
+                conn.execute("PRAGMA mmap_size = 268435456;")
+                conn.execute("PRAGMA temp_store = MEMORY;")
+                with conn:
+                    yield conn
+            finally:
+                conn.close()
+
+    @contextmanager
+    def _process_access(self):
+        with open(self.db_path + ".lock", "a+b") as handle:
+            deadline = time.monotonic() + 10
+            if os.name == "nt":
+                import msvcrt
+                def lock():
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                def unlock():
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                def lock():
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                def unlock():
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            while True:
+                try:
+                    lock()
+                    break
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("Local storage is busy; scan retained for inspection.") from None
+                    time.sleep(.01)
+            try:
+                if os.fstat(handle.fileno()).st_size == 0:
+                    handle.write(b"\0")
+                    handle.flush()
+                yield
+            finally:
+                unlock()
 
     def _init_db(self):
         with self._get_connection() as conn:
@@ -46,7 +99,7 @@ class LocalDatabaseManager:
                     total_scanned INTEGER DEFAULT 0,
                     fertile_count INTEGER DEFAULT 0,
                     infertile_count INTEGER DEFAULT 0,
-                    abnormal_count INTEGER DEFAULT 0,
+                    manual_review_count INTEGER DEFAULT 0,
                     avg_inference_ms REAL DEFAULT 0.0
                 );
             """)
@@ -70,11 +123,171 @@ class LocalDatabaseManager:
                 );
             """)
 
+            session_columns = {r[1] for r in conn.execute("PRAGMA table_info(local_sessions);")}
+            for column in ("end_synced_at", "sync_last_attempt_at", "sync_error"):
+                if column not in session_columns:
+                    conn.execute(f"ALTER TABLE local_sessions ADD COLUMN {column} TEXT;")
+            scan_columns = {r[1] for r in conn.execute("PRAGMA table_info(local_scans);")}
+            if "evidence_json" not in scan_columns:
+                conn.execute("ALTER TABLE local_scans ADD COLUMN evidence_json TEXT;")
+            # Metadata and photos have independent acknowledgements. Existing saved
+            # photos automatically enter the outbox, including already-synced scans.
+            for column in ("image_synced_at", "image_url", "image_sync_error", "image_last_attempt_at"):
+                if column not in scan_columns:
+                    conn.execute(f"ALTER TABLE local_scans ADD COLUMN {column} TEXT;")
+            conn.execute("CREATE TABLE IF NOT EXISTS machine_journal (device_id TEXT PRIMARY KEY, state_json TEXT NOT NULL);")
+            conn.execute("""CREATE TABLE IF NOT EXISTS local_batches (
+                batch_id TEXT PRIMARY KEY, batch_code TEXT NOT NULL UNIQUE, breed TEXT NOT NULL,
+                incubator_id TEXT NOT NULL, initial_egg_count INTEGER NOT NULL, set_date TEXT NOT NULL,
+                notes TEXT, device_id TEXT NOT NULL, operator_name TEXT NOT NULL,
+                origin TEXT NOT NULL, created_at TEXT NOT NULL, synced_at TEXT,
+                last_attempt_at TEXT, sync_error TEXT);""")
+            batch_columns = {r[1] for r in conn.execute("PRAGMA table_info(local_batches);")}
+            if "sync_blocked" not in batch_columns:
+                conn.execute("ALTER TABLE local_batches ADD COLUMN sync_blocked INTEGER NOT NULL DEFAULT 0;")
+                conn.execute("""UPDATE local_batches SET sync_blocked=1 WHERE
+                    sync_error LIKE '%conflicts with a backend record%'
+                    OR sync_error LIKE '%acknowledgement does not match%';""")
+            conn.execute("""CREATE TABLE IF NOT EXISTS batch_preferences (
+                id INTEGER PRIMARY KEY CHECK(id=1), data_json TEXT NOT NULL);""")
+            if "manual_review_count" not in session_columns:
+                conn.execute("ALTER TABLE local_sessions ADD COLUMN manual_review_count INTEGER DEFAULT 0;")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_sync ON local_scans(is_synced);")
+            conn.execute("""CREATE INDEX IF NOT EXISTS idx_scan_image_outbox
+                ON local_scans(image_last_attempt_at, scanned_at, scan_id)
+                WHERE is_synced = 1 AND image_path IS NOT NULL AND image_synced_at IS NULL;""")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_session ON local_scans(session_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_batch_seq ON local_scans(batch_id, sequence_number);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_batch_class ON local_scans(batch_id, final_class, sequence_number);")
+            self._migrate_legacy_contract(conn)
             conn.commit()
+
+    @staticmethod
+    def _migrate_legacy_contract(conn: sqlite3.Connection) -> None:
+        """Normalize records from the retired domain contract before operation."""
+        conn.execute("CREATE TABLE IF NOT EXISTS local_schema_migrations (version TEXT PRIMARY KEY);")
+        if conn.execute("SELECT 1 FROM local_schema_migrations WHERE version = ?;",
+                        ("two_class_v1",)).fetchone():
+            return
+        session_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(local_sessions);").fetchall()
+        }
+        if "abnormal_count" in session_columns:
+            conn.execute("""
+                UPDATE local_sessions
+                SET infertile_count = infertile_count + abnormal_count,
+                    stage = 'DAY_10';
+            """)
+            try:
+                conn.execute("ALTER TABLE local_sessions DROP COLUMN abnormal_count;")
+            except sqlite3.OperationalError:
+                # Older SQLite versions may retain the unused legacy column.
+                pass
+        else:
+            conn.execute("UPDATE local_sessions SET stage = 'DAY_10' WHERE stage <> 'DAY_10';")
+        conn.execute("UPDATE local_scans SET final_class = 'INFERTILE' WHERE final_class = 'ABNORMAL';")
+        conn.execute("INSERT INTO local_schema_migrations (version) VALUES (?);", ("two_class_v1",))
+
+    def save_local_batch(self, record, device_id, operator_name):
+        from ..core.batches import validate_batch_record, same_batch
+        values = validate_batch_record(record)
+        if not isinstance(device_id, str) or not device_id.strip() or len(device_id) > 64:
+            raise ValueError("A station ID is required to create a batch.")
+        if not isinstance(operator_name, str) or not operator_name.strip() or len(operator_name.strip()) > 100:
+            raise ValueError("Enter the operator name (1–100 characters).")
+        with self._get_connection() as conn:
+            existing = conn.execute("SELECT * FROM local_batches WHERE batch_id=?;", (values["batch_id"],)).fetchone()
+            if existing:
+                if not same_batch(dict(existing), values):
+                    raise ValueError("This batch already exists with different details. Choose it under Existing batch.")
+                return dict(existing)
+            try:
+                conn.execute("""INSERT INTO local_batches
+                    (batch_id,batch_code,breed,incubator_id,initial_egg_count,set_date,notes,
+                     device_id,operator_name,origin,created_at)
+                    VALUES (:batch_id,:batch_code,:breed,:incubator_id,:initial_egg_count,:set_date,:notes,
+                            :device_id,:operator_name,'LOCAL',:created_at);""",
+                    {**values, "device_id": device_id.strip(), "operator_name": operator_name.strip(),
+                     "created_at": datetime.now(timezone.utc).isoformat()})
+            except sqlite3.IntegrityError:
+                raise ValueError("Batch code already exists. Select the existing batch instead.") from None
+            conn.commit()
+        return self.get_local_batch(values["batch_id"])
+
+    def get_local_batch(self, batch_id):
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT * FROM local_batches WHERE batch_id=?;", (batch_id,)).fetchone()
+            return dict(row) if row else None
+
+    def cache_batches(self, records):
+        from ..core.batches import validate_batch_record
+        with self._get_connection() as conn:
+            for record in records:
+                values = validate_batch_record(record)
+                if conn.execute("SELECT 1 FROM local_batches WHERE batch_code=? AND batch_id<>?;",
+                                (values["batch_code"], values["batch_id"])).fetchone():
+                    continue  # A conflicting server code cannot hide other available batches.
+                conn.execute("""INSERT INTO local_batches
+                    (batch_id,batch_code,breed,incubator_id,initial_egg_count,set_date,notes,
+                     device_id,operator_name,origin,created_at,synced_at)
+                    VALUES (:batch_id,:batch_code,:breed,:incubator_id,:initial_egg_count,:set_date,:notes,
+                            '', '', 'CACHED', :now, :now)
+                    ON CONFLICT(batch_id) DO UPDATE SET batch_code=excluded.batch_code, breed=excluded.breed,
+                        incubator_id=excluded.incubator_id, initial_egg_count=excluded.initial_egg_count,
+                        set_date=excluded.set_date, notes=excluded.notes
+                    WHERE local_batches.synced_at IS NOT NULL;""",
+                    {**values, "now": datetime.now(timezone.utc).isoformat()})
+            conn.commit()
+
+    def list_available_batches(self):
+        with self._get_connection() as conn:
+            records = [dict(row) for row in conn.execute("SELECT * FROM local_batches ORDER BY created_at DESC, batch_id;")]
+            # Legacy references remain untouched until the worker supplies their real metadata.
+            records.extend(dict(row) for row in conn.execute("""SELECT s.batch_id,
+                s.batch_id AS batch_code, 1 AS needs_details FROM local_sessions s
+                WHERE NOT EXISTS (SELECT 1 FROM local_batches b WHERE b.batch_id=s.batch_id)
+                GROUP BY s.batch_id ORDER BY MAX(s.started_at) DESC;"""))
+            return records
+
+    def get_pending_batches(self, limit=5):
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute("""SELECT * FROM local_batches WHERE synced_at IS NULL
+                ORDER BY last_attempt_at, created_at, batch_id LIMIT ?;""", (limit,))]
+
+    def mark_batch_attempt(self, batch_id, error=None, synced=False, blocked=None):
+        with self._get_connection() as conn:
+            now = datetime.now(timezone.utc).isoformat()
+            conn.execute("""UPDATE local_batches SET last_attempt_at=?, sync_error=?, synced_at=?
+                WHERE batch_id=?;""", (now, error, now if synced else None, batch_id))
+            if synced or blocked is not None:
+                conn.execute("UPDATE local_batches SET sync_blocked=? WHERE batch_id=?;",
+                             (0 if synced else int(blocked), batch_id))
+            conn.commit()
+
+    def get_pending_batch_count(self):
+        with self._get_connection() as conn:
+            return conn.execute("SELECT COUNT(*) FROM local_batches WHERE synced_at IS NULL;").fetchone()[0]
+
+    def get_batch_preferences(self):
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT data_json FROM batch_preferences WHERE id=1;").fetchone()
+            return json.loads(row[0]) if row else {}
+
+    def remember_batch_selection(self, batch_id, operator_name, target):
+        from ..core.operator_flow import validate_batch_config
+        batch_id, operator_name, target = validate_batch_config(batch_id, operator_name, target, "DAY_10")
+        batch = self.get_local_batch(batch_id)
+        if batch is None:
+            raise ValueError("Complete this batch's incubation details before selecting it.")
+        if target > batch["initial_egg_count"]:
+            raise ValueError("This run's scan target cannot exceed the original egg count.")
+        values = {"batch_id": batch_id, "breed": batch["breed"], "incubator_id": batch["incubator_id"],
+                  "operator": operator_name, "egg_count": target}
+        with self._get_connection() as conn:
+            conn.execute("INSERT INTO batch_preferences VALUES (1,?) ON CONFLICT(id) DO UPDATE SET data_json=excluded.data_json;",
+                         (json.dumps(values),))
+            conn.commit()
+        return batch
 
     def get_distinct_batches(self) -> List[Dict[str, Any]]:
         """Fetch all unique batches stored in local SQLite with scan counts and latest timestamp."""
@@ -85,7 +298,6 @@ class LocalDatabaseManager:
                     COUNT(*) as total_scans,
                     SUM(CASE WHEN final_class = 'FERTILE' THEN 1 ELSE 0 END) as fertile_count,
                     SUM(CASE WHEN final_class = 'INFERTILE' THEN 1 ELSE 0 END) as infertile_count,
-                    SUM(CASE WHEN final_class = 'ABNORMAL' THEN 1 ELSE 0 END) as abnormal_count,
                     MAX(scanned_at) as last_scanned_at
                 FROM local_scans
                 GROUP BY batch_id
@@ -93,11 +305,12 @@ class LocalDatabaseManager:
             """)
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_scans_by_batch(self, batch_id: str, limit: int = 300, class_filter: Optional[str] = None, search_query: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_scans_by_batch(self, batch_id: str, limit: Optional[int] = 300, class_filter: Optional[str] = None, search_query: Optional[str] = None) -> List[Dict[str, Any]]:
         """Fetch scans for a batch or ALL batches with optional class and text filtering."""
         with self._get_connection() as conn:
             query = """
-                SELECT sequence_number, scan_id, batch_id, session_id, final_class, confidence, inference_ms, routing_action, scanned_at, is_synced
+                SELECT sequence_number, scan_id, batch_id, session_id, final_class, confidence, inference_ms, routing_action, scanned_at,
+                    (is_synced = 1 AND (COALESCE(image_path, '') = '' OR image_synced_at IS NOT NULL)) AS is_synced
                 FROM local_scans
                 WHERE 1=1
             """
@@ -120,8 +333,10 @@ class LocalDatabaseManager:
                     query += " AND (scan_id LIKE ? OR final_class LIKE ?)"
                     params.extend([f"%{clean_query}%", f"%{clean_query}%"])
 
-            query += " ORDER BY sequence_number DESC LIMIT ?"
-            params.append(limit)
+            query += " ORDER BY sequence_number DESC"
+            if limit is not None:
+                query += " LIMIT ?"
+                params.append(limit)
 
             cursor = conn.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
@@ -135,12 +350,12 @@ class LocalDatabaseManager:
         os.makedirs(output_dir, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        batch_tag = "ALL_BATCHES" if batch_id == "ALL" else batch_id
-        filter_tag = f"_{class_filter.lower()}" if class_filter and class_filter != "ALL" else ""
+        batch_tag = self._filename_tag("ALL_BATCHES" if batch_id == "ALL" else batch_id)
+        filter_tag = f"_{self._filename_tag(class_filter.lower())}" if class_filter and class_filter != "ALL" else ""
         filename = f"OvaLens_{batch_tag}{filter_tag}_{timestamp}.csv"
         filepath = os.path.join(output_dir, filename)
 
-        scans = self.get_scans_by_batch(batch_id, limit=10000, class_filter=class_filter)
+        scans = self.get_scans_by_batch(batch_id, limit=None, class_filter=class_filter)
         with open(filepath, mode="w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(["#", "Scan ID", "Batch Code", "Classification", "Confidence", "Action", "Latency (ms)", "Timestamp (UTC)", "Server Synced"])
@@ -159,6 +374,8 @@ class LocalDatabaseManager:
         return filepath
 
     def create_session(self, session_id: str, batch_id: str, device_id: str, stage: str, operator_name: str) -> Dict[str, Any]:
+        if stage != "DAY_10":
+            raise ValueError("OvaLens supports only the DAY_10 candling stage.")
         started_at = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             conn.execute("""
@@ -176,13 +393,82 @@ class LocalDatabaseManager:
             "started_at": started_at
         }
 
+    def check_readiness(self, full=True):
+        """Probe real WAL writes and image storage without altering scan evidence."""
+        import shutil
+        import tempfile
+        directory = os.path.join(os.path.dirname(self.db_path), "local_scans")
+        os.makedirs(directory, exist_ok=True)
+        if shutil.disk_usage(directory).free < 256 * 1024 * 1024:
+            raise OSError("Less than 256 MB free. Free disk space before sorting.")
+        with self._get_connection() as conn:
+            if conn.execute("PRAGMA journal_mode;").fetchone()[0].lower() != "wal":
+                raise OSError("Local scan database requires WAL mode.")
+            if full and conn.execute("PRAGMA quick_check;").fetchone()[0] != "ok":
+                raise OSError("Local database integrity check failed. Preserve the database and contact support.")
+            probe = "readiness-" + str(uuid.uuid4())
+            conn.execute("INSERT INTO machine_journal(device_id, state_json) VALUES (?, ?)", (probe, "{}"))
+            conn.execute("DELETE FROM machine_journal WHERE device_id = ?", (probe,))
+        fd, temporary = tempfile.mkstemp(dir=directory, prefix="readiness-", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(b"OvaLens storage check")
+                stream.flush()
+                os.fsync(stream.fileno())
+        finally:
+            os.unlink(temporary)
+        return True
+
+    def save_scan_image(self, scan_id, image):
+        """Atomically persist the captured evidence before releasing its egg."""
+        import cv2
+        import tempfile
+        scan_id = str(uuid.UUID(str(scan_id)))
+        directory = os.path.join(os.path.dirname(self.db_path), "local_scans")
+        os.makedirs(directory, exist_ok=True)
+        ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        if not ok:
+            raise OSError("Could not encode candling evidence")
+        target = os.path.join(directory, scan_id + ".jpg")
+        fd, temporary = tempfile.mkstemp(dir=directory, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(encoded.tobytes())
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, target)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        return target
+
     def record_scan(self, scan_id: str, session_id: str, batch_id: str, sequence_number: int,
                     final_class: str, confidence: float, inference_ms: int, routing_action: str,
-                    detections: list, image_path: Optional[str] = None) -> Dict[str, Any]:
+                    detections: list, image_path: Optional[str] = None,
+                    evidence: Optional[dict] = None) -> Dict[str, Any]:
+        if final_class not in {"FERTILE", "INFERTILE"}:
+            raise ValueError("final_class must be FERTILE or INFERTILE.")
+        if (not isinstance(confidence, (int, float)) or not math.isfinite(confidence)
+                or not 0 <= confidence <= 1):
+            raise ValueError("confidence must be finite and between 0 and 1.")
+        expected = "ACCEPT" if final_class == "FERTILE" else "REJECT"
+        if routing_action not in {expected, "MANUAL_REVIEW"}:
+            raise ValueError("routing action contradicts classification.")
+        # Automatic cycles validate the configured (>=70%) threshold and stable
+        # stopped evidence before this durable write. Diagnostics still use 75%.
+        if confidence < 0.70 and routing_action != "MANUAL_REVIEW":
+            raise ValueError("Low confidence requires MANUAL_REVIEW.")
+        if type(sequence_number) is not int or sequence_number < 1 or type(inference_ms) is not int or inference_ms < 0:
+            raise ValueError("Sequence and latency must be nonnegative integers (sequence >= 1).")
         scanned_at = datetime.now(timezone.utc).isoformat()
         det_json = json.dumps(detections)
 
         with self._get_connection() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
+            session = conn.execute("SELECT batch_id, ended_at FROM local_sessions WHERE session_id = ?;",
+                                   (session_id,)).fetchone()
+            if session is None or session["batch_id"] != batch_id or session["ended_at"]:
+                raise ValueError("Scan requires an open session with the same batch ID.")
             conn.execute("""
                 INSERT INTO local_scans (
                     scan_id, session_id, batch_id, sequence_number,
@@ -196,7 +482,11 @@ class LocalDatabaseManager:
             ))
 
             # Update session rollup counters
-            col = "fertile_count" if final_class == "FERTILE" else ("infertile_count" if final_class == "INFERTILE" else "abnormal_count")
+            if evidence is not None:
+                conn.execute("UPDATE local_scans SET evidence_json = ? WHERE scan_id = ?;",
+                             (json.dumps(evidence, allow_nan=False), scan_id))
+            col = ("manual_review_count" if routing_action == "MANUAL_REVIEW" else
+                   "fertile_count" if final_class == "FERTILE" else "infertile_count")
             conn.execute(f"""
                 UPDATE local_sessions
                 SET total_scanned = total_scanned + 1,
@@ -215,23 +505,92 @@ class LocalDatabaseManager:
             "scanned_at": scanned_at
         }
 
-    def get_uncommitted_scans(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def save_machine_state(self, device_id: str, state: dict):
+        with self._get_connection() as conn:
+            conn.execute("INSERT INTO machine_journal(device_id, state_json) VALUES (?, ?) "
+                         "ON CONFLICT(device_id) DO UPDATE SET state_json=excluded.state_json;",
+                         (device_id, json.dumps(state, allow_nan=False)))
+            conn.commit()
+
+    def load_machine_state(self, device_id: str):
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT state_json FROM machine_journal WHERE device_id=?;", (device_id,)).fetchone()
+            return json.loads(row[0]) if row else None
+
+    def get_pending_scan_sessions(self, limit=5):
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute("""
+                SELECT s.* FROM local_sessions s WHERE EXISTS (
+                    SELECT 1 FROM local_scans c WHERE c.session_id=s.session_id AND c.is_synced=0)
+                ORDER BY s.sync_last_attempt_at, s.started_at, s.session_id LIMIT ?;
+            """, (limit,))]
+
+    def get_pending_session_ends(self, limit=5):
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute("""
+                SELECT s.* FROM local_sessions s
+                WHERE s.ended_at IS NOT NULL AND s.ended_at<>'' AND s.end_synced_at IS NULL
+                  AND NOT EXISTS (SELECT 1 FROM local_scans c
+                    WHERE c.session_id=s.session_id AND c.is_synced=0)
+                ORDER BY s.sync_last_attempt_at, s.started_at, s.session_id LIMIT ?;
+            """, (limit,))]
+
+    def mark_session_sync_attempt(self, session_id, error=None):
+        with self._get_connection() as conn:
+            conn.execute("UPDATE local_sessions SET sync_last_attempt_at=?, sync_error=? WHERE session_id=?;",
+                (datetime.now(timezone.utc).isoformat(), error, session_id))
+            conn.commit()
+
+    def mark_session_end_synced(self, session_id, ended_at):
+        with self._get_connection() as conn:
+            conn.execute("""UPDATE local_sessions SET end_synced_at=?, sync_error=NULL
+                WHERE session_id=? AND ended_at=?;""",
+                (datetime.now(timezone.utc).isoformat(), session_id, ended_at))
+            conn.commit()
+
+    def get_pending_session_end_count(self):
+        with self._get_connection() as conn:
+            return conn.execute("""SELECT COUNT(*) FROM local_sessions
+                WHERE ended_at IS NOT NULL AND ended_at<>'' AND end_synced_at IS NULL;""").fetchone()[0]
+
+    def get_uncommitted_scans(self, limit: int = 50, session_id=None) -> List[Dict[str, Any]]:
         """Fetch pending unsynced scans for the background network worker."""
         with self._get_connection() as conn:
             cursor = conn.execute("""
                 SELECT * FROM local_scans
-                WHERE is_synced = 0
+                WHERE is_synced = 0 AND (? IS NULL OR session_id=?)
                 ORDER BY sequence_number ASC
                 LIMIT ?;
-            """, (limit,))
+            """, (session_id, session_id, limit))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 
     def get_unsynced_count(self) -> int:
-        """Return total number of scans pending network synchronization."""
+        """Count scans whose metadata or saved photo still needs acknowledgement."""
         with self._get_connection() as conn:
-            cursor = conn.execute("SELECT COUNT(*) FROM local_scans WHERE is_synced = 0;")
+            cursor = conn.execute("""SELECT COUNT(*) FROM local_scans WHERE is_synced = 0
+                OR (COALESCE(image_path, '') <> '' AND image_synced_at IS NULL);""")
             return cursor.fetchone()[0]
+
+    def get_pending_scan_images(self, limit: int = 5) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute("""
+                SELECT * FROM local_scans WHERE is_synced = 1
+                    AND image_path IS NOT NULL AND image_path <> '' AND image_synced_at IS NULL
+                ORDER BY image_last_attempt_at, scanned_at, scan_id LIMIT ?;
+            """, (limit,))]
+
+    def mark_scan_image_attempt(self, scan_id: str, error: str):
+        with self._get_connection() as conn:
+            conn.execute("""UPDATE local_scans SET image_last_attempt_at = ?, image_sync_error = ?
+                WHERE scan_id = ? AND image_synced_at IS NULL;""",
+                (datetime.now(timezone.utc).isoformat(), error[:500], scan_id))
+
+    def mark_scan_image_synced(self, scan_id: str, image_url: str):
+        with self._get_connection() as conn:
+            conn.execute("""UPDATE local_scans SET image_synced_at = ?, image_url = ?,
+                image_sync_error = NULL WHERE scan_id = ?;""",
+                (datetime.now(timezone.utc).isoformat(), image_url, scan_id))
 
     def mark_scans_synced(self, scan_ids: List[str]):
         """Mark a batch of scan UUIDs as successfully committed to central PostgreSQL."""
@@ -258,7 +617,8 @@ class LocalDatabaseManager:
     def get_recent_scans(self, limit: int = 20) -> List[Dict[str, Any]]:
         with self._get_connection() as conn:
             cursor = conn.execute("""
-                SELECT scan_id, sequence_number, final_class, confidence, inference_ms, routing_action, scanned_at, is_synced
+                SELECT scan_id, sequence_number, final_class, confidence, inference_ms, routing_action, scanned_at,
+                    (is_synced = 1 AND (COALESCE(image_path, '') = '' OR image_synced_at IS NOT NULL)) AS is_synced
                 FROM local_scans
                 ORDER BY sequence_number DESC
                 LIMIT ?;
@@ -296,12 +656,13 @@ class LocalDatabaseManager:
         session_stats = self.get_session_stats(session_id)
         batch_id = session_stats.get("batch_id", "BATCH-UNKNOWN")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"OvaLens_Report_{batch_id}_{timestamp}.csv"
+        filename = f"OvaLens_Report_{self._filename_tag(batch_id)}_{timestamp}.csv"
         filepath = os.path.join(output_dir, filename)
 
         with self._get_connection() as conn:
             cursor = conn.execute("""
-                SELECT sequence_number, scan_id, batch_id, final_class, confidence, routing_action, inference_ms, scanned_at, is_synced
+                SELECT sequence_number, scan_id, batch_id, final_class, confidence, routing_action, inference_ms, scanned_at,
+                    (is_synced = 1 AND (COALESCE(image_path, '') = '' OR image_synced_at IS NOT NULL)) AS is_synced
                 FROM local_scans
                 WHERE session_id = ?
                 ORDER BY sequence_number ASC;
@@ -325,3 +686,8 @@ class LocalDatabaseManager:
                 ])
 
         return filepath
+
+    @staticmethod
+    def _filename_tag(value: str) -> str:
+        """Keep identifiers in filenames from introducing directories."""
+        return re.sub(r"[^A-Za-z0-9_-]", "_", str(value))[:100] or "UNKNOWN"

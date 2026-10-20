@@ -10,9 +10,7 @@ interface BatchProgressTimelineProps {
 export const BatchProgressTimeline: React.FC<BatchProgressTimelineProps> = ({ currentStage }) => {
   const stages = [
     { key: 'SETTING', day: 'Day 0', title: 'Incubator Set', desc: 'Initial tray load' },
-    { key: 'DAY_10', day: 'Day 10', title: '1st Candling', desc: 'Penoy market salvage' },
-    { key: 'DAY_18', day: 'Day 18', title: 'Hatcher Transfer', desc: 'Stop turning, 75% RH' },
-    { key: 'DAY_25', day: 'Day 25', title: 'Pipping Stage', desc: 'Air cell breach' },
+    { key: 'DAY_10', day: 'Day 10', title: 'Candling', desc: 'Fertility classification' },
     { key: 'HATCHED', day: 'Day 28', title: 'Hatch Harvest', desc: 'Duckling takeoff' },
   ];
 
@@ -20,10 +18,8 @@ export const BatchProgressTimeline: React.FC<BatchProgressTimelineProps> = ({ cu
     switch (stage) {
       case 'SETTING': return 0;
       case 'DAY_10': return 1;
-      case 'DAY_18': return 2;
-      case 'DAY_25': return 3;
       case 'HATCHED':
-      case 'COMPLETED': return 4;
+      case 'COMPLETED': return 2;
       default: return 0;
     }
   };
@@ -46,21 +42,21 @@ export const BatchProgressTimeline: React.FC<BatchProgressTimelineProps> = ({ cu
           const isCompleted = idx < currentIndex || currentStage === 'HATCHED' || currentStage === 'COMPLETED';
           const isCurrent = idx === currentIndex && currentStage !== 'HATCHED' && currentStage !== 'COMPLETED';
 
-          let circleStyle = "bg-white text-slate-400 border-slate-300";
+          let circleStyle = "bg-card text-slate-400 border-slate-300";
           if (isCompleted) {
             circleStyle = "bg-[#800000] text-white border-[#800000]";
           } else if (isCurrent) {
-            circleStyle = "bg-white text-[#800000] border-[#800000] ring-4 ring-maroon-100";
+            circleStyle = "bg-card text-brand border-[#800000] ring-4 ring-maroon-100";
           }
 
           return (
             <div key={st.key} className="relative z-10 flex flex-col items-center text-center max-w-[90px]">
               <div
-                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all shadow-xs ${circleStyle}`}
+                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all  ${circleStyle}`}
               >
                 {isCompleted ? <Check className="w-4 h-4" /> : idx + 1}
               </div>
-              <span className="mt-2 text-xs font-bold text-[#0F172A]">
+              <span className="mt-2 text-xs font-bold text-foreground">
                 {st.day}
               </span>
               <span className="text-[11px] font-semibold text-slate-700 leading-tight">

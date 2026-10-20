@@ -3,12 +3,11 @@ import {
   TrendingUp, 
   AlertTriangle, 
   CheckCircle2, 
-  Sparkles, 
+  ChartNoAxesCombined,
   Egg, 
   Coins, 
   ShieldAlert, 
-  Activity,
-  ArrowUpRight
+  Activity
 } from 'lucide-react';
 import { BatchForecastResponse } from '../types';
 
@@ -20,7 +19,7 @@ interface BatchForecastCardProps {
 export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, isLoading = false }) => {
   if (isLoading) {
     return (
-      <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs animate-pulse space-y-4">
+      <div className="bg-card border border-border rounded-xl p-5  space-y-4">
         <div className="h-5 bg-slate-100 rounded w-1/3" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="h-20 bg-slate-50 rounded-lg" />
@@ -38,42 +37,40 @@ export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, 
   const isCritical = forecast.anomaly_status === 'CRITICAL';
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs space-y-4">
+    <div className="bg-card border border-border rounded-xl p-5  space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 text-[#357a38] flex items-center justify-center">
-            <Sparkles className="w-4 h-4" />
-          </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <ChartNoAxesCombined className="w-[18px] h-[18px] text-slate-500 shrink-0" aria-hidden="true" />
           <div>
-            <h3 className="font-bold text-[#0F172A] text-sm flex items-center gap-2">
+            <h3 className="font-bold text-foreground text-sm flex flex-wrap items-center gap-2">
               Day 28 Hatch Yield & Revenue Forecast
-              <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                AI Biological Engine
+              <span className="status-badge status-neutral">
+                Estimate
               </span>
             </h3>
             <p className="text-[11px] text-slate-500">
-              Predictive embryonic viability retention model based on Day 10 candling metrics.
+              Model estimate using saved scans and fixed breed assumptions; not a measured hatch outcome.
             </p>
           </div>
         </div>
 
         {/* Anomaly Badge */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {isOptimal && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-800">
+            <span className="status-badge status-success gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
               Optimal Progression
             </span>
           )}
           {isWarning && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 border border-amber-200 text-amber-800">
+            <span className="status-badge status-warning gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
               Incubation Warning
             </span>
           )}
           {isCritical && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 border border-red-200 text-red-800 animate-pulse">
+            <span className="status-badge status-danger gap-1.5">
               <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
               Critical Anomaly Detected
             </span>
@@ -82,21 +79,20 @@ export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, 
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-3.5">
         {/* Metric 1: Predicted Ducklings */}
         <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-1">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
             <span>Projected Hatched</span>
             <Egg className="w-3.5 h-3.5 text-slate-400" />
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-black text-[#0F172A] tracking-tight">
+          <div className="flex flex-wrap items-baseline gap-1.5">
+            <span className="text-xl font-semibold text-foreground tracking-tight">
               {forecast.predicted_hatched_count.toLocaleString()}
             </span>
             <span className="text-xs text-slate-500 font-semibold">ducklings</span>
           </div>
           <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-0.5">
-            <ArrowUpRight className="w-3 h-3" />
             <span>{forecast.predicted_hatchability_rate}% est. hatchability</span>
           </div>
         </div>
@@ -107,8 +103,8 @@ export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, 
             <span>Detected Fertility</span>
             <Activity className="w-3.5 h-3.5 text-slate-400" />
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-black text-[#0F172A] tracking-tight">
+          <div className="flex flex-wrap items-baseline gap-1.5">
+            <span className="text-xl font-semibold text-foreground tracking-tight">
               {forecast.detected_fertility_rate}%
             </span>
             <span className="text-[11px] text-slate-400">
@@ -123,16 +119,16 @@ export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, 
         {/* Metric 3: Penoy Realized Revenue */}
         <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-1">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Penoy Salvaged (Day 10)</span>
+            <span>Estimated Penoy value</span>
             <Coins className="w-3.5 h-3.5 text-amber-500" />
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-black text-amber-800 tracking-tight">
+          <div className="flex flex-wrap items-baseline gap-1.5">
+            <span className="text-xl font-semibold text-amber-800 tracking-tight">
               ₱{forecast.penoy_realized_revenue_php.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
           </div>
           <div className="text-[11px] text-slate-500">
-            Immediate cash recovery
+            Estimate from classifications or breed assumptions
           </div>
         </div>
 
@@ -142,8 +138,8 @@ export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, 
             <span>Total Forecasted Revenue</span>
             <TrendingUp className="w-3.5 h-3.5 text-emerald-700" />
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-black text-emerald-950 tracking-tight">
+          <div className="flex flex-wrap items-baseline gap-1.5">
+            <span className="text-xl font-semibold text-emerald-950 tracking-tight">
               ₱{forecast.projected_total_revenue_php.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
           </div>
@@ -167,7 +163,7 @@ export const BatchForecastCard: React.FC<BatchForecastCardProps> = ({ forecast, 
           ) : isWarning ? (
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           ) : (
-            <CheckCircle2 className="w-4 h-4 text-[#357a38] shrink-0 mt-0.5" />
+            <CheckCircle2 className="w-4 h-4 text-agri-green shrink-0 mt-0.5" />
           )}
           <div className="space-y-1">
             <span className="font-bold block">Incubation Advisory & Diagnostic Insights:</span>

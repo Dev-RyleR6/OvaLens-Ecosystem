@@ -9,7 +9,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Edge**: resolve camera staleness false abort, port locking, and add batch finish button (2026-10-15)
+- **Edge**: [TASK-NEW-EDGE-SERVO-STARTUP-01] synchronize servo diagnostic serial startup (2026-10-14)
+- **Edge**: [TASK-NEW-EDGE-SERVO-SIMPLE-01] remove IR requirements from servo test (2026-10-14)
+- **Edge**: [TASK-NEW-EDGE-OFFCENTER-01] allow stable off-centre automatic sorting (2026-10-09)
+- **Edge**: [TASK-NEW-EDGE-SESSION-SYNC-01] replay completed sessions and unblock sync (2026-10-09)
+- **Edge**: [TASK-NEW-EDGE-CONFIDENCE-70-01] allow automatic sorting at 70 percent confidence (2026-10-09)
+- **Edge**: [TASK-NEW-EDGE-CAPTURE-SETTLE-01] allow longer settling before egg capture (2026-10-09)
+- **Edge**: [TASK-NEW-EDGE-GATEFIRST-01] position sorting gate before conveyor release (2026-10-09)
+- **Edge**: [TASK-NEW-EDGE-SETUP-01] use camera zero for station defaults (2026-10-08)
+- **Edge**: [TASK-NEW-EDGE-RUNTIME-01] select project Python before loading packages (2026-10-08)
+- **Dashboard**: [TASK-NEW-DASH-CLOSE-06] standardize close buttons across overlays (2026-10-07)
+- **Dashboard**: [TASK-NEW-DASH-STATUS-05] unify incubation status across pages (2026-10-07)
+- **Dashboard**: [TASK-NEW-DASH-CHART-04] align operational charts and badge semantics (2026-10-07)
+- **Dashboard**: [TASK-NEW-DASH-TABLE-03] correct batch table layout and floating actions (2026-10-07)
+- **Dashboard**: [TASK-NEW-DASH-RESP-01] improve responsive layouts and reconcile analytics (2026-10-07)
+- **Dashboard**: [TASK-NEW-DASH-LIVE-01] restore analytics charts and edge app heartbeats (2026-10-07)
+- **Dashboard**: [TASK-NEW-DASH-UX-01] improve operational UX and truthful telemetry (2026-10-07)
+- **Edge**: [TASK-NEW-EDGE-FLOW-01] add single-click diagnostic flow, isolated correlated inference with deadlines, retryable finalization, target completion, consistent controls, and strict session/batch validation (2026-10-06).
+- **Firmware**: [TASK-NEW-FW-DET-01] require sustained confident egg classification (2026-10-02)
+- **Firmware**: [TASK-NEW-FW-CYCLE-01] set default stepper delay to 1000 microseconds (2026-10-02)
+- **Firmware**: [TASK-NEW-FW-CYCLE-01] use 1000-step travel with midpoint servo blocking (2026-10-02)
+- **Firmware**: [TASK-NEW-FW-CYCLE-01] wait for detection readiness and servo settling (2026-10-02)
+- **Firmware**: [TASK-NEW-FW-APP-01] preserve explicit egg/servo port assignments, add the COM5/COM7 hardware launcher, and display deployed controller status replies (2026-10-02).
+
 ### Added
+- **Edge**: [TASK-NEW-EDGE-PREPUSH-01] align native three-board regression assertions and window initialization (2026-10-20)
+- **Edge**: [TASK-NEW-EDGE-SERVO-TEST-01] add standalone COM7 servo diagnostic (2026-10-14)
+- **Edge**: [TASK-NEW-EDGE-STEPPER-TEST-01] add standalone COM5 stepper diagnostic (2026-10-14)
+- **Edge**: [TASK-NEW-EDGE-READINESS-01] prepare and verify station before sorting (2026-10-14)
+- **Edge**: [TASK-NEW-EDGE-BATCH-CREATE-01] create and sync complete batches offline (2026-10-14)
+- **Edge**: [TASK-NEW-EDGE-PAUSE-01] pause and resume active sorting sessions (2026-10-09)
+- **Edge**: [TASK-NEW-EDGE-MANUAL-LIGHT-01] add manual candling light switch (2026-10-09)
+- **Edge**: [TASK-NEW-EDGE-IMAGE-SYNC-01] sync saved scan images to backend (2026-10-09)
+- **Edge**: [TASK-NEW-EDGE-CAMERA-LIVE-01] apply camera preview tweaks live (2026-10-09)
+- **Edge**: [TASK-NEW-EDGE-CAMERA-ALIGN-01] add camera sliders and cradle alignment (2026-10-09)
+- **Edge**: [TASK-NEW-EDGE-CAMERA-PREVIEW-01] tune camera beside live preview (2026-10-09)
+- **Edge**: [TASK-NEW-EDGE-MODEL-V3-01] use verified best_v3 model export (2026-10-09)
+- **Edge**: [TASK-NEW-EDGE-EASYFLOW-01] simplify daily operator workflow (2026-10-09)
+- **Edge**: [TASK-NEW-EDGE-SETUP-01] simplify default station setup (2026-10-08)
+- **Edge**: [TASK-NEW-EDGE-3BOARD-01] integrate three-board candling rig (2026-10-08)
+- **Edge**: [TASK-NEW-EDGE-UI-POLISH-01] improve operator typography and status performance (2026-10-07)
+- **Edge**: [TASK-NEW-EDGE-CONTROL-01] integrate dual-board sorting and camera defaults (2026-10-07)
+- **Dashboard**: [TASK-NEW-DASH-BRAND-02] refresh branding and incubation batch layout (2026-10-07)
+- **Backend**: [TASK-NEW-BE-SCHEMA-01] align database schema contracts for manual reviews and metrics (2026-10-07)
+- **Dashboard**: [TASK-NEW-DASH-LOGO-01] use supplied OvaLens logo (2026-10-07)
+- **Edge**: launch operator app in full screen mode by default (2026-10-07)
+- **Dashboard**: bundle and enforce plus jakarta sans font across all components (2026-10-06)
+- **Edge App & Firmware**: [TASK-EDGE-TRK-01 / TASK-FW-STP-01] engineered event-driven ChamberController FSM, dedicated InferenceWorker thread, StartupConfigWindow pre-operation batch dialog, and ESP32 motor commands (2026-10-05).
+- **Firmware**: [TASK-NEW-FW-CYCLE-01] add automatic stepper camera and servo cycle (2026-10-02)
+- **Firmware**: [TASK-NEW-FW-DET-01] optimize operator workspace and add egg detection (2026-10-02)
+- **Firmware**: [TASK-NEW-FW-APP-01] integrate egg and servo prototype controls (2026-10-02)
 - **Workflow**: establish multi-agent orchestra and cross-agent communication protocols (2026-09-15)
 - **Workflow**: [TASK-DOC-03] integrate automated task checklist and global agent protocol into workflow (2026-09-15)
 - Created `PROJECT_PLAN.md` living task backlog mapped to Design Science Research Methodology (DSRM) and Agile iteration cycles.
@@ -19,6 +70,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added OvaLens Master System Activity Flowchart (`Systemflow_chart_final.drawio` & `.html`) to `docs/diagrams/flowcharts/`.
 - Added Master UML Use Case Diagram (`OvaLens_Use_Case_Diagram.drawio` & `.html`) to `docs/diagrams/use_cases/`.
 - Updated Capstone Manuscript Chapters 1, 2, 3, and References in `docs/manuscript/` with authentic proposal text and 15 APA 7th academic citations.
+
+### Changed
+- **Edge**: [TASK-NEW-EDGE-STOPSCAN-01] classify only confirmed stopped eggs (2026-10-09)
+- **Firmware**: [TASK-NEW-FW-INSTALL-01] install and verify three-board v3 builds (2026-10-08)
+- **Edge**: [TASK-NEW-EDGE-DESIGN-02] focus operator design on camera and sorting (2026-10-07)
+- **Dashboard**: [TASK-NEW-DASH-DESIGN-01] replace Plus Jakarta Sans with self-hosted IBM Plex Sans; unify controls, status badges, navigation and purposeful icons; adapt cards, tables and forms to available width; improve keyboard interactions, authenticated backup downloads and truthful candling records; preserve local batch-date instants and distinguish pending review from low confidence (2026-10-07).
+- **Agents**: [TASK-NEW-AGENTS-IGNORE-01] ignore local AI tooling and unused logo copy (2026-10-07)
+- **Dashboard**: improve ui/ux responsiveness and eliminate ai slop (2026-10-06)
+- **Dashboard**: streamline web app into defense-ready 5-page portal; consolidate historical records into Batches and Analytics, prune mock MLOps ModelsPage and redundant AuditLogsPage, remove synthetic 42-slot tray matrix in favor of linear conveyor velocity telemetry, eliminate audio beeps, and convert financial simulator into data-driven Day 10 economic recovery model (2026-10-06).
+- **System scope**: [TASK-NEW-SCOPE-01] standardize OvaLens on Day 10 candling with the strict `FERTILE`/`INFERTILE` class contract across backend, edge, dashboard, firmware, tests, and documentation (2026-09-30).
+- **Data compatibility**: add one-way PostgreSQL and automatic edge SQLite migration paths that merge legacy `ABNORMAL` outcomes into `INFERTILE` before removing obsolete stages and counters (2026-09-30).
 
 ---
 

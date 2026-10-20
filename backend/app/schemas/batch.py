@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from app.models.batch import DuckBreed, BatchStage, BatchStatus
 
 
@@ -12,6 +12,36 @@ class BatchCreate(BaseModel):
     initial_egg_count: int = Field(..., gt=0)
     set_date: datetime
     notes: Optional[str] = None
+
+
+class EdgeBatchRegister(BatchCreate):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+    batch_id: str = Field(..., min_length=1, max_length=64)
+    device_id: str = Field(..., min_length=1, max_length=64)
+    operator_name: str = Field(..., min_length=1, max_length=100)
+    initial_egg_count: int = Field(..., gt=0, le=1000000, strict=True)
+    notes: Optional[str] = Field(None, max_length=2000)
+
+    @field_validator("batch_id", "batch_code", "incubator_id", "device_id", "operator_name", mode="before")
+    @classmethod
+    def nonblank(cls, value):
+        if not isinstance(value, str):
+            return value
+        value = value.strip()
+        if not value:
+            raise ValueError("Must not be blank")
+        return value
+
+    @field_validator("set_date")
+    @classmethod
+    def actual_set_date(cls, value):
+        if value.tzinfo is None:
+            raise ValueError("Set date must include its timezone")
+        from datetime import timezone, timedelta
+        farm_zone = timezone(timedelta(hours=8))
+        if value.astimezone(farm_zone).date() > datetime.now(farm_zone).date():
+            raise ValueError("Incubation set date cannot be in the future")
+        return value
 
 
 class BatchUpdate(BaseModel):
@@ -63,7 +93,7 @@ class BatchSummaryResponse(BaseModel):
     total_scanned: int = 0
     fertile_count: int = 0
     infertile_count: int = 0
-    abnormal_count: int = 0
+    manual_review_count: int = 0
     fertility_rate: float = 0.0
     hatchability_rate: float = 0.0
     notes: Optional[str] = None
@@ -85,7 +115,7 @@ class SessionSummaryItem(BaseModel):
     total_scanned: int
     fertile_count: int
     infertile_count: int
-    abnormal_count: int
+    manual_review_count: int = 0
     fertility_rate: float
     avg_inference_ms: float
 
@@ -106,7 +136,7 @@ class BatchAnalyticsResponse(BaseModel):
     total_scanned_day_10: int
     fertile_day_10: int
     infertile_penoy_day_10: int
-    abnormal_day_10: int
+    manual_review_day_10: int = 0
     day_10_fertility_rate: float
     
     # Financial Salvage
@@ -159,4 +189,3 @@ class BatchForecastResponse(BaseModel):
     anomaly_status: str  # OPTIMAL | WARNING | CRITICAL
     confidence_level: str  # HIGH | MEDIUM | LOW
     advisory_notes: List[str]
-

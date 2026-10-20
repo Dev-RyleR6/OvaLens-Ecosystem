@@ -1,9 +1,9 @@
 export type DuckBreed = 'KAYUMANGGI' | 'ITIM' | 'KHAKI';
-export type BatchStage = 'SETTING' | 'DAY_10' | 'DAY_18' | 'DAY_25' | 'HATCHED' | 'COMPLETED';
-export type BatchStatus = 'INCUBATING' | 'COMPLETED' | 'CANCELLED';
-export type FertilityClass = 'FERTILE' | 'INFERTILE' | 'ABNORMAL';
-export type RoutingAction = 'ACCEPT' | 'REJECT';
-export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
+export type BatchStage = 'SETTING' | 'DAY_10' | 'HATCHED' | 'COMPLETED';
+export type BatchStatus = 'INCUBATING' | 'CANDLING_DUE' | 'COMPLETED' | 'ARCHIVED';
+export type FertilityClass = 'FERTILE' | 'INFERTILE';
+export type RoutingAction = 'ACCEPT' | 'REJECT' | 'MANUAL_REVIEW';
+export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'SCANNING' | 'ERROR';
 export type UserRole = 'ADMIN' | 'MANAGER' | 'OPERATOR';
 
 export interface LoginCredentials {
@@ -47,7 +47,7 @@ export interface BatchSummary extends Batch {
   total_scanned: number;
   fertile_count: number;
   infertile_count: number;
-  abnormal_count: number;
+  manual_review_count?: number;
   fertility_rate: number;
   hatchability_rate: number;
   elapsed_days?: number;
@@ -62,7 +62,7 @@ export interface SessionSummaryItem {
   total_scanned: number;
   fertile_count: number;
   infertile_count: number;
-  abnormal_count: number;
+  manual_review_count?: number;
   fertility_rate: number;
   avg_inference_ms: number;
 }
@@ -81,7 +81,7 @@ export interface BatchAnalyticsResponse {
   total_scanned_day_10: number;
   fertile_day_10: number;
   infertile_penoy_day_10: number;
-  abnormal_day_10: number;
+  manual_review_day_10?: number;
   day_10_fertility_rate: number;
   penoy_salvage_value_php: number;
   electricity_saved_php: number;
@@ -98,31 +98,26 @@ export interface FinalizeHatchPayload {
   notes?: string;
 }
 
-export interface StageMortalityItem {
+export interface Day10OutcomeItem {
   stage_name: string;
   day_marker: number;
-  culled_count: number;
+  infertile_count: number;
   cull_rate_percentage: number;
   description: string;
 }
 
-export interface BreedMortalityProgression {
+export interface BreedDay10Outcome {
   breed: string;
   initial_eggs: number;
   day_10_infertile_penoy: number;
-  day_10_early_dead: number;
-  day_18_mid_dead: number;
-  day_25_late_dead: number;
   hatched_ducklings: number;
-  early_mortality_rate: number;
-  mid_mortality_rate: number;
-  late_mortality_rate: number;
+  day_10_cull_rate: number;
   final_hatchability_rate: number;
 }
 
 export interface MortalityProgressionResponse {
-  overall_stages: StageMortalityItem[];
-  breed_breakdown: BreedMortalityProgression[];
+  day_10_outcome: Day10OutcomeItem;
+  breed_breakdown: BreedDay10Outcome[];
 }
 
 export interface MilestoneCheckResponse {
@@ -162,14 +157,14 @@ export interface CandlingSession {
   session_id: string;
   batch_id: string;
   device_id: string;
-  stage: 'DAY_10' | 'DAY_18' | 'DAY_25';
+  stage: 'DAY_10';
   operator_name: string;
   started_at: string;
   ended_at?: string;
   total_scanned: number;
   fertile_count: number;
   infertile_count: number;
-  abnormal_count: number;
+  manual_review_count?: number;
   avg_inference_ms: number;
   created_at: string;
 }
@@ -183,13 +178,38 @@ export interface EggScan {
   confidence: number;
   inference_ms: number;
   routing_action: RoutingAction;
+  cradle_index?: number;
+  aspect_ratio?: number;
+  vascular_index?: number;
+  is_overridden?: boolean;
+  override_reason?: string;
+  overridden_at?: string;
   thumbnail_url?: string;
+  image_url?: string;
   detections: Array<{
     bbox: number[];
     confidence: number;
     class: string;
   }>;
   scanned_at: string;
+}
+
+export interface ScanPage {
+  items: EggScan[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface ScanSearchParams {
+  batch_id?: string;
+  final_class?: FertilityClass;
+  confidence?: 'ALL' | 'HIGH' | 'MID' | 'LOW' | 'REVIEW';
+  q?: string;
+  sort?: 'sequence_number' | 'confidence' | 'inference_ms' | 'scanned_at';
+  order?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
 }
 
 export interface Device {
@@ -210,10 +230,12 @@ export interface AnalyticsOverview {
   total_eggs_scanned: number;
   total_fertile: number;
   total_infertile: number;
-  total_abnormal: number;
   overall_fertility_rate: number;
   active_batches_count: number;
-  avg_inference_ms: number;
+  day_10_cull_rate: number;
+  total_hatched_ducklings: number;
+  overall_hatchability_rate: number;
+  average_inference_latency_ms: number;
 }
 
 export interface EconomicYield {
@@ -230,9 +252,7 @@ export interface EconomicYield {
 }
 
 export interface MortalityTrends {
-  day_10_early_mortality_rate: number;
-  day_18_mid_mortality_rate: number;
-  day_25_late_mortality_rate: number;
+  day_10_cull_rate: number;
   total_culled_eggs: number;
 }
 
@@ -241,7 +261,6 @@ export interface BreedMetricItem {
   total_eggs: number;
   fertile_count: number;
   infertile_count: number;
-  abnormal_count: number;
   fertility_rate: number;
   hatched_count: number;
   hatchability_rate: number;
@@ -306,7 +325,6 @@ export interface ModelOpsSummary {
   dataset_distribution: {
     fertile: number;
     infertile: number;
-    abnormal: number;
   };
   overall_map50: number;
   overall_precision: number;

@@ -72,8 +72,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 - [x] **TASK-AI-OPT-02**: Production Weights Verified (`edge/models/weights/best.onnx` ready for runtime execution)
 - [x] **TASK-AI-LAT-01**: Edge Inference Latency Benchmark (Enforce `<= 200 ms` SLA constraint on target hardware)
 - [ ] **TASK-AI-EVL-01**: Breed Subgroup Metric Evaluator (Compute Precision, Recall, F1, mAP for IP-Itim vs IP-Khaki vs IP-Kayumanggi)
-- [ ] **TASK-AI-EVL-02**: Stage Subgroup Metric Evaluator (Compute Precision, Recall, F1, mAP across Day 10, Day 18, Day 25)
-- [ ] **TASK-AI-EVL-03**: 3-Class Confusion Matrix & ROC Generator (Generate formal confusion matrix and curves for Chapter 4)
+- [ ] **TASK-AI-EVL-02**: Day 10 Breed/Batch Subgroup Metric Evaluator (Compute Precision, Recall, F1, and mAP across Day 10 cohorts)
+- [ ] **TASK-AI-EVL-03**: 2-Class Confusion Matrix & PR Curve Generator (Generate the Fertile/Infertile evaluation artifacts for Chapter 4)
 
 ---
 
@@ -82,11 +82,10 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 - [x] **TASK-FW-INT-02**: 600ms Hardware Optical Debounce Lockout (Non-blocking timer lockout preventing false double-triggers)
 - [x] **TASK-FW-LED-01**: Candling Strobe LED Driver Relay (GPIO 19 strobe trigger synchronized with camera exposure)
 - [x] **TASK-FW-SER-01**: Non-Blocking Serial UART Command Parser (Buffer incoming 115200 baud UART bytes without `delay()` calls)
-- [ ] **TASK-FW-SER-02**: Serial ACK / NACK Status Protocol (Transmit acknowledgement packets upon command execution to edge driver)
-- [ ] **TASK-FW-STP-01**: Stepper Pocket-Conveyor Transport Routine (Indexed step timing to advance pocket conveyor one cradle at a time)
+- [x] **TASK-FW-SER-02**: Serial ACK / NACK Status Protocol (Transmit acknowledgement packets upon command execution to edge driver)
+- [x] **TASK-FW-STP-01**: Stepper Pocket-Conveyor Transport Routine (Indexed step timing to advance pocket conveyor one cradle at a time: `CMD:MOTOR:START/STOP/STEP`)
 - [x] **TASK-FW-SRV-01**: Servo Gate 1 - Fertile Release (Actuate servo diverter for Fertile eggs into cushioned incubation tray)
 - [ ] **TASK-FW-SRV-02**: Servo Gate 2 - Infertile / Penoy Salvage (Actuate servo diverter for Day 10 Penoy salvage sale @ ₱14.00)
-- [ ] **TASK-FW-SRV-03**: Servo Gate 3 - Abnormal Discard (Actuate servo diverter to cull dead/bursting embryos to waste bin)
 - [x] **TASK-FW-KIN-01**: Kinematic Actuation Delay Timer ($\Delta t = D / v = 25\text{ cm} / 12.5\text{ cm/s} = 2,000\text{ ms}$ delay before servo firing)
 
 ---
@@ -105,13 +104,13 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 - [x] **TASK-EDGE-SYN-02**: Local CSV Session Exporter (Emergency offline CSV exporter saving session records to local USB drive)
 - [x] **TASK-EDGE-SER-01**: PySerial ESP32 UART Driver (Thread 3: Non-blocking serial worker communicating at 115200 baud)
 - [x] **TASK-EDGE-SER-02**: Serial Mock Driver for Hardware-Free Dev (Simulate ESP32 optical triggers and servo responses in unit tests)
-- [ ] **TASK-EDGE-TRK-01**: Cradle Tracking FIFO Queue (Maintain cradle queue mapping `cradle_id` from image station to sorting gate)
-- [ ] **TASK-EDGE-TRK-02**: Conveyor Index Resynchronization Handler (Pause conveyor and alert operator if physical cradle index drifts)
-- [ ] **TASK-EDGE-REV-01**: Manual Review Fallback State Machine (Trigger manual review flag when confidence $< 0.75$ or egg uncentered)
+- [x] **TASK-EDGE-TRK-01**: Cradle Tracking FIFO Queue (Maintain cradle queue mapping `cradle_id` from image station to sorting gate)
+- [x] **TASK-EDGE-TRK-02**: Conveyor Index Resynchronization Handler (Pause conveyor and alert operator if physical cradle index drifts)
+- [x] **TASK-EDGE-REV-01**: Manual Review Fallback State Machine (Trigger manual review flag when confidence $< 0.75$ or egg uncentered)
 - [x] **TASK-EDGE-UI-01**: CustomTkinter 60 FPS Operator Desktop UI (Main Thread: CustomTkinter operator GUI with Foundation University theme)
 - [x] **TASK-EDGE-UI-02**: Live Candling Video Viewport (Smooth video rendering canvas with overlay bounding box and class tag)
-- [x] **TASK-EDGE-UI-03**: Real-Time Session Statistics Counters (Live counters for Fertile, Infertile, Abnormal, and Manual Review count)
-- [ ] **TASK-EDGE-UI-04**: Interactive Manual Override Dialog Modal (Modal popup enabling operator to inspect flagged egg and confirm class)
+- [x] **TASK-EDGE-UI-03**: Real-Time Session Statistics Counters (Live counters for Fertile, Infertile, and Manual Review)
+- [x] **TASK-EDGE-UI-04**: Interactive Manual Override Dialog Modal (Modal popup enabling operator to inspect flagged egg and confirm class)
 - [x] **TASK-EDGE-UI-05**: Conveyor Pause & Emergency Stop Controls (Instant physical rig pause and serial E-STOP command dispatch)
 
 ---
@@ -133,9 +132,9 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 - [x] **TASK-BE-BAT-03**: `POST /api/v1/batches` (Create new incubation batch specifying breed: Itim/Khaki/Kayumanggi and egg count)
 - [x] **TASK-BE-BAT-04**: `GET /api/v1/batches/{id}` (Get detailed batch record with tray matrix slots and current milestone)
 - [x] **TASK-BE-BAT-05**: `GET /api/v1/batches/{id}/analytics` (Incubation analytics: fertility rate, mortality curve, penoy salvage total)
-- [x] **TASK-BE-BAT-06**: `GET /api/v1/batches/{id}/forecast` (Hatch yield forecast calculation based on Day 10 and Day 18 viability rates)
+- [x] **TASK-BE-BAT-06**: `GET /api/v1/batches/{id}/forecast` (Hatch yield forecast based on the Day 10 fertility rate)
 - [x] **TASK-BE-BAT-07**: `PUT /api/v1/batches/{id}` (Update batch metadata, notes, and incubator chamber ID)
-- [x] **TASK-BE-BAT-08**: `POST /api/v1/batches/{id}/advance-stage` (Advance batch milestone: Day 10 -> Day 18 -> Day 25)
+- [x] **TASK-BE-BAT-08**: `POST /api/v1/batches/{id}/advance-stage` (Advance batch lifecycle: Setting -> Day 10 -> Hatched -> Completed)
 - [x] **TASK-BE-BAT-09**: `POST /api/v1/batches/{id}/finalize-hatch` (Close batch lifecycle and record final hatchling count on Day 28)
 - [x] **TASK-BE-BAT-10**: `GET /api/v1/batches/{id}/summary` (Comprehensive batch summary DTO for compliance and audit archiving)
 - [x] **TASK-BE-BAT-11**: `DELETE /api/v1/batches/{id}` (Soft-delete or purge batch; Admin only protection)
@@ -144,7 +143,7 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 #### Candling Sessions & Scan Ingestion
 - [x] **TASK-BE-SES-01**: `GET /api/v1/sessions` (List all active and completed edge candling sorting sessions)
 - [x] **TASK-BE-SES-02**: `POST /api/v1/sessions` (Start new candling session linked to batch and edge sorter device ID)
-- [x] **TASK-BE-SES-03**: `GET /api/v1/sessions/{id}` (Get session progress: total eggs candled, fertile, infertile, abnormal counts)
+- [x] **TASK-BE-SES-03**: `GET /api/v1/sessions/{id}` (Get Day 10 session progress: total, fertile, and infertile counts)
 - [x] **TASK-BE-SES-04**: `PUT /api/v1/sessions/{id}/end` (Conclude candling session and trigger batch analytics recalculation)
 - [x] **TASK-BE-SCN-01**: `POST /api/v1/scans/sync` (Idempotent batch scan sync with `ON CONFLICT (scan_id) DO NOTHING`)
 - [x] **TASK-BE-SCN-02**: `POST /api/v1/scans/upload-image` (Upload high-res candling frame image associated with scan ID)
@@ -156,7 +155,7 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 - [x] **TASK-BE-ANL-01**: `GET /api/v1/analytics/overview` (Aggregated hatchery statistics: total eggs, fertility rate, cull rate)
 - [x] **TASK-BE-ANL-02**: `GET /api/v1/analytics/breed-comparison` (Disaggregated analytics comparing IP-Itim vs IP-Khaki vs IP-Kayumanggi)
 - [x] **TASK-BE-ANL-03**: `GET /api/v1/analytics/mortality-trends` (Longitudinal mortality tracking across batches and candling stages)
-- [x] **TASK-BE-ANL-04**: `GET /api/v1/analytics/mortality-progression` (Progressive loss analysis from Day 10 to Day 18 to Day 25)
+- [x] **TASK-BE-ANL-04**: `GET /api/v1/analytics/mortality-progression` (Day 10 cull analysis by breed)
 - [x] **TASK-BE-ANL-05**: `GET /api/v1/analytics/economic-yield` (Day 10 Penoy salvage revenue: `Count * ₱14.00` & thermal energy savings)
 - [x] **TASK-BE-REP-01**: `GET /api/v1/reports/batch/{id}/csv` (Export CSV spreadsheet containing detailed scan log for batch)
 - [x] **TASK-BE-REP-02**: `GET /api/v1/reports/batch/{id}/pdf` (Generate official Foundation University formatted PDF compliance report)
@@ -176,21 +175,21 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 #### Pages & Workspaces
 - [x] **TASK-DASH-PG-01**: `LoginPage.tsx` (Login view with Foundation University maroon branding and token persistence)
 - [x] **TASK-DASH-PG-02**: `OverviewPage.tsx` (Real-time KPI summary cards of active batches, fertility %, and sorting volume)
-- [x] **TASK-DASH-PG-03**: `BatchesPage.tsx` (Table of all batches, stage advancement modal Day 10/18/25, hatch closure)
+- [x] **TASK-DASH-PG-03**: `BatchesPage.tsx` (Table of all batches, Day 10 stage advancement, and hatch closure)
 - [x] **TASK-DASH-PG-04**: `ScanExplorerPage.tsx` (Filterable grid of historical scan captures with image lightbox inspection)
 - [x] **TASK-DASH-PG-05**: `AnalyticsPage.tsx` (Recharts visualizer for mortality curves, breed comparisons, Penoy revenue)
-- [x] **TASK-DASH-PG-06**: `RecordsPage.tsx` (Historical scan and session records table with one-click CSV/PDF download)
+- [x] **TASK-DASH-PG-06**: `RecordsPage.tsx` (Consolidated into Batches and Analytics pages)
 - [x] **TASK-DASH-PG-07**: `DevicesPage.tsx` (Live cards showing connected Raspberry Pi and ESP32 sorter rigs)
-- [x] **TASK-DASH-PG-08**: `ModelsPage.tsx` (View deployed YOLOv8 ONNX model version, latency benchmarks, thresholds)
+- [x] **TASK-DASH-PG-08**: `ModelsPage.tsx` (Pruned; models managed offline with ONNX FP16 edge deployment)
 - [x] **TASK-DASH-PG-09**: `UsersPage.tsx` (Admin table for managing operator, supervisor, and administrator accounts)
-- [x] **TASK-DASH-PG-10**: `AuditLogsPage.tsx` (Chronological table of all system events, login attempts, and overrides)
+- [x] **TASK-DASH-PG-10**: `AuditLogsPage.tsx` (Pruned redundant security audit trail to streamline hatchery operations)
 - [x] **TASK-DASH-PG-11**: `SettingsPage.tsx` (Configure Penoy price ₱14, confidence thresholds, and DB backup downloads)
 
 #### Reusable UI Widgets & System Tokens
-- [x] **TASK-DASH-CP-01**: Incubation Tray Matrix 42 Slots ($A1 \to F7$) (Interactive SVG grid showing slot occupancy and status)
-- [x] **TASK-DASH-CP-02**: Interactive Penoy Economic Calculator (Widget computing Day 10 salvage income based on ₱14.00/egg price)
+- [x] **TASK-DASH-CP-01**: Linear Conveyor Telemetry (Real sorting throughput pace replacing synthetic 42-slot tray simulation)
+- [x] **TASK-DASH-CP-02**: Day-10 Penoy Economic Recovery Model (Backend-driven economic recovery model replacing manual slider simulator)
 - [x] **TASK-DASH-CP-03**: Breed Filter Dropdown (Dropdown to isolate metrics by `IP-Itim`, `IP-Khaki`, `IP-Kayumanggi`)
-- [x] **TASK-DASH-CP-04**: Milestone Filter Toggle (Toggle to filter analysis by candling milestone: `Day 10`, `Day 18`, `Day 25`)
+- [x] **TASK-DASH-CP-04**: Day 10 Candling Filter Toggle
 - [x] **TASK-DASH-CP-05**: Dark / Light Mode Theme System (TailwindCSS theme switcher with FU Maroon `#800000` accents)
 
 ---
@@ -217,10 +216,100 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-PREPUSH-01**: Verify the accumulated feature branch before publishing, align native three-board regression assertions with the 50-degree reject preset and three-second watchdog measured from the latest command, and initialize the native camera test window before shutdown.
+- [ ] **TASK-NEW-EDGE-LIGHT-TEST-01**: Add a simple standalone COM9-only light on/off diagnostic with bounded duration, v3 identity and output confirmation, synchronized serial boot and off/stop cleanup; verify without physical hardware.
+
+- [x] **TASK-NEW-EDGE-SERVO-STARTUP-01**: Synchronize the standalone COM7 servo diagnostic after ESP32 boot before identifying the controller; discard only startup input, terminate any partial command, retain fatal runtime errors and verify cleanup without physical hardware.
+
+- [x] **TASK-NEW-EDGE-SERVO-SIMPLE-01**: Simplify the COM7 servo diagnostic to a visible 90/120/90 test independent of IR presence/readings and egg-cycle state, retaining controller identity, bounded angles, held pause and cleanup; verify without physical hardware.
+
+- [x] **TASK-NEW-EDGE-SERVO-TEST-01**: Provide a separate COM7 servo diagnostic with a bounded angle sequence, clear-path confirmation before connection, v3 identity and completion checks, held conveyor pause, and error/Ctrl+C cleanup; verify with simulated serial hardware without opening physical ports.
+
+- [x] **TASK-NEW-EDGE-STEPPER-TEST-01**: Provide a standalone COM5 stepper diagnostic with bounded slow jogs, versioned role verification, pause-interlock enforcement, position/completion checks and stop/close cleanup; verify with simulated serial hardware without accessing the physical rig.
+
+- [x] **TASK-NEW-EDGE-READINESS-01**: Separate empty-conveyor preparation from final Start, expose configuration/camera/model/storage/IoT readiness, recheck and invalidate stale preparation, retain offline operation and explicit fault recovery, and verify cancellation and native controls without hardware.
+
+- [x] **TASK-NEW-EDGE-BATCH-CREATE-01**: Implement worker-led offline batch creation with complete SQLite records, stable IDs, cached selection and remembered defaults; register batches idempotently before sessions/scans, report conflicts, repair legacy missing metadata without reassigning evidence, and verify worker permissions, retry ordering and native setup controls without hardware.
+
+- [x] **TASK-NEW-EDGE-OFFCENTER-01**: Permit stable single-egg automatic sorting anywhere in the camera frame at the configured confidence threshold; remove the fixed central-position veto while retaining geometry validation, fresh agreeing captures, durable scan evidence and confirmed gate-before-release ordering. Replay the recorded off-centre capture with simulated hardware.
+
+- [x] **TASK-NEW-EDGE-SESSION-SYNC-01**: Diagnose missing dashboard batches, replay completed session timestamps durably after scan acknowledgements, report missing batches explicitly, prevent one blocked session from starving other scans, and refresh/display candling completion in the dashboard. Preserve pending evidence and verify offline/restart recovery without hardware.
+
+- [x] **TASK-NEW-EDGE-CONFIDENCE-70-01**: Lower automatic sorting defaults, minimum and this station's saved threshold to 0.70; retain stopped evidence and review below the configured threshold, permit durable 70% decisions and align synced review metrics/filtering with explicit review actions. Verify boundaries, persistence and backend counts without hardware.
+
+- [x] **TASK-NEW-EDGE-PAUSE-01**: Pause and resume an active three-board sorting session at a stopped boundary, preserving durable scans, counts, holder positions and gate state while the app stays open; verify hold/resume checks and native operator controls without hardware.
+
+- [x] **TASK-NEW-EDGE-MANUAL-LIGHT-01**: Add a visible manual candling light switch with confirmed board state, lamp-only connection, automatic-mode locks, watchdog renewal, STOP/shutdown cancellation and hardware-free operator tests.
+
+- [x] **TASK-NEW-EDGE-IMAGE-SYNC-01**: Save paired scan photos locally and synchronize them through a durable independent image outbox; verify retry acknowledgements, backend JPEG storage, scan history image routing and persistent container storage without hardware.
+
+- [x] **TASK-NEW-EDGE-CAMERA-LIVE-01**: Apply camera edits live with bounded latest-value coalescing, responsive controls, separate persistence, continuous preview frames and cancellation around cradle work, STOP and panel shutdown; verify with fake camera/board adapters.
+
+- [x] **TASK-NEW-EDGE-CAMERA-ALIGN-01**: Add camera-value sliders with editable saved spans and idle cradle alignment controls; bound each stepper jog, restore hardware pause, preserve STOP cancellation and verify with fake devices and native UI.
+
+- [x] **TASK-NEW-EDGE-CAMERA-PREVIEW-01**: Add an idle camera-control panel beside live preview with autofocus, exposure, gain, white balance and image controls; background camera-only application, driver readback, saved defaults, operation locks and fake-device/native UI verification.
+
+- [x] **TASK-NEW-EDGE-MODEL-V3-01**: Export the supplied best_v3.pt to a verified two-class ONNX detector, prefer the installed v3 export while preserving explicit model overrides and the prior export, and verify offline predictions, provenance and latency without hardware.
+
+- [x] **TASK-NEW-EDGE-CAPTURE-SETTLE-01**: Increase three-board pre-capture settling to 1500ms after lamp confirmation, retain saved custom timing and confidence checks, and verify settle-before-drain/inference plus cancellation with fake hardware. Physical blur improvement remains to be observed.
+
+- [x] **TASK-NEW-EDGE-EASYFLOW-01**: Combine remembered station discovery, inspection, preparation and start; keep camera preview ready, provide clear feeding instructions, tuck diagnostics into Tools, finalize completed batches inline, and reduce the default display hold while retaining stopped evidence and servo release checks.
+
+- [x] **TASK-NEW-EDGE-GATEFIRST-01**: Position the three-board sorting servo immediately after a durable classification and await completion before conveyor release; retain the gate through passage, reject conflicting early arrivals, and verify command ordering and failures with simulated boards.
+
+- [x] **TASK-NEW-EDGE-STOPSCAN-01**: Keep the camera preview live while restricting AI to confirmed stationary captures; collect three agreeing frames across 300ms, pair overlays and saved evidence with their exact frames, clear before movement, and verify cancellation/manual review with simulated hardware.
+
+- [x] **TASK-NEW-FW-INSTALL-01**: Install and verify the three-board v3 firmware on the confirmed COM5 conveyor, COM7 egg controller and COM9 light controller after explicit user authorization with the conveyor empty. Confirm versioned identities and stopped/paused/lamp-off telemetry; physical sorting and calibration remain separate acceptance work.
+
+- [x] **TASK-NEW-EDGE-RUNTIME-01**: Make the normal launcher prefer the project Python environment before importing dependencies, add a double-click Windows launcher and hardware-free runtime check, and prevent the shared serial package from masking PySerial.
+
+- [x] **TASK-NEW-EDGE-SETUP-01**: Simplify three-board station setup with remembered COM5 stepper, COM7 egg/servo/IR and COM9 light defaults, automatic role detection, a main-screen empty-conveyor preparation action, cancellation and software-only verification.
+
+- [x] **TASK-NEW-EDGE-3BOARD-01**: Integrate the three-ESP32 handoff rig with versioned serial discovery, hardware pause, candling light, fresh camera capture, position-tracked routing, durable scan evidence, manual review, explicit recovery, operator settings, firmware behavior tests, and offline integration verification. Physical flashing and rig acceptance are tracked separately in docs/EDGE_THREE_BOARD_IMPLEMENTATION.md.
+
+- [x] **TASK-NEW-DASH-BRAND-02**: Use the final OvaLens SVG, introduce FU maroon navigation, and improve incubation batch layout, readable sizing, filters, and responsive cards.
+
+- [x] **TASK-NEW-DASH-TABLE-03**: Fix batch action menu row expansion, text encoding, duplicate status labels, and wide-screen workspace alignment; verify keyboard and responsive behavior.
+
+- [x] **TASK-NEW-DASH-CHART-04**: Verify plotted counts against persisted scans, align paired chart categories and scales, show zero-scan rows and numeric values, and unify role and routine stage badge styling.
+
+- [x] **TASK-NEW-DASH-STATUS-05**: Use the shared incubation status display in the overview schedule and batches workspace, including matching column labels and due/checkpoint presentation.
+
+- [x] **TASK-NEW-DASH-CLOSE-06**: Standardize icon close buttons across dialogs, drawers, custom modals, and mobile navigation while preserving pending-action guards and accessible labels.
+
 These features can be claimed by any agent using `python scripts/verify_and_commit.py --task <ID>`:
 
+- [x] **TASK-NEW-DASH-DESIGN-01**: Unify dashboard typography with self-hosted IBM Plex Sans, normalize shared controls and meaningful iconography, and improve responsive operational pages, navigation, and dialogs. Dashboard regression tests/build and the monorepo verify-only gate pass; browser checks cover 320/768/1280px layouts, view switching, keyboard menus, theme persistence, and short-screen dialogs. Screenshot-based visual and print acceptance remain unverified because the selected provider cannot read images. Unrelated workspace changes preserved.
+
+- [x] **TASK-NEW-DASH-RESP-01**: Fix responsive charts, badges, tables and page consistency; reconcile analytics with persisted scan records and clearly scope financial estimates and repeated scans.
+
+- [x] **TASK-NEW-AGENTS-IGNORE-01**: Ignore local Codex and Impeccable installations/integration files and the unused raster logo copy while preserving shared repository skills and CI workflows.
+
+- [x] **TASK-NEW-DASH-LIVE-01**: Restore operational analytics charts and discoverable Analytics navigation; wire independent edge device heartbeats and continuous dashboard availability checks.
+
+- [x] **TASK-NEW-DASH-UX-01**: Correct dashboard telemetry and scan-history filtering/pagination, harden keyboard access and save feedback, connect display preferences, and refine the hatchery interface for readable daily operations.
+
+- [x] **TASK-NEW-DASH-LOGO-01**: Use the supplied OvaLens SVG in the dashboard navigation, login header, and browser favicon, with trimmed empty margins for readable small-size branding.
+
+- [ ] **TASK-NEW-EDGE-FLOW-01**: Improve manual diagnostic flow with visible operator states, single-click fresh-frame capture, correlated dedicated inference and deadlines, retryable session finalization, diagnostic target completion, strict batch validation, and session/batch write guards. Automatic hardware sorting remains a separate integration task.
+
+- [ ] **TASK-NEW-EDGE-AUDIT-01**: Audit the main edge operator flow; harden camera/model failures, background UI dispatch, durable scan counters, cancellation, shutdown, CSV exports, and sync acknowledgements; disable incompatible legacy motion. Software regression checks recorded in docs/OVALENS_EDGE_OPERATION_AUDIT.md; automatic sorting remains pending dual-board integration and physical validation.
+
+- [x] **TASK-NEW-FW-CYCLE-01**: Add a repeatable COM5 stepper / COM7 servo integration cycle with configurable travel, stopped camera capture, persisted classification or detection blocking, feedback-driven movement, and timeout/manual-review recovery
+- [x] **TASK-NEW-FW-DET-01**: Optimize the hardware prototype workspace and integrate real camera egg detection, Day 10 classification, local WAL scan recording, and optical trigger visibility
+- [x] **TASK-NEW-FW-APP-01**: Unified CustomTkinter edge prototype for the egg conveyor and servo controllers, with independent serial workers, calibration, shared controls, and explicit hardware-free simulation
+- [ ] **TASK-NEW-EDGE-START-01**: Fix startup configuration window's unsupported Tk color and verify real hidden-window construction without hardware. Fix and GUI regression test complete; automated commit gate blocked by local test-environment access restrictions.
+- [ ] **TASK-NEW-FW-SAFE-01**: Harden dual sensorless ESP32 sketches with correlated commands, latched recovery, no-home stopping, heartbeat watchdogs, configurable servo neutral, and native firmware behavior tests. Implementation and 21 native tests complete; full verification gate awaits running PostgreSQL; rig validation pending.
+- [ ] **TASK-NEW-EDGE-POS-SPEC-01**: Revise the two-ESP32 spaced-holder position-based operation specification and audit database migration requirements; software/hardware implementation remains separate
+- [x] **TASK-NEW-EDGE-CONTROL-01**: Integrate dual v2 ESP32 control with chamber IR stopping, tracked holders, durable scan evidence, idle camera/AI defaults and prioritized inference. Links TASK-NEW-FW-SAFE-01 and TASK-NEW-EDGE-POS-SPEC-01. Physical identification, firmware upload and rig bench validation remain required.
 - [ ] **TASK-NEW-WS-01**: Edge-to-Dashboard WebSocket Live Stream (`ws://localhost:8000/ws/live-feed` for real-time remote candling monitor)
 - [ ] **TASK-NEW-ZIP-01**: Bulk Dataset Zip Exporter (`GET /api/v1/batches/{id}/export-dataset` to package images + YOLO annotations)
 - [ ] **TASK-NEW-SMS-01**: Hatchery Supervisor SMS / Email Alerts (Notify supervisor when Day 10 penoy count exceeds 40% cull threshold)
 - [ ] **TASK-NEW-QR-01**: Incubation Tray QR Code Generator & Scanner (Print QR label for physical 42-egg incubation trays)
 - [ ] **TASK-NEW-LANE-01**: Multi-Lane Conveyor Scaling Support (Extend firmware and edge tracker from 1 lane to 4 parallel candling lanes)
+- [x] **TASK-NEW-SCOPE-01**: Refactor OvaLens to the single Day 10 checkpoint and strict two-class (`FERTILE`, `INFERTILE`) domain contract
+- [x] **TASK-NEW-BE-SCHEMA-01**: Align database schema contracts across Edge, Backend, and Dashboard: add MANUAL_REVIEW routing action, session manual review counts, scan override tracking, physical cradle indexing, and optical research metrics
+
+- [x] **TASK-NEW-EDGE-UI-POLISH-01**: Improve native edge typography, operator visibility and minimum-size layouts; eliminate redundant Tk status/control updates. Verify with simulated GUI, measured before/after updates and repository gates.
+
+- [x] **TASK-NEW-EDGE-DESIGN-02**: Apply impeccable Operate guidance to the edge station: one compact record panel, aligned count rows, restrained semantic colour, clear camera empty state and consistent action hierarchy; preserve cached refreshes and verify minimum-size review controls.

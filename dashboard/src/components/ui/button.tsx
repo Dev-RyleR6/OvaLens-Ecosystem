@@ -9,23 +9,23 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "default", size = "default", ...props }, ref) => {
-    const baseClasses = "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
-    
+    const baseClasses = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0"
+
     const variants = {
-      default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-      maroon: "bg-[#800000] text-white shadow hover:bg-[#6e0000]",
-      destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
-      outline: "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
-      secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
-      ghost: "hover:bg-accent hover:text-accent-foreground",
-      link: "text-primary underline-offset-4 hover:underline",
+      default: "bg-primary text-primary-foreground hover:bg-primary-hover",
+      maroon: "bg-primary text-primary-foreground hover:bg-primary-hover",
+      destructive: "bg-destructive text-destructive-foreground hover:bg-destructive-hover",
+      outline: "border border-input bg-card text-foreground hover:bg-slate-50",
+      secondary: "bg-secondary text-secondary-foreground hover:bg-slate-200",
+      ghost: "text-slate-700 hover:bg-slate-100 hover:text-foreground",
+      link: "text-brand underline underline-offset-4 hover:decoration-2",
     }
 
     const sizes = {
-      default: "h-9 px-4 py-2",
-      sm: "h-8 rounded-md px-3 text-xs",
-      lg: "h-10 rounded-md px-8",
-      icon: "h-9 w-9",
+      default: "px-4 py-2.5",
+      sm: "px-3 py-2 text-sm",
+      lg: "min-h-12 px-6 py-3",
+      icon: "h-11 w-11 p-0",
     }
 
     return (

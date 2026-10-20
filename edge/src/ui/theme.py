@@ -14,7 +14,7 @@ class FUTheme:
     PRIMARY_MAROON_BORDER = "#800000" # Institutional maroon border
 
     # Semantic Biological Classes (Luminous High Contrast for Gray Surfaces)
-    FERTILE_GREEN = "#22C55E"         # Agri-Green Luminous
+    FERTILE_GREEN = "#357a38"         # Foundation University Agri-Green
     FERTILE_GREEN_HOVER = "#16A34A"
     FERTILE_GREEN_BG = "#133E25"      # Deep forest green badge container
     FERTILE_GREEN_CARD = "#162D20"    # Subtle green card fill
@@ -28,29 +28,34 @@ class FUTheme:
     INFERTILE_AMBER_BORDER = "#6B3D10"
     INFERTILE_AMBER_TEXT = "#FDE68A"  # High-contrast amber text
 
-    ABNORMAL_RED = "#F87171"          # Reject Red Luminous
-    ABNORMAL_RED_HOVER = "#EF4444"
-    ABNORMAL_RED_BG = "#4C1D24"       # Deep red badge container
-    ABNORMAL_RED_CARD = "#33161A"     # Subtle red card fill
-    ABNORMAL_RED_BORDER = "#6E222C"
-    ABNORMAL_RED_TEXT = "#FECACA"    # High-contrast red text
+    REJECT_RED = "#DC2626"
+    REJECT_RED_HOVER = "#B91C1C"
+    REJECT_RED_BG = "#4C1D24"
+    REJECT_RED_CARD = "#33161A"
+    REJECT_RED_BORDER = "#6E222C"
+    REJECT_RED_TEXT = "#FECACA"
 
     # Industrial Pro Gray Surfaces (Mid-Tone Charcoal & Slate)
-    BG_LIGHT = "#181A20"              # Canvas Background (Neutral Charcoal)
-    PANEL_LIGHT = "#262932"           # Elevated Card Surfaces (Industrial Pro Gray)
+    BG_LIGHT = "#0F172A"              # FU dark slate canvas
+    PANEL_LIGHT = "#1E293B"           # FU dark slate cards
     PANEL_LIGHT_ALT = "#1E2129"       # Inset Containers / Dropdown Surfaces (Deep Slate)
     PANEL_ACCENT = "#353A47"          # Hover / Interactive Surface (Mid Slate)
-    BORDER = "#3B4150"                # Crisp Slate-Gray Card Border
+    BORDER = "#334155"                # FU dark slate border
     BORDER_DARK = "#4F5768"           # Focus / Accent Border
     DARKROOM_VIEWPORT = "#111317"     # Studio Viewport for Candling Stream
 
     # Typography (High-Contrast Off-White on Industrial Gray)
     TEXT_PRIMARY = "#F1F3F7"          # Crisp Slate-50 Off-White (High contrast)
     TEXT_SECONDARY = "#CBD2E0"        # Soft Silver Slate
-    TEXT_MUTED = "#8F96A6"            # Muted Cool Gray
-    TEXT_DIM = "#6B7280"              # Dim Gray
+    TEXT_MUTED = "#A8B4C8"            # Readable secondary metadata on slate
+    TEXT_DIM = "#94A3B8"              # Quiet text with accessible contrast
     TEXT_WHITE = "#FFFFFF"            # Pure White for dark buttons
     TEXT_ACCENT = "#FDE047"           # Gold / Amber highlight
 
     # Standard Typography
-    FONT_FAMILY = "Plus Jakarta Sans"
+    # Native Windows face: available offline, with real regular/bold weights.
+    FONT_FAMILY = "Segoe UI"
+    FONT_BODY = 14
+    FONT_LABEL = 12
+    FONT_HEADING = 20
+    FONT_METRIC = 24

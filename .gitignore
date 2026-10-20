@@ -69,3 +69,19 @@ Thumbs.db
 backups/
 *.json.gz
 
+
+edge/db/prototype-test-temp/
+edge/db/edge_settings.json
+edge/db/*.tmp
+.flow_tests/
+*.db.lock
+
+# Locally installed AI tooling and Impeccable integration files
+/.codex/
+/.agents/skills/impeccable/
+/.github/agents/impeccable-*.agent.md
+/.github/hooks/impeccable.json
+/.github/skills/impeccable/
+
+# Unused raster copy; the dashboard uses ovalens_logo.svg
+/dashboard/src/assets/logos/ovalens_logo.png

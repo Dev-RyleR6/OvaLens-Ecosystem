@@ -3,11 +3,14 @@ from typing import List, Optional, Tuple, Dict, Any
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
+from sqlalchemy.dialects.postgresql import insert
 
 from app.models.batch import BatchModel, BatchStage, BatchStatus, DuckBreed
 from app.models.session import CandlingSessionModel, CandlingStage
 from app.models.scan import EggScanModel, FertilityClass
 from app.models.settings import HatcherySettingsModel
+from app.models.audit import AuditLogModel
+from app.services.scan_metrics import scan_totals
 from app.schemas.batch import (
     BatchCreate, BatchUpdate, BatchSummaryResponse,
     BatchAnalyticsResponse, SessionSummaryItem, MilestoneCheckResponse, FinalizeHatchPayload
@@ -16,6 +19,27 @@ from app.core.exceptions import DuplicateEntityException, EntityNotFoundExceptio
 
 
 class BatchService:
+    @staticmethod
+    def register_edge_batch(db: Session, payload) -> BatchModel:
+        """Create once by permanent Edge ID; conflicting retries never overwrite inventory."""
+        values = payload.model_dump(exclude={"device_id", "operator_name"})
+        values.update(target_hatch_date=payload.set_date + timedelta(days=28),
+                      current_stage=BatchStage.SETTING, status=BatchStatus.INCUBATING)
+        inserted = db.execute(insert(BatchModel).values(**values).on_conflict_do_nothing()
+                              .returning(BatchModel.batch_id)).scalar_one_or_none()
+        batch = db.get(BatchModel, payload.batch_id)
+        matches = batch is not None and all(getattr(batch, key) == getattr(payload, key)
+            for key in ("batch_code", "breed", "incubator_id", "initial_egg_count", "set_date", "notes"))
+        if not matches:
+            db.rollback()
+            raise DuplicateEntityException("Batch ID or code already exists with different details; saved Edge data must be reviewed.")
+        if inserted:
+            db.add(AuditLogModel(action="BATCH_CREATED", entity_type="BATCH", entity_id=batch.batch_id,
+                details={"source": "EDGE", "device_id": payload.device_id, "operator_name": payload.operator_name}))
+        db.commit()
+        db.refresh(batch)
+        return batch
+
     @staticmethod
     def _compute_milestone(set_date: datetime, current_stage: BatchStage) -> Tuple[int, Optional[str]]:
         now = datetime.now(timezone.utc)
@@ -26,10 +50,6 @@ class BatchService:
         alert = None
         if current_stage == BatchStage.SETTING and elapsed >= 10:
             alert = "CANDLING DUE: Day 10 Embryo Viability & Penoy Salvage"
-        elif current_stage == BatchStage.DAY_10 and elapsed >= 18:
-            alert = "TRANSFER DUE: Day 18 Lockdown into Hatcher Trays"
-        elif current_stage == BatchStage.DAY_18 and elapsed >= 25:
-            alert = "PIPING WATCH: Day 25 Final Hatch Preparation"
         elif elapsed >= 28 and current_stage not in (BatchStage.HATCHED, BatchStage.COMPLETED):
             alert = "HATCH DUE: Day 28 Final Hatch Record Pending"
 
@@ -84,7 +104,7 @@ class BatchService:
             query = query.filter(BatchModel.status == status)
         if breed:
             query = query.filter(BatchModel.breed == breed)
-        return query.order_by(desc(BatchModel.set_date)).offset(offset).limit(limit).all()
+        return query.order_by(desc(BatchModel.set_date), BatchModel.batch_id).offset(offset).limit(limit).all()
 
     @staticmethod
     def update_batch(db: Session, batch_id: str, payload: BatchUpdate) -> BatchModel:
@@ -183,18 +203,12 @@ class BatchService:
     def get_batch_summary(db: Session, batch_id: str) -> BatchSummaryResponse:
         batch = BatchService.get_batch(db, batch_id)
 
-        # Aggregate metrics across all sessions for this batch
-        totals = db.query(
-            func.coalesce(func.sum(CandlingSessionModel.total_scanned), 0).label("scanned"),
-            func.coalesce(func.sum(CandlingSessionModel.fertile_count), 0).label("fertile"),
-            func.coalesce(func.sum(CandlingSessionModel.infertile_count), 0).label("infertile"),
-            func.coalesce(func.sum(CandlingSessionModel.abnormal_count), 0).label("abnormal")
-        ).filter(CandlingSessionModel.batch_id == batch_id).first()
+        totals = scan_totals(db, batch_id=batch_id)
 
         total_scanned = totals.scanned or 0
         fertile = totals.fertile or 0
         infertile = totals.infertile or 0
-        abnormal = totals.abnormal or 0
+        manual_review = totals.manual_review or 0
 
         fertility_rate = (fertile / total_scanned * 100.0) if total_scanned > 0 else 0.0
         hatchability_rate = (batch.hatched_count / batch.initial_egg_count * 100.0) if batch.initial_egg_count > 0 else 0.0
@@ -216,7 +230,7 @@ class BatchService:
             total_scanned=total_scanned,
             fertile_count=fertile,
             infertile_count=infertile,
-            abnormal_count=abnormal,
+            manual_review_count=manual_review,
             fertility_rate=round(fertility_rate, 2),
             hatchability_rate=round(hatchability_rate, 2),
             notes=batch.notes,
@@ -234,22 +248,17 @@ class BatchService:
         kwh_per_egg = float(settings.kwh_saved_per_culled_egg) if settings else 0.2000
 
         # Day 10 primary stats
-        d10_stats = db.query(
-            func.coalesce(func.sum(CandlingSessionModel.total_scanned), 0).label("scanned"),
-            func.coalesce(func.sum(CandlingSessionModel.fertile_count), 0).label("fertile"),
-            func.coalesce(func.sum(CandlingSessionModel.infertile_count), 0).label("infertile"),
-            func.coalesce(func.sum(CandlingSessionModel.abnormal_count), 0).label("abnormal")
-        ).filter(CandlingSessionModel.batch_id == batch_id, CandlingSessionModel.stage == CandlingStage.DAY_10).first()
+        d10_stats = scan_totals(db, batch_id=batch_id)
 
         d10_tot = d10_stats.scanned or 0
         d10_fer = d10_stats.fertile or 0
         d10_inf = d10_stats.infertile or 0
-        d10_abn = d10_stats.abnormal or 0
+        d10_rev = d10_stats.manual_review or 0
         d10_rate = (d10_fer / d10_tot * 100.0) if d10_tot > 0 else 0.0
 
         # Financial values
         penoy_val = d10_inf * penoy_price
-        power_saved = (d10_inf + d10_abn) * (kwh_rate * kwh_per_egg)
+        power_saved = d10_inf * (kwh_rate * kwh_per_egg)
         duckling_rev = batch.hatched_count * duckling_price
         hatch_rate = (batch.hatched_count / batch.initial_egg_count * 100.0) if batch.initial_egg_count > 0 else 0.0
 
@@ -257,18 +266,19 @@ class BatchService:
         sessions = db.query(CandlingSessionModel).filter(CandlingSessionModel.batch_id == batch_id).order_by(CandlingSessionModel.started_at.asc()).all()
         session_items = []
         for s in sessions:
-            f_rate = (s.fertile_count / s.total_scanned * 100.0) if s.total_scanned > 0 else 0.0
+            recorded = scan_totals(db, session_id=s.session_id)
+            f_rate = (recorded.fertile / recorded.scanned * 100.0) if recorded.scanned else 0.0
             session_items.append(SessionSummaryItem(
                 session_id=s.session_id,
                 stage=s.stage.value,
                 operator_name=s.operator_name,
                 started_at=s.started_at,
-                total_scanned=s.total_scanned,
-                fertile_count=s.fertile_count,
-                infertile_count=s.infertile_count,
-                abnormal_count=s.abnormal_count,
+                total_scanned=recorded.scanned,
+                fertile_count=recorded.fertile,
+                infertile_count=recorded.infertile,
+                manual_review_count=recorded.manual_review,
                 fertility_rate=round(f_rate, 2),
-                avg_inference_ms=float(s.avg_inference_ms)
+                avg_inference_ms=float(recorded.avg_inference_ms)
             ))
 
         elapsed, _ = BatchService._compute_milestone(batch.set_date, batch.current_stage)
@@ -287,7 +297,7 @@ class BatchService:
             total_scanned_day_10=d10_tot,
             fertile_day_10=d10_fer,
             infertile_penoy_day_10=d10_inf,
-            abnormal_day_10=d10_abn,
+            manual_review_day_10=d10_rev,
             day_10_fertility_rate=round(d10_rate, 2),
             penoy_salvage_value_php=round(penoy_val, 2),
             electricity_saved_php=round(power_saved, 2),
@@ -297,4 +307,3 @@ class BatchService:
             actual_hatchability_rate=round(hatch_rate, 2),
             sessions=session_items
         )
-

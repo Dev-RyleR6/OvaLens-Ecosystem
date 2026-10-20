@@ -19,6 +19,14 @@ class DeviceHeartbeat(BaseModel):
     status: DeviceStatus = DeviceStatus.ONLINE
 
 
+class DeviceCalibrationUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    conveyor_speed_cm_s: float = Field(..., gt=0, le=100, allow_inf_nan=False)
+    conveyor_dist_cm: float = Field(..., gt=0, le=999, allow_inf_nan=False)
+    servo_pulse_ms: int = Field(..., ge=1, le=60000)
+
+
 class DeviceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

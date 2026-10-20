@@ -8,7 +8,9 @@ Usage:
 """
 
 import sys
-if hasattr(sys.stdout, "reconfigure"):
+from io import TextIOWrapper
+
+if isinstance(sys.stdout, TextIOWrapper):
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
@@ -142,6 +144,10 @@ def main():
     parser.add_argument("--skip-tests", action="store_true", help="Skip running test suites (not recommended)")
     parser.add_argument("--skip-frontend", action="store_true", help="Skip frontend build check")
     parser.add_argument("--no-changelog", action="store_true", help="Skip updating CHANGELOG.md")
+    parser.add_argument("--verify-only", action="store_true",
+                        help="Run checks without modifying checklists, changelog, staging, or committing")
+    parser.add_argument("--staged-only", action="store_true",
+                        help="Commit the prepared index without staging unrelated workspace changes")
     args = parser.parse_args()
 
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -160,13 +166,17 @@ def main():
         run_command(f"{sys.executable} -m pytest tests/test_api.py -v", cwd=os.path.join(repo_root, "backend"))
 
         print("\n🧪 [2/3] Running Edge CV Pipeline Test Suite...")
-        run_command(f"{sys.executable} -m pytest tests/test_edge_pipeline.py -v", cwd=os.path.join(repo_root, "edge"))
+        run_command(f"{sys.executable} -m pytest tests -v", cwd=os.path.join(repo_root, "edge"))
 
         if not args.skip_frontend:
             print("\n🧪 [3/3] Checking React Dashboard Build...")
             run_command("npm.cmd run build", cwd=os.path.join(repo_root, "dashboard"))
     else:
         print("\n⚠️ Skipping automated test suites as requested.")
+
+    if args.verify_only:
+        print("\nSUCCESS: Verification complete; no files staged or committed.")
+        return
 
     # 2. Update Checklist (PROJECT_PLAN.md & Excel)
     if args.task:
@@ -179,7 +189,8 @@ def main():
 
     # 4. Git stage and commit
     print("\n📦 Staging files and creating Git commit...")
-    run_command("git add .", cwd=repo_root)
+    if not args.staged_only:
+        run_command("git add .", cwd=repo_root)
     run_command(f'git commit -m "{full_message}"', cwd=repo_root)
 
     print("\n" + "=" * 70)

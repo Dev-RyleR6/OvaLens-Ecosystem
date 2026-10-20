@@ -6,7 +6,10 @@ dashboard page, firmware routine, and AI task.
 """
 
 import sys
-if hasattr(sys.stdout, "reconfigure"):
+from io import TextIOWrapper
+from typing import cast
+
+if isinstance(sys.stdout, TextIOWrapper):
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
@@ -15,6 +18,7 @@ if hasattr(sys.stdout, "reconfigure"):
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 
 def build_excel_checklist():
     wb = openpyxl.Workbook()
@@ -52,7 +56,7 @@ def build_excel_checklist():
     # -------------------------------------------------------------------------
     # TAB 1: EXECUTIVE SUMMARY & DASHBOARD
     # -------------------------------------------------------------------------
-    ws_dash = wb.active
+    ws_dash = cast(Worksheet, wb.active)
     ws_dash.title = "Executive Overview"
     ws_dash.views.sheetView[0].showGridLines = True
 
@@ -138,7 +142,7 @@ def build_excel_checklist():
     # -------------------------------------------------------------------------
     # TAB 2: MASTER FEATURE CHECKLIST (EXHAUSTIVE ENUMERATION)
     # -------------------------------------------------------------------------
-    ws_master = wb.create_sheet(title="Master Checklist")
+    ws_master = cast(Worksheet, wb.create_sheet(title="Master Checklist"))
     ws_master.views.sheetView[0].showGridLines = True
 
     headers = [
@@ -159,6 +163,7 @@ def build_excel_checklist():
         ("TASK-DOC-01", "Phase 1: Planning", "Docs & Plan", "Authentic Manuscript Integration", "Parse DevIn (2026).md into Chapters 1-6 with 15 APA 7 citations and Title/Approval Sheet", "Manuscript 00-06", "Antigravity", "Done", "P0 - Critical", "docs/manuscript/*.md review"),
         ("TASK-DOC-02", "Phase 1: Planning", "Docs & Plan", "Import & Catalog Academic Diagrams", "Embed and convert IPO Matrix, DSRM Methodology, System Flowchart, and Use Case diagrams (.drawio & .html)", "All 4 Diagrams", "Antigravity", "Done", "P0 - Critical", "docs/diagrams catalog audit"),
         ("TASK-DOC-03", "Phase 1: Planning", "Docs & Plan", "Two-Tier Agent Workflow & Quality Gate", "Establish Antigravity + Codex partnership, PROJECT_PLAN.md, CHANGELOG.md, and verify_and_commit.py", "PROJECT_PLAN.md", "Antigravity", "Done", "P0 - Critical", "python scripts/verify_and_commit.py"),
+        ("TASK-NEW-SCOPE-01", "Phase 4: Development", "Cross-System", "Day 10 Binary Domain Refactor", "Standardize backend, edge, dashboard, firmware, tests, and docs on Day 10 with FERTILE/INFERTILE outcomes", "System-wide contract", "Codex", "Done", "P0 - Critical", "pytest + npm.cmd run build"),
 
         # --- BACKEND REST API: AUTH & USERS ---
         ("TASK-BE-AUTH-01", "Phase 4C: Backend", "Backend API", "POST /api/v1/auth/login", "JWT authentication endpoint with bcrypt password verification and role extraction", "Use Case: Worker", "Codex", "Done", "P0 - Critical", "test_login_and_me"),
@@ -176,9 +181,9 @@ def build_excel_checklist():
         ("TASK-BE-BAT-03", "Phase 4C: Backend", "Backend API", "POST /api/v1/batches", "Create new incubation batch specifying breed (Itim/Khaki/Kayumanggi) and egg count", "Use Case: Supervisor", "Codex", "Done", "P0 - Critical", "test_batch_analytics_and_milestones"),
         ("TASK-BE-BAT-04", "Phase 4C: Backend", "Backend API", "GET /api/v1/batches/{id}", "Get detailed batch record with tray matrix slots and current milestone", "Use Case: Supervisor", "Codex", "Done", "P0 - Critical", "test_batch_analytics_and_milestones"),
         ("TASK-BE-BAT-05", "Phase 4C: Backend", "Backend API", "GET /api/v1/batches/{id}/analytics", "Incubation analytics: fertility rate, mortality curve, penoy salvage total", "Use Case: Supervisor", "Codex", "Done", "P0 - Critical", "test_batch_analytics_and_milestones"),
-        ("TASK-BE-BAT-06", "Phase 4C: Backend", "Backend API", "GET /api/v1/batches/{id}/forecast", "Hatch yield forecast calculation based on Day 10 and Day 18 viability rates", "Use Case: Supervisor", "Codex", "Done", "P1 - High", "test_hatch_yield_forecast_and_backup_service"),
+        ("TASK-BE-BAT-06", "Phase 4C: Backend", "Backend API", "GET /api/v1/batches/{id}/forecast", "Hatch yield forecast based on the Day 10 fertility rate", "Use Case: Supervisor", "Codex", "Done", "P1 - High", "test_hatch_yield_forecast_and_backup_service"),
         ("TASK-BE-BAT-07", "Phase 4C: Backend", "Backend API", "PUT /api/v1/batches/{id}", "Update batch metadata, notes, and incubator chamber ID", "Use Case: Supervisor", "Codex", "Done", "P1 - High", "test_batch_analytics_and_milestones"),
-        ("TASK-BE-BAT-08", "Phase 4C: Backend", "Backend API", "POST /api/v1/batches/{id}/advance-stage", "Advance batch milestone: Day 10 -> Day 18 -> Day 25", "Use Case: Supervisor", "Codex", "Done", "P0 - Critical", "test_batch_analytics_and_milestones"),
+        ("TASK-BE-BAT-08", "Phase 4C: Backend", "Backend API", "POST /api/v1/batches/{id}/advance-stage", "Advance lifecycle: Setting -> Day 10 -> Hatched -> Completed", "Use Case: Supervisor", "Codex", "Done", "P0 - Critical", "test_batch_analytics_and_milestones"),
         ("TASK-BE-BAT-09", "Phase 4C: Backend", "Backend API", "POST /api/v1/batches/{id}/finalize-hatch", "Close batch lifecycle and record final hatchling count on Day 28", "Use Case: Supervisor", "Codex", "Done", "P1 - High", "test_batch_analytics_and_milestones"),
         ("TASK-BE-BAT-10", "Phase 4C: Backend", "Backend API", "GET /api/v1/batches/{id}/summary", "Comprehensive batch summary DTO for compliance and audit archiving", "Use Case: Supervisor", "Codex", "Done", "P1 - High", "test_batch_analytics_and_milestones"),
         ("TASK-BE-BAT-11", "Phase 4C: Backend", "Backend API", "DELETE /api/v1/batches/{id}", "Soft-delete or purge batch (Admin only protection)", "Use Case: Admin", "Codex", "Done", "P2 - Medium", "test_rbac_and_admin_security_protections"),
@@ -187,7 +192,7 @@ def build_excel_checklist():
         # --- BACKEND REST API: SESSIONS & SCANS ---
         ("TASK-BE-SES-01", "Phase 4C: Backend", "Backend API", "GET /api/v1/sessions", "List all active and completed edge candling sorting sessions", "Use Case: Worker", "Codex", "Done", "P0 - Critical", "test_api.py"),
         ("TASK-BE-SES-02", "Phase 4C: Backend", "Backend API", "POST /api/v1/sessions", "Start new candling session linked to batch and edge sorter device ID", "Use Case: Worker", "Codex", "Done", "P0 - Critical", "test_api.py"),
-        ("TASK-BE-SES-03", "Phase 4C: Backend", "Backend API", "GET /api/v1/sessions/{id}", "Get session progress: total eggs candled, fertile, infertile, abnormal counts", "Use Case: Worker", "Codex", "Done", "P0 - Critical", "test_api.py"),
+        ("TASK-BE-SES-03", "Phase 4C: Backend", "Backend API", "GET /api/v1/sessions/{id}", "Get Day 10 progress: total, fertile, and infertile counts", "Use Case: Worker", "Codex", "Done", "P0 - Critical", "test_api.py"),
         ("TASK-BE-SES-04", "Phase 4C: Backend", "Backend API", "PUT /api/v1/sessions/{id}/end", "Conclude candling session and trigger batch analytics recalculation", "Use Case: Worker", "Codex", "Done", "P0 - Critical", "test_api.py"),
         ("TASK-BE-SCN-01", "Phase 4C: Backend", "Backend API", "POST /api/v1/scans/sync", "Idempotent batch scan sync with ON CONFLICT (scan_id) DO NOTHING", "System Flowchart", "Codex", "Done", "P0 - Critical", "test_analytics_overview"),
         ("TASK-BE-SCN-02", "Phase 4C: Backend", "Backend API", "POST /api/v1/scans/upload-image", "Upload high-res candling frame image associated with scan ID", "System Flowchart", "Codex", "Done", "P1 - High", "test_api.py"),
@@ -199,7 +204,7 @@ def build_excel_checklist():
         ("TASK-BE-ANL-01", "Phase 4C: Backend", "Backend API", "GET /api/v1/analytics/overview", "Aggregated hatchery statistics (total eggs, fertility rate, cull rate)", "Use Case: Supervisor", "Codex", "Done", "P0 - Critical", "test_analytics_overview"),
         ("TASK-BE-ANL-02", "Phase 4C: Backend", "Backend API", "GET /api/v1/analytics/breed-comparison", "Disaggregated analytics comparing IP-Itim vs IP-Khaki vs IP-Kayumanggi", "Methodology 3.1", "Codex", "Done", "P1 - High", "test_analytics_overview"),
         ("TASK-BE-ANL-03", "Phase 4C: Backend", "Backend API", "GET /api/v1/analytics/mortality-trends", "Longitudinal mortality tracking across batches and candling stages", "Use Case: Supervisor", "Codex", "Done", "P1 - High", "test_mortality_progression"),
-        ("TASK-BE-ANL-04", "Phase 4C: Backend", "Backend API", "GET /api/v1/analytics/mortality-progression", "Progressive loss analysis from Day 10 to Day 18 to Day 25", "Methodology 3.1", "Codex", "Done", "P1 - High", "test_mortality_progression"),
+        ("TASK-BE-ANL-04", "Phase 4C: Backend", "Backend API", "GET /api/v1/analytics/mortality-progression", "Day 10 cull analysis by breed", "Methodology 3.1", "Codex", "Done", "P1 - High", "test_mortality_progression"),
         ("TASK-BE-ANL-05", "Phase 4C: Backend", "Backend API", "GET /api/v1/analytics/economic-yield", "Day 10 Penoy salvage revenue (Count * P14.00) & thermal energy savings", "AGENTS.md Tenet 3", "Codex", "Done", "P0 - Critical", "test_analytics_economic_yield"),
         ("TASK-BE-REP-01", "Phase 4C: Backend", "Backend API", "GET /api/v1/reports/batch/{id}/csv", "Export CSV spreadsheet containing detailed scan log for batch", "Use Case: Supervisor", "Codex", "Done", "P1 - High", "test_pdf_and_csv_reports"),
         ("TASK-BE-REP-02", "Phase 4C: Backend", "Backend API", "GET /api/v1/reports/batch/{id}/pdf", "Generate official Foundation University formatted PDF compliance report", "Use Case: Supervisor", "Codex", "Done", "P0 - Critical", "test_pdf_and_csv_reports"),
@@ -234,14 +239,14 @@ def build_excel_checklist():
         ("TASK-EDGE-REV-01", "Phase 4B: Edge App", "Edge CV", "Manual Review Fallback State Machine", "Trigger manual review flag when confidence < 0.75 or egg uncentered", "System Flowchart Node 9,10", "Codex", "Backlog", "P0 - Critical", "test_manual_review_fallback.py"),
         ("TASK-EDGE-UI-01", "Phase 4B: Edge App", "Edge CV", "CustomTkinter 60 FPS Operator Desktop UI", "Main Thread: CustomTkinter operator GUI with Foundation University theme", "Use Case: Worker", "Codex", "Done", "P0 - Critical", "Desktop UI smoke launch"),
         ("TASK-EDGE-UI-02", "Phase 4B: Edge App", "Edge CV", "Live Candling Video Viewport", "Smooth video rendering canvas with overlay bounding box and class tag", "Use Case: Worker", "Codex", "Done", "P0 - Critical", "Desktop UI verification"),
-        ("TASK-EDGE-UI-03", "Phase 4B: Edge App", "Edge CV", "Real-Time Session Statistics Counters", "Live counters for Fertile, Infertile, Abnormal, and Manual Review count", "Use Case: Worker", "Codex", "Done", "P1 - High", "Desktop UI verification"),
+        ("TASK-EDGE-UI-03", "Phase 4B: Edge App", "Edge CV", "Real-Time Session Statistics Counters", "Live counters for Fertile, Infertile, and Manual Review", "Use Case: Worker", "Codex", "Done", "P1 - High", "Desktop UI verification"),
         ("TASK-EDGE-UI-04", "Phase 4B: Edge App", "Edge CV", "Interactive Manual Override Dialog Modal", "Modal popup enabling operator to inspect flagged egg and confirm class", "System Flowchart Node 10", "Codex", "Backlog", "P0 - Critical", "Desktop UI modal test"),
         ("TASK-EDGE-UI-05", "Phase 4B: Edge App", "Edge CV", "Conveyor Pause & Emergency Stop Controls", "Instant physical rig pause and serial E-STOP command dispatch", "System Flowchart Node 16", "Codex", "Done", "P1 - High", "Desktop UI verification"),
 
         # --- DASHBOARD WEB PORTAL ---
         ("TASK-DASH-PG-01", "Phase 4D: Dashboard", "Dashboard", "LoginPage.tsx with JWT Auth", "Login view with Foundation University maroon branding and token persistence", "Use Case: Worker", "Codex", "Done", "P0 - Critical", "npm.cmd run build"),
         ("TASK-DASH-PG-02", "Phase 4D: Dashboard", "Dashboard", "OverviewPage.tsx Real-Time KPI Cards", "High-level summary of active batches, fertility %, and today's sorting volume", "Use Case: Supervisor", "Codex", "Done", "P0 - Critical", "npm.cmd run build"),
-        ("TASK-DASH-PG-03", "Phase 4D: Dashboard", "Dashboard", "BatchesPage.tsx Lifecycle Management", "Table of all batches, stage advancement modal (Day 10/18/25), hatch closure", "Use Case: Supervisor", "Codex", "Done", "P0 - Critical", "npm.cmd run build"),
+        ("TASK-DASH-PG-03", "Phase 4D: Dashboard", "Dashboard", "BatchesPage.tsx Lifecycle Management", "Table of all batches, Day 10 stage advancement, and hatch closure", "Use Case: Supervisor", "Codex", "Done", "P0 - Critical", "npm.cmd run build"),
         ("TASK-DASH-PG-04", "Phase 4D: Dashboard", "Dashboard", "ScanExplorerPage.tsx Visual Search", "Filterable grid of historical scan captures with image lightbox inspection", "Use Case: Supervisor", "Codex", "Done", "P1 - High", "npm.cmd run build"),
         ("TASK-DASH-PG-05", "Phase 4D: Dashboard", "Dashboard", "AnalyticsPage.tsx Multi-Chart Suite", "Recharts visualizer for mortality curves, breed comparisons, and Penoy revenue", "Use Case: Supervisor", "Codex", "Done", "P0 - Critical", "npm.cmd run build"),
         ("TASK-DASH-PG-06", "Phase 4D: Dashboard", "Dashboard", "RecordsPage.tsx Audit Archive", "Historical scan and session records table with one-click CSV/PDF download", "Use Case: Supervisor", "Codex", "Done", "P1 - High", "npm.cmd run build"),
@@ -253,7 +258,7 @@ def build_excel_checklist():
         ("TASK-DASH-CP-01", "Phase 4D: Dashboard", "Dashboard", "Incubation Tray Matrix (42 Slots A1-F7)", "Interactive SVG grid showing physical incubator tray slot occupancy and status", "Use Case: Supervisor", "Codex", "Done", "P0 - Critical", "npm.cmd run build"),
         ("TASK-DASH-CP-02", "Phase 4D: Dashboard", "Dashboard", "Interactive Penoy Economic Calculator", "Widget computing Day 10 salvage income based on P14.00/egg price", "AGENTS.md Tenet 3", "Codex", "Done", "P1 - High", "npm.cmd run build"),
         ("TASK-DASH-CP-03", "Phase 4D: Dashboard", "Dashboard", "Breed Filter: IP-Itim, Khaki, Kayumanggi", "Dropdown to isolate metrics by pure line vs commercial hybrid", "Methodology 3.1", "Codex", "Done", "P1 - High", "npm.cmd run build"),
-        ("TASK-DASH-CP-04", "Phase 4D: Dashboard", "Dashboard", "Stage Filter: Day 10, Day 18, Day 25", "Toggle to filter analysis by candling milestone checkpoint", "Methodology 3.1", "Codex", "Done", "P1 - High", "npm.cmd run build"),
+        ("TASK-DASH-CP-04", "Phase 4D: Dashboard", "Dashboard", "Day 10 Filter", "Filter analytics for the single Day 10 checkpoint", "Methodology 3.1", "Codex", "Done", "P1 - High", "npm.cmd run build"),
         ("TASK-DASH-CP-05", "Phase 4D: Dashboard", "Dashboard", "Dark / Light Mode Theme System", "TailwindCSS theme switcher with FU Maroon (#800000) accents", "AGENTS.md FU Brand", "Codex", "Done", "P2 - Medium", "npm.cmd run build"),
 
         # --- FIRMWARE & MECHANICAL RIG ---
@@ -265,7 +270,6 @@ def build_excel_checklist():
         ("TASK-FW-STP-01", "Phase 4A: Firmware", "Firmware", "Stepper Pocket-Conveyor Transport Routine", "Indexed step timing to advance pocket conveyor one cradle at a time", "System Flowchart Node 6,14", "Codex", "Backlog", "P0 - Critical", "Firmware bench test"),
         ("TASK-FW-SRV-01", "Phase 4A: Firmware", "Firmware", "Servo Gate 1 (Fertile Release)", "Actuate servo diverter for Fertile eggs into cushioned incubation tray", "System Flowchart Node 18", "Codex", "Done", "P0 - Critical", "esp32_actuator.ino review"),
         ("TASK-FW-SRV-02", "Phase 4A: Firmware", "Firmware", "Servo Gate 2 (Infertile / Penoy Salvage)", "Actuate servo diverter for Day 10 Penoy salvage sale (@ P14.00)", "System Flowchart Node 19", "Codex", "Backlog", "P0 - Critical", "Firmware bench test"),
-        ("TASK-FW-SRV-03", "Phase 4A: Firmware", "Firmware", "Servo Gate 3 (Abnormal Discard)", "Actuate servo diverter to cull dead/bursting embryos to waste bin", "System Flowchart Node 20", "Codex", "Backlog", "P0 - Critical", "Firmware bench test"),
         ("TASK-FW-KIN-01", "Phase 4A: Firmware", "Firmware", "Kinematic Actuation Delay Timer", "Calculate Delta-t = D / v = 25cm / 12.5cm/s = 2000ms delay before servo firing", "Methodology 3.4", "Codex", "Done", "P0 - Critical", "esp32_actuator.ino review"),
 
         # --- AI MODEL & DATASET ---
@@ -278,8 +282,8 @@ def build_excel_checklist():
         ("TASK-AI-OPT-02", "Phase 3: AI Vision", "AI & Data", "Production Weights 'edge/models/weights/best.onnx'", "Verified production ONNX FP16 weights ready for edge execution", "AGENTS.md Tenet 3", "Codex", "Done", "P0 - Critical", "test_inference_engine_and_latency_benchmark"),
         ("TASK-AI-LAT-01", "Phase 3: AI Vision", "AI & Data", "Edge Inference Latency Benchmark (<=200ms)", "Benchmark inference latency ensuring <= 200 ms SLA on edge hardware", "Chapter 1 Objectives", "Codex", "Done", "P0 - Critical", "test_inference_engine_and_latency_benchmark"),
         ("TASK-AI-EVL-01", "Phase 3: AI Vision", "AI & Data", "Breed Subgroup Metric Evaluator", "Compute Precision, Recall, F1, mAP for IP-Itim, Khaki, and Kayumanggi", "IPO Matrix", "Codex", "Backlog", "P1 - High", "test_subgroup_metrics.py"),
-        ("TASK-AI-EVL-02", "Phase 3: AI Vision", "AI & Data", "Stage Subgroup Metric Evaluator", "Compute Precision, Recall, F1, mAP across Day 10, Day 18, and Day 25", "IPO Matrix", "Codex", "Backlog", "P1 - High", "test_subgroup_metrics.py"),
-        ("TASK-AI-EVL-03", "Phase 3: AI Vision", "AI & Data", "3-Class Confusion Matrix & ROC Generator", "Generate formal confusion matrix and ROC curves for Chapter 4", "Chapter 4 Manuscript", "Codex", "Backlog", "P0 - Critical", "generate_confusion_matrix.py"),
+        ("TASK-AI-EVL-02", "Phase 3: AI Vision", "AI & Data", "Day 10 Subgroup Metric Evaluator", "Compute Precision, Recall, F1, and mAP across Day 10 cohorts", "IPO Matrix", "Codex", "Backlog", "P1 - High", "test_subgroup_metrics.py"),
+        ("TASK-AI-EVL-03", "Phase 3: AI Vision", "AI & Data", "2-Class Confusion Matrix & PR Curve Generator", "Generate Fertile/Infertile metrics for Chapter 4", "Chapter 4 Manuscript", "Codex", "Backlog", "P0 - Critical", "generate_confusion_matrix.py"),
 
         # --- INTEGRATION & EVALUATION ---
         ("TASK-INT-01", "Phase 5: Integration", "Integration", "End-to-End Sorting Pilot Simulation", "Simulate 50-egg continuous cycle: load -> index -> capture -> predict -> divert -> sync", "System Flowchart", "Antigravity / Codex", "Backlog", "P0 - Critical", "test_end_to_end_pilot.py"),
@@ -319,7 +323,7 @@ def build_excel_checklist():
     for ws in [ws_dash, ws_master]:
         for col in ws.columns:
             max_len = max(len(str(cell.value or '')) for cell in col)
-            col_letter = get_column_letter(col[0].column)
+            col_letter = get_column_letter(cast(int, col[0].column))
             ws.column_dimensions[col_letter].width = min(max(max_len + 3, 12), 52)
 
     ws_master.column_dimensions["A"].width = 18

@@ -21,8 +21,8 @@ export const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({
   if (!allowedRoles.includes(currentRole)) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-xs text-center space-y-5">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 mx-auto flex items-center justify-center shadow-2xs">
+        <div className="max-w-md w-full bg-card border border-slate-200 rounded-2xl p-6 sm:p-8  text-center space-y-5">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 mx-auto flex items-center justify-center ">
             <ShieldAlert className="w-6 h-6" />
           </div>
 
@@ -68,7 +68,7 @@ export const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({
 
             <Link
               to="/batches"
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-bold shadow-xs transition-colors btn-press cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-bold  transition-colors btn-press cursor-pointer"
             >
               <Layers className="w-3.5 h-3.5" />
               <span>Incubation Batches</span>

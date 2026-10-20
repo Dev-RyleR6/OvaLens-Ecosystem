@@ -15,8 +15,6 @@ class DuckBreed(str, enum.Enum):
 class BatchStage(str, enum.Enum):
     SETTING = "SETTING"
     DAY_10 = "DAY_10"
-    DAY_18 = "DAY_18"
-    DAY_25 = "DAY_25"
     HATCHED = "HATCHED"
     COMPLETED = "COMPLETED"
 

@@ -144,36 +144,75 @@ Capstone/
 
 ### Step 4: ESP32 IoT Conveyor Firmware (Hardware Rig)
 
-1. Open `firmware/esp32_actuator/esp32_actuator.ino` in **Arduino IDE**.
-2. Install the **`ESP32Servo`** library via Arduino Library Manager.
-3. Select Board: **ESP32 Dev Module**.
-4. Connect the ESP32 via USB and upload the sketch.
+The current rig uses three ESP32 Dev Module boards at 115200 baud:
+
+- **COM5**: `firmware/three_board/conveyor_esp32` (stepper).
+- **COM7**: `firmware/three_board/egg_controller_esp32` (servo and IR).
+- **COM9**: `firmware/three_board/light_controller_esp32` (candling light).
+
+These sketches were installed on this rig. Rebuild/upload only when intentionally
+updating firmware. See [wiring, calibration and verification](docs/EDGE_THREE_BOARD_IMPLEMENTATION.md).
 
 ---
 
 ## 🎮 How to Operate OvaLens in Production
 
 ### 1. Daily Startup Sequence
-1. Start the **FastAPI Backend Server** (Port 8000).
-2. Connect the **USB Camera** and **ESP32 Microcontroller** to the Edge Machine.
-3. Power on the **10W Cree Candling Lamp** and **Conveyor Motor**.
-4. Launch the **Edge Operator App** (`python launcher.py`).
-5. Open the **React Admin Dashboard** (`http://localhost:5173` or port 3000 on Docker) on the hatchery manager's computer.
+
+1. Connect camera 0 and the three ESP32s; power the rig.
+2. Double-click **Start_OvaLens.cmd** in the repository root and enter the batch
+   details. The camera preview starts automatically using remembered controls.
+3. Check the empty conveyor, alignment and gate, then tick the inspection box.
+4. Click **Start sorting** once. The app connects and prepares the saved station
+   in the background. STOP remains available throughout preparation.
+5. Start the backend/dashboard when network reporting is needed. Sorting records
+   scans locally in SQLite and continues through network outages.
 
 ### 2. Conducting a Candling Run
-1. In the Edge GUI, verify the **ESP32: CONNECTED** and **SYNC: ONLINE** status badges in the top right.
-2. Click **▶ START CANDLING SESSION** (or press `[SPACEBAR]`).
-3. Place duck eggs onto the motorized infeed lane.
-4. As each egg passes over the candling aperture:
-   * The **Optical Sensor** triggers a snapshot.
-   * **YOLOv8 ONNX FP16** classifies the egg in $\le 30\text{ms}$.
-   * If **`FERTILE`**: Egg passes freely to the incubator collection tray.
-   * If **`INFERTILE`** or **`ABNORMAL`**: The ESP32 microsecond timer fires the servo flipper gate at the exact arrival moment ($\Delta t = D/v$), directing the egg into the cull chute.
-5. Review real-time batch counts and the Day-10 Penoy salvage revenue on the Web Dashboard.
 
-### 3. Keyboard Shortcuts & Overrides:
-* **`[SPACEBAR]`**: Trigger manual candling scan.
-* **`[R]`**: Manual diverter ejection override (fires servo kicker immediately).
+1. Feed one Day 10 egg only when the large instruction says **Feed next egg**.
+2. Wait through **Inspecting egg**, **Positioning gate** and **Wait ? egg passing**.
+   Inference and boxes appear after the sensor stop is confirmed, lamp ON and
+   camera settling; three agreeing fresh predictions are required.
+3. Classification saves locally before the servo moves. The gate confirms its
+   stroke before the stepper resumes, then holds its angle through gate exit.
+4. Low confidence or disagreement holds the egg for manual review. Review choices
+   appear when needed; STOP halts the station and finalizes local records.
+5. At the target, final totals and **Start next batch** appear on the same screen.
+   Configure the next batch, inspect the empty conveyor and Start sorting again.
+
+Defaults: camera **0**, **COM5 stepper**, **COM7 servo + IR**, **COM9 light**. Saved
+camera controls and gate calibration are retained. New three-board display hold
+is **300ms**; pre-capture settling defaults to **1500ms** and evidence/servo checks are preserved.
+Measured gate distances and physical acceptance remain required for the rig.
+
+### 3. Keyboard Shortcuts & Tools
+
+- **Space**: Single scan diagnostic, also under **Tools > Single scan**.
+- **R**: STOP; it does not fire the diverter.
+- **F1**: Operator guide.
+- **F11**: Kiosk/windowed display.
+- **Camera controls** above the preview (also **Tools > Camera controls**): Tune
+  the idle camera while watching its image. Set Autofocus On, or choose Off and
+  enter manual Focus. Exposure, gain, white balance and image controls are also
+  available as sliders and exact numeric values. Sliders and automatic modes
+  update the preview live; typed values apply after a short pause. **Range** edits
+  a slider's tuning span; it does not claim driver-supported limits. Scroll to
+  reach the remaining controls. Driver feedback reports
+  unsupported requests; numeric ranges depend on the webcam.
+- **Apply now** immediately applies the form temporarily. **Save as default**
+  applies and saves them for future launches. **Load saved settings** fills the
+  form without applying; use Apply now to activate loaded values. Blank values
+  leave properties unchanged. Click **Done**
+  and inspect the conveyor again before starting a session.
+- **Camera controls > Cradle**: Confirm the path is clear, then **Connect for
+  alignment**. The saved boards connect, the lamp turns on and the belt stays
+  held. Choose a small step count and click Forward/Backward to position the
+  cradle. Each move finishes with a hold; IR detection may stop it early. Switch
+  to Camera to tune the stationary image. Done holds the belt and turns the lamp
+  off. STOP [R] cancels motion. Re-inspect the empty rig before sorting.
+- **Tools > Settings**: Advanced camera configuration, connections and measured calibration.
+- **Tools > Retry camera preview**: Restart the preview after fixing its connection.
 
 ---
 
@@ -206,11 +245,21 @@ python -m pytest tests/test_edge_pipeline.py -v
 
 ---
 
+## Edge app availability and dashboard charts
+
+The dashboard Overview includes recorded Day 10 classification and scans-versus-eggs-set charts. **Analytics & graphs** provides breed/status/batch filters, economic estimates, and batch forecasts. Charts, tables, and economic figures on Analytics share the selected scope. Overview Penoy estimates follow the selected batch. Missing records do not generate example results.
+
+Classification totals are computed from persisted scan records, including their current manual overrides, rather than cached session counters. A scan event is not a unique egg: repeated scans can exceed the initial set count and can overstate Penoy quantity/value estimates. Awaiting-review counts are a subset of the two biological classifications. Forecasts use fixed breed assumptions and are estimates, not measured hatch outcomes or confirmed sales. Expand the exact-count tables below charts to inspect every value.
+
+When launched through `edge/launcher.py` in normal operation, the edge app sends an authenticated device heartbeat every 15 seconds on a separate background thread. Configure `API_BASE_URL`, `API_KEY`, and a unique `DEVICE_ID` in `edge/.env`; the API key must match the backend configuration. Unknown stations register automatically; existing station calibration is preserved. Explicit simulation does not report a production station online.
+
+The dashboard checks device records every 15 seconds, independently of the data refresh preference, and expires online status after 90 seconds without a heartbeat. Closing the app or losing connectivity therefore changes its status after the expiry period. “Backend API” indicates server connectivity; “Edge app connections” indicates recent app heartbeats. Neither confirms physical camera, serial controller, or conveyor readiness. Device heartbeat failures appear as sync attention in the edge app and leave locally saved scans intact.
+
 ## ❓ Troubleshooting FAQ
 
 1. **Camera Feed is Black / Blank**:
    - Verify `CAMERA_INDEX` in `edge/.env`. On Windows with multiple webcams, try index `1` or `2`.
-   - If no camera is plugged in, OvaLens automatically falls back to the **Synthetic Candling Stream Generator** for seamless offline testing.
+   - If the camera is unavailable, reconnect it and use **Tools > Retry camera preview**. Normal sorting never substitutes synthetic frames; preview simulation must be explicitly selected at startup.
 
 2. **ESP32 Serial Connection Error**:
    - Check device manager for the COM port (e.g. `COM3` on Windows, `/dev/ttyUSB0` on Linux).

@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import { CloseButton } from './ui/CloseButton';
+import { useDialogAccessibility } from '@/hooks/useDialogAccessibility';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Award, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Award, CheckCircle2, AlertCircle } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { BatchSummary } from '../types';
 import { useModalAnimation } from '@/hooks/useModalAnimation';
@@ -28,15 +30,19 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const { shouldRender, isClosing } = useModalAnimation(isOpen, 220);
+  const dialogRef = useDialogAccessibility(isOpen && shouldRender, () => { if (!isSubmitting) onClose(); }, 'Record hatch results');
+
+  useEffect(() => { if (isOpen) { setHatchedCount(batch?.hatched_count ?? 0); setNotes(''); setError(null); } }, [isOpen, batch?.batch_id, batch?.hatched_count]);
 
   if (!shouldRender || !displayBatch) return null;
 
-  const initialCount = displayBatch.initial_egg_count || 500;
+  const initialCount = displayBatch.initial_egg_count;
   const unhatchedCount = Math.max(0, initialCount - Number(hatchedCount || 0));
   const hatchRate = initialCount > 0 ? ((Number(hatchedCount || 0) / initialCount) * 100).toFixed(1) : '0.0';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (hatchedCount < 0) {
       setError('Hatched count cannot be negative.');
       return;
@@ -65,75 +71,70 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 bg-slate-900/65 backdrop-blur-xs transition-opacity",
+          "fixed inset-0 bg-slate-900/65  transition-opacity",
           isClosing ? "animate-modal-backdrop-exit" : "animate-modal-backdrop"
         )}
-        onClick={onClose}
+        onClick={() => { if (!isSubmitting) onClose(); }}
       />
 
       <div
         className={cn(
-          "bg-white border border-slate-200/90 rounded-2xl shadow-2xl max-w-md w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] flex flex-col overflow-hidden z-10 my-auto",
+          "bg-card border border-slate-200/90 rounded-2xl shadow-2xl max-w-md w-full min-w-0 max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] flex flex-col overflow-hidden z-10 my-auto",
           isClosing ? "animate-modal-content-exit" : "animate-modal-content"
         )}
       >
         {/* Modal Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-white flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#800000]/10 text-[#800000] flex items-center justify-center font-black">
-              <Award className="w-5 h-5" />
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-start justify-between gap-2 bg-card flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 shrink-0 rounded-xl bg-[#800000]/10 text-brand flex items-center justify-center font-semibold">
+              <Award aria-hidden="true" className="w-5 h-5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h2 className="text-sm font-bold text-slate-900">
                 Finalize Day 28 Hatch Trial
               </h2>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-xs text-slate-500 break-words">
                 Batch: {displayBatch.batch_code} ({displayBatch.breed})
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <CloseButton type="button" aria-label="Close hatch results dialog" disabled={isSubmitting} onClick={() => { if (!isSubmitting) onClose(); }} />
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4" aria-busy={isSubmitting}>
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-semibold text-red-700 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-semibold text-red-700 flex items-center gap-2">
+              <AlertCircle aria-hidden="true" className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
-            <div className="flex justify-between text-slate-600">
+            <div className="flex flex-wrap justify-between gap-2 text-slate-600">
               <span>Initial Eggs Set:</span>
               <span className="font-bold text-slate-900">{initialCount} eggs</span>
             </div>
-            <div className="flex justify-between text-slate-600">
+            <div className="flex flex-wrap justify-between gap-2 text-slate-600">
               <span>Day 10 Fertile Active:</span>
-              <span className="font-bold text-emerald-700">{displayBatch.fertile_count || displayBatch.initial_egg_count} eggs</span>
+              <span className="font-bold text-emerald-700">{displayBatch.fertile_count} eggs</span>
             </div>
-            <div className="flex justify-between text-slate-600 border-t border-slate-200 pt-1.5">
+            <div className="flex flex-wrap justify-between gap-2 text-slate-600 border-t border-slate-200 pt-1.5">
               <span>Calculated Hatchability:</span>
-              <span className="font-bold text-[#800000]">{hatchRate}%</span>
+              <span className="font-bold text-brand">{hatchRate}%</span>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">
+            <label htmlFor="finalizehatchmodal-field-1" className="text-xs font-bold text-slate-700">
               Total Hatched Healthy Ducklings *
             </label>
-            <input
+            <input id="finalizehatchmodal-field-1"
               type="number"
               min={0}
               max={initialCount}
@@ -141,49 +142,50 @@ export const FinalizeHatchModal: React.FC<FinalizeHatchModalProps> = ({
               value={hatchedCount}
               onChange={(e) => setHatchedCount(Number(e.target.value))}
               placeholder="e.g. 450"
-              className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 font-bold focus:outline-none focus:border-[#800000]"
+              className="w-full min-w-0 h-11 px-3 bg-card border border-slate-200 rounded-lg text-sm text-slate-900 font-bold focus:outline-none focus:border-[#800000]"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700">
+            <label htmlFor="finalizehatchmodal-field-2" className="text-xs font-semibold text-slate-700">
               Unhatched / Dead-in-Shell (Auto-calculated)
             </label>
-            <input
+            <input id="finalizehatchmodal-field-2"
               type="number"
               disabled
               value={unhatchedCount}
-              className="w-full h-9 px-3 bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-500 font-medium cursor-not-allowed"
+              className="w-full min-w-0 h-11 px-3 bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-500 font-medium cursor-not-allowed"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700">
+            <label htmlFor="finalizehatchmodal-field-3" className="text-xs font-semibold text-slate-700">
               Hatch Notes / Observation (Optional)
             </label>
-            <textarea
+            <textarea id="finalizehatchmodal-field-3"
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Successful hatch, high duckling vigor, clean shell separation."
-              className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-[#800000]"
+              className="w-full min-w-0 p-2.5 bg-card border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-[#800000]"
             />
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+          <div className="page-actions justify-end pt-3 border-t border-slate-100">
             <button
-              type="button"
-              onClick={onClose}
-              className="px-3.5 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold cursor-pointer"
+              type="button" disabled={isSubmitting}
+              onClick={() => { if (!isSubmitting) onClose(); }}
+              className="secondary-action"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 rounded-lg bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+              className="primary-action"
             >
+              <CheckCircle2 aria-hidden="true" className="w-4 h-4" />
               {isSubmitting ? 'Finalizing...' : 'Confirm & Complete Batch'}
             </button>
           </div>

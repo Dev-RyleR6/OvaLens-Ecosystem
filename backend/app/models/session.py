@@ -8,8 +8,6 @@ from app.core.database import Base
 
 class CandlingStage(str, enum.Enum):
     DAY_10 = "DAY_10"
-    DAY_18 = "DAY_18"
-    DAY_25 = "DAY_25"
 
 
 class CandlingSessionModel(Base):
@@ -25,7 +23,7 @@ class CandlingSessionModel(Base):
     total_scanned = Column(Integer, nullable=False, default=0)
     fertile_count = Column(Integer, nullable=False, default=0)
     infertile_count = Column(Integer, nullable=False, default=0)
-    abnormal_count = Column(Integer, nullable=False, default=0)
+    manual_review_count = Column(Integer, nullable=False, default=0)
     avg_inference_ms = Column(Numeric(6, 2), nullable=False, default=0.00)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

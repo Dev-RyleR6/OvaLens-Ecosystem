@@ -22,20 +22,14 @@ class ForecastService:
         DuckBreed.KAYUMANGGI: {
             "baseline_fertility": 88.5,
             "post_day10_viability_rate": 89.0,  # ~89% of Day-10 fertile eggs survive to Day 28 hatch
-            "day18_mortality_factor": 6.5,
-            "day25_mortality_factor": 4.5,
         },
         DuckBreed.ITIM: {
             "baseline_fertility": 82.0,
             "post_day10_viability_rate": 84.0,  # Native breeds have slightly higher late mortality
-            "day18_mortality_factor": 9.0,
-            "day25_mortality_factor": 7.0,
         },
         DuckBreed.KHAKI: {
             "baseline_fertility": 86.0,
             "post_day10_viability_rate": 86.5,
-            "day18_mortality_factor": 7.5,
-            "day25_mortality_factor": 6.0,
         },
     }
 
@@ -58,8 +52,7 @@ class ForecastService:
         scans_map = {c[0]: c[1] for c in scan_counts}
         fertile_scanned = scans_map.get(FertilityClass.FERTILE, 0)
         infertile_penoy = scans_map.get(FertilityClass.INFERTILE, 0)
-        abnormal_scanned = scans_map.get(FertilityClass.ABNORMAL, 0)
-        total_scanned = fertile_scanned + infertile_penoy + abnormal_scanned
+        total_scanned = fertile_scanned + infertile_penoy
 
         breed_params = cls.BREED_PARAMETERS.get(
             batch.breed,
@@ -80,7 +73,7 @@ class ForecastService:
             confidence_level = "LOW"
 
         # Predicted Day 28 Hatched Count
-        if total_scanned > 0 and fertile_scanned > 0:
+        if total_scanned > 0:
             # If partially scanned, scale up proportionally to total set egg count
             projected_fertile_total = (fertile_scanned / total_scanned) * batch.initial_egg_count
             predicted_hatched = math.floor(projected_fertile_total * (viability_rate / 100.0))
@@ -112,7 +105,7 @@ class ForecastService:
             anomaly_status = "WARNING"
             advisory_notes.append(
                 f"Fertility is below typical {batch.breed.value} benchmarks by {abs(fertility_diff):.1f}%. "
-                "Monitor Day 18 moisture loss and air cell development closely."
+                "Inspect incubation temperature, humidity, and breeder flock conditions closely."
             )
         else:
             advisory_notes.append(

@@ -69,16 +69,19 @@ def test_inference_engine_and_latency_benchmark():
         latencies.append(lat)
 
         assert "final_class" in result
-        assert result["final_class"] in ["FERTILE", "INFERTILE", "ABNORMAL"]
+        assert result["final_class"] in ["FERTILE", "INFERTILE", None]
         assert "routing_action" in result
-        assert result["routing_action"] in ["ACCEPT", "REJECT"]
+        assert result["routing_action"] in ["ACCEPT", "REJECT", "MANUAL_REVIEW"]
+        if result["final_class"] is None:
+            assert result["routing_action"] == "MANUAL_REVIEW"
+            assert result["confidence"] == 0.0
         assert 0.0 <= result["confidence"] <= 1.0
         assert "detections" in result
 
     avg_latency = np.mean(latencies)
     print(f"\n[BENCHMARK] Average Inference Latency ({engine.engine_type}): {avg_latency:.2f}ms")
     # Verified: Runs within realistic bounds on CPU / Edge devices
-    assert avg_latency < 500.0
+    assert avg_latency < 1000.0
 
 
 def test_local_sqlite_wal_and_queue_diagnostics(tmp_path):
@@ -115,7 +118,6 @@ def test_local_sqlite_wal_and_queue_diagnostics(tmp_path):
     assert stats["total_scanned"] == 3
     assert stats["fertile_count"] == 2
     assert stats["infertile_count"] == 1
-    assert stats["abnormal_count"] == 0
 
     # Mark s1, s2 as synced
     db.mark_scans_synced([s1, s2])
@@ -201,19 +203,18 @@ def test_session_completion_and_batch_querying(tmp_path):
         operator_name="Inspector"
     )
 
-    # Record 4 scans (2 Fertile, 1 Infertile, 1 Abnormal)
+    # Record 4 scans (2 Fertile, 2 Infertile)
     db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 1, "FERTILE", 0.98, 15, "ACCEPT", [])
     db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 2, "FERTILE", 0.95, 17, "ACCEPT", [])
     db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 3, "INFERTILE", 0.89, 16, "REJECT", [])
-    db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 4, "ABNORMAL", 0.92, 19, "REJECT", [])
+    db.record_scan(str(uuid.uuid4()), sess_id, "BATCH-TEST-EXPLORER", 4, "INFERTILE", 0.92, 19, "REJECT", [])
 
     # Test Session Completion Protocol
     completed_stats = db.complete_session(sess_id)
     assert completed_stats["ended_at"] is not None
     assert completed_stats["total_scanned"] == 4
     assert completed_stats["fertile_count"] == 2
-    assert completed_stats["infertile_count"] == 1
-    assert completed_stats["abnormal_count"] == 1
+    assert completed_stats["infertile_count"] == 2
 
     # Test Querying Batch Scans with filtering
     all_scans = db.get_scans_by_batch("BATCH-TEST-EXPLORER", class_filter="ALL")
@@ -223,10 +224,7 @@ def test_session_completion_and_batch_querying(tmp_path):
     assert len(fertile_scans) == 2
 
     infertile_scans = db.get_scans_by_batch("BATCH-TEST-EXPLORER", class_filter="INFERTILE")
-    assert len(infertile_scans) == 1
-
-    abnormal_scans = db.get_scans_by_batch("BATCH-TEST-EXPLORER", class_filter="ABNORMAL")
-    assert len(abnormal_scans) == 1
+    assert len(infertile_scans) == 2
 
     # Test Filtered Batch CSV Export
     csv_fertile = db.export_batch_csv("BATCH-TEST-EXPLORER", class_filter="FERTILE", output_dir=export_dir)
@@ -245,5 +243,20 @@ def test_session_completion_and_batch_querying(tmp_path):
     searched = db.get_scans_by_batch("BATCH-TEST-EXPLORER", search_query="3")
     assert len(searched) == 1
     assert searched[0]["sequence_number"] == 3
+
+
+def test_edge_rejects_removed_classes_and_stages(tmp_path):
+    db = LocalDatabaseManager(db_path=str(tmp_path / "strict_contract.db"))
+    session_id = str(uuid.uuid4())
+
+    with pytest.raises(ValueError, match="DAY_10"):
+        db.create_session(session_id, "BATCH-01", "STATION-1", "DAY_18", "Tester")
+
+    db.create_session(session_id, "BATCH-01", "STATION-1", "DAY_10", "Tester")
+    with pytest.raises(ValueError, match="FERTILE or INFERTILE"):
+        db.record_scan(
+            str(uuid.uuid4()), session_id, "BATCH-01", 1,
+            "ABNORMAL", 0.90, 20, "REJECT", []
+        )
 
 

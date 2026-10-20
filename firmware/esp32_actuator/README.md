@@ -2,6 +2,14 @@
 
 Firmware for the ESP32 microcontroller controlling the automated duck egg sorting gate and optical trigger sensor for the OvaLens Capstone system.
 
+## Unified edge hardware prototype
+
+The [combined desktop app](../prototype/README.md) integrates the standalone
+egg and servo controller controls with independent ESP32 connections and an
+explicit simulation mode. Run `python -m firmware.prototype.app` from the
+repository root. It requires the two boards' legacy controller protocols;
+the `CMD:...` actuator sketch documented below uses a different protocol.
+
 ---
 
 ## 📌 Hardware Pinout & Wiring

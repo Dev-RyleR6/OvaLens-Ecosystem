@@ -6,13 +6,30 @@ Supports clean session on-demand start/stop lifecycle.
 
 import time
 import threading
+import sys
+import queue
+from concurrent.futures import Future
+from dataclasses import dataclass
 from typing import Optional, Tuple
 import cv2
 import numpy as np
+from .camera_controls import exposure_modes
+
+
+@dataclass(frozen=True)
+class CameraFrame:
+    sequence: int
+    captured_at: float
+    settings_revision: int
+    image: np.ndarray
+
+
+FRAME_STALENESS_THRESHOLD_S = 1.5
 
 
 class CameraGrabber:
-    def __init__(self, camera_index: int = 0, width: int = 1280, height: int = 720, fps: int = 30):
+    def __init__(self, camera_index: int = 0, width: int = 1280, height: int = 720, fps: int = 30,
+                 allow_mock: bool = False):
         self.camera_index = camera_index
         self.width = width
         self.height = height
@@ -21,6 +38,7 @@ class CameraGrabber:
         self.cap: Optional[cv2.VideoCapture] = None
         self._lock = threading.Lock()
         self._latest_frame: Optional[np.ndarray] = None
+        self._latest_revision = 0
         self._is_running = False
         self._thread: Optional[threading.Thread] = None
         self._is_mock_mode = False
@@ -28,6 +46,18 @@ class CameraGrabber:
         self._current_fps = 0.0
         self._last_fps_time = time.time()
         self._static_bg: Optional[np.ndarray] = None
+        self.allow_mock = allow_mock
+        self.last_error = None
+        self._last_frame_at = 0.0
+        self._sequence = 0
+        self.settings_revision = 0
+        self._requests = queue.Queue(maxsize=4)
+        self._still_requests = queue.Queue(maxsize=1)
+        self.property_report = {}
+        self.identity = ""
+        self._discard_frames = 0
+        self.initial_settings = None
+        self.exposure_modes = {}
 
     def _init_static_bg(self):
         """Pre-render darkroom candling aperture background once to minimize CPU cycles."""
@@ -37,57 +67,197 @@ class CameraGrabber:
         self._static_bg = bg
 
     def start(self):
-        """Initialize camera hardware and start continuous frame grabber thread."""
+        """Open/read the camera on its worker; never silently substitute mock frames."""
         if self._is_running:
             return
-
-        if self._static_bg is None:
-            self._init_static_bg()
-
-        self._open_camera()
+        if self._thread and self._thread.is_alive():
+            raise RuntimeError("Previous camera worker is still stopping")
+        self.last_error = None
         self._is_running = True
-        self._thread = threading.Thread(target=self._capture_loop, daemon=True, name="OvaLens-CameraThread")
+        self._thread = threading.Thread(target=self._capture_loop, daemon=True,
+                                        name="OvaLens-CameraThread")
         self._thread.start()
 
     def _open_camera(self):
-        # Try DirectShow on Windows, default on Linux
-        try:
-            self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
-            if not self.cap.isOpened():
-                self.cap = cv2.VideoCapture(self.camera_index)
-        except Exception:
-            self.cap = cv2.VideoCapture(self.camera_index)
-
-        if self.cap and self.cap.isOpened():
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-            self.cap.set(cv2.CAP_PROP_FPS, self.fps)
-            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimum buffer to prevent lag
-            self._is_mock_mode = False
-        else:
+        if self.allow_mock:
             self._is_mock_mode = True
+            self._init_static_bg()
+            return
+        backend = cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_V4L2
+        self.cap = cv2.VideoCapture(self.camera_index, backend)
+        if not self.cap.isOpened():
+            self.cap.release()
+            self.cap = cv2.VideoCapture(self.camera_index)
+        if not self.cap.isOpened():
+            raise RuntimeError("Camera unavailable; check its index and USB connection")
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+        self.cap.set(cv2.CAP_PROP_FPS, self.fps)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self._is_mock_mode = False
+        self.identity = f"opencv:{self.camera_index}:{self.cap.getBackendName()}"
+        normalized = bool(self.cap.get(cv2.CAP_PROP_MODE)) if self.identity.endswith((":V4L2", ":V4L")) else False
+        self.exposure_modes = exposure_modes(self.identity, normalized)
+
+    def apply_settings(self, settings, timeout=10, *, controls_only=False, live_preview=False):
+        """Called from an operation worker; only the capture thread touches VideoCapture."""
+        future = Future()
+        self._requests.put_nowait((settings, future, controls_only, live_preview))
+        self.start()
+        return future.result(timeout=timeout)
+
+    def _apply_on_worker(self, settings, controls_only=False, live_preview=False):
+        from .settings import EdgeSettings
+        EdgeSettings(camera=settings).validate()
+        if live_preview and not controls_only:
+            raise ValueError("Live preview updates must preserve camera stream settings")
+        if self.allow_mock:
+            raise RuntimeError("Camera property tuning requires a real camera")
+        if controls_only and settings.index != self.camera_index:
+            raise RuntimeError("Use station settings to change the camera device")
+        if settings.index != self.camera_index:
+            self.cap.release()
+            self.camera_index = settings.index
+            self.width, self.height, self.fps = settings.width, settings.height, settings.fps
+            self._open_camera()
+        if settings.identity and settings.identity != self.identity:
+            raise RuntimeError("Camera identity changed; confirm this device before applying defaults")
+        properties = {
+            "width": cv2.CAP_PROP_FRAME_WIDTH, "height": cv2.CAP_PROP_FRAME_HEIGHT,
+            "fps": cv2.CAP_PROP_FPS, "auto_exposure": cv2.CAP_PROP_AUTO_EXPOSURE,
+            "autofocus": cv2.CAP_PROP_AUTOFOCUS, "auto_white_balance": cv2.CAP_PROP_AUTO_WB,
+            "exposure": cv2.CAP_PROP_EXPOSURE, "gain": cv2.CAP_PROP_GAIN,
+            "focus": cv2.CAP_PROP_FOCUS, "white_balance": cv2.CAP_PROP_WB_TEMPERATURE,
+            "brightness": cv2.CAP_PROP_BRIGHTNESS, "contrast": cv2.CAP_PROP_CONTRAST,
+            "saturation": cv2.CAP_PROP_SATURATION, "sharpness": cv2.CAP_PROP_SHARPNESS,
+        }
+        if controls_only:
+            properties = {name: prop for name, prop in properties.items() if name not in {"width", "height", "fps"}}
+        report = {}
+        for name, prop in properties.items():
+            requested = getattr(settings, name)
+            try:
+                automatic = {"focus": settings.autofocus == 1,
+                    "white_balance": settings.auto_white_balance == 1,
+                    "exposure": settings.auto_exposure is not None and settings.auto_exposure == self.exposure_modes.get("On")}
+                inactive = automatic.get(name, False)
+                accepted = self.cap.set(prop, requested) if requested is not None and not inactive else None
+                actual = self.cap.get(prop)
+                verified = (accepted is True and np.isfinite(actual)
+                            and abs(actual - requested) <= max(.01, abs(requested) * .01))
+                report[name] = {"requested": requested, "actual": actual if np.isfinite(actual) else None,
+                                "status": "inactive while automatic mode is on" if inactive else "verified readback" if verified else
+                                "rejected / unsupported" if accepted is False else "unverified"}
+            except (cv2.error, ValueError) as exc:
+                report[name] = {"requested": requested, "actual": None, "status": str(exc)}
+        self.width, self.height, self.fps = settings.width, settings.height, settings.fps
+        self.property_report = {**self.property_report, **report}
+        with self._lock:
+            self.settings_revision += 1
+            if not live_preview:
+                self._latest_frame = None
+                self._last_frame_at = 0.0
+        # Live tuning must not repeatedly restart the settling drain and starve
+        # the preview. Sorting still uses its full settle + fresh capture path.
+        self._discard_frames = 0 if live_preview else max(3, int(settings.fps * .3))
+        return {"identity": self.identity, "properties": report, "revision": self.settings_revision,
+                "exposure_modes": dict(self.exposure_modes)}
+
+    def snapshot(self, copy=True):
+        with self._lock:
+            if not self._is_running or self._latest_frame is None or time.monotonic() - self._last_frame_at > FRAME_STALENESS_THRESHOLD_S:
+                return None
+            return CameraFrame(self._sequence, self._last_frame_at, self._latest_revision,
+                               self._latest_frame.copy() if copy else self._latest_frame)
+
+    def capture_fresh(self, drain=6, timeout=3):
+        """Flush and capture on the sole VideoCapture owner, never on the caller."""
+        if type(drain) is not int or not 1 <= drain <= 30:
+            raise ValueError("Camera drain must be between 1 and 30 frames")
+        if not self._is_running or self.allow_mock:
+            raise RuntimeError("Fresh capture requires an active real camera")
+        future = Future()
+        self._still_requests.put_nowait((drain, future))
+        try:
+            return future.result(timeout=timeout)
+        except TimeoutError:
+            future.cancel()
+            raise
+
+    def _publish(self, frame):
+        with self._lock:
+            self._latest_frame = frame
+            self._latest_revision = self.settings_revision
+            self._last_frame_at = time.monotonic()
+            self._sequence += 1
+            return CameraFrame(self._sequence, self._last_frame_at, self.settings_revision, frame)
 
     def _capture_loop(self):
-        frame_interval = 1.0 / max(1, self.fps)
-        while self._is_running:
-            t_start = time.time()
-            if not self._is_mock_mode and self.cap and self.cap.isOpened():
-                ret, frame = self.cap.read()
-                if ret and frame is not None:
-                    with self._lock:
-                        self._latest_frame = frame
-                    self._update_fps()
+        try:
+            self._open_camera()
+            if self.initial_settings is not None and self._requests.empty() and not self.allow_mock:
+                self._apply_on_worker(self.initial_settings)
+            while self._is_running:
+                try:
+                    drain, still = self._still_requests.get_nowait()
+                except queue.Empty:
+                    pass
                 else:
-                    time.sleep(0.005)
-            else:
-                # Generate synthetic candling frame with a moving egg silhouette
-                frame = self._generate_mock_candling_frame()
-                with self._lock:
-                    self._latest_frame = frame
+                    if still.set_running_or_notify_cancel():
+                        try:
+                            for _ in range(drain):
+                                if not self._is_running or not self.cap.grab():
+                                    raise RuntimeError("Fresh camera buffer drain failed")
+                            ok, image = self.cap.read()
+                            if not self._is_running or not ok or image is None:
+                                raise RuntimeError("Fresh camera capture failed")
+                            still.set_result(self._publish(image))
+                        except Exception as exc:
+                            still.set_exception(exc)
+                            raise
+                try:
+                    settings, future, controls_only, live_preview = self._requests.get_nowait()
+                except queue.Empty:
+                    pass
+                else:
+                    if future.set_running_or_notify_cancel():
+                        try:
+                            future.set_result(self._apply_on_worker(settings, controls_only, live_preview))
+                        except Exception as exc:
+                            future.set_exception(exc)
+                if self._is_mock_mode:
+                    frame = self._generate_mock_candling_frame()
+                    time.sleep(1 / max(1, self.fps))
+                else:
+                    ret, frame = self.cap.read()
+                    if not ret or frame is None:
+                        raise RuntimeError("Camera frame acquisition failed; reconnect before restarting")
+                if self._discard_frames:
+                    self._discard_frames -= 1
+                    continue
+                self._publish(frame)
                 self._update_fps()
-                elapsed = time.time() - t_start
-                sleep_time = max(0.001, frame_interval - elapsed)
-                time.sleep(sleep_time)
+        except Exception as exc:
+            self.last_error = str(exc)
+        finally:
+            self._is_running = False
+            if self.cap:
+                self.cap.release()
+                self.cap = None
+            with self._lock:
+                self._latest_frame = None
+                self._last_frame_at = 0.0
+            while not self._requests.empty():
+                try:
+                    _, future, _, _ = self._requests.get_nowait()
+                    future.set_exception(RuntimeError(self.last_error or "Camera stopped"))
+                except queue.Empty:
+                    break
+
+            while not self._still_requests.empty():
+                _, future = self._still_requests.get_nowait()
+                if not future.done():
+                    future.set_exception(RuntimeError(self.last_error or "Camera stopped"))
 
     def _update_fps(self):
         self._fps_count += 1
@@ -127,7 +297,7 @@ class CameraGrabber:
         if not self._is_running:
             return None
         with self._lock:
-            if self._latest_frame is not None:
+            if self._latest_frame is not None and time.monotonic() - self._last_frame_at <= FRAME_STALENESS_THRESHOLD_S:
                 return self._latest_frame.copy() if copy else self._latest_frame
             return None
 
@@ -189,15 +359,20 @@ class CameraGrabber:
             "contrast_ratio": contrast_ratio,
         }
 
-    def stop(self):
-        """Safely release camera resources and stop thread."""
+    def request_stop(self):
+        """Immediate UI-safe cancellation; the worker owns handle release."""
         self._is_running = False
+
+    def stop(self):
+        """The capture worker owns its camera handle, including release."""
+        self.request_stop()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1.0)
+        if self._thread and self._thread.is_alive():
+            self.last_error = "Camera worker did not stop within one second"
+        else:
             self._thread = None
-        if self.cap and self.cap.isOpened():
-            self.cap.release()
-            self.cap = None
         with self._lock:
             self._latest_frame = None
+            self._last_frame_at = 0.0
         self._current_fps = 0.0

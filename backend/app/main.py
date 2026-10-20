@@ -12,8 +12,10 @@ from app.api.v1.router import api_router
 # Ensure all ORM models are registered with Base
 import app.models  # noqa: F401
 
-# Auto-create tables on startup
+# Auto-create tables and apply idempotent migrations on startup
 Base.metadata.create_all(bind=engine)
+from app.core.migrations import run_migrations
+run_migrations(engine)
 
 # Ensure local storage directory exists
 os.makedirs(settings.STORAGE_DIR, exist_ok=True)

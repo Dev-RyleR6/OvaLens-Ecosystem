@@ -1,13 +1,16 @@
 """
 OvaLens Operator Desktop GUI (CustomTkinter 60 FPS)
 Foundation University Automated Duck Egg Candling & Conveyor Sorting System.
-High-Contrast White Institutional Theme with Rich Accent Badges, Interactive Standby HUD, and Streamlined Controls.
+FU slate operator interface with readable typography and persistent safety controls.
 """
 
 import os
 import time
 import uuid
 import threading
+import queue
+import math
+from functools import wraps
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List, Tuple
 
@@ -20,53 +23,107 @@ import customtkinter as ctk
 from .theme import FUTheme
 from ..core.camera import CameraGrabber
 from ..core.inference import InferenceEngine
+from ..core.chamber_controller import ChamberController, ChamberState
+from ..core.background_jobs import BackgroundJobs
+from ..core.inference_worker import InferenceWorker
+from ..core.capture_view import CaptureView
+from ..core.operator_flow import OperatorState, validate_batch_config
+from ..core.operator_cues import cycle_cue
 from ..iot.serial_driver import ESP32SerialDriver
 from ..db.local_db import LocalDatabaseManager
 from ..sync.sync_worker import BackgroundSyncWorker
+from .station_settings import StationSettingsWindow
+from .camera_controls import CameraControlsPanel
+from .station_readiness import ReadinessFlow, StationReadinessPanel
 
 
-class OvaLensOperatorApp(ctk.CTk):
+def _building_dialog(method):
+    """Defer shutdown during Tk's reentrant dialog-construction callbacks."""
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        if self._closing:
+            return
+        self._dialog_build_depth = getattr(self, "_dialog_build_depth", 0) + 1
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            self._dialog_build_depth -= 1
+    return wrapped
+
+
+class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
     def __init__(self, camera: CameraGrabber, engine: InferenceEngine,
                  iot: ESP32SerialDriver, db: LocalDatabaseManager,
-                 sync_worker: BackgroundSyncWorker, device_id: str = "STATION-01-RP5"):
+                 sync_worker: BackgroundSyncWorker,
+                 chamber: Optional[ChamberController] = None,
+                 inference_worker: Optional[Any] = None,
+                 device_id: str = "STATION-01-RP5",
+                 startup_config: Optional[Dict[str, Any]] = None,
+                 fullscreen: bool = True, station=None):
         super().__init__()
 
         self.camera = camera
+        self.station = station
         self.engine = engine
         self.iot = iot
         self.db = db
         self.sync_worker = sync_worker
+        self.chamber = chamber
+        self.inference_worker = inference_worker
+        self._operator_state = OperatorState.READY
+        self._pending_prediction = None
+        self._inference_request_id = None
+        self._pending_finalization_id = None
+        self._finalization_failed = False
+        self._diagnostics_complete = False
+        self._batch_complete = False
         self.device_id = device_id
+        self._ui_events = queue.Queue()
+        self._closing = False
+        self._operation_generation = 0
+        self._setup_request = None
+        self._automatic_complete_cycle = None
+        self._camera_panel = None
+        self._scan_busy = False
+        self._stopping = False
+        self.simulation = bool((startup_config or {}).get("simulation", False))
 
-        # Conveyor & Chamber Timing Defaults
-        self.conveyor_speed_cm_s = 12.50
-        self.conveyor_dist_cm = 25.00
-        self.servo_pulse_ms = 250
-        self.chamber_pause_ms = 350       # Time conveyor pauses inside chamber for blur-free candling
-        self.conveyor_advance_ms = 900     # Time conveyor moves between consecutive eggs
+        # Operational parameters from startup config
+        cfg = startup_config or {}
+        self.conveyor_speed_cm_s  = float(cfg.get("conveyor_speed_cm_s", 12.50))
+        self.conveyor_dist_cm     = float(cfg.get("conveyor_dist_cm", 25.00))
+        self.servo_pulse_ms       = int(cfg.get("servo_pulse_ms", 250))
+        self.display_result_ms    = int(cfg.get("display_result_ms", 1200))
+        self.chamber_pause_ms     = int(cfg.get("chamber_pause_ms", 150))       # Settle time inside chamber
+        self.conveyor_advance_ms  = int(cfg.get("conveyor_advance_ms", 900))     # Advance time between eggs
 
-        # Batch & Session Configuration
+        # Batch & Session Configuration (from startup config)
         self.current_session_id: Optional[str] = None
-        self.current_batch_id: str = "BATCH-2026-08-KAY-01"
-        self.current_breed: str = "KAYUMANGGI"
-        self.current_stage: str = "DAY_10"
-        self.target_egg_count: int = 500
+        self._batch_record_ready = False
+        self.current_batch_id: str = str(cfg.get("batch_id", ""))
+        self.current_batch_code = str(cfg.get("batch_code", self.current_batch_id or "Choose a batch"))
+        self._startup_operator = cfg.get("operator")
+        self.current_breed: str = str(cfg.get("breed", "KAYUMANGGI"))
+        self.current_stage: str = str(cfg.get("stage", "DAY_10"))
+        self.target_egg_count: int = int(cfg.get("egg_count", 500))
         self.incubator_id: str = "INCUBATOR-A1"
-        self.operator_name: str = "Pedro Penduko"
+        self.operator_name: str = str(cfg.get("operator", "Pedro Penduko"))
         self.is_session_active: bool = False
         self.is_auto_cycle_running: bool = False
         self.scan_sequence: int = 0
 
         # Automated Cycle Threading
         self._auto_cycle_thread: Optional[threading.Thread] = None
+        self._chamber_thread: Optional[threading.Thread] = None
         self._stop_cycle_event = threading.Event()
 
         # Live Real-time Inference Cache
         self._latest_detections: List[Dict[str, Any]] = []
         self._last_live_infer_time = 0.0
+        self._last_scan_result_time = 0.0
 
         # Performance & Ergonomics State
-        self.is_fullscreen = False
+        self.is_fullscreen = bool((startup_config or {}).get("fullscreen", fullscreen))
         self.show_crosshairs = True
         self._session_start_time: Optional[float] = None
         self._cached_container_w = 640
@@ -76,7 +133,14 @@ class OvaLensOperatorApp(ctk.CTk):
         self.total_count = 0
         self.fertile_count = 0
         self.infertile_count = 0
-        self.abnormal_count = 0
+        self.review_count = 0
+
+        # Wire ChamberController callbacks if provided
+        if self.chamber is not None:
+            self.chamber.on_state_change = lambda s, c, t: self._ui_events.put(lambda: self._on_chamber_state_change(s, c, t))
+            self.chamber.on_scan_result = lambda r: self._ui_events.put(lambda: self._on_chamber_scan_result(r))
+            self.chamber.on_batch_complete = lambda c: self._ui_events.put(lambda: self._on_batch_complete_callback(c))
+            self.chamber.on_jam_detected = lambda: self._ui_events.put(self._on_jam_detected)
 
         # Window Configuration (Industrial Pro Gray Theme)
         self.title("OvaLens — Automated Duck Egg Candling System (Foundation University)")
@@ -84,19 +148,33 @@ class OvaLensOperatorApp(ctk.CTk):
         self.minsize(1024, 720)
         ctk.set_appearance_mode("dark")
         self.configure(fg_color=FUTheme.BG_LIGHT)
+        if self.is_fullscreen:
+            try:
+                self.attributes("-fullscreen", True)
+            except Exception:
+                try:
+                    self.state("zoomed")
+                except Exception:
+                    pass
 
         # Standard Window Exit Confirmation
         self.protocol("WM_DELETE_WINDOW", self.confirm_exit_dialog)
 
         # Setup UI Layout
         self._build_header()
-        self._build_main_layout()
         self._build_footer()
+        self._build_main_layout()
+        self.readiness_panel = StationReadinessPanel(self) if self.station else None
+        self._jobs = BackgroundJobs()
+        if self.inference_worker is None:
+            self.inference_worker = InferenceWorker(self.engine)
+            self.inference_worker.start()
+        self._diagnostic_view = None
 
         # Keyboard Accelerators & Operator Hotkeys
-        self.bind("<space>", lambda event: self.trigger_candling_scan())
-        self.bind("r", lambda event: self.trigger_manual_eject())
-        self.bind("R", lambda event: self.trigger_manual_eject())
+        self.bind("<space>", self._scan_shortcut)
+        self.bind("r", self._stop_shortcut)
+        self.bind("R", self._stop_shortcut)
         self.bind("b", lambda event: self.open_batch_setup_dialog())
         self.bind("B", lambda event: self.open_batch_setup_dialog())
         self.bind("<F1>", lambda event: self.open_onboarding_guide())
@@ -107,12 +185,167 @@ class OvaLensOperatorApp(ctk.CTk):
         self.bind("C", self.toggle_crosshairs)
         self.bind("s", lambda event: self.open_scan_history_modal())
         self.bind("S", lambda event: self.open_scan_history_modal())
-        self.bind("<Escape>", lambda event: self.open_end_session_modal() if (self.is_session_active or self.camera.is_running) else None)
+        self.bind("<Escape>", lambda event: self.open_end_session_modal() if (self.is_session_active or self.camera.is_running) else (self.finish_current_batch() if (getattr(self, "_batch_complete", False) or getattr(self, "_diagnostics_complete", False)) else None))
 
         # Start Standby Display & Status Loop
         self._render_standby_hud()
         self._update_video_frame()
         self._update_status_loop()
+        self._drain_operation_events()
+        self._set_operation_state(OperatorState.READY, "Choose a batch, then prepare the empty conveyor")
+        self.after(0, self._start_preview)
+        self.after(0, self._restore_batch_selection)
+        self.after(100, self.run_software_checks)
+
+        # Auto-start operation if invoked with startup configuration
+        if startup_config is not None:
+            self.after(500, self._auto_start_from_config)
+
+
+    def _drain_operation_events(self):
+        if self._closing:
+            return
+        try:
+            self._jobs.drain()
+            self._drain_predictions()
+            self._poll_station()
+            for _ in range(16):
+                try:
+                    callback = self._ui_events.get_nowait()
+                except queue.Empty:
+                    break
+                callback()
+        except Exception as exc:
+            self._log("[UI ERROR] " + str(exc))
+        finally:
+            if not self._closing:
+                self.after(30, self._drain_operation_events)
+
+    def shutdown(self):
+        """Wait asynchronously for queued commits/cleanup before destroying Tk."""
+        if self._closing:
+            return
+        if getattr(self, "_dialog_build_depth", 0):
+            self.after(50, self.shutdown)
+            return
+        self.stop_or_cancel_session()
+        self._closing = True
+        self._operation_generation += 1
+        done = threading.Event()
+        deadline = time.monotonic() + 5.0
+        def cleanup():
+            try:
+                for resource in (getattr(self, "station", None), self.inference_worker,
+                                 self.chamber, self.iot, self.sync_worker, self.camera):
+                    if resource:
+                        try:
+                            resource.stop()
+                        except Exception as exc:
+                            print(f"[SHUTDOWN WARNING] {type(resource).__name__}: {exc}")
+            finally:
+                self._jobs.close()
+                done.set()
+        try:
+            self._jobs.submit(cleanup, lambda _: None, lambda _: None)
+        except (queue.Full, RuntimeError):
+            threading.Thread(target=cleanup, daemon=True).start()
+        def poll():
+            try:
+                self._jobs.drain()
+            except Exception as exc:
+                print("[SHUTDOWN WARNING] Completion callback failed: " + str(exc))
+            if done.is_set() or time.monotonic() >= deadline:
+                if not done.is_set():
+                    print("[SHUTDOWN WARNING] Worker cleanup timed out; interrupted sessions require review.")
+                if self._finalization_failed:
+                    print("[SHUTDOWN WARNING] Local session was not finalized; reconciliation required.")
+                self.destroy()
+            else:
+                self.after(50, poll)
+        self.after(50, poll)
+
+
+    def _export_report(self, work, label):
+        def saved(path):
+            self._log("[EXPORT] CSV saved: " + path)
+            if label.winfo_exists():
+                label.configure(text="Saved: " + os.path.basename(path),
+                                text_color=FUTheme.FERTILE_GREEN_TEXT)
+        def failed(message):
+            self._log("[EXPORT ERROR] " + message)
+            if label.winfo_exists():
+                label.configure(text="Export failed: " + message,
+                                text_color=FUTheme.REJECT_RED_TEXT)
+        try:
+            self._jobs.submit(work, saved, failed)
+        except (queue.Full, RuntimeError) as exc:
+            failed(str(exc))
+
+    def _scan_shortcut(self, event):
+        # Typing in a dialog or editable field must never start a scan.
+        if event.widget.winfo_toplevel() is not self or self.grab_current() is not None:
+            return
+        if isinstance(event.widget, (tk.Entry, tk.Text, tk.Spinbox)):
+            return
+        self.trigger_candling_scan()
+        return "break"
+
+    def _stop_shortcut(self, event):
+        if event.widget.winfo_toplevel() is not self or isinstance(event.widget, (tk.Entry, tk.Text, tk.Spinbox)):
+            return
+        self.trigger_manual_eject()
+        return "break"
+
+    def _set_operation_state(self, state, message):
+        self._operator_state = state
+        self._operator_state_msg = message
+        color = (FUTheme.INFERTILE_AMBER if state in
+                 {OperatorState.REVIEW, OperatorState.ERROR, OperatorState.RECOVERY}
+                 else FUTheme.TEXT_MUTED)
+        titles = {
+            OperatorState.READY: "Ready to prepare", OperatorState.CAMERA_STARTING: "Starting camera",
+            OperatorState.CLASSIFYING: "Inspecting egg", OperatorState.SAVING: "Saving scan",
+            OperatorState.REVIEW: "Inspect this egg", OperatorState.ERROR: "Check station",
+            OperatorState.STOPPING: "Stopping", OperatorState.RECOVERY: "Sorting stopped",
+            OperatorState.COMPLETE: "Diagnostics complete",
+        }
+        self._update_cycle_hud("", color, titles.get(state, "Wait"), detail=message)
+        self._set_session_active_state(self.is_session_active or self._scan_busy or self._stopping)
+
+    def _drain_predictions(self):
+        try:
+            result = self.inference_worker.result_queue.get_nowait()
+        except queue.Empty:
+            return
+        pending = self._pending_prediction
+        if pending is None or result.get("request_id") != pending["id"]:
+            return
+        self._pending_prediction = None
+        self._inference_request_id = None
+        if pending["generation"] != self._operation_generation or self._closing or self._stopping:
+            return
+        if time.monotonic() >= pending["deadline"]:
+            self._scan_failed("Inference timed out; result discarded.", OperatorState.REVIEW)
+            return
+        if not OvaLensOperatorApp._diagnostic_stationary(self):
+            self._scan_failed("Conveyor moved during the diagnostic; result discarded.")
+            return
+        frame = pending.get("frame")
+        if frame is None or frame.settings_revision != self.camera.settings_revision:
+            self._scan_failed("Camera settings changed; result discarded.")
+            return
+        self._diagnostic_view = CaptureView.create(frame, result)
+        self._process_scan_result(result)
+
+    def _scan_failed(self, message, state=OperatorState.ERROR):
+        self._scan_busy = False
+        self._diagnostic_view = None
+        self._latest_detections = []
+        self.result_title.configure(text="No scan recorded")
+        self.result_badge.configure(text=state.value)
+        self.result_subtitle.configure(text=message)
+        self._set_operation_state(state, message)
+        self._log("[" + state.value + "] " + message)
 
     def _build_header(self):
         self.header_frame = ctk.CTkFrame(
@@ -121,8 +354,11 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         self.header_frame.pack(side="top", fill="x")
 
+        navigation = ctk.CTkFrame(self.header_frame, fg_color="transparent")
+        navigation.pack(fill="x")
+
         # Left: University & Project Brand
-        brand_container = ctk.CTkFrame(self.header_frame, fg_color="transparent")
+        brand_container = ctk.CTkFrame(navigation, fg_color="transparent")
         brand_container.pack(side="left", padx=18, pady=10)
 
         badge = ctk.CTkLabel(
@@ -137,20 +373,20 @@ class OvaLensOperatorApp(ctk.CTk):
 
         title = ctk.CTkLabel(
             title_box, text="OvaLens Edge Operator",
-            font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY
+            font=(FUTheme.FONT_FAMILY, FUTheme.FONT_HEADING, "bold"), text_color=FUTheme.TEXT_PRIMARY
         )
         title.pack(anchor="w")
 
         subtitle = ctk.CTkLabel(
             title_box, text="Foundation University • Team DevIn",
-            font=(FUTheme.FONT_FAMILY, 10), text_color=FUTheme.TEXT_MUTED
+            font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED
         )
         subtitle.pack(anchor="w")
 
         # Center: Interactive Active Batch Setup Button with High Contrast
         self.batch_btn = ctk.CTkButton(
-            self.header_frame,
-            text=f"📋 Batch: {self.current_batch_id}  ({self.current_stage})  ▾",
+            navigation,
+            text=f"Batch: {self.current_batch_code}  ({self.current_stage})  ▾",
             font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT,
             text_color=FUTheme.TEXT_PRIMARY,
@@ -164,9 +400,9 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Quick Onboarding / Help Guide Button
         self.help_btn = ctk.CTkButton(
-            self.header_frame,
-            text="📘 Quick Guide [F1]",
-            font=(FUTheme.FONT_FAMILY, 11, "bold"),
+            navigation,
+            text="Guide [F1]", width=100,
+            font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT,
             text_color=FUTheme.TEXT_PRIMARY,
             hover_color=FUTheme.PANEL_ACCENT,
@@ -179,9 +415,9 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Fullscreen Kiosk Mode Button
         self.kiosk_btn = ctk.CTkButton(
-            self.header_frame,
-            text="⛶ Kiosk [F11]",
-            font=(FUTheme.FONT_FAMILY, 11, "bold"),
+            navigation,
+            text="Windowed [F11]" if self.is_fullscreen else "Kiosk [F11]", width=128,
+            font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT,
             text_color=FUTheme.TEXT_SECONDARY,
             hover_color=FUTheme.PANEL_ACCENT,
@@ -194,23 +430,23 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Right: Status Telemetry Badges
         right_container = ctk.CTkFrame(self.header_frame, fg_color="transparent")
-        right_container.pack(side="right", padx=18)
+        right_container.pack(fill="x", padx=18, pady=(0, 8))
 
         self.fps_label = ctk.CTkLabel(
-            right_container, text="FPS: 0.0", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_MUTED
+            right_container, text="FPS: 0.0", font=(FUTheme.FONT_FAMILY, 12, "bold"), text_color=FUTheme.TEXT_MUTED
         )
-        self.fps_label.pack(side="left", padx=8)
+        self.fps_label.pack(side="right", padx=8)
 
         self.iot_status_badge = ctk.CTkLabel(
             right_container, text="ESP32: STANDBY", fg_color=FUTheme.PANEL_LIGHT_ALT,
-            text_color=FUTheme.TEXT_SECONDARY, font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            text_color=FUTheme.TEXT_SECONDARY, font=(FUTheme.FONT_FAMILY, 12, "bold"),
             corner_radius=4, padx=8, pady=3
         )
         self.iot_status_badge.pack(side="left", padx=4)
 
         self.net_status_badge = ctk.CTkLabel(
             right_container, text="SYNC: ONLINE", fg_color=FUTheme.FERTILE_GREEN_BG,
-            text_color=FUTheme.FERTILE_GREEN_TEXT, font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            text_color=FUTheme.FERTILE_GREEN_TEXT, font=(FUTheme.FONT_FAMILY, 12, "bold"),
             corner_radius=4, padx=8, pady=3
         )
         self.net_status_badge.pack(side="left", padx=4)
@@ -282,29 +518,33 @@ class OvaLensOperatorApp(ctk.CTk):
         self.left_panel.pack(side="left", fill="both", expand=True, padx=(0, 10))
 
         # Top of Left Panel: Live Automated Cycle State Indicator
-        self.cycle_hud = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.PANEL_LIGHT_ALT, height=36, corner_radius=8)
+        self.cycle_hud = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.PANEL_LIGHT_ALT, height=96, corner_radius=8)
         self.cycle_hud.pack(fill="x", padx=10, pady=(10, 6))
         self.cycle_hud.pack_propagate(False)
 
         self.cycle_status_dot = ctk.CTkLabel(
-            self.cycle_hud, text="●", font=(FUTheme.FONT_FAMILY, 12, "bold"), text_color=FUTheme.TEXT_MUTED
+            self.cycle_hud, text="●", font=(FUTheme.FONT_FAMILY, 14, "bold"), text_color=FUTheme.TEXT_MUTED
         )
         self.cycle_status_dot.pack(side="left", padx=(12, 6))
 
-        self.cycle_status_label = ctk.CTkLabel(
-            self.cycle_hud, text="CONVEYOR STANDBY — CLICK 'START AUTO SORTING' TO ACTIVATE",
-            font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY
-        )
-        self.cycle_status_label.pack(side="left")
+        self.camera_controls_btn = ctk.CTkButton(self.cycle_hud, text="Camera controls",
+            width=132, height=34, font=(FUTheme.FONT_FAMILY, 13),
+            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
+            border_width=1, border_color=FUTheme.BORDER, command=self.open_camera_controls)
+        self.camera_controls_btn.pack(side="right", padx=10)
 
-        # Quick End Session Button on HUD Bar (dynamically revealed during active sessions)
-        self.hud_cancel_btn = ctk.CTkButton(
-            self.cycle_hud, text="⏹ End Session [ESC]", font=(FUTheme.FONT_FAMILY, 10, "bold"),
-            fg_color="transparent", hover_color=FUTheme.ABNORMAL_RED_BG,
-            text_color=FUTheme.TEXT_MUTED, border_width=1, border_color=FUTheme.BORDER,
-            command=self.open_end_session_modal, height=26, width=135, corner_radius=6
+        cue_body = ctk.CTkFrame(self.cycle_hud, fg_color="transparent")
+        cue_body.pack(side="left", fill="both", expand=True, padx=(0, 10), pady=8)
+        self.cycle_status_label = ctk.CTkLabel(
+            cue_body, text="Ready to prepare",
+            font=(FUTheme.FONT_FAMILY, 21, "bold"), text_color=FUTheme.TEXT_PRIMARY
         )
-        # Note: Packed dynamically when session starts
+        self.cycle_status_label.configure(wraplength=340, justify="left", anchor="w")
+        self.cycle_status_label.pack(fill="x")
+        self.cycle_detail_label = ctk.CTkLabel(cue_body, text="Choose a batch, then prepare the empty conveyor.",
+            font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_SECONDARY,
+            wraplength=340, justify="left", anchor="w")
+        self.cycle_detail_label.pack(fill="x")
 
         # Inner container with disabled propagation to lock video dimensions
         self.video_container = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.DARKROOM_VIEWPORT, corner_radius=8)
@@ -326,74 +566,77 @@ class OvaLensOperatorApp(ctk.CTk):
         self.standby_frame = ctk.CTkFrame(self.video_container, fg_color="transparent")
         self.standby_frame.place(relx=0.5, rely=0.5, anchor="center")
 
-        # Right Column: Controls & Live Analytics (Fixed width 440px)
-        self.right_panel = ctk.CTkFrame(self.main_container, fg_color="transparent", width=440)
+        # Right column leaves enough room for the viewport at 1024px.
+        self.right_panel = ctk.CTkFrame(self.main_container, fg_color=FUTheme.PANEL_LIGHT, width=400,
+                                       corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
         self.right_panel.pack(side="right", fill="both", padx=(0, 0))
         self.right_panel.pack_propagate(False)
 
         # 1. Classification Result Banner (High Contrast Card)
         self.result_banner = ctk.CTkFrame(
-            self.right_panel, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, height=105,
-            border_width=1, border_color=FUTheme.BORDER
+            self.right_panel, fg_color="transparent", corner_radius=0, height=118,
+            border_width=0, border_color=FUTheme.BORDER
         )
-        self.result_banner.pack(fill="x", pady=(0, 10))
+        self.result_banner.pack(fill="x", padx=8, pady=(8, 6))
+        ctk.CTkFrame(self.right_panel, height=1, corner_radius=0, fg_color=FUTheme.BORDER).pack(fill="x", padx=16)
         self.result_banner.pack_propagate(False)
 
         top_banner_row = ctk.CTkFrame(self.result_banner, fg_color="transparent")
         top_banner_row.pack(fill="x", padx=16, pady=(14, 2))
 
         self.result_badge = ctk.CTkLabel(
-            top_banner_row, text="STANDBY", font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            top_banner_row, text="STANDBY", font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_MUTED,
             corner_radius=4, padx=8, pady=2
         )
         self.result_badge.pack(side="left")
 
         self.latency_label = ctk.CTkLabel(
-            top_banner_row, text="Latency: -- ms", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_DIM
+            top_banner_row, text="Latency: -- ms", font=(FUTheme.FONT_FAMILY, 12, "bold"), text_color=FUTheme.TEXT_DIM
         )
         self.latency_label.pack(side="right")
 
         self.result_title = ctk.CTkLabel(
-            self.result_banner, text="Ready for Auto Sorting",
+            self.result_banner, text="Ready to connect",
             font=(FUTheme.FONT_FAMILY, 18, "bold"), text_color=FUTheme.TEXT_PRIMARY
         )
+        self.result_title.configure(wraplength=360, justify="left", font=(FUTheme.FONT_FAMILY, 17, "bold"))
         self.result_title.pack(anchor="w", padx=16, pady=(2, 1))
 
         self.result_subtitle = ctk.CTkLabel(
-            self.result_banner, text="Conveyor advances, pauses inside chamber, and auto-sorts",
-            font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
+            self.result_banner, text="Choose a batch, confirm an empty conveyor, then Prepare station.",
+            font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_MUTED
         )
+        self.result_subtitle.configure(wraplength=360, justify="left")
         self.result_subtitle.pack(anchor="w", padx=16)
 
         # 2. Live Batch Counters & Progress Panel
         counters_frame = ctk.CTkFrame(
-            self.right_panel, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12,
-            border_width=1, border_color=FUTheme.BORDER
+            self.right_panel, fg_color="transparent", corner_radius=0, border_width=0
         )
         counters_frame.pack(fill="x", pady=(0, 10))
 
         c_header = ctk.CTkFrame(counters_frame, fg_color="transparent")
-        c_header.pack(fill="x", padx=16, pady=(12, 4))
+        c_header.pack(fill="x", padx=16, pady=(8, 4))
 
         c_title = ctk.CTkLabel(
-            c_header, text="BATCH PROGRESS & METRICS", font=(FUTheme.FONT_FAMILY, 11, "bold"),
+            c_header, text="Batch progress", height=22, font=(FUTheme.FONT_FAMILY, 13, "bold"),
             text_color=FUTheme.TEXT_PRIMARY
         )
         c_title.pack(side="left")
 
         self.progress_pct_label = ctk.CTkLabel(
-            c_header, text="0.0% (0 / 500)", font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            c_header, text="0.0%", height=22, font=(FUTheme.FONT_FAMILY, 12, "bold"),
             text_color=FUTheme.TEXT_PRIMARY
         )
         self.progress_pct_label.pack(side="right")
 
         # Throughput Speedometer & Remaining ETA
         self.speed_eta_label = ctk.CTkLabel(
-            c_header, text="⚡ Ready (Target: 500 eggs)", font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            c_header, text="", height=22, font=(FUTheme.FONT_FAMILY, 12, "bold"),
             text_color=FUTheme.TEXT_MUTED
         )
-        self.speed_eta_label.pack(side="right", padx=(0, 12))
+        self.speed_eta_label.pack(side="left", padx=(12, 0))
 
         # Progress Bar
         self.progress_bar = ctk.CTkProgressBar(
@@ -404,18 +647,19 @@ class OvaLensOperatorApp(ctk.CTk):
         self.progress_bar.set(0.0)
 
         grid = ctk.CTkFrame(counters_frame, fg_color="transparent")
-        grid.pack(fill="x", padx=10, pady=(0, 12))
+        grid.pack(fill="x", padx=10, pady=(0, 8))
 
-        # 4 High-Contrast White Stat Tiles with Semantic Accent Card Fills
-        self.box_total = self._create_stat_box(grid, "TOTAL SCANNED", f"0 / {self.target_egg_count}", 0, 0, accent_color=FUTheme.PRIMARY_MAROON, bg_color=FUTheme.PANEL_LIGHT_ALT)
-        self.box_fertile = self._create_stat_box(grid, "FERTILE (ACCEPT)", "0 (0%)", 0, 1, accent_color=FUTheme.FERTILE_GREEN, bg_color=FUTheme.FERTILE_GREEN_CARD)
-        self.box_infertile = self._create_stat_box(grid, "INFERTILE (PENOY)", "0", 1, 0, accent_color=FUTheme.INFERTILE_AMBER, bg_color=FUTheme.INFERTILE_AMBER_CARD)
-        self.box_abnormal = self._create_stat_box(grid, "ABNORMAL (REJECT)", "0", 1, 1, accent_color=FUTheme.ABNORMAL_RED, bg_color=FUTheme.ABNORMAL_RED_CARD)
+        # Aligned count rows keep the record readable without decorative tiles.
+        self.box_total = self._create_count_row(grid, "Scanned", f"0 / {self.target_egg_count}", 0, FUTheme.TEXT_PRIMARY)
+        self.box_fertile = self._create_count_row(grid, "Fertile / accept", "0 (0%)", 1, FUTheme.FERTILE_GREEN_TEXT)
+        self.box_infertile = self._create_count_row(grid, "Infertile / penoy", "0", 2, FUTheme.INFERTILE_AMBER_TEXT)
+        self.box_review = self._create_count_row(grid, "Manual review", "0", 3, FUTheme.TEXT_PRIMARY)
+
+        ctk.CTkFrame(self.right_panel, height=1, corner_radius=0, fg_color=FUTheme.BORDER).pack(fill="x", padx=16)
 
         # 3. Recent Scans Log
         log_frame = ctk.CTkFrame(
-            self.right_panel, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12,
-            border_width=1, border_color=FUTheme.BORDER
+            self.right_panel, fg_color="transparent", corner_radius=0, border_width=0
         )
         log_frame.pack(fill="both", expand=True)
 
@@ -423,13 +667,13 @@ class OvaLensOperatorApp(ctk.CTk):
         log_header.pack(fill="x", padx=16, pady=(10, 4))
 
         log_title = ctk.CTkLabel(
-            log_header, text="RECENT SCANS LOG", font=(FUTheme.FONT_FAMILY, 11, "bold"),
+            log_header, text="Recent activity", font=(FUTheme.FONT_FAMILY, 13, "bold"),
             text_color=FUTheme.TEXT_PRIMARY
         )
         log_title.pack(side="left")
 
         self.history_btn = ctk.CTkButton(
-            log_header, text="🔍 Explorer [S]", font=(FUTheme.FONT_FAMILY, 10, "bold"),
+            log_header, text="History [S]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
             border_width=1, border_color=FUTheme.BORDER,
             text_color=FUTheme.TEXT_SECONDARY, command=self.open_scan_history_modal,
@@ -439,69 +683,68 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Compact Live Scans List Box
         self.log_textbox = ctk.CTkTextbox(
-            log_frame, fg_color=FUTheme.PANEL_LIGHT_ALT, font=("Consolas", 10),
+            log_frame, fg_color=FUTheme.PANEL_LIGHT, font=(FUTheme.FONT_FAMILY, 13),
             text_color=FUTheme.TEXT_SECONDARY, corner_radius=8,
-            border_width=1, border_color=FUTheme.BORDER
+            border_width=0
         )
-        self.log_textbox.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        self.log_textbox.pack(fill="both", expand=True, padx=12, pady=(0, 8))
         self.log_textbox.configure(state="disabled")
 
     def _render_standby_hud(self):
-        """Build centered Standby Card in video viewport when camera is idle."""
+        """Explain camera setup directly in the idle viewport."""
         for child in self.standby_frame.winfo_children():
             child.destroy()
 
-        card = ctk.CTkFrame(
-            self.standby_frame, fg_color=FUTheme.PANEL_LIGHT, corner_radius=16,
-            border_width=1, border_color=FUTheme.BORDER
-        )
-        card.pack(padx=24, pady=24)
+        # The camera well is the empty-state surface; no nested floating card.
+        ctk.CTkLabel(self.standby_frame, text="Camera preview",
+                     font=(FUTheme.FONT_FAMILY, 22, "bold"),
+                     text_color=FUTheme.TEXT_PRIMARY).pack(padx=24, pady=(16, 8))
+        ctk.CTkLabel(self.standby_frame, text="Camera 0 starts automatically.\nChoose a batch, then Prepare station on an empty conveyor.",
+                     font=(FUTheme.FONT_FAMILY, 14), text_color=FUTheme.TEXT_SECONDARY,
+                     justify="center").pack(padx=24, pady=(0, 16))
+        ctk.CTkLabel(self.standby_frame, text="F1  Operator guide     Tools  Camera diagnostics",
+                     font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED).pack(padx=20, pady=(0, 16))
 
-        icon = ctk.CTkLabel(
-            card, text="🥚", font=(FUTheme.FONT_FAMILY, 40)
-        )
-        icon.pack(pady=(20, 2))
-
-        title = ctk.CTkLabel(
-            card, text="CAMERA & AI VISION ON STANDBY",
-            font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color="#F8FAFC"
-        )
-        title.pack(pady=(0, 4))
-
-        sub = ctk.CTkLabel(
-            card,
-            text=f"Batch: {self.current_batch_id}  •  Breed: {self.current_breed}  •  Stage: {self.current_stage}\nTarget: {self.target_egg_count} Eggs  •  Conveyor: Ready",
-            font=(FUTheme.FONT_FAMILY, 11), text_color="#94A3B8", justify="center"
-        )
-        sub.pack(pady=(0, 14), padx=20)
-
-        hint_box = ctk.CTkFrame(card, fg_color="#0F172A", corner_radius=8)
-        hint_box.pack(padx=16, pady=(0, 16))
-
-        hint = ctk.CTkLabel(
-            hint_box,
-            text="⚡ [SPACE] Single Candling Scan  •  [START AUTO SORTING] Continuous Conveyor  •  [ESC] Standby / Cancel",
-            font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_WHITE, padx=14, pady=6, justify="center"
-        )
-        hint.pack()
-
-    def _create_stat_box(self, parent, label_text: str, val_text: str, row: int, col: int, accent_color: str, bg_color: str = None):
-        card_bg = bg_color or FUTheme.PANEL_LIGHT_ALT
-        f = ctk.CTkFrame(parent, fg_color=card_bg, corner_radius=10, border_width=1, border_color=FUTheme.BORDER)
-        f.grid(row=row, column=col, padx=4, pady=4, sticky="nsew")
-        parent.grid_columnconfigure(col, weight=1)
-
-        top_strip = ctk.CTkFrame(f, fg_color=accent_color, height=4, corner_radius=2)
-        top_strip.pack(fill="x", side="top")
-
-        lbl = ctk.CTkLabel(f, text=label_text, font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED)
-        lbl.pack(anchor="w", padx=10, pady=(6, 0))
-
-        val = ctk.CTkLabel(f, text=val_text, font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=accent_color if accent_color != FUTheme.PRIMARY_MAROON else FUTheme.TEXT_PRIMARY)
-        val.pack(anchor="w", padx=10, pady=(0, 6))
-        return val
+    def _create_count_row(self, parent, label_text: str, value_text: str, row: int, color: str):
+        parent.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(parent, text=label_text, anchor="w",
+                     font=(FUTheme.FONT_FAMILY, 14), text_color=FUTheme.TEXT_SECONDARY).grid(
+                         row=row, column=0, sticky="w", padx=6, pady=1)
+        value = ctk.CTkLabel(parent, text=value_text, anchor="e",
+                             font=(FUTheme.FONT_FAMILY, 20, "bold"), text_color=color)
+        value.grid(row=row, column=1, sticky="e", padx=6, pady=1)
+        return value
 
     def _build_footer(self):
+        self.station_strip = ctk.CTkFrame(self, fg_color=FUTheme.PANEL_LIGHT, corner_radius=0)
+        self.station_strip.pack(side="bottom", fill="x")
+        self.station_status = ctk.CTkLabel(self.station_strip, text="Boards disconnected | Camera idle", anchor="w", wraplength=950, justify="left", font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_SECONDARY)
+        self.station_status.pack(fill="x", padx=16, pady=(8, 4))
+        self.setup_row = ctk.CTkFrame(self.station_strip, fg_color="transparent")
+        setup_actions = ctk.CTkFrame(self.setup_row, fg_color="transparent")
+        setup_actions.pack(fill="x")
+        self.setup_inspected = ctk.BooleanVar(value=False)
+        self.setup_check = ctk.CTkCheckBox(setup_actions, text="Conveyor empty, aligned; gate checked",
+            font=(FUTheme.FONT_FAMILY, 14), variable=self.setup_inspected,
+            command=lambda: self._set_session_active_state(False))
+        self.setup_check.pack(side="left", padx=4, pady=8)
+        self.prepare_btn = ctk.CTkButton(setup_actions, text="Prepare station", width=155, height=36,
+            font=(FUTheme.FONT_FAMILY, 13, "bold"), fg_color=FUTheme.PRIMARY_MAROON,
+            hover_color=FUTheme.HOVER_MAROON, command=self.prepare_station)
+        self.prepare_btn.pack(side="right", padx=4, pady=8)
+        self.setup_notice = ctk.CTkLabel(self.setup_row,
+            text="Confirm an empty conveyor, then Prepare station. Connection can reset boards and move the gate to neutral; the belt stays stopped.",
+            anchor="w", justify="left", wraplength=950, font=(FUTheme.FONT_FAMILY, 12),
+            text_color=FUTheme.TEXT_SECONDARY)
+        self.setup_notice.pack(fill="x", pady=(0, 8))
+        review_row = self.review_row = ctk.CTkFrame(self.station_strip, fg_color="transparent")
+        ctk.CTkLabel(review_row, text="Operator review", font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED).pack(side="left", padx=4)
+        self.review_buttons = []
+        for label, classification in (("Confirm fertile", "FERTILE"), ("Confirm infertile", "INFERTILE"), ("Confirm empty", "EMPTY")):
+            button = ctk.CTkButton(review_row, text=label, width=145, height=34, font=(FUTheme.FONT_FAMILY, 13, "bold"), state="disabled",
+                fg_color=FUTheme.PRIMARY_MAROON, command=lambda c=classification: self._resolve_station_review(c))
+            button.pack(side="right", padx=4, pady=4)
+            self.review_buttons.append(button)
         self.footer_frame = ctk.CTkFrame(
             self, fg_color=FUTheme.PANEL_LIGHT, corner_radius=0, height=68,
             border_width=1, border_color=FUTheme.BORDER
@@ -510,84 +753,355 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Automated Cycle Button (Starts Camera & Sorting Loop)
         self.session_btn = ctk.CTkButton(
-            self.footer_frame, text="▶ START AUTO SORTING", font=(FUTheme.FONT_FAMILY, 13, "bold"),
+            self.footer_frame, text="Start sorting", font=(FUTheme.FONT_FAMILY, 13, "bold"),
             fg_color=FUTheme.PRIMARY_MAROON, hover_color=FUTheme.HOVER_MAROON,
             text_color=FUTheme.TEXT_WHITE, command=self.toggle_auto_session,
-            width=190, height=42, corner_radius=8
+            width=155, height=44, corner_radius=8
         )
         self.session_btn.pack(side="left", padx=(14, 6), pady=13)
 
         # Single Trigger Scan Button (Manual Override)
         self.scan_btn = ctk.CTkButton(
-            self.footer_frame, text="⚡ Single Scan [SPACE]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
+            self.footer_frame, text="Single Scan [SPACE]", font=(FUTheme.FONT_FAMILY, 14, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
             border_width=1, border_color=FUTheme.BORDER_DARK,
             text_color=FUTheme.TEXT_PRIMARY, command=self.trigger_candling_scan,
-            width=160, height=42, corner_radius=8
+            width=160, height=44, corner_radius=8
         )
-        self.scan_btn.pack(side="left", padx=6, pady=13)
 
         # Dedicated Terminate / Cancel / End Session Button (hidden in Standby, visible when active)
         self.cancel_btn = ctk.CTkButton(
-            self.footer_frame, text="⏹ End Session [ESC]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
-            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.ABNORMAL_RED_BG,
+            self.footer_frame, text="End Session [ESC]", font=(FUTheme.FONT_FAMILY, 14, "bold"),
+            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.REJECT_RED_BG,
             border_width=1, border_color=FUTheme.BORDER_DARK,
             text_color=FUTheme.TEXT_PRIMARY, command=self.open_end_session_modal,
-            width=165, height=42, corner_radius=8
+            width=155, height=44, corner_radius=8
         )
         # Note: Packed dynamically when a session/camera is started
 
         # Manual Eject Button with High-Contrast Luminous Text
         self.eject_btn = ctk.CTkButton(
-            self.footer_frame, text="⏏ Manual Eject [R]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
-            fg_color=FUTheme.ABNORMAL_RED_BG, hover_color=FUTheme.ABNORMAL_RED_HOVER,
-            border_width=1, border_color=FUTheme.ABNORMAL_RED_BORDER,
-            text_color=FUTheme.ABNORMAL_RED_TEXT, command=self.trigger_manual_eject,
-            width=145, height=42, corner_radius=8
+            self.footer_frame, text="STOP [R]", font=(FUTheme.FONT_FAMILY, 14, "bold"),
+            fg_color=FUTheme.REJECT_RED, hover_color=FUTheme.REJECT_RED_HOVER,
+            border_width=1, border_color=FUTheme.REJECT_RED_BORDER,
+            text_color=FUTheme.TEXT_WHITE, command=self.trigger_manual_eject,
+            width=100, height=44, corner_radius=8
         )
         self.eject_btn.pack(side="left", padx=6, pady=13)
 
+        self.light_btn = ctk.CTkButton(self.footer_frame, text="Turn light on", width=125, height=44,
+            font=(FUTheme.FONT_FAMILY, 13), fg_color=FUTheme.PANEL_LIGHT_ALT,
+            hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER,
+            text_color=FUTheme.TEXT_PRIMARY, command=self.toggle_manual_light)
+        self.light_btn.pack(side="left", padx=6, pady=13)
+
+        self.pause_btn = ctk.CTkButton(self.footer_frame, text="Pause", width=105, height=44,
+            font=(FUTheme.FONT_FAMILY, 13, "bold"), fg_color=FUTheme.PANEL_LIGHT_ALT,
+            hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER,
+            text_color=FUTheme.TEXT_PRIMARY, command=self.toggle_sorting_pause)
+
+        # Dedicated Finish Batch Button (prominently revealed when batch/diagnostics complete)
+        self.finish_btn = ctk.CTkButton(
+            self.footer_frame, text="✓ Finish Batch", font=(FUTheme.FONT_FAMILY, 13, "bold"),
+            fg_color=FUTheme.FERTILE_GREEN, hover_color=FUTheme.FERTILE_GREEN_HOVER,
+            text_color=FUTheme.TEXT_WHITE, command=self.finish_current_batch,
+            width=140, height=44, corner_radius=8
+        )
+
         # Batch Setup Quick Button
         self.batch_setup_btn = ctk.CTkButton(
-            self.footer_frame, text="📋 Batch Setup", font=(FUTheme.FONT_FAMILY, 12, "bold"),
+            self.footer_frame, text="Batch setup", font=(FUTheme.FONT_FAMILY, 14, "bold"),
             fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
             border_width=1, border_color=FUTheme.BORDER_DARK,
             text_color=FUTheme.TEXT_PRIMARY, command=self.open_batch_setup_dialog,
-            width=130, height=42, corner_radius=8
+            width=110, height=44, corner_radius=8
         )
         self.batch_setup_btn.pack(side="right", padx=(6, 14), pady=13)
 
         # Conveyor Settings Button
         self.settings_btn = ctk.CTkButton(
-            self.footer_frame, text="⚙ Config", font=(FUTheme.FONT_FAMILY, 12),
+            self.footer_frame, text="Tools", font=(FUTheme.FONT_FAMILY, 14),
             fg_color=FUTheme.PANEL_LIGHT_ALT, border_width=1, border_color=FUTheme.BORDER,
             text_color=FUTheme.TEXT_SECONDARY, hover_color=FUTheme.PANEL_ACCENT,
-            command=self.open_calibration_dialog, width=100, height=42, corner_radius=8
+            command=self.open_tools_menu, width=100, height=42, corner_radius=8
         )
         self.settings_btn.pack(side="right", padx=6, pady=13)
+        self.tools_menu = tk.Menu(self, tearoff=False, bg=FUTheme.PANEL_LIGHT,
+            fg=FUTheme.TEXT_PRIMARY, activebackground=FUTheme.PANEL_ACCENT,
+            activeforeground=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 12))
+        self.tools_menu.add_command(label="Single scan    Space", command=self.trigger_candling_scan)
+        self.tools_menu.add_command(label="Settings", command=self.open_calibration_dialog)
+        self.tools_menu.add_command(label="Retry camera preview", command=self._start_preview)
+        self.tools_menu.add_command(label="Camera controls", command=self.open_camera_controls)
+
+    def _refresh_pause_control(self):
+        if not hasattr(self, "pause_btn"):
+            return
+        cycle = getattr(getattr(self, "station", None), "cycle", None)
+        visible = bool(cycle is not None and callable(getattr(cycle, "request_pause", None))
+                       and cycle.active and self.is_auto_cycle_running)
+        state = cycle.status["state"] if visible else ""
+        pending = bool(visible and cycle.pause_requested)
+        resuming = bool(visible and cycle.resume_requested)
+        text = ("Resuming..." if resuming or state == "RESUMING" else "Resume" if state == "PAUSED"
+                else "Pausing..." if pending or state == "PAUSING" else "Pause")
+        allowed = (visible and not self._stopping and not self._closing
+                   and state not in {"MANUAL_REVIEW", "PAUSING", "RESUMING", "COMPLETE", "RECOVERY_REQUIRED"}
+                   and not resuming and (state == "PAUSED" or not pending))
+        signature = visible, text, allowed
+        if signature == getattr(self, "_pause_signature", None):
+            return
+        self._pause_signature = signature
+        if visible:
+            self.pause_btn.pack(side="left", padx=6, pady=13, after=self.eject_btn)
+        else:
+            self.pause_btn.pack_forget()
+        self.pause_btn.configure(text=text, state="normal" if allowed else "disabled")
+
+    def toggle_sorting_pause(self):
+        cycle = getattr(getattr(self, "station", None), "cycle", None)
+        if self._stopping or self._closing or not self.is_auto_cycle_running or cycle is None or not cycle.active:
+            return
+        try:
+            if cycle.status["state"] == "PAUSED":
+                cycle.resume()
+                self._log("[CYCLE] Resume requested; checking the held rig.")
+            elif cycle.status["state"] != "MANUAL_REVIEW" and not cycle.pause_requested:
+                cycle.request_pause()
+                self._log("[CYCLE] Pause requested; finishing the current motion or egg first.")
+        except RuntimeError as exc:
+            self._log("[CYCLE] " + str(exc))
+        self._refresh_pause_control()
+
+    def _manual_light_allowed(self):
+        station = getattr(self, "station", None)
+        panel = getattr(self, "_camera_panel", None)
+        profile = getattr(getattr(station, "settings", None), "rig_profile", None)
+        return (station is not None and profile == "three_v3"
+                and not self.simulation and not self._closing and not self._stopping
+                and not self._scan_busy and not self.is_auto_cycle_running and not station.active
+                and not getattr(self, "_setup_busy", False) and not getattr(self, "_light_busy", False)
+                and not (panel is not None and panel.pending) and self.grab_current() is None)
+
+    def _refresh_light_control(self):
+        if not hasattr(self, "light_btn"):
+            return
+        station = getattr(self, "station", None)
+        link = getattr(station, "light_link", None)
+        report = link.snapshot() if link is not None else None
+        available = report is not None and report.connected and report.identified and not report.error
+        value = report.telemetry.get("LIGHT") if available else None
+        allowed = OvaLensOperatorApp._manual_light_allowed(self)
+        busy = getattr(self, "_light_busy", False)
+        text = "Switching light..." if busy else "Turn light off" if value == "1" else "Turn light on"
+        if link is not None and not available and not busy:
+            text = "Retry light"
+        if station is not None and station.active:
+            text = "Light: ON" if value == "1" else "Light: OFF"
+        signature = text, allowed
+        if signature != getattr(self, "_light_signature", None):
+            self._light_signature = signature
+            self.light_btn.configure(text=text, state="normal" if allowed else "disabled")
+
+    def toggle_manual_light(self):
+        if not self._manual_light_allowed():
+            return
+        link = self.station.light_link
+        report = link.snapshot() if link is not None else None
+        enabled = report is None or not report.connected or not report.identified or bool(report.error) or report.telemetry.get("LIGHT") != "1"
+        cancel = self._light_request_cancel = threading.Event()
+        generation = self._operation_generation
+        self._light_busy = True
+        self._set_session_active_state(self.is_session_active)
+        self._log("[LIGHT] Switching candling light " + ("on..." if enabled else "off..."))
+        def work():
+            if cancel.is_set() or generation != self._operation_generation:
+                return None
+            return self.station.set_manual_light(enabled, cancel=cancel)
+        def finished(message, failed=False):
+            self._light_busy = False
+            if self._closing:
+                return
+            if message and generation == self._operation_generation:
+                self._log("[LIGHT] " + ("Could not switch light: " if failed else "") + str(message))
+                panel = getattr(self, "_camera_panel", None)
+                if failed and panel is not None:
+                    panel.notice.configure(text="Could not switch light: " + str(message))
+            self._set_session_active_state(self.is_session_active)
+        try:
+            self._jobs.submit(work, finished, lambda message: finished(message, True))
+        except (queue.Full, RuntimeError) as exc:
+            finished(str(exc), True)
+
+    def _camera_tuning_allowed(self):
+        return (self.station is not None and not self.simulation and not self._closing
+                and not self._stopping and not self._scan_busy and not self.current_session_id
+                and not self.is_session_active and not self.is_auto_cycle_running
+                and not self._finalization_failed and not self._pending_finalization_id
+                and not getattr(self, "_setup_busy", False) and not getattr(self, "_light_busy", False) and not self.station.active
+                and self.grab_current() is None)
+
+    def open_camera_controls(self):
+        if not self._camera_tuning_allowed():
+            self._log("[CAMERA] Finish the current operation before tuning the camera.")
+            return
+        if self._camera_panel is not None:
+            self._camera_panel.lift()
+            return
+        self._camera_panel = CameraControlsPanel(self)
+        self._set_session_active_state(False)
+
+    def open_tools_menu(self):
+        try:
+            self.tools_menu.tk_popup(self.settings_btn.winfo_rootx(),
+                                     self.settings_btn.winfo_rooty() - 100)
+        finally:
+            self.tools_menu.grab_release()
+
+    def _start_preview(self):
+        if self._closing or self._stopping or getattr(self, "_setup_busy", False):
+            return
+        if not self.camera.is_running:
+            start = getattr(self.camera, "start", None)
+            if not callable(start):
+                return
+            try:
+                start()
+            except Exception as exc:
+                self._set_operation_state(OperatorState.ERROR, str(exc))
+                return
+        deadline = time.monotonic() + 6
+        def ready():
+            if self._closing or self._stopping:
+                return
+            snapshot = getattr(self.camera, "snapshot", None)
+            if callable(snapshot) and snapshot(copy=False) is not None:
+                self.standby_frame.place_forget()
+                if getattr(self, "_operator_state", None) == OperatorState.ERROR and "camera 0" in getattr(self, "_operator_state_msg", ""):
+                    self._set_operation_state(OperatorState.READY, "Choose a batch, then prepare the empty conveyor")
+            elif time.monotonic() < deadline and not self.camera.last_error:
+                self.after(50, ready)
+            elif not getattr(self, "_setup_busy", False) and not self.is_auto_cycle_running:
+                snapshot = getattr(self.camera, "snapshot", None)
+                if callable(snapshot) and snapshot(copy=False) is not None:
+                    self.standby_frame.place_forget()
+                    if getattr(self, "_operator_state", None) == OperatorState.ERROR and "camera 0" in getattr(self, "_operator_state_msg", ""):
+                        self._set_operation_state(OperatorState.READY, "Choose a batch, then prepare the empty conveyor")
+                else:
+                    self._set_operation_state(OperatorState.ERROR, "Check camera 0; use Tools to retry the preview")
+        ready()
 
     def _set_session_active_state(self, is_active: bool):
-        """Dynamically show/hide cancel controls and toggle main session button appearance."""
+        """Refresh controls from pending work and local session identity."""
+        is_active = is_active or self.current_session_id is not None
+        station = getattr(self, "station", None)
+        cycle = station.cycle if station is not None else None
+        tuning = getattr(self, "_camera_panel", None) is not None
+        OvaLensOperatorApp._refresh_light_control(self)
+        OvaLensOperatorApp._refresh_pause_control(self)
+        signature = (is_active, self.current_session_id, self.is_auto_cycle_running,
+                     self._scan_busy, self._stopping, self._closing,
+                     self._pending_finalization_id, self._finalization_failed,
+                     bool(self.inference_worker.busy), self._diagnostics_complete,
+                     cycle.session_id if cycle is not None else None,
+                     bool(getattr(self, "_batch_complete", False)),
+                     bool(self.setup_inspected.get()) if hasattr(self, "setup_inspected") else False,
+                     getattr(self, "_setup_busy", False), bool(getattr(station, "calibrated", False)),
+                     bool(getattr(self, "_station_prepared", False)), bool(getattr(self, "_batch_record_ready", False)),
+                     bool(getattr(station, "boards", None)), tuning, getattr(self, "_light_busy", False))
+        if hasattr(self, "setup_row"):
+            self._refresh_setup_controls(is_active)
+        if signature == getattr(self, "_controls_signature", None):
+            return
+        self._controls_signature = signature
         if is_active:
             # Reveal cancel buttons dynamically when active
-            self.cancel_btn.pack(side="left", padx=6, pady=13, after=self.scan_btn)
-            self.hud_cancel_btn.pack(side="right", padx=(0, 8), pady=5)
+            if self.is_auto_cycle_running:
+                self.cancel_btn.pack_forget()
+            else:
+                self.cancel_btn.pack(side="left", padx=6, pady=13, after=self.eject_btn)
             if self.is_auto_cycle_running:
                 self.session_btn.configure(
-                    text="⏹ STOP AUTO SORTING", fg_color=FUTheme.ABNORMAL_RED,
-                    hover_color=FUTheme.ABNORMAL_RED_HOVER
+                    text="Stop sorting", fg_color=FUTheme.REJECT_RED,
+                    hover_color=FUTheme.REJECT_RED_HOVER
                 )
         else:
             # Hide cancel buttons when in standby
             self.cancel_btn.pack_forget()
-            self.hud_cancel_btn.pack_forget()
             self.session_btn.configure(
-                text="▶ START AUTO SORTING", fg_color=FUTheme.PRIMARY_MAROON,
+                text="Start next batch" if getattr(self, "_batch_complete", False) else "Start sorting", fg_color=FUTheme.PRIMARY_MAROON,
                 hover_color=FUTheme.HOVER_MAROON
             )
+        is_complete = bool(getattr(self, "_batch_complete", False) or getattr(self, "_diagnostics_complete", False))
+        if hasattr(self, "finish_btn"):
+            if is_complete and not is_active:
+                self.finish_btn.pack(side="left", padx=6, pady=13, after=self.session_btn)
+            else:
+                self.finish_btn.pack_forget()
+        blocked = self._pending_finalization_id is not None or self._finalization_failed
+        setup_busy = getattr(self, "_setup_busy", False) or getattr(self, "_light_busy", False)
+        state = "disabled" if is_active or self._scan_busy or self._stopping or blocked or setup_busy or tuning else "normal"
+        self.batch_setup_btn.configure(state=state)
+        self.settings_btn.configure(state=state)
+        station = getattr(self, "station", None)
+        automatic_session = station is not None and station.cycle is not None and self.current_session_id == station.cycle.session_id
+        busy = self._scan_busy or self._stopping or self._closing or self.inference_worker.busy or self.is_auto_cycle_running or automatic_session or setup_busy or tuning
+        dual = getattr(getattr(station, "settings", None), "rig_profile", None) == "dual_v2"
+        needs_setup = (station is not None and not is_active and not getattr(self, "_batch_complete", False)
+                       and (not getattr(self, "_batch_record_ready", False) or not
+                            (station.calibrated and self.setup_inspected.get() if dual else getattr(self, "_station_prepared", False))))
+        self.session_btn.configure(state="disabled" if self._scan_busy or self._stopping or blocked or setup_busy or tuning or needs_setup or (self.inference_worker.busy and not self.is_auto_cycle_running) or (is_active and not self.is_auto_cycle_running) else "normal",
+                                   text="Preparing..." if setup_busy else "Stop sorting" if self.is_auto_cycle_running else "Start next batch" if getattr(self, "_batch_complete", False) else "Start sorting")
+        self.scan_btn.configure(state="disabled" if busy or blocked or self._diagnostics_complete else "normal",
+                                text="Working…" if self._scan_busy else "Single Scan [SPACE]")
+        self.cancel_btn.configure(state="disabled" if self._stopping else "normal",
+                                  text="Retry Finalization" if blocked else "End Session [ESC]")
+        if hasattr(self, "tools_menu"):
+            self.tools_menu.entryconfigure(0, state="disabled" if busy or blocked or self._diagnostics_complete else "normal")
+            self.tools_menu.entryconfigure(1, state=state)
+            self.tools_menu.entryconfigure(3, state=state)
+        if hasattr(self, "camera_controls_btn"):
+            self.camera_controls_btn.configure(state="disabled" if is_active or self._scan_busy or self._stopping or blocked or setup_busy or self._closing or self.simulation or station is None else "normal")
+        if blocked:
+            self.cancel_btn.pack(side="left", padx=6, pady=13, after=self.eject_btn)
 
+    def _refresh_setup_controls(self, is_active):
+        busy = getattr(self, "_setup_busy", False)
+        visible = self.station is not None and not is_active and not self._closing and not getattr(self, "_batch_complete", False)
+        allowed = (not busy and not self._scan_busy and not self._stopping
+                   and not getattr(self, "_light_busy", False) and not self._finalization_failed
+                   and self._pending_finalization_id is None and getattr(self, "_camera_panel", None) is None)
+        signature = (visible, busy, self._scan_busy, self._stopping, allowed,
+                     self.setup_inspected.get(), getattr(self, "_batch_record_ready", False), getattr(self, "_station_prepared", False))
+        if signature == getattr(self, "_setup_controls_signature", None):
+            return
+        self._setup_controls_signature = signature
+        if visible:
+            self.setup_row.pack(fill="x", padx=16)
+        else:
+            self.setup_row.pack_forget()
+        batch_ready = getattr(self, "_batch_record_ready", False)
+        self.setup_check.configure(state="disabled" if busy or self._scan_busy or self._stopping else "normal")
+        self.prepare_btn.configure(state="normal" if allowed and self.setup_inspected.get() else "disabled",
+                                   text="Preparing..." if busy else "Prepare again" if getattr(self, "_station_prepared", False) else "Prepare station",
+                                   fg_color=FUTheme.PANEL_LIGHT_ALT if getattr(self, "_station_prepared", False) else FUTheme.PRIMARY_MAROON)
+        if not batch_ready:
+            self.setup_notice.configure(text="Choose or create a batch in Batch setup first, then Prepare station.")
+        elif not self.setup_inspected.get():
+            self.setup_notice.configure(text="Confirm the conveyor is empty, aligned and the gate checked.")
+        else:
+            self.setup_notice.configure(text="Confirm an empty conveyor, then Prepare station. Connection can reset boards and move the gate to neutral; the belt stays stopped.")
+
+
+    @_building_dialog
     def open_end_session_modal(self, event=None):
         """Interactive End Session modal with run summary statistics and direct CSV export."""
+        if self._pending_finalization_id or self._finalization_failed:
+            self.stop_or_cancel_session()
+            return
+        if self._scan_busy or self._stopping:
+            self.stop_or_cancel_session()
+            return
         # If no scans recorded and camera is idle, instantly stop without prompt
         if self.total_count == 0 and not self.is_auto_cycle_running and not self.camera.is_running:
             self.stop_or_cancel_session()
@@ -596,7 +1110,7 @@ class OvaLensOperatorApp(ctk.CTk):
         # If automated conveyor is currently moving, pause conveyor motor while modal is open
         was_auto_running = self.is_auto_cycle_running
         if was_auto_running:
-            self.iot.set_conveyor(False)
+            self.chamber.stop() if self.chamber else None
 
         dialog = ctk.CTkToplevel(self)
         dialog.title(f"End Candling Session — {self.current_batch_id}")
@@ -620,7 +1134,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         ctk.CTkLabel(
             card,
-            text=f"Batch: {self.current_batch_id}  •  Breed: {self.current_breed}  •  Stage: {self.current_stage}\nOperator: {self.operator_name}  •  Device: {self.device_id}",
+            text=f"Batch: {self.current_batch_code}  •  Breed: {self.current_breed}  •  Stage: {self.current_stage}\nOperator: {self.operator_name}  •  Device: {self.device_id}",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED, justify="left"
         ).pack(anchor="w", padx=16, pady=(2, 12))
 
@@ -630,7 +1144,7 @@ class OvaLensOperatorApp(ctk.CTk):
         grid.columnconfigure(0, weight=1)
         grid.columnconfigure(1, weight=1)
 
-        pct = (self.fertile_count / max(1, self.total_count)) * 100.0 if self.total_count > 0 else 0.0
+        pct = (self.fertile_count / max(1, self.fertile_count + self.infertile_count)) * 100.0 if self.total_count > 0 else 0.0
         penoy_salvage_val = self.infertile_count * 14.00
 
         # Tile 1: Total Processed
@@ -651,11 +1165,11 @@ class OvaLensOperatorApp(ctk.CTk):
         ctk.CTkLabel(t3, text="PENOY SALVAGE YIELD", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.INFERTILE_AMBER_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
         ctk.CTkLabel(t3, text=f"{self.infertile_count} eggs -> ₱{penoy_salvage_val:,.2f}", font=(FUTheme.FONT_FAMILY, 14, "bold"), text_color=FUTheme.INFERTILE_AMBER).pack(anchor="w", padx=10, pady=(0, 6))
 
-        # Tile 4: Abnormal Culls
-        t4 = ctk.CTkFrame(grid, fg_color=FUTheme.ABNORMAL_RED_CARD, corner_radius=8, border_width=1, border_color=FUTheme.ABNORMAL_RED_BORDER)
+        # Tile 4: Manual review fallback
+        t4 = ctk.CTkFrame(grid, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         t4.grid(row=1, column=1, padx=4, pady=4, sticky="nsew")
-        ctk.CTkLabel(t4, text="ABNORMAL (REJECT)", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.ABNORMAL_RED_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
-        ctk.CTkLabel(t4, text=f"{self.abnormal_count} Eggs", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.ABNORMAL_RED).pack(anchor="w", padx=10, pady=(0, 6))
+        ctk.CTkLabel(t4, text="MANUAL REVIEW", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=10, pady=(6, 0))
+        ctk.CTkLabel(t4, text=f"{self.review_count} Eggs", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=10, pady=(0, 6))
 
         # Direct CSV Export Section Box
         export_box = ctk.CTkFrame(card, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=10, border_width=1, border_color=FUTheme.BORDER)
@@ -673,12 +1187,11 @@ class OvaLensOperatorApp(ctk.CTk):
         status_msg.pack(anchor="w", padx=14, pady=(0, 8))
 
         def export_csv():
-            try:
-                path = self.db.export_session_csv(self.current_session_id)
-                status_msg.configure(text=f"✓ Exported successfully: {os.path.basename(path)}", text_color=FUTheme.FERTILE_GREEN_TEXT)
-                self._log(f"[EXPORT] CSV Report saved: {path}")
-            except Exception as e:
-                status_msg.configure(text=f"Export failed: {e}", text_color=FUTheme.ABNORMAL_RED_TEXT)
+            session_id = self.current_session_id or getattr(self, "_last_session_id", None)
+            if not session_id:
+                status_msg.configure(text="No recorded session to export.")
+                return
+            self._export_report(lambda: self.db.export_session_csv(session_id), status_msg)
 
         ctk.CTkButton(
             export_box, text="📄 Export Records directly into CSV", fg_color=FUTheme.PRIMARY_MAROON,
@@ -702,14 +1215,14 @@ class OvaLensOperatorApp(ctk.CTk):
         def resume():
             def do_resume():
                 if was_auto_running and self.is_auto_cycle_running:
-                    self.iot.set_conveyor(True)
+                    self._log("[BLOCKED] Sorting cannot resume before station validation.")
                     self._log("[INFO] Session resumed.")
             self._animate_modal_close(dialog, on_close=do_resume)
 
         ctk.CTkButton(
-            btn_row, text="⏹ Confirm & End Session", fg_color=FUTheme.ABNORMAL_RED_BG,
-            hover_color=FUTheme.ABNORMAL_RED_HOVER, border_width=1, border_color=FUTheme.ABNORMAL_RED_BORDER,
-            text_color=FUTheme.ABNORMAL_RED_TEXT, font=(FUTheme.FONT_FAMILY, 12, "bold"),
+            btn_row, text="⏹ Confirm & End Session", fg_color=FUTheme.REJECT_RED_BG,
+            hover_color=FUTheme.REJECT_RED_HOVER, border_width=1, border_color=FUTheme.REJECT_RED_BORDER,
+            text_color=FUTheme.REJECT_RED_TEXT, font=(FUTheme.FONT_FAMILY, 12, "bold"),
             command=confirm_end, height=40, corner_radius=8
         ).pack(side="left", fill="x", expand=True, padx=(0, 8))
 
@@ -721,248 +1234,613 @@ class OvaLensOperatorApp(ctk.CTk):
         ).pack(side="right")
 
     def stop_or_cancel_session(self):
-        """
-        Universal, Conflict-Free End Session Protocol:
-        1. Signals auto-cycle loop cancellation event.
-        2. Commands ESP32 hardware conveyor motor to stop immediately.
-        3. Cleanly joins background cycle worker thread with timeout to avoid race conditions.
-        4. Finalizes the local SQLite session (records ended_at & commits passive WAL checkpoint).
-        5. Flushes pending synchronization payloads.
-        6. Safely stops the OpenCV frame grabber hardware handle.
-        7. Clears viewport and displays Standby HUD card.
-        8. Restores UI controls and hides active session buttons.
-        """
-        # 1. Cancel running cycle thread & halt hardware motor
-        if self.is_auto_cycle_running or self._stop_cycle_event.is_set():
-            self._stop_cycle_event.set()
-            self.iot.set_conveyor(False)
-            if hasattr(self, "_auto_cycle_thread") and self._auto_cycle_thread and self._auto_cycle_thread.is_alive():
-                try:
-                    self._auto_cycle_thread.join(timeout=0.6)
-                except Exception:
-                    pass
-            self.is_auto_cycle_running = False
-
-        # 2. Finalize Session in Database
-        if self.current_session_id:
-            try:
-                self.db.complete_session(self.current_session_id)
-            except Exception as e:
-                self._log(f"[DB] Session completion warning: {e}")
-
-        # 3. Stop Camera Grabber
-        if self.camera.is_running:
-            self.camera.stop()
-
-        # 4. Reset internal session flags
+        """Keep failed finalization retryable; cancel predictions independently of storage."""
+        if self._stopping:
+            return
+        station = getattr(self, "station", None)
+        light_cancel = getattr(self, "_light_request_cancel", None)
+        if light_cancel is not None:
+            light_cancel.set()
+        request = getattr(self, "_setup_request", None)
+        panel = getattr(self, "_camera_panel", None)
+        if panel is not None:
+            panel.cancel_alignment()
+        if request:
+            request["cancel"].set()
+        if station and (station.active or getattr(self, "_setup_busy", False) or getattr(self, "_camera_panel", None) is not None
+                        or getattr(station, "light_link", None) is not None):
+            station.halt()
+        completed = getattr(self, "_automatic_complete_cycle", None)
+        if completed is not None and self.current_session_id == completed.session_id:
+            self._finalize_automatic_batch(completed)
+            return
+        self._operation_generation += 1
+        self._pending_prediction = self._inference_request_id = None
+        self._scan_busy = False
+        self._stopping = True
+        self._stop_cycle_event.set()
+        if self.chamber:
+            self.chamber.stop()
+        self.is_auto_cycle_running = False
         self.is_session_active = False
-        self._session_start_time = None
 
-        # 5. Restore Viewport & HUD
-        self.video_label.configure(image=None)
+        # Keep the station preview available while stopping physical operations.
+        try:
+            request_stop = getattr(self.camera, "request_stop", None) if station is None else None
+            if callable(request_stop):
+                request_stop()
+            elif station is None:
+                self.camera.stop()
+        except Exception:
+            pass
+
+        self._diagnostic_view = None
+
+        # 3. Immediately clear all detections and blank out the camera preview
+        self._latest_detections = []
+        self._last_scan_result_time = 0.0
+        self._current_photo = None
+        try:
+            self.video_label.configure(image="")
+        except Exception:
+            pass
+
+        # 4. Display the Standby HUD cleanly over the dark viewport
         self._render_standby_hud()
         self.standby_frame.place(relx=0.5, rely=0.5, anchor="center")
-        self._update_cycle_hud("●", FUTheme.TEXT_MUTED, "CONVEYOR STANDBY — SESSION IDLE")
-        self._set_session_active_state(False)
-        self._log("[ACTION] End session protocol completed. System returned to Standby.")
+
+        session_id = self._pending_finalization_id or self.current_session_id
+        self._pending_finalization_id = session_id
+        self._set_operation_state(OperatorState.STOPPING, "STOPPING - FINALIZING LOCAL RECORDS")
+
+        def finish():
+            if station is None and callable(getattr(self.camera, "request_stop", None)):
+                self.camera.stop()
+            if station and station.cycle and station.cycle.active:
+                station.cycle._thread.join(timeout=5)
+                if station.cycle.active:
+                    raise RuntimeError("Sorting worker is still stopping; retry finalization")
+            # Cancellation before the first queued write can legitimately leave
+            # no local session. A database read error still enters recovery.
+            if session_id and self.db.get_session_stats(session_id):
+                return self.db.complete_session(session_id)
+            return {}
+
+        def finished(stats):
+            self._stopping = False
+            if session_id and stats:
+                self._last_session_id = session_id
+                # Recover counts even if Stop invalidated the UI callback of a
+                # scan that had already committed to SQLite.
+                self.total_count = stats["total_scanned"]
+                self.fertile_count = stats["fertile_count"]
+                self.infertile_count = stats["infertile_count"]
+                self.review_count = stats["manual_review_count"]
+                self._update_counters_ui()
+            self.current_session_id = self._pending_finalization_id = None
+            self._finalization_failed = False
+            self._session_start_time = None
+            if self.camera.is_running:
+                self.standby_frame.place_forget()
+            if hasattr(self, "setup_inspected"):
+                self.setup_inspected.set(False)
+            self._set_operation_state(OperatorState.COMPLETE if self._diagnostics_complete else OperatorState.READY,
+                                      "DIAGNOSTIC TARGET REACHED" if self._diagnostics_complete else "STOPPED - LOCAL RECORDS FINALIZED")
+            automatic = station is not None and station.cycle is not None and station.cycle.session_id == session_id
+            self._log("[STOPPED] " + ("Local session finalized." if stats else "No pending local session.")
+                      + (" Gate passage is timed; inspect the output trays." if automatic else " Physical sorting was not performed."))
+            if self._diagnostics_complete and not self._closing and self.grab_current() is None:
+                self.after(0, self.open_batch_completion_modal)
+
+        def failed(error):
+            self._stopping = False
+            self._finalization_failed = True
+            # Preserve identity so Retry cannot abandon an unfinished session.
+            self._set_operation_state(OperatorState.RECOVERY, "FINALIZATION FAILED - RETRY END SESSION")
+            self._log("[STORAGE ERROR] Session finalization failed: " + error)
+        try:
+            self._jobs.submit(finish, finished, failed)
+        except (queue.Full, RuntimeError) as exc:
+            failed(str(exc))
 
     def _stop_auto_cycle(self):
         """Helper to cleanly stop automated cycle loop."""
         self.stop_or_cancel_session()
 
-    def toggle_auto_session(self):
-        """Toggle automated full conveyor sorting cycle with on-demand camera start."""
-        if not self.is_session_active:
-            # 1. Start Camera Stream On-Demand
-            if not self.camera.is_running:
-                self.camera.start()
+    def _resolve_station_review(self, classification):
+        if self.station and self.station.cycle:
+            try:
+                self.station.cycle.resolve_review(classification)
+                for button in self.review_buttons:
+                    button.configure(state="disabled")
+            except ValueError as exc:
+                self._log("[REVIEW] " + str(exc))
 
-            # Hide Standby Overlay Frame
-            self.standby_frame.place_forget()
-
-            # 2. Start New Session & Auto Conveyor Cycle
-            self.current_session_id = str(uuid.uuid4())
-            self.is_session_active = True
-            self.is_auto_cycle_running = True
-            self.scan_sequence = 0
-            self.total_count = 0
-            self.fertile_count = 0
-            self.infertile_count = 0
-            self.abnormal_count = 0
-
-            # Record in SQLite WAL
-            self.db.create_session(
-                session_id=self.current_session_id,
-                batch_id=self.current_batch_id,
-                device_id=self.device_id,
-                stage=self.current_stage,
-                operator_name=self.operator_name
-            )
-
-            # Sync session creation to FastAPI backend
-            self.sync_worker.register_session({
-                "session_id": self.current_session_id,
-                "batch_id": self.current_batch_id,
-                "device_id": self.device_id,
-                "stage": self.current_stage,
-                "operator_name": self.operator_name,
-                "started_at": datetime.now(timezone.utc).isoformat()
-            })
-
-            # Record session start time for live throughput computation
-            self._session_start_time = time.time()
-
-            # Update UI state & reveal cancel button
-            self._set_session_active_state(True)
-            self._update_counters_ui()
-            self._log(f"[*] AUTO SESSION STARTED: {self.current_session_id[:8]}... (Batch: {self.current_batch_id}, Target: {self.target_egg_count} eggs)")
-
-            # Launch Automated Conveyor Cycle Worker Thread
-            self._stop_cycle_event.clear()
-            self._auto_cycle_thread = threading.Thread(target=self._auto_conveyor_cycle_loop, daemon=True, name="OvaLens-ConveyorCycle")
-            self._auto_cycle_thread.start()
+    def _poll_station(self):
+        station = getattr(self, "station", None)
+        if station is None:
+            return
+        OvaLensOperatorApp.refresh_readiness(self)
+        OvaLensOperatorApp._refresh_light_control(self)
+        OvaLensOperatorApp._refresh_pause_control(self)
+        now = time.monotonic()
+        self._ui_tick_ms = (now - getattr(self, "_last_station_poll", now)) * 1000
+        self._last_station_poll = now
+        boards = station.boards
+        parts = []
+        if boards:
+            for link in getattr(boards, "links", (boards.conveyor, boards.servo)):
+                state = link.snapshot()
+                status = state.error or state.telemetry.get("FAULT", "identifying")
+                parts.append(f"{link.role}: {status if state.connected else 'disconnected'}")
+            if hasattr(boards, "egg"):
+                parts.append("IR: " + boards.egg.snapshot().telemetry.get("SENSOR", "unknown"))
+                parts.append("Lamp: " + boards.light.snapshot().telemetry.get("LIGHT", "unknown"))
+            else:
+                parts.append("IR: " + boards.conveyor.snapshot().telemetry.get("IR_ACTIVE", "unknown"))
         else:
-            # Stop Session & Release Camera
-            self.stop_or_cancel_session()
+            parts.append("Boards disconnected")
+            lamp = getattr(station, "light_link", None)
+            if lamp is not None:
+                state = lamp.snapshot()
+                value = state.telemetry.get("LIGHT") if state.connected and not state.error else None
+                parts.append("Candling light: " + ("ON" if value == "1" else "OFF" if value == "0" else "unknown"))
+        recovery = getattr(station, "recovery", None)
+        if recovery and recovery.get("state") not in {"COMPLETE", "CLEARED"}:
+            parts.append("Recovery: inspect interrupted eggs before validating")
+        parts.append("Camera: " + (self.camera.last_error or ("ready" if self.camera.is_running else "idle")))
+        label = " | ".join(parts)
+        if label != getattr(self, "_last_station_label", None):
+            self.station_status.configure(text=label)
+            self._last_station_label = label
+        cycle = station.cycle
+        if cycle is None:
+            return
+        status = cycle.status
+        result = cycle.latest_result
+        if result and result["scan_id"] != getattr(self, "_last_station_scan", None):
+            self._last_station_scan = result["scan_id"]
+            self._update_result_banner(result["final_class"], result["confidence"], result["routing_action"], result.get("inference_ms", 0))
+            self.result_subtitle.configure(text=f"Egg {result['holder']} saved locally; gate passage is estimated. Inspect the output trays.")
+        pending_pause = bool(getattr(cycle, "pause_requested", False))
+        key = (cycle.session_id, status["state"], status.get("holder"), status.get("reason"), pending_pause)
+        if key != getattr(self, "_last_cycle_status", None):
+            self._last_cycle_status = key
+            message = f"{status['state']} | Holder {status.get('holder', 0)} | {status.get('reason', '')}"
+            title, detail, tone = cycle_cue(status)
+            if pending_pause and status["state"] not in {"PAUSED", "PAUSING", "RESUMING", "MANUAL_REVIEW", "COMPLETE", "RECOVERY_REQUIRED"}:
+                title, detail, tone = cycle_cue({"state": "PAUSING"})
+            color = FUTheme.INFERTILE_AMBER if tone in {"review", "error"} else FUTheme.TEXT_PRIMARY
+            self._update_cycle_hud("", color, title, detail=detail)
+            if status["state"] == "MANUAL_REVIEW":
+                self.review_row.pack(fill="x", padx=12, pady=(0, 8))
+            else:
+                self.review_row.pack_forget()
+            for button in self.review_buttons:
+                button.configure(state="normal" if status["state"] == "MANUAL_REVIEW" else "disabled")
+            self._log("[CYCLE] " + message)
+        if status["state"] != "COMPLETE" and self.current_session_id == cycle.session_id and not getattr(self, "_station_stats_pending", False) and now - getattr(self, "_station_stats_at", 0) >= .5:
+            self._station_stats_at = now
+            self._station_stats_pending = True
+            session_id = cycle.session_id
+            def updated(stats):
+                self._station_stats_pending = False
+                if self.current_session_id != session_id or not stats:
+                    return
+                self.total_count = self.scan_sequence = stats["total_scanned"]
+                self.fertile_count, self.infertile_count, self.review_count = stats["fertile_count"], stats["infertile_count"], stats["manual_review_count"]
+                self._update_counters_ui()
+            def failed(message):
+                self._station_stats_pending = False
+                self._log("[STORAGE] " + message)
+            try:
+                self._jobs.submit(lambda: self.db.get_session_stats(session_id), updated, failed)
+            except (queue.Full, RuntimeError) as exc:
+                failed(str(exc))
+        if status["state"] in {"COMPLETE", "RECOVERY_REQUIRED"} and not getattr(self, "_station_terminal_seen", False):
+            self._station_terminal_seen = True
+            self.is_auto_cycle_running = False
+            if status["state"] == "COMPLETE":
+                self._finalize_automatic_batch(cycle)
+            else:
+                self._log("[RECOVERY] Stop/finalize this session, inspect holders, then reconnect and validate setup.")
+            self._set_session_active_state(True)
 
-        self._log(f"[OK] Auto sorting ended. Completed {self.total_count}/{self.target_egg_count} eggs.")
+    def toggle_auto_session(self):
+        """Final Start consumes a fresh preparation; it never discovers or calibrates."""
+        if getattr(self, "_setup_busy", False) or getattr(self, "_light_busy", False) or self._stopping or self._closing or getattr(self, "_camera_panel", None) is not None:
+            return
+        if self.is_session_active or self.is_auto_cycle_running:
+            self.stop_or_cancel_session()
+            return
+        if getattr(self, "_batch_complete", False):
+            self.open_batch_setup_dialog()
+            return
+        if (not self.station or self.simulation or self.grab_current() is not None
+                or self._scan_busy or self.current_session_id or self._finalization_failed or self.inference_worker.busy):
+            self._log("[BLOCKED] Finish the current operation before starting sorting.")
+            return
+        if not getattr(self, "_batch_record_ready", False):
+            self.setup_notice.configure(text="Choose or create a batch with its incubation details first.")
+            self.open_batch_setup_dialog()
+            return
+        try:
+            batch, operator, target = validate_batch_config(self.current_batch_id, self.operator_name,
+                                                           self.target_egg_count, self.current_stage)
+        except ValueError as exc:
+            self.setup_notice.configure(text=str(exc))
+            return
+        if self.station.settings.rig_profile == "dual_v2":
+            if not self.station.calibrated or not self.setup_inspected.get():
+                self.setup_notice.configure(text="Prepare the saved two-board profile in Tools / Settings first.")
+                return
+            try:
+                self._activate_cycle(self.station.start_cycle(batch, target, operator))
+                self.setup_inspected.set(False)
+            except Exception as exc:
+                self.station.halt()
+                self.setup_notice.configure(text=str(exc))
+            return
+        if not self.station.readiness.ready:
+            self._station_prepared = False
+            self.setup_notice.configure(text=self.station.readiness.reason)
+            self._set_session_active_state(False)
+            return
+        self._submit_station_request(start=True, args=(batch, target, operator))
+
+    def _activate_cycle(self, cycle):
+        self.current_session_id = cycle.session_id
+        self.is_session_active = self.is_auto_cycle_running = True
+        self._station_terminal_seen = False
+        self._automatic_complete_cycle = None
+        self._diagnostic_view = None
+        self._batch_complete = False
+        self.total_count = self.fertile_count = self.infertile_count = self.review_count = self.scan_sequence = 0
+        self._session_start_time = time.time()
+        self._diagnostics_complete = False
+        self.standby_frame.place_forget()
+        self._log("[STARTED] Feed one egg when the instruction says Feed next egg.")
+        self._set_session_active_state(True)
+
+    def _finalize_automatic_batch(self, cycle):
+        if self._stopping or self.current_session_id != cycle.session_id:
+            return
+        self._automatic_complete_cycle = cycle
+        self._pending_finalization_id = cycle.session_id
+        self._stopping = True
+        self.is_auto_cycle_running = False
+        generation = self._operation_generation
+        self._update_cycle_hud("", FUTheme.TEXT_PRIMARY, "Finishing batch", detail="Saving totals locally.")
+        self._set_session_active_state(True)
+        def work():
+            if cycle.active:
+                cycle._thread.join(timeout=5)
+                if cycle.active:
+                    raise RuntimeError("Sorting is still stopping. Retry finalization.")
+            if cycle.status["state"] != "COMPLETE":
+                raise RuntimeError("Sorting did not finish. Inspect the conveyor.")
+            stats = self.db.get_session_stats(cycle.session_id)
+            if not stats or not stats.get("ended_at"):
+                raise RuntimeError("Final totals are unavailable. Retry finalization.")
+            return stats
+        def success(stats):
+            if generation != self._operation_generation or self._closing:
+                return
+            self._stopping = self.is_session_active = False
+            self._last_session_id = cycle.session_id
+            self.current_session_id = self._pending_finalization_id = None
+            self._finalization_failed = False
+            self._batch_complete = True
+            self._session_start_time = None
+            self.setup_inspected.set(False)
+            self.total_count = self.scan_sequence = stats["total_scanned"]
+            self.fertile_count, self.infertile_count, self.review_count = (stats["fertile_count"],
+                stats["infertile_count"], stats["manual_review_count"])
+            self._update_counters_ui()
+            self._set_session_active_state(False)
+            self._update_cycle_hud("", FUTheme.FERTILE_GREEN_TEXT, "Batch complete", detail="Review the totals or start the next batch.")
+            self.result_title.configure(text="Batch complete")
+            self.result_badge.configure(text="COMPLETE")
+            self.result_subtitle.configure(text=f"{self.total_count} scans saved locally. Inspect the output trays.")
+            self._log(f"[COMPLETE] {cycle.count} saved scans; {cycle.routed} estimated gate passages.")
+            if not self._closing and self.grab_current() is None:
+                self.after(0, self.open_batch_completion_modal)
+        def failed(error):
+            if generation != self._operation_generation or self._closing:
+                return
+            self._stopping = False
+            self._finalization_failed = True
+            self._set_session_active_state(True)
+            self._update_cycle_hud("", FUTheme.INFERTILE_AMBER, "Retry finalization", detail=error)
+        try:
+            self._jobs.submit(work, success, failed)
+        except (queue.Full, RuntimeError) as exc:
+            failed(str(exc))
 
     def _auto_conveyor_cycle_loop(self):
-        """
-        Industrial Automated Conveyor State Machine:
-        1. Motor Advances Conveyor
-        2. Egg enters dark candling chamber (Conveyor Pauses for blur-free optical capture)
-        3. AI Vision inference executes in worker thread (Zero UI lag)
-        4. Servo diverter actuates if rejected; lets egg pass to incubator lane if fertile
-        5. Automatically repeats until target batch count is satisfied
-        """
-        while self.is_auto_cycle_running and not self._stop_cycle_event.is_set():
-            if self.total_count >= self.target_egg_count:
-                self.after(0, self._on_batch_target_complete)
-                break
-
-            # PHASE 1: Motor Advance (Transport egg to candling aperture)
-            self.after(0, lambda: self._update_cycle_hud("🟢", FUTheme.FERTILE_GREEN, f"CONVEYOR ADVANCING EGG #{self.total_count + 1} (120 EGGS/MIN)...", bg_color=FUTheme.FERTILE_GREEN_CARD))
-            self.iot.set_conveyor(True)
-            time.sleep(self.conveyor_advance_ms / 1000.0)
-
-            if self._stop_cycle_event.is_set():
-                break
-
-            # PHASE 2: Chamber Entry & Stabilization Pause
-            self.after(0, lambda: self._update_cycle_hud("🟡", FUTheme.INFERTILE_AMBER, f"EGG #{self.total_count + 1} IN CHAMBER — OPTICAL CANDLING", bg_color=FUTheme.INFERTILE_AMBER_CARD))
-            self.iot.set_conveyor(False)
-            time.sleep(self.chamber_pause_ms / 1000.0)
-
-            if self._stop_cycle_event.is_set():
-                break
-
-            # PHASE 3: AI Candling Scan & Actuation in Background Thread
-            self.after(0, lambda: self._update_cycle_hud("🔵", FUTheme.PRIMARY_MAROON, f"AI INFERENCE — SCANNING EGG #{self.total_count + 1}...", bg_color=FUTheme.PRIMARY_MAROON_BG))
-            
-            frame = self.camera.get_latest_frame(copy=True)
-            if frame is not None:
-                # Run neural net prediction asynchronously in this background thread
-                result = self.engine.predict(frame)
-                self.after(0, lambda res=result: self._process_scan_result(res))
-            else:
-                self.after(0, self.trigger_candling_scan)
-
-            # Settle time between cycles
-            time.sleep(0.35)
+        raise RuntimeError("The legacy timed conveyor cycle is disabled.")
 
     def _on_batch_target_complete(self):
-        self._stop_auto_cycle()
-        self._update_cycle_hud("🏁", FUTheme.PRIMARY_MAROON, f"BATCH COMPLETE: ALL {self.target_egg_count} EGGS SORTED!", bg_color=FUTheme.PRIMARY_MAROON_BG)
-        self._log(f"[COMPLETE] Batch {self.current_batch_id} fully scanned ({self.target_egg_count}/{self.target_egg_count} eggs).")
-        self._play_completion_chime()
-        self.open_batch_completion_modal()
+        # A retired controller callback is not proof of completed physical work.
+        if self.total_count < self.target_egg_count or self._diagnostics_complete:
+            return
+        self._diagnostics_complete = True
+        self.stop_or_cancel_session()
 
-    def _update_cycle_hud(self, dot_icon: str, dot_color: str, status_text: str, bg_color: str = None):
+    def _auto_start_from_config(self):
+        self._log("[READY] Batch configuration loaded. No motion starts automatically.")
+        if self.simulation:
+            self._log("[SIMULATION] Preview only: no hardware commands or saved scans.")
+        else:
+            self._log("[READY] Choose a batch, then prepare the empty conveyor. Tools contains diagnostics and settings.")
+
+    def _on_chamber_state_change(self, state: str, current: int, total: int):
+        """ChamberController state callback — updates the cycle HUD (runs on main thread via after())."""
+        hud_map = {
+            ChamberState.MOTOR_ADVANCE:  ("🟢", FUTheme.FERTILE_GREEN,    f"CONVEYOR ADVANCING — EGG #{current} OF {total}", FUTheme.FERTILE_GREEN_CARD),
+            ChamberState.STABILIZING:    ("🟡", FUTheme.INFERTILE_AMBER,  f"EGG #{current} IN CHAMBER — STABILIZING ({self.chamber_pause_ms}ms)", FUTheme.INFERTILE_AMBER_CARD),
+            ChamberState.AI_SCAN:        ("🔵", FUTheme.PRIMARY_MAROON,   f"AI SCANNING EGG #{current}...", FUTheme.PRIMARY_MAROON_BG),
+            ChamberState.DISPLAYING:     ("🔵", FUTheme.PRIMARY_MAROON,   f"RESULT DISPLAYED — EGG #{current}", FUTheme.PRIMARY_MAROON_BG),
+            ChamberState.ACTUATING:      ("⚡", FUTheme.INFERTILE_AMBER,  f"ACTUATING SERVO — EGG #{current}", FUTheme.INFERTILE_AMBER_CARD),
+            ChamberState.ADVANCE_NEXT:   ("🟢", FUTheme.FERTILE_GREEN,    f"EGG #{current} DONE — ADVANCING NEXT", FUTheme.FERTILE_GREEN_CARD),
+            ChamberState.COMPLETE:       ("🏁", FUTheme.PRIMARY_MAROON,   "CONTROLLER FINISHED - VERIFY LOCAL RECORDS", FUTheme.PRIMARY_MAROON_BG),
+            ChamberState.EMERGENCY_STOP: ("🔴", FUTheme.REJECT_RED,       "⚠ JAM DETECTED — CONVEYOR HALTED", FUTheme.REJECT_RED_BG),
+            ChamberState.STANDBY:        ("●",  FUTheme.TEXT_MUTED,       "CONVEYOR STANDBY — SESSION IDLE", FUTheme.PANEL_LIGHT_ALT),
+        }
+        icon, color, text, bg = hud_map.get(state, ("●", FUTheme.TEXT_MUTED, state, FUTheme.PANEL_LIGHT_ALT))
+        self._update_cycle_hud(icon, color, text, bg_color=bg)
+
+    def _on_chamber_scan_result(self, result: dict):
+        """ChamberController scan result callback — records to DB and updates UI (main thread)."""
+        self._process_scan_result(result)
+
+    def _on_batch_complete_callback(self, count: int):
+        """ChamberController batch complete callback (main thread)."""
+        self._on_batch_target_complete()
+
+    def _on_jam_detected(self):
+        """ChamberController jam timeout callback (main thread)."""
+        self.is_auto_cycle_running = False
+        self._log("[WARN] ⚠ JAM DETECTED: No egg arrived within 30 seconds. Conveyor halted.")
+        self._show_jam_alert_modal()
+
+    def _show_jam_alert_modal(self):
+        """Show a jam alert modal prompting operator to check the conveyor."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("⚠ Conveyor Jam Detected")
+        dialog.geometry("480x260")
+        dialog.configure(fg_color=FUTheme.BG_LIGHT)
+        dialog.transient(self)
+        dialog.grab_set()
+        self._center_window(dialog, 480, 260)
+
+        card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
+        card.pack(fill="both", expand=True, padx=16, pady=16)
+
+        ctk.CTkLabel(card, text="⚠ Conveyor Jam Detected",
+                     font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.REJECT_RED).pack(pady=(18, 6))
+        ctk.CTkLabel(card,
+                     text=f"No egg was detected in the candling chamber within 30 seconds.\nConveyor motor has been halted automatically.\n\nPlease check for physical obstructions, then restart the session.\n\nScans completed: {self.total_count} / {self.target_egg_count}",
+                     font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED, justify="center").pack(pady=(0, 18))
+
+        btn_row = ctk.CTkFrame(card, fg_color="transparent")
+        btn_row.pack(fill="x", padx=16, pady=(0, 12))
+
+        def resume():
+            self._animate_modal_close(dialog, on_close=self.toggle_auto_session)
+
+        ctk.CTkButton(btn_row, text="↩ Resume Sorting", fg_color=FUTheme.PRIMARY_MAROON,
+                      hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE,
+                      font=(FUTheme.FONT_FAMILY, 12, "bold"), command=resume, height=38, corner_radius=8
+                      ).pack(side="left", fill="x", expand=True, padx=(0, 8))
+        ctk.CTkButton(btn_row, text="End Session", fg_color=FUTheme.PANEL_LIGHT_ALT,
+                      hover_color=FUTheme.REJECT_RED_BG, border_width=1, border_color=FUTheme.BORDER,
+                      text_color=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 11),
+                      command=lambda: self._animate_modal_close(dialog, on_close=self.stop_or_cancel_session),
+                      height=38, corner_radius=8, width=130).pack(side="right")
+
+    def _update_cycle_hud(self, dot_icon: str, dot_color: str, status_text: str, bg_color: str = None, detail=""):
         hud_bg = bg_color or FUTheme.PANEL_LIGHT_ALT
+        signature = (dot_icon, dot_color, status_text, hud_bg, detail)
+        if signature == getattr(self, "_hud_signature", None):
+            return
+        self._hud_signature = signature
         self.cycle_hud.configure(fg_color=hud_bg)
         self.cycle_status_dot.configure(text=dot_icon, text_color=dot_color)
         self.cycle_status_label.configure(text=status_text, text_color=dot_color if dot_color != FUTheme.TEXT_MUTED else FUTheme.TEXT_PRIMARY)
+        if hasattr(self, "cycle_detail_label"):
+            self.cycle_detail_label.configure(text=detail)
 
-    def _process_scan_result(self, result: Dict[str, Any]):
-        """Commit scan result to database, schedule physical actuator, and update telemetry on UI."""
-        if not self.is_session_active:
-            self.current_session_id = self.current_session_id or str(uuid.uuid4())
-            self.is_session_active = True
-            self._session_start_time = time.time()
-            self.db.create_session(
-                session_id=self.current_session_id,
-                batch_id=self.current_batch_id,
-                device_id=self.device_id,
-                stage=self.current_stage,
-                operator_name=self.operator_name
-            )
-
-        self.scan_sequence += 1
-        scan_id = str(uuid.uuid4())
-
-        final_cls = result["final_class"]
-        conf = result["confidence"]
-        action = result["routing_action"]
-        lat_ms = result["inference_ms"]
-        detections = result.get("detections", [])
-
-        self._latest_detections = detections
-
-        # If rejected, schedule ESP32 conveyor kicker
-        if action == "REJECT":
-            delay_ms = max(50, int((self.conveyor_dist_cm / max(1.0, self.conveyor_speed_cm_s)) * 1000))
-            self.iot.schedule_ejection(delay_ms, self.servo_pulse_ms)
-
-        # Record scan to local SQLite WAL
-        self.db.record_scan(
-            scan_id=scan_id,
-            session_id=self.current_session_id,
-            batch_id=self.current_batch_id,
-            sequence_number=self.scan_sequence,
-            final_class=final_cls,
-            confidence=conf,
-            inference_ms=lat_ms,
-            routing_action=action,
-            detections=detections
-        )
-
-        # Update Counters
-        self.total_count += 1
-        if final_cls == "FERTILE":
-            self.fertile_count += 1
-        elif final_cls == "INFERTILE":
-            self.infertile_count += 1
-        else:
-            self.abnormal_count += 1
-
-        self._update_counters_ui()
-        self._update_result_banner(final_cls, conf, action, lat_ms)
-        self._log(f"#{self.scan_sequence:03d} | {final_cls:<9} | {conf*100:5.1f}% | {action:<6} | {lat_ms}ms")
-
-    def trigger_candling_scan(self):
-        """Perform instant snapshot inference on-demand (Manual Test Scan)."""
-        if not self.camera.is_running:
-            self.camera.start()
-            self.standby_frame.place_forget()
-            self._set_session_active_state(True)
-            time.sleep(0.05)
-
-        frame = self.camera.get_latest_frame(copy=True)
-        if frame is None:
+    def _process_scan_result(self, result):
+        """Persist a manual diagnostic scan on a worker; never actuate from a UI callback."""
+        if self._closing or self._stopping:
+            return
+        final_cls = result.get("final_class")
+        conf = result.get("confidence", 0.0)
+        if (final_cls not in {"FERTILE", "INFERTILE"} or not isinstance(conf, (int, float))
+                or not math.isfinite(conf) or not 0 <= conf <= 1 or not result.get("detections")):
+            self._scan_failed("No trustworthy egg classification: "
+                              + result.get("error_code", "EGG_NOT_CONFIRMED"), OperatorState.REVIEW)
+            return
+        action = "MANUAL_REVIEW" if conf < 0.75 else ("ACCEPT" if final_cls == "FERTILE" else "REJECT")
+        latency = result.get("inference_ms", 0)
+        if not isinstance(latency, int) or latency < 0:
+            self._scan_failed("Invalid inference latency; scan was not saved.")
             return
 
-        result = self.engine.predict(frame)
-        self._process_scan_result(result)
+        # The viewport uses the paired diagnostic snapshot, never a live frame.
+        self._latest_detections = result.get("detections", [])
+        self._last_scan_result_time = time.monotonic()
+
+        if self.simulation or self.camera.is_mock_mode or not str(result.get("engine", "")).startswith("ONNX"):
+            self._scan_busy = False
+            self._update_result_banner(final_cls, conf, "PREVIEW_ONLY", latency)
+            self._set_operation_state(OperatorState.READY, "PREVIEW ONLY - NO SCAN RECORDED")
+            self._log("[PREVIEW] Simulated/fallback results are not saved or routed.")
+            return
+        generation = self._operation_generation
+        new_session = self.current_session_id is None
+        if new_session:
+            self.scan_sequence = self.total_count = self.fertile_count = self.infertile_count = self.review_count = 0
+        session_id = self.current_session_id or str(uuid.uuid4())
+        self.current_session_id = session_id
+        batch_id, sequence = self.current_batch_id, self.scan_sequence + 1
+        device_id, stage, operator = self.device_id, self.current_stage, self.operator_name
+        scan_id = str(uuid.uuid4())
+        view = getattr(self, "_diagnostic_view", None)
+        # Keep the inference-owned snapshot alive through the queued disk write.
+        # Legacy metadata-only callers have no paired snapshot to save.
+        image = view.frame.image if view is not None else None
+        self._set_operation_state(OperatorState.SAVING, "SAVING SCAN - WAITING FOR LOCAL COMMIT")
+
+        def work():
+            if generation != self._operation_generation:
+                return None
+            if not self.db.get_session_stats(session_id):
+                self.db.create_session(session_id, batch_id, device_id, stage, operator)
+            if generation != self._operation_generation:
+                return None
+            image_path = self.db.save_scan_image(scan_id, image) if image is not None else None
+            return self.db.record_scan(scan_id, session_id, batch_id, sequence,
+                                       final_cls, conf, latency, action, result["detections"], image_path=image_path)
+
+        def saved(record):
+            if generation != self._operation_generation or record is None:
+                return
+            self._scan_busy = False
+            self.scan_sequence = sequence
+            self.is_session_active = True
+            self._session_start_time = self._session_start_time or time.time()
+            self.total_count += 1
+            if action == "MANUAL_REVIEW":
+                self.review_count += 1
+            elif final_cls == "FERTILE":
+                self.fertile_count += 1
+            else:
+                self.infertile_count += 1
+            self._latest_detections = result["detections"]
+            self._last_scan_result_time = time.monotonic()
+            self._set_session_active_state(True)
+            self._update_counters_ui()
+            self._update_result_banner(final_cls, conf, action, latency)
+            self._log(f"#{sequence:03d} | {final_cls} | {conf:.1%} | {action} | saved locally; not physically routed")
+            self._set_operation_state(OperatorState.REVIEW if action == "MANUAL_REVIEW" else OperatorState.READY,
+                                      "SCAN SAVED - MANUAL REVIEW REQUIRED" if action == "MANUAL_REVIEW" else "SCAN SAVED - READY FOR NEXT DIAGNOSTIC")
+            if self.total_count >= self.target_egg_count:
+                self._diagnostics_complete = True
+                self.stop_or_cancel_session()
+
+        def failed(message):
+            if generation != self._operation_generation:
+                return
+            # A session may have been created before record_scan failed. Reuse it
+            # rather than creating the same session again on the next attempt.
+            self._scan_failed("Scan was not recorded. Retry after resolving storage error: " + message)
+        try:
+            self._jobs.submit(work, saved, failed)
+        except (queue.Full, RuntimeError) as exc:
+            failed(str(exc))
+
+    def trigger_candling_scan(self):
+        """One click waits for a fresh camera frame, then starts bounded inference."""
+        if getattr(self, "_camera_panel", None) is not None:
+            self._log("[CAMERA] Finish camera tuning before scanning.")
+            return
+        if self._closing or self._scan_busy or self._stopping or self.is_auto_cycle_running or getattr(self, "_setup_busy", False) or getattr(self, "_light_busy", False):
+            return
+        station = getattr(self, "station", None)
+        if station and station.cycle and self.current_session_id == station.cycle.session_id:
+            self._log("[BLOCKED] End the automatic session before starting manual diagnostics.")
+            return
+        if self._pending_finalization_id or self._finalization_failed:
+            self._log("[BLOCKED] Retry session finalization before another scan.")
+            return
+        if self._diagnostics_complete:
+            self._log("[COMPLETE] Diagnostic target reached. Configure a new batch to continue.")
+            return
+        if self.inference_worker.busy:
+            self._log("[WAIT] Previous inference is still running; no additional scan queued.")
+            return
+        if self.grab_current() is not None:
+            self._log("[BLOCKED] Close the dialog before scanning.")
+            return
+        if not self.simulation and not getattr(self, "_batch_record_ready", True):
+            self._log("[BATCH] Choose or create a batch with its incubation details before saving scans.")
+            self.open_batch_setup_dialog()
+            return
+        if not OvaLensOperatorApp._diagnostic_stationary(self):
+            self._log("[BLOCKED] Stop the conveyor before a diagnostic scan.")
+            return
+        self._scan_busy = True
+        self._diagnostic_view = None
+        self._latest_detections = []
+        self.result_title.configure(text="Waiting for a fresh camera frame")
+        self.result_badge.configure(text="PENDING")
+        self.result_subtitle.configure(text="No result recorded yet")
+        self._set_operation_state(OperatorState.CAMERA_STARTING, "STARTING CAMERA - WAITING FOR FRESH FRAME")
+        try:
+            if not self.camera.is_running:
+                self.camera.start()
+            self.standby_frame.place_forget()
+        except Exception as exc:
+            self._scan_failed("Camera could not start: " + str(exc))
+            return
+        generation = self._operation_generation
+        self._await_scan_frame(generation, time.monotonic() + 3.0)
+
+    def _await_scan_frame(self, generation, deadline):
+        if generation != self._operation_generation or self._closing or self._stopping:
+            return
+        if time.monotonic() >= deadline:
+            self._scan_failed("Camera timed out. Check the camera, then retry Scan.")
+            return
+        if self.camera.last_error:
+            self._scan_failed("Camera unavailable: " + self.camera.last_error)
+            return
+        frame = self.camera.snapshot()
+        if frame is None:
+            self.after(50, lambda: self._await_scan_frame(generation, deadline))
+            return
+        if not OvaLensOperatorApp._diagnostic_stationary(self):
+            self._scan_failed("Stop the conveyor before a diagnostic scan.")
+            return
+        request_id = str(uuid.uuid4())
+        self._pending_prediction = {"id": request_id, "generation": generation,
+                                    "deadline": time.monotonic() + 2.0, "frame": frame}
+        self._inference_request_id = request_id
+        self._set_operation_state(OperatorState.CLASSIFYING, "CLASSIFYING - NO RECORD SAVED YET")
+        self.result_title.configure(text="Classifying camera snapshot")
+        try:
+            self.inference_worker.submit(frame.image, request_id)
+        except (queue.Full, RuntimeError) as exc:
+            self._pending_prediction = self._inference_request_id = None
+            self._scan_failed("Inference unavailable: " + str(exc))
+            return
+        self.after(2000, lambda: self._prediction_timeout(request_id, generation))
+
+    def _prediction_timeout(self, request_id, generation):
+        if (self._closing or generation != self._operation_generation
+                or self._inference_request_id != request_id):
+            return
+        self._pending_prediction = self._inference_request_id = None
+        self._scan_failed("Inference timed out. Wait for the model to finish before retrying.",
+                          OperatorState.REVIEW)
 
     def trigger_manual_eject(self):
-        """Fire servo kicker immediately with visual confirmation on UI."""
-        self.iot.trigger_ejection_now()
-        self.result_banner.configure(fg_color=FUTheme.ABNORMAL_RED_CARD, border_color=FUTheme.ABNORMAL_RED_BORDER)
-        self.result_badge.configure(text="MANUAL EJECT", fg_color=FUTheme.ABNORMAL_RED_BG, text_color=FUTheme.ABNORMAL_RED_TEXT)
-        self.result_title.configure(text="⏏ Manual Ejection Triggered", text_color=FUTheme.ABNORMAL_RED)
-        self.result_subtitle.configure(text="Hardware servo diverter gate pulsed via ESP32 GPIO override")
-        self._log("[ACTION] Manual Ejection Triggered.")
+        light_cancel = getattr(self, "_light_request_cancel", None)
+        if light_cancel is not None:
+            light_cancel.set()
+        panel = getattr(self, "_camera_panel", None)
+        if panel is not None:
+            panel.cancel_alignment()
+        station = getattr(self, "station", None)
+        if station:
+            station.halt()
+        if (getattr(self, "_setup_busy", False) or self.current_session_id or self._scan_busy):
+            self.stop_or_cancel_session()
+        if hasattr(self, "setup_inspected"):
+            self.setup_inspected.set(False)
+        self._log("[STOP] Inspect the empty conveyor before starting again.")
 
     def _update_result_banner(self, final_cls: str, conf: float, action: str, lat_ms: int):
         if final_cls == "FERTILE":
@@ -971,24 +1849,23 @@ class OvaLensOperatorApp(ctk.CTk):
             badge_bg = FUTheme.FERTILE_GREEN_BG
             badge_text_color = FUTheme.FERTILE_GREEN_TEXT
             title_color = FUTheme.FERTILE_GREEN_TEXT
-            title_text = f"🟢 FERTILE — ACCEPT ({conf*100:.1f}%)"
-            sub_text = "Viable spider embryo network verified • Routed to setter tray"
-        elif final_cls == "INFERTILE":
+            title_text = f"FERTILE — ACCEPT ({conf*100:.1f}%)"
+            sub_text = "Fertile prediction recorded • physical route not confirmed"
+        else:
             card_bg = FUTheme.INFERTILE_AMBER_CARD
             card_border = FUTheme.INFERTILE_AMBER_BORDER
             badge_bg = FUTheme.INFERTILE_AMBER_BG
             badge_text_color = FUTheme.INFERTILE_AMBER_TEXT
             title_color = FUTheme.INFERTILE_AMBER
-            title_text = f"🟡 INFERTILE — REJECT ({conf*100:.1f}%)"
-            sub_text = "Clear unfertilized yolk • Diverted to Penoy salvage @ ₱14.00"
-        else:
-            card_bg = FUTheme.ABNORMAL_RED_CARD
-            card_border = FUTheme.ABNORMAL_RED_BORDER
-            badge_bg = FUTheme.ABNORMAL_RED_BG
-            badge_text_color = FUTheme.ABNORMAL_RED_TEXT
-            title_color = FUTheme.ABNORMAL_RED
-            title_text = f"🔴 ABNORMAL — REJECT ({conf*100:.1f}%)"
-            sub_text = "Dead embryo / Corrupted yolk • Ejected to cull bin"
+            title_text = f"INFERTILE — REJECT ({conf*100:.1f}%)"
+            sub_text = "Infertile prediction recorded • physical route not confirmed"
+
+        if action in {"MANUAL_REVIEW", "PREVIEW_ONLY"}:
+            title_text = f"{action.replace('_', ' ')} ({conf:.1%})"
+            sub_text = "Inspect the egg manually; no physical route was requested."
+            card_bg, card_border = FUTheme.INFERTILE_AMBER_CARD, FUTheme.INFERTILE_AMBER_BORDER
+            badge_bg, badge_text_color = FUTheme.INFERTILE_AMBER_BG, FUTheme.INFERTILE_AMBER_TEXT
+            title_color = FUTheme.INFERTILE_AMBER
 
         self.result_banner.configure(fg_color=card_bg, border_color=card_border)
         self.result_badge.configure(text=action, fg_color=badge_bg, text_color=badge_text_color)
@@ -997,12 +1874,12 @@ class OvaLensOperatorApp(ctk.CTk):
         self.result_subtitle.configure(text=sub_text)
 
     def _update_counters_ui(self):
-        pct = (self.fertile_count / max(1, self.total_count)) * 100.0
+        pct = (self.fertile_count / max(1, self.fertile_count + self.infertile_count)) * 100.0
         batch_pct = min(100.0, (self.total_count / max(1, self.target_egg_count)) * 100.0)
 
         # Update Progress Bar & Percentage
         self.progress_bar.set(batch_pct / 100.0)
-        self.progress_pct_label.configure(text=f"{batch_pct:.1f}% ({self.total_count} / {self.target_egg_count})")
+        self.progress_pct_label.configure(text=f"{batch_pct:.1f}%")
 
         # Compute Real-time Sorting Speed & Remaining ETA
         if self._session_start_time and self.total_count > 0:
@@ -1014,131 +1891,226 @@ class OvaLensOperatorApp(ctk.CTk):
                 eta_str = f"{eta_sec // 60:02d}:{eta_sec % 60:02d}"
             else:
                 eta_str = "--:--"
-            self.speed_eta_label.configure(text=f"⚡ {rate_per_min:.0f} eggs/min  •  ETA: {eta_str}")
+            self.speed_eta_label.configure(text=f"{rate_per_min:.0f}/min · ETA {eta_str}")
         else:
-            self.speed_eta_label.configure(text=f"⚡ Ready (Target: {self.target_egg_count} eggs)")
+            self.speed_eta_label.configure(text="")
 
         # Update Counter Tiles
-        self.box_total.configure(text=f"{self.total_count} / {self.target_egg_count}")
-        self.box_fertile.configure(text=f"{self.fertile_count} ({pct:.1f}%)")
+        total_text = f"{self.total_count} / {self.target_egg_count}"
+        fertile_text = f"{self.fertile_count} ({pct:.1f}%)"
+        for widget, text in ((self.box_total, total_text), (self.box_fertile, fertile_text)):
+            widget.configure(text=text, font=(FUTheme.FONT_FAMILY,
+                             18 if len(text) > 12 else 20, "bold"))
         self.box_infertile.configure(text=str(self.infertile_count))
-        self.box_abnormal.configure(text=str(self.abnormal_count))
+        self.box_review.configure(text=str(self.review_count))
+
+    def _diagnostic_stationary(self):
+        station = getattr(self, "station", None)
+        if station is None or getattr(station, "boards", None) is None:
+            return True  # Camera-only diagnostics are supported.
+        state = station.boards.conveyor.snapshot()
+        return (state.connected and state.identified and not state.error
+                and state.telemetry.get("BUSY") == "0")
+
+    def _get_display_capture(self):
+        if getattr(self, "_stopping", False) or not self.camera.is_running:
+            return None
+        station = getattr(self, "station", None)
+        cycle = getattr(station, "cycle", None)
+        if cycle is not None and getattr(self, "is_auto_cycle_running", False):
+            if cycle.status["state"] in {"CLASSIFYING", "SAVING", "ROUTING", "DISPLAYING", "MANUAL_REVIEW"}:
+                return getattr(cycle, "capture_view", None)
+            return None
+        if (not getattr(self, "_scan_busy", False)
+                and time.monotonic() - getattr(self, "_last_scan_result_time", 0) < 1.5
+                and OvaLensOperatorApp._diagnostic_stationary(self)):
+            return getattr(self, "_diagnostic_view", None)
+        return None
+
+    def _get_active_display_detections(self) -> List[Dict[str, Any]]:
+        view = OvaLensOperatorApp._get_display_capture(self)
+        return view.result.get("detections", []) if view else []
 
     def _update_video_frame(self):
         """
-        High-Performance Video Render Loop (~33 FPS).
-        Uses atomic frame buffer and native Tkinter PhotoImage for zero-overhead GUI rendering.
+        Render fresh camera frames only; actual cadence depends on camera and PC.
         """
-        if self.camera.is_running:
-            frame = self.camera.get_latest_frame(copy=False)
-            if frame is not None:
-                # Copy only if drawing active annotations to avoid mutating grabber buffer
-                if self.show_crosshairs or self._latest_detections:
-                    disp_frame = frame.copy()
+        if self._closing:
+            return
+        try:
+            if getattr(self.camera, "is_running", False) and not getattr(self, "_stopping", False):
+                snapshot = self.camera.snapshot(copy=False)
+                frame = snapshot.image if snapshot else None
+                view = self._get_display_capture()
+                if view is not None:
+                    frame = view.frame.image
+                if frame is not None:
+                    if hasattr(self, "standby_frame") and self.standby_frame.winfo_ismapped():
+                        self.standby_frame.place_forget()
+                    if getattr(self, "_operator_state", None) == OperatorState.ERROR and "camera 0" in getattr(self, "_operator_state_msg", ""):
+                        self._set_operation_state(OperatorState.READY, "Choose a batch, then prepare the empty conveyor")
+                    render_key = (("capture", id(view)) if view is not None else ("live", snapshot.sequence), self._cached_container_w, self._cached_container_h)
+                    if render_key == getattr(self, "_last_render_key", None):
+                        return
+                    self._last_render_key = render_key
+                    h, w = frame.shape[:2]
+
+                    # 1. Compute optimal viewport dimensions with cached container
+                    container_w = max(100, self._cached_container_w)
+                    container_h = max(100, self._cached_container_h)
+
+                    frame_aspect = w / max(1, h)
+                    container_aspect = container_w / max(1, container_h)
+
+                    if container_aspect > frame_aspect:
+                        target_h = container_h
+                        target_w = int(target_h * frame_aspect)
+                    else:
+                        target_w = container_w
+                        target_h = int(target_w / frame_aspect)
+
+                    target_w = max(160, min(target_w, container_w))
+                    target_h = max(120, min(target_h, container_h))
+
+                    # 2. Optimized Downsampling: Resize BGR frame first (reduces pixel processing by 4x-6x)
+                    disp_frame = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+
+                    # 3. Draw Optical Candling Alignment Guide / Crosshairs (if enabled)
+                    if self.show_crosshairs:
+                        cx, cy = target_w // 2, target_h // 2
+                        cv2.circle(disp_frame, (cx, cy), 5, (0, 255, 0), -1, cv2.LINE_AA)
+                        cv2.line(disp_frame, (cx - 20, cy), (cx + 20, cy), (0, 255, 0), 1, cv2.LINE_AA)
+                        cv2.line(disp_frame, (cx, cy - 20), (cx, cy + 20), (0, 255, 0), 1, cv2.LINE_AA)
+
+                    # 4. Draw only this captured frame's predictions.
+                    active_detections = view.result.get("detections", []) if view else []
+                    for det in active_detections:
+                        bbox = det.get("bbox", [])
+                        cls_name = det.get("class", "FERTILE")
+                        conf = det.get("confidence", 0.90)
+                        is_scanning = det.get("is_scanning", False)
+
+                        if (len(bbox) == 4 and all(type(v) in (int, float) and math.isfinite(v) for v in bbox)
+                                and type(conf) in (int, float) and math.isfinite(conf)):
+                            xc, yc, bw, bh = bbox
+                            x1 = max(0, int((xc - bw / 2.0) * target_w))
+                            y1 = max(0, int((yc - bh / 2.0) * target_h))
+                            x2 = min(target_w - 1, int((xc + bw / 2.0) * target_w))
+                            y2 = min(target_h - 1, int((yc + bh / 2.0) * target_h))
+
+                            if is_scanning:
+                                box_bgr = (0, 215, 255)       # Gold / Amber scan lock
+                                label_str = "SCANNING..."
+                            elif cls_name == "FERTILE":
+                                box_bgr = (56, 122, 53)       # Agri-Green
+                                label_str = f"FERTILE: {conf*100:.1f}%"
+                            else:
+                                box_bgr = (6, 119, 217)       # Penoy Amber
+                                label_str = f"INFERTILE: {conf*100:.1f}%"
+
+                            # High-visibility bounding box with industrial corner brackets
+                            cv2.rectangle(disp_frame, (x1, y1), (x2, y2), box_bgr, 1, cv2.LINE_AA)
+
+                            corner_len = max(6, min(16, int(min(x2 - x1, y2 - y1) * 0.2)))
+                            # Top-Left corner
+                            cv2.line(disp_frame, (x1, y1), (x1 + corner_len, y1), box_bgr, 2, cv2.LINE_AA)
+                            cv2.line(disp_frame, (x1, y1), (x1, y1 + corner_len), box_bgr, 2, cv2.LINE_AA)
+                            # Top-Right corner
+                            cv2.line(disp_frame, (x2, y1), (x2 - corner_len, y1), box_bgr, 2, cv2.LINE_AA)
+                            cv2.line(disp_frame, (x2, y1), (x2, y1 + corner_len), box_bgr, 2, cv2.LINE_AA)
+                            # Bottom-Left corner
+                            cv2.line(disp_frame, (x1, y2), (x1 + corner_len, y2), box_bgr, 2, cv2.LINE_AA)
+                            cv2.line(disp_frame, (x1, y2), (x1, y2 - corner_len), box_bgr, 2, cv2.LINE_AA)
+                            # Bottom-Right corner
+                            cv2.line(disp_frame, (x2, y2), (x2 - corner_len, y2), box_bgr, 2, cv2.LINE_AA)
+                            cv2.line(disp_frame, (x2, y2), (x2, y2 - corner_len), box_bgr, 2, cv2.LINE_AA)
+
+                            # Pill badge header
+                            (tw, th), _ = cv2.getTextSize(label_str, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)
+                            badge_y1 = max(0, y1 - th - 6)
+                            badge_y2 = y1
+                            badge_x2 = min(target_w, x1 + tw + 8)
+                            cv2.rectangle(disp_frame, (x1, badge_y1), (badge_x2, badge_y2), box_bgr, -1)
+                            cv2.putText(disp_frame, label_str, (x1 + 4, badge_y2 - 3),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1, cv2.LINE_AA)
+
+                    # 5. Fast color conversion on downscaled frame
+                    rgb_frame = cv2.cvtColor(disp_frame, cv2.COLOR_BGR2RGB)
+                    pil_img = Image.fromarray(rgb_frame)
+                    photo = ImageTk.PhotoImage(image=pil_img)
+                    self.video_label.configure(image=photo)
+                    self._current_photo = photo
+                    if getattr(self, "_operator_state", None) == OperatorState.ERROR and "camera 0" in getattr(self, "_operator_state_msg", ""):
+                        self._set_operation_state(OperatorState.READY, "Choose a batch, then prepare the empty conveyor")
                 else:
-                    disp_frame = frame
+                    self._last_render_key = None
+                    if self._current_photo is not None:
+                        self._current_photo = None
+                        self.video_label.configure(image="")
+            else:
+                # Camera turned off or session ending / on standby: clear viewport completely
+                self._last_render_key = None
+                if self._current_photo is not None:
+                    self._current_photo = None
+                    try:
+                        self.video_label.configure(image="")
+                    except Exception:
+                        pass
 
-                h, w = disp_frame.shape[:2]
-
-                # 1. Draw Optical Candling Alignment Guide / Crosshairs (if enabled)
-                if self.show_crosshairs:
-                    cv2.circle(disp_frame, (w // 2, h // 2), 6, (0, 255, 0), -1)
-                    cv2.line(disp_frame, (w // 2 - 25, h // 2), (w // 2 + 25, h // 2), (0, 255, 0), 1)
-                    cv2.line(disp_frame, (w // 2, h // 2 - 25), (w // 2, h // 2 + 25), (0, 255, 0), 1)
-                    cv2.ellipse(disp_frame, (w // 2, h // 2), (180, 240), 0, 0, 360, (0, 200, 255), 1)
-
-                # 2. Draw Live AI Bounding Boxes & Classification Labels
-                for det in self._latest_detections:
-                    bbox = det.get("bbox", [])
-                    cls_name = det.get("class", "FERTILE")
-                    conf = det.get("confidence", 0.90)
-
-                    if len(bbox) == 4:
-                        xc, yc, bw, bh = bbox
-                        x1 = int((xc - bw / 2) * w)
-                        y1 = int((yc - bh / 2) * h)
-                        x2 = int((xc + bw / 2) * w)
-                        y2 = int((yc + bh / 2) * h)
-
-                        if cls_name == "FERTILE":
-                            box_bgr = (56, 122, 53)     # Agri-Green
-                            label_str = f"FERTILE: {conf*100:.1f}%"
-                        elif cls_name == "INFERTILE":
-                            box_bgr = (6, 119, 217)     # Penoy Amber
-                            label_str = f"INFERTILE (PENOY): {conf*100:.1f}%"
-                        else:
-                            box_bgr = (38, 38, 220)     # Reject Red
-                            label_str = f"ABNORMAL: {conf*100:.1f}%"
-
-                        cv2.rectangle(disp_frame, (x1, y1), (x2, y2), box_bgr, 2)
-                        (tw, th), _ = cv2.getTextSize(label_str, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
-                        cv2.rectangle(disp_frame, (x1, y1 - th - 8), (x1 + tw + 10, y1), box_bgr, -1)
-                        cv2.putText(disp_frame, label_str, (x1 + 5, y1 - 4),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA)
-
-                # 3. High-Speed Aspect Ratio Scaling
-                rgb_frame = cv2.cvtColor(disp_frame, cv2.COLOR_BGR2RGB)
-
-                container_w = max(100, self._cached_container_w)
-                container_h = max(100, self._cached_container_h)
-
-                frame_aspect = w / max(1, h)
-                container_aspect = container_w / max(1, container_h)
-
-                if container_aspect > frame_aspect:
-                    target_h = container_h
-                    target_w = int(target_h * frame_aspect)
-                else:
-                    target_w = container_w
-                    target_h = int(target_w / frame_aspect)
-
-                target_w = max(160, min(target_w, container_w))
-                target_h = max(120, min(target_h, container_h))
-
-                resized = cv2.resize(rgb_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
-                pil_img = Image.fromarray(resized)
-                photo = ImageTk.PhotoImage(image=pil_img)
-                self.video_label.configure(image=photo)
-                self._current_photo = photo
-
-        self.after(30, self._update_video_frame)
+        except Exception as exc:
+            self._log("[PREVIEW ERROR] " + str(exc))
+        finally:
+            if not self._closing:
+                self.after(16, self._update_video_frame)
 
     def _update_status_loop(self):
-        # Update FPS
+        if self._closing:
+            return
+        self.sync_worker.device_status = "SCANNING" if self._scan_busy or self.is_auto_cycle_running else "ONLINE"
+        self._set_session_active_state(self.is_session_active or self._scan_busy or self._stopping)
         self.fps_label.configure(text=f"FPS: {self.camera.current_fps:.1f}")
-
-        # Update Network Sync Status & Offline Queue Count
-        try:
-            unsynced_count = self.db.get_unsynced_count()
-        except Exception:
-            unsynced_count = 0
-
-        if self.sync_worker.is_online:
-            if unsynced_count > 0:
-                self.net_status_badge.configure(
-                    text=f"SYNC: {unsynced_count} PENDING",
-                    fg_color=FUTheme.INFERTILE_AMBER_BG,
-                    text_color=FUTheme.INFERTILE_AMBER
-                )
-            else:
-                self.net_status_badge.configure(
-                    text="SYNC: ONLINE",
-                    fg_color=FUTheme.FERTILE_GREEN_BG,
-                    text_color=FUTheme.FERTILE_GREEN
-                )
+        if not getattr(self, "_queue_count_pending", False):
+            self._queue_count_pending = True
+            def updated(count):
+                self._queue_count_pending = False
+                self._unsynced_count = count
+            def failed(message):
+                self._queue_count_pending = False
+                self._unsynced_count = None
+                self._log("[STORAGE ERROR] Queue status unavailable: " + message)
+            try:
+                self._jobs.submit(self.db.get_unsynced_count, updated, failed)
+            except (queue.Full, RuntimeError):
+                self._queue_count_pending = False
+        count = getattr(self, "_unsynced_count", None)
+        pending_ends = getattr(self.sync_worker, "pending_session_ends", 0)
+        if count is not None and type(pending_ends) is int:
+            count += pending_ends
+        pending_batches = getattr(self.sync_worker, "pending_batches", 0)
+        if count is not None and type(pending_batches) is int:
+            count += pending_batches
+        error = self.sync_worker.last_error or self.sync_worker.heartbeat_error
+        if error:
+            text, color = "SYNC: ATTENTION", FUTheme.INFERTILE_AMBER
+            if error != getattr(self, "_last_sync_error", None):
+                self._log("[SYNC] " + error)
+        elif count is None:
+            text, color = "SYNC: QUEUE UNKNOWN", FUTheme.INFERTILE_AMBER
+        elif self.sync_worker.is_online:
+            text, color = f"SYNC: ONLINE ({count} PENDING)", FUTheme.FERTILE_GREEN_TEXT
         else:
-            self.net_status_badge.configure(
-                text=f"SYNC: OFFLINE ({unsynced_count} WAL)",
-                fg_color=FUTheme.PANEL_LIGHT_ALT,
-                text_color=FUTheme.TEXT_MUTED
-            )
-
-        # Update ESP32 IoT Status
-        if self.iot.is_connected:
-            self.iot_status_badge.configure(text="ESP32: CONNECTED", fg_color=FUTheme.FERTILE_GREEN_BG, text_color=FUTheme.FERTILE_GREEN)
-        else:
-            self.iot_status_badge.configure(text="ESP32: STANDBY", fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_MUTED)
-
+            text, color = f"SYNC: OFFLINE ({count} PENDING)", FUTheme.TEXT_MUTED
+        self._last_sync_error = error
+        self.net_status_badge.configure(text=text, fg_color=FUTheme.PANEL_LIGHT_ALT,
+                                        text_color=color)
+        station = getattr(self, "station", None)
+        ready = station is not None and (station.calibrated or station.active)
+        self.iot_status_badge.configure(text="SORTER: ACTIVE" if station and station.active else "SORTER: READY" if ready else "SORTER: SETUP NEEDED",
+                                        fg_color=FUTheme.PANEL_LIGHT_ALT,
+                                        text_color=FUTheme.FERTILE_GREEN_TEXT if ready else FUTheme.INFERTILE_AMBER)
+        if self.camera.last_error and self.camera.last_error != getattr(self, "_last_camera_error", None):
+            self._log("[CAMERA ERROR] " + self.camera.last_error)
+        self._last_camera_error = self.camera.last_error
         self.after(1000, self._update_status_loop)
 
     def _log(self, message: str):
@@ -1154,6 +2126,7 @@ class OvaLensOperatorApp(ctk.CTk):
         except Exception:
             pass
 
+    @_building_dialog
     def confirm_exit_dialog(self):
         """High-contrast modal confirmation prompt before stopping operations or shutting down."""
         dialog = ctk.CTkToplevel(self)
@@ -1178,13 +2151,13 @@ class OvaLensOperatorApp(ctk.CTk):
             warning_box.pack(fill="x", padx=16, pady=(0, 10))
             ctk.CTkLabel(
                 warning_box,
-                text="⚡ ACTIVE SORTING SESSION IN PROGRESS\nConveyor motors will halt and remaining eggs stay safely queued.",
+                text="ACTIVE DIAGNOSTIC SESSION\nPending local writes will finish before shutdown.",
                 font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.INFERTILE_AMBER_TEXT,
                 justify="center", padx=10, pady=8
             ).pack()
             msg = "Local scans are saved to SQLite WAL.\nAre you sure you want to stop operations and exit?"
         else:
-            msg = "All local database records are safely synchronized.\nAre you sure you want to close the operator station?"
+            msg = "Local records remain saved; unsynced records are retained.\nAre you sure you want to close the operator station?"
 
         ctk.CTkLabel(
             card, text=msg, font=(FUTheme.FONT_FAMILY, 11),
@@ -1204,12 +2177,8 @@ class OvaLensOperatorApp(ctk.CTk):
         def do_exit():
             def actual_shutdown():
                 print("\n[*] Shutting down OvaLens Edge Subsystems...")
-                if self.camera.is_running:
-                    self.camera.stop()
-                self.iot.stop()
-                self.sync_worker.stop()
-                self.destroy()
-                print("[OK] Graceful shutdown complete.")
+                self.shutdown()
+                print("[INFO] Waiting for shutdown cleanup.")
             self._animate_modal_close(dialog, on_close=actual_shutdown)
 
         ctk.CTkButton(
@@ -1219,309 +2188,53 @@ class OvaLensOperatorApp(ctk.CTk):
             width=160, height=38, corner_radius=8
         ).pack(side="right")
 
+    @_building_dialog
     def open_batch_setup_dialog(self):
-        """Robust Modal for Batch creation, selection, and candling stage setup with Offline Format Builder."""
-        if self.is_session_active:
-            self._log("[WARN] Please stop the current active auto session before changing batch parameters.")
+        if getattr(self, "_camera_panel", None) is not None:
+            return
+        if self.current_session_id or self.is_session_active or self._scan_busy or self._stopping or self._finalization_failed or getattr(self, "_setup_busy", False):
+            self._log("[BLOCKED] Finish the current session before changing batch parameters.")
+            return
+        from .batch_setup import BatchSetupWindow
+        if getattr(self, "_batch_setup_window", None) is not None and self._batch_setup_window.winfo_exists():
+            self._batch_setup_window.lift()
+            return
+        self._batch_setup_window = BatchSetupWindow(self)
 
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("Egg Batch & Candling Setup")
-        dialog.geometry("520x660")
-        dialog.configure(fg_color=FUTheme.BG_LIGHT)
-        dialog.transient(self)
-        dialog.grab_set()
-        self._center_window(dialog, 520, 660)
+    def _apply_batch_selection(self, batch, operator, target):
+        self.current_batch_id, self.current_breed = batch["batch_id"], batch["breed"]
+        self.current_batch_code = batch["batch_code"]
+        self.incubator_id, self.current_stage = batch["incubator_id"], "DAY_10"
+        self.operator_name, self.target_egg_count = operator, target
+        self._batch_record_ready = True
+        if self.station:
+            self.station.readiness.invalidate("Batch selected. Inspect the empty conveyor, then Prepare station.")
+        self._station_prepared = False
+        self._batch_original_count = batch["initial_egg_count"]
+        self._diagnostics_complete = self._batch_complete = False
+        self.setup_inspected.set(False)
+        self.total_count = self.fertile_count = self.infertile_count = self.review_count = self.scan_sequence = 0
+        self.batch_btn.configure(text=f"Batch: {batch['batch_code']}  (DAY_10)  ▾")
+        self._update_counters_ui()
+        self._render_standby_hud()
+        self._set_operation_state(OperatorState.READY, "Choose a batch, then prepare the empty conveyor")
+        self._log(f"[BATCH] {batch['batch_code']} selected · {target} eggs this run · saved locally")
 
-        ctk.CTkLabel(
-            dialog, text="Egg Batch & Candling Setup",
-            font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.TEXT_PRIMARY
-        ).pack(pady=(16, 2))
-        ctk.CTkLabel(
-            dialog, text="Select active batch from office or create one using the quick builder",
-            font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
-        ).pack(pady=(0, 12))
+    def _restore_batch_selection(self):
+        def load():
+            prefs = self.db.get_batch_preferences()
+            return prefs, self.db.get_local_batch(prefs.get("batch_id", self.current_batch_id))
+        def restored(result):
+            prefs, batch = result
+            if (not isinstance(batch, dict) or self.current_session_id or self._closing
+                    or getattr(self, "_batch_setup_window", None) is not None):
+                return
+            self._apply_batch_selection(batch, self._startup_operator or prefs.get("operator", self.operator_name),
+                                        prefs.get("egg_count", min(self.target_egg_count, batch["initial_egg_count"])))
+        self._jobs.submit(load, restored, lambda error: self._log("[BATCH] " + error))
 
-        content = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
-        content.pack(fill="both", expand=True, padx=20, pady=(0, 14))
 
-        # Mode Switcher (Quick Batch Builder vs Office Batches vs Custom)
-        mode_var = ctk.StringVar(value="BUILDER")
-
-        mode_segmented = ctk.CTkSegmentedButton(
-            content, values=["⚡ Quick Batch Builder", "🌐 Saved Office Batches", "✏️ Custom Code"],
-            selected_color=FUTheme.PRIMARY_MAROON, selected_hover_color=FUTheme.HOVER_MAROON,
-            unselected_color=FUTheme.PANEL_LIGHT_ALT, unselected_hover_color=FUTheme.PANEL_ACCENT,
-            text_color=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 11, "bold"), height=32
-        )
-        mode_segmented.set("⚡ Quick Batch Builder")
-        mode_segmented.pack(fill="x", padx=16, pady=(12, 10))
-
-        # Dynamic Container Frames
-        builder_frame = ctk.CTkFrame(content, fg_color="transparent")
-        server_frame = ctk.CTkFrame(content, fg_color="transparent")
-        custom_frame = ctk.CTkFrame(content, fg_color="transparent")
-
-        # 1. QUICK BATCH BUILDER CONTROLS
-        # Current Year-Month default
-        now = datetime.now()
-        cur_year_month = now.strftime("%Y-%m")
-        months_opts = [
-            cur_year_month,
-            now.replace(month=(now.month % 12) + 1 if now.month < 12 else 1).strftime("%Y-%m"),
-            now.replace(month=max(1, now.month - 1)).strftime("%Y-%m"),
-        ]
-
-        ym_row = ctk.CTkFrame(builder_frame, fg_color="transparent")
-        ym_row.pack(fill="x", pady=(0, 8))
-
-        # Year-Month
-        ym_col = ctk.CTkFrame(ym_row, fg_color="transparent")
-        ym_col.pack(side="left", fill="x", expand=True, padx=(0, 4))
-        ctk.CTkLabel(ym_col, text="Setting Month:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        ym_dropdown = ctk.CTkOptionMenu(
-            ym_col, values=months_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
-            height=34, corner_radius=8
-        )
-        ym_dropdown.set(cur_year_month)
-        ym_dropdown.pack(fill="x")
-
-        # Batch Number (Group #)
-        batch_col = ctk.CTkFrame(ym_row, fg_color="transparent")
-        batch_col.pack(side="right", fill="x", expand=True, padx=(4, 0))
-        ctk.CTkLabel(batch_col, text="Batch #:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        batch_num_opts = [f"{i:02d}" for i in range(1, 13)]
-        batch_num_dropdown = ctk.CTkOptionMenu(
-            batch_col, values=batch_num_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
-            height=34, corner_radius=8
-        )
-        batch_num_dropdown.set("01")
-        batch_num_dropdown.pack(fill="x")
-
-        # Breed Dropdown
-        ctk.CTkLabel(builder_frame, text="Duck Breed:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(2, 2))
-        breed_map = {
-            "KAY (Kayumanggi / Itik Pinas)": ("KAY", "KAYUMANGGI"),
-            "ITM (Itim / Native Black)": ("ITM", "ITIM"),
-            "KHK (Khaki Campbell Layer)": ("KHK", "KHAKI_CAMPBELL"),
-            "PEK (Pekin Cherry Valley)": ("PEK", "PEKIN"),
-            "MUS (Muscovy Pato)": ("MUS", "MUSCOVY"),
-        }
-        breed_builder_dropdown = ctk.CTkOptionMenu(
-            builder_frame, values=list(breed_map.keys()), fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
-            height=34, corner_radius=8
-        )
-        breed_builder_dropdown.set("KAY (Kayumanggi / Itik Pinas)")
-        breed_builder_dropdown.pack(fill="x", pady=(0, 8))
-
-        # Live Code Preview Box with Rich Light Maroon Color Fill & Green Status
-        preview_frame = ctk.CTkFrame(
-            builder_frame, fg_color=FUTheme.PRIMARY_MAROON_BG, corner_radius=10,
-            border_width=1, border_color=FUTheme.PRIMARY_MAROON_BORDER
-        )
-        preview_frame.pack(fill="x", pady=(2, 10), ipady=4)
-
-        p_top = ctk.CTkFrame(preview_frame, fg_color="transparent")
-        p_top.pack(fill="x", padx=12, pady=(6, 0))
-        ctk.CTkLabel(p_top, text="LIVE BATCH CODE:", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(side="left")
-        ctk.CTkLabel(p_top, text="● READY FOR CONVEYOR", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.FERTILE_GREEN).pack(side="right")
-
-        preview_label = ctk.CTkLabel(preview_frame, text="BATCH-2026-08-KAY-01", font=(FUTheme.FONT_FAMILY, 16, "bold"), text_color=FUTheme.TEXT_PRIMARY)
-        preview_label.pack(anchor="w", padx=12, pady=(0, 6))
-
-        def update_preview(*args):
-            ym = ym_dropdown.get()
-            b_key = breed_builder_dropdown.get()
-            b_code = breed_map.get(b_key, ("KAY", "KAYUMANGGI"))[0]
-            b_num = batch_num_dropdown.get()
-            preview_label.configure(text=f"BATCH-{ym}-{b_code}-{b_num}")
-
-        ym_dropdown.configure(command=update_preview)
-        breed_builder_dropdown.configure(command=update_preview)
-        batch_num_dropdown.configure(command=update_preview)
-        update_preview()
-
-        # 2. SAVED OFFICE BATCHES CONTROLS
-        ctk.CTkLabel(server_frame, text="Active Incubator Batches (from Office):", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        server_dropdown = ctk.CTkOptionMenu(
-            server_frame, values=["Loading active batches from server..."], fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
-            height=36, corner_radius=8
-        )
-        server_dropdown.pack(fill="x", pady=(0, 10))
-
-        server_batches_cache = []
-
-        def fetch_server_batches():
-            import urllib.request
-            import json
-            try:
-                url = "http://localhost:8000/api/v1/batches"
-                req = urllib.request.Request(url, headers={"User-Agent": "OvaLensEdge/2.0"})
-                with urllib.request.urlopen(req, timeout=1.5) as resp:
-                    if resp.status == 200:
-                        data = json.loads(resp.read().decode('utf-8'))
-                        if isinstance(data, list) and len(data) > 0:
-                            server_batches_cache.clear()
-                            server_batches_cache.extend(data)
-                            opts = [f"{b.get('batch_code', b.get('batch_id'))}  ({b.get('breed')}, {b.get('initial_egg_count', 500)} eggs)" for b in data]
-                            server_dropdown.configure(values=opts)
-                            server_dropdown.set(opts[0])
-                            return
-            except Exception:
-                pass
-            server_dropdown.configure(values=["(Offline — Use Format Builder tab)"])
-            server_dropdown.set("(Offline — Use Format Builder tab)")
-
-        threading.Thread(target=fetch_server_batches, daemon=True).start()
-
-        # 3. CUSTOM CODE CONTROLS
-        ctk.CTkLabel(custom_frame, text="Custom / Experimental Batch Code:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        custom_entry = ctk.CTkEntry(custom_frame, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=36)
-        custom_entry.insert(0, self.current_batch_id)
-        custom_entry.pack(fill="x", pady=(0, 10))
-
-        # Mode visibility controller
-        def on_mode_change(selected_mode):
-            builder_frame.pack_forget()
-            server_frame.pack_forget()
-            custom_frame.pack_forget()
-            if "Builder" in selected_mode:
-                builder_frame.pack(fill="x", padx=16, pady=(0, 6))
-            elif "Server" in selected_mode:
-                server_frame.pack(fill="x", padx=16, pady=(0, 6))
-            else:
-                custom_frame.pack(fill="x", padx=16, pady=(0, 6))
-
-        mode_segmented.configure(command=on_mode_change)
-        builder_frame.pack(fill="x", padx=16, pady=(0, 6))
-
-        # COMMON PARAMETERS: Candling Stage
-        ctk.CTkLabel(content, text="Candling Stage:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=16, pady=(4, 2))
-        stage_opts = [
-            "DAY_10 (Primary Penoy Salvage @ ₱14.00)",
-            "DAY_18 (Lockdown Hatcher Transfer)",
-            "DAY_25 (Pipping Watch)",
-            "DAY_7 (Initial Blood Ring Check)"
-        ]
-        stage_dropdown = ctk.CTkOptionMenu(
-            content, values=stage_opts, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
-            button_color=FUTheme.PRIMARY_MAROON, button_hover_color=FUTheme.HOVER_MAROON,
-            dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_text_color=FUTheme.TEXT_PRIMARY, dropdown_hover_color=FUTheme.PANEL_ACCENT,
-            height=34, corner_radius=8
-        )
-        for s in stage_opts:
-            if self.current_stage in s:
-                stage_dropdown.set(s)
-                break
-        stage_dropdown.pack(fill="x", padx=16, pady=(0, 8))
-
-        # Target Quantity & Operator
-        qty_row = ctk.CTkFrame(content, fg_color="transparent")
-        qty_row.pack(fill="x", padx=16, pady=(0, 4))
-
-        col1 = ctk.CTkFrame(qty_row, fg_color="transparent")
-        col1.pack(side="left", fill="x", expand=True, padx=(0, 4))
-        ctk.CTkLabel(col1, text="Total Eggs in Batch:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        qty_entry = ctk.CTkEntry(col1, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=34)
-        qty_entry.insert(0, str(self.target_egg_count))
-        qty_entry.pack(fill="x")
-
-        col2 = ctk.CTkFrame(qty_row, fg_color="transparent")
-        col2.pack(side="right", fill="x", expand=True, padx=(4, 0))
-        ctk.CTkLabel(col2, text="Operator Name:", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", pady=(0, 2))
-        op_entry = ctk.CTkEntry(col2, fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, height=34)
-        op_entry.insert(0, self.operator_name)
-        op_entry.pack(fill="x")
-
-        # Quantity Quick Preset Chips
-        chips_frame = ctk.CTkFrame(content, fg_color="transparent")
-        chips_frame.pack(fill="x", padx=16, pady=(0, 10))
-
-        def set_preset_qty(q: int):
-            qty_entry.delete(0, "end")
-            qty_entry.insert(0, str(q))
-
-        for q_label, q_val in [("500 (12 Trays)", 500), ("250 (6 Trays)", 250), ("100 Eggs", 100), ("42 (1 Tray)", 42)]:
-            ctk.CTkButton(
-                chips_frame, text=q_label, font=(FUTheme.FONT_FAMILY, 9, "bold"),
-                fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_SECONDARY,
-                hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER,
-                height=26, corner_radius=6, command=lambda v=q_val: set_preset_qty(v)
-            ).pack(side="left", padx=(0, 4), expand=True, fill="x")
-
-        def apply_batch():
-            mode = mode_segmented.get()
-            if "Builder" in mode:
-                ym = ym_dropdown.get()
-                b_key = breed_builder_dropdown.get()
-                b_code, full_breed = breed_map.get(b_key, ("KAY", "KAYUMANGGI"))
-                b_num = batch_num_dropdown.get()
-                final_batch_id = f"BATCH-{ym}-{b_code}-{b_num}"
-                final_breed = full_breed
-            elif "Server" in mode:
-                sel = server_dropdown.get()
-                raw_code = sel.split(" ")[0]
-                if raw_code.startswith("BATCH-"):
-                    final_batch_id = raw_code
-                    matched = next((b for b in server_batches_cache if b.get("batch_code") == raw_code or b.get("batch_id") == raw_code), None)
-                    final_breed = matched.get("breed", "KAYUMANGGI") if matched else "KAYUMANGGI"
-                else:
-                    final_batch_id = self.current_batch_id
-                    final_breed = self.current_breed
-            else:
-                final_batch_id = custom_entry.get().strip() or self.current_batch_id
-                final_breed = self.current_breed
-
-            raw_qty = qty_entry.get().strip()
-            raw_op = op_entry.get().strip()
-            raw_stage = stage_dropdown.get().split(" ")[0]
-
-            try:
-                parsed_qty = max(1, int(raw_qty))
-            except ValueError:
-                parsed_qty = 500
-
-            self.current_batch_id = final_batch_id
-            self.current_breed = final_breed
-            self.current_stage = raw_stage
-            self.target_egg_count = parsed_qty
-            self.operator_name = raw_op or "Operator"
-
-            if not self.is_session_active:
-                self.total_count = 0
-                self.fertile_count = 0
-                self.infertile_count = 0
-                self.abnormal_count = 0
-                self._render_standby_hud()
-
-            self.batch_btn.configure(text=f"📋 Batch: {self.current_batch_id}  ({self.current_stage})  ▾")
-            self._update_counters_ui()
-            self._log(f"[BATCH] Configured: {self.current_batch_id} | Breed: {self.current_breed} | Stage: {self.current_stage} | Target: {self.target_egg_count} eggs")
-            self._animate_modal_close(dialog)
-
-        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
-        btn_row.pack(fill="x", padx=20, pady=(0, 16))
-
-        ctk.CTkButton(
-            btn_row, text="Cancel", fg_color="transparent", border_width=1, border_color=FUTheme.BORDER,
-            text_color=FUTheme.TEXT_MUTED, hover_color=FUTheme.PANEL_ACCENT,
-            command=lambda: self._animate_modal_close(dialog),
-            width=100, height=38
-        ).pack(side="left")
-
-        ctk.CTkButton(
-            btn_row, text="Save & Set Active Batch", fg_color=FUTheme.PRIMARY_MAROON,
-            hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE,
-            font=(FUTheme.FONT_FAMILY, 12, "bold"), command=apply_batch, height=38
-        ).pack(side="right", fill="x", expand=True, padx=(10, 0))
-
+    @_building_dialog
     def open_onboarding_guide(self):
         """Interactive visual operator onboarding guide & hotkey reference modal."""
         dialog = ctk.CTkToplevel(self)
@@ -1550,11 +2263,11 @@ class OvaLensOperatorApp(ctk.CTk):
         s1.pack(fill="x", pady=(0, 10))
         s1_hdr = ctk.CTkFrame(s1, fg_color=FUTheme.PRIMARY_MAROON, height=28, corner_radius=6)
         s1_hdr.pack(fill="x", padx=6, pady=6)
-        ctk.CTkLabel(s1_hdr, text="STEP 1: SELECT OR CREATE BATCH CODE", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_WHITE).pack(side="left", padx=10)
+        ctk.CTkLabel(s1_hdr, text="STEP 1: SELECT OR CREATE A BATCH", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_WHITE).pack(side="left", padx=10)
 
         s1_body = ctk.CTkLabel(
             s1,
-            text="• Online: Select active batch registered from the office dashboard.\n• Offline: Use the 100% Dropdown Quick Batch Builder (Month + Breed + Batch #).\n• Example batch code: BATCH-2026-08-KAY-01.",
+            text="Use Batch setup to create a new batch or select a saved batch.\nEnter the actual set date, breed, incubator and original egg count.\nSet a separate target for this candling run. Details save locally offline.",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s1_body.pack(anchor="w", padx=14, pady=(2, 10))
@@ -1568,7 +2281,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         s2_body = ctk.CTkLabel(
             s2,
-            text="• Click [START AUTO SORTING] in footer to activate camera & motor.\n• Sorter advances eggs into the dark candling chamber at 120 eggs/min.\n• High-speed YOLOv8 ONNX model classifies embryo vitality in < 25ms.\n• Machine automatically stops and chimes when all target eggs are sorted.",
+            text="Check the live camera and empty conveyor.\nConfirm the inspection checkbox, then click Prepare station.\nWhen all checks pass, click Start sorting.\nFeed one Day 10 egg only when the screen says Feed next egg.\nWait while the egg is inspected and passes the sorting gate.\nLow confidence holds the egg for your decision. STOP is always available.\nUse Tools for a single scan, camera retry or settings.",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s2_body.pack(anchor="w", padx=14, pady=(2, 10))
@@ -1578,11 +2291,11 @@ class OvaLensOperatorApp(ctk.CTk):
         s3.pack(fill="x", pady=(0, 10))
         s3_hdr = ctk.CTkFrame(s3, fg_color=FUTheme.INFERTILE_AMBER, height=28, corner_radius=6)
         s3_hdr.pack(fill="x", padx=6, pady=6)
-        ctk.CTkLabel(s3_hdr, text="STEP 3: 3-CLASS SORTING & DIVERTER ACTIONS", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_WHITE).pack(side="left", padx=10)
+        ctk.CTkLabel(s3_hdr, text="STEP 3: BINARY SORTING & DIVERTER ACTIONS", font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_WHITE).pack(side="left", padx=10)
 
         s3_body = ctk.CTkLabel(
             s3,
-            text="🟢 FERTILE (Accept): Spider blood veins verified -> stays on tray to Day 18.\n🟡 INFERTILE (Reject): Clear yolk -> servo diverts to Penoy salvage @ ₱14.00.\n🔴 ABNORMAL (Reject): Dead embryo / blood ring -> ejected to cull bin.",
+            text="FERTILE (Accept): Day 10 embryo viability verified -> remains in incubation.\nINFERTILE (Reject): Non-fertile Day 10 result -> diverted to Penoy salvage @ ₱14.00.\n⚪ MANUAL REVIEW: Below saved sorting confidence (70% default) or synchronization error.\nManual diagnostic scans use a 75% review threshold.",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s3_body.pack(anchor="w", padx=14, pady=(2, 10))
@@ -1596,7 +2309,7 @@ class OvaLensOperatorApp(ctk.CTk):
 
         s4_body = ctk.CTkLabel(
             s4,
-            text="• [SPACEBAR]: Trigger Single Test Scan (Manual Candling)\n• [ESC] key: End Session (Run Summary & Direct CSV Export)\n• [S] key: Scan Explorer & Candling History\n• [R] key: Emergency Manual Servo Eject\n• [F11] key: Toggle Kiosk / Fullscreen Mode\n• [C] key: Toggle Optical Alignment Crosshairs\n• [B] key: Open Batch Setup Modal\n• [F1] / [H]: Open this Operator Quick Guide",
+            text="• [SPACEBAR]: Trigger Single Test Scan (Manual Candling)\n• [ESC] key: End Session (Run Summary & Direct CSV Export)\n• [S] key: Scan Explorer & Candling History\n• [R] key: Stop the station\n• [F11] key: Toggle Kiosk / Fullscreen Mode\n• [C] key: Toggle Optical Alignment Crosshairs\n• [B] key: Open Batch Setup Modal\n• [F1] / [H]: Open this Operator Quick Guide",
             font=(FUTheme.FONT_FAMILY, 11, "bold"), text_color=FUTheme.TEXT_PRIMARY, justify="left"
         )
         s4_body.pack(anchor="w", padx=14, pady=(2, 10))
@@ -1612,7 +2325,16 @@ class OvaLensOperatorApp(ctk.CTk):
             command=lambda: self._animate_modal_close(dialog), height=38
         ).pack(fill="x")
 
+    @_building_dialog
     def open_calibration_dialog(self):
+        if getattr(self, "_camera_panel", None) is not None:
+            return
+        if self.current_session_id or self.is_session_active or self._scan_busy or self._stopping or self._finalization_failed or getattr(self, "_setup_busy", False):
+            self._log("[BLOCKED] Stop the session before editing calibration.")
+            return
+        if getattr(self, "station", None) is not None:
+            StationSettingsWindow(self)
+            return
         dialog = ctk.CTkToplevel(self)
         dialog.title("Conveyor Calibration & Cycle Timing")
         dialog.geometry("450x440")
@@ -1652,14 +2374,21 @@ class OvaLensOperatorApp(ctk.CTk):
 
         def save():
             try:
-                self.conveyor_speed_cm_s = float(speed_entry.get())
-                self.chamber_pause_ms = int(pause_entry.get())
-                self.conveyor_advance_ms = int(adv_entry.get())
-                self.conveyor_dist_cm = float(dist_entry.get())
+                speed = float(speed_entry.get())
+                pause = int(pause_entry.get())
+                advance = int(adv_entry.get())
+                distance = float(dist_entry.get())
+                if (not math.isfinite(speed) or not math.isfinite(distance)
+                        or speed <= 0 or distance <= 0 or pause < 0 or advance <= 0):
+                    raise ValueError("Calibration requires finite positive distances/speed and valid timings.")
+                self.conveyor_speed_cm_s = speed
+                self.chamber_pause_ms = pause
+                self.conveyor_advance_ms = advance
+                self.conveyor_dist_cm = distance
                 self._log(f"[CONFIG] Updated: Speed={self.conveyor_speed_cm_s}cm/s, Pause={self.chamber_pause_ms}ms, Advance={self.conveyor_advance_ms}ms")
                 self._animate_modal_close(dialog)
-            except ValueError:
-                pass
+            except ValueError as exc:
+                self._log("[CONFIG ERROR] " + str(exc))
 
         btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
         btn_row.pack(fill="x", padx=24, pady=10)
@@ -1678,9 +2407,19 @@ class OvaLensOperatorApp(ctk.CTk):
     def toggle_fullscreen(self, event=None):
         """Toggle borderless kiosk fullscreen for industrial touchscreens."""
         self.is_fullscreen = not self.is_fullscreen
-        self.attributes("-fullscreen", self.is_fullscreen)
+        try:
+            self.attributes("-fullscreen", self.is_fullscreen)
+        except Exception:
+            try:
+                self.state("zoomed" if self.is_fullscreen else "normal")
+            except Exception:
+                pass
         if not self.is_fullscreen:
             self.geometry("1280x860")
+        if hasattr(self, "kiosk_btn") and self.kiosk_btn.winfo_exists():
+            self.kiosk_btn.configure(
+                text="Windowed [F11]" if self.is_fullscreen else "Kiosk [F11]"
+            )
         self._log(f"[UI] Kiosk Fullscreen Mode: {'ENABLED' if self.is_fullscreen else 'DISABLED'}")
 
     def toggle_crosshairs(self, event=None):
@@ -1696,6 +2435,11 @@ class OvaLensOperatorApp(ctk.CTk):
         except Exception:
             pass
 
+    def finish_current_batch(self):
+        """Open the batch completion summary dialog and finalize batch state."""
+        self.open_batch_completion_modal()
+
+    @_building_dialog
     def open_batch_completion_modal(self):
         """Interactive Batch Completion Report dialog with 1-click local CSV export."""
         dialog = ctk.CTkToplevel(self)
@@ -1711,12 +2455,12 @@ class OvaLensOperatorApp(ctk.CTk):
 
         # Header with Trophy / Check Icon
         ctk.CTkLabel(
-            card, text="🏁 Batch Sorting Completed!",
+            card, text="Diagnostic Target Reached",
             font=(FUTheme.FONT_FAMILY, 17, "bold"), text_color=FUTheme.TEXT_PRIMARY
         ).pack(pady=(16, 2))
 
         ctk.CTkLabel(
-            card, text=f"Batch: {self.current_batch_id}  •  Stage: {self.current_stage}  •  Operator: {self.operator_name}",
+            card, text=f"Batch: {self.current_batch_code}  •  Stage: {self.current_stage}  •  Operator: {self.operator_name}",
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
         ).pack(pady=(0, 14))
 
@@ -1726,13 +2470,13 @@ class OvaLensOperatorApp(ctk.CTk):
         grid.columnconfigure(0, weight=1)
         grid.columnconfigure(1, weight=1)
 
-        pct = (self.fertile_count / max(1, self.total_count)) * 100.0
+        pct = (self.fertile_count / max(1, self.fertile_count + self.infertile_count)) * 100.0
         penoy_salvage_val = self.infertile_count * 14.00
 
         # Tile 1: Total Processed
         t1 = ctk.CTkFrame(grid, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         t1.grid(row=0, column=0, padx=4, pady=4, sticky="nsew")
-        ctk.CTkLabel(t1, text="TOTAL SORTED", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=10, pady=(6, 0))
+        ctk.CTkLabel(t1, text="SCANS RECORDED", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=10, pady=(6, 0))
         ctk.CTkLabel(t1, text=f"{self.total_count} Eggs (100%)", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=10, pady=(0, 6))
 
         # Tile 2: Fertile Embryos
@@ -1747,23 +2491,22 @@ class OvaLensOperatorApp(ctk.CTk):
         ctk.CTkLabel(t3, text="PENOY SALVAGE YIELD", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.INFERTILE_AMBER_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
         ctk.CTkLabel(t3, text=f"{self.infertile_count} eggs -> ₱{penoy_salvage_val:,.2f}", font=(FUTheme.FONT_FAMILY, 14, "bold"), text_color=FUTheme.INFERTILE_AMBER).pack(anchor="w", padx=10, pady=(0, 6))
 
-        # Tile 4: Abnormal Culls
-        t4 = ctk.CTkFrame(grid, fg_color=FUTheme.ABNORMAL_RED_CARD, corner_radius=8, border_width=1, border_color=FUTheme.ABNORMAL_RED_BORDER)
+        # Tile 4: Manual review fallback
+        t4 = ctk.CTkFrame(grid, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         t4.grid(row=1, column=1, padx=4, pady=4, sticky="nsew")
-        ctk.CTkLabel(t4, text="ABNORMAL (CULL)", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.ABNORMAL_RED_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
-        ctk.CTkLabel(t4, text=f"{self.abnormal_count} Eggs", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.ABNORMAL_RED).pack(anchor="w", padx=10, pady=(0, 6))
+        ctk.CTkLabel(t4, text="MANUAL REVIEW", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=10, pady=(6, 0))
+        ctk.CTkLabel(t4, text=f"{self.review_count} Eggs", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=10, pady=(0, 6))
 
         # Export Status Toast
         status_msg = ctk.CTkLabel(card, text="", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.FERTILE_GREEN_TEXT)
         status_msg.pack(pady=(0, 6))
 
         def export_csv():
-            try:
-                path = self.db.export_session_csv(self.current_session_id)
-                status_msg.configure(text=f"✓ Report Exported to {os.path.basename(path)}", text_color=FUTheme.FERTILE_GREEN_TEXT)
-                self._log(f"[EXPORT] CSV Report saved: {path}")
-            except Exception as e:
-                status_msg.configure(text=f"Export failed: {e}", text_color=FUTheme.ABNORMAL_RED_TEXT)
+            session_id = self.current_session_id or getattr(self, "_last_session_id", None)
+            if not session_id:
+                status_msg.configure(text="No recorded session to export.")
+                return
+            self._export_report(lambda: self.db.export_session_csv(session_id), status_msg)
 
         # Export Button
         ctk.CTkButton(
@@ -1778,7 +2521,21 @@ class OvaLensOperatorApp(ctk.CTk):
         btn_row.pack(fill="x", padx=16, pady=(0, 12))
 
         def start_next():
+            self._batch_complete = False
+            self._diagnostics_complete = False
+            self._station_prepared = False
+            self._set_session_active_state(False)
             self._animate_modal_close(dialog, on_close=self.open_batch_setup_dialog)
+
+        def finish_done():
+            self._batch_complete = False
+            self._diagnostics_complete = False
+            self._station_prepared = False
+            self._set_operation_state(OperatorState.READY, "Batch finished. Select next batch or prepare station.")
+            self._set_session_active_state(False)
+            self._animate_modal_close(dialog)
+
+        dialog.protocol("WM_DELETE_WINDOW", finish_done)
 
         ctk.CTkButton(
             btn_row, text="🔁 Setup Next Batch", fg_color=FUTheme.PRIMARY_MAROON,
@@ -1788,12 +2545,13 @@ class OvaLensOperatorApp(ctk.CTk):
         ).pack(side="left", fill="x", expand=True, padx=(0, 6))
 
         ctk.CTkButton(
-            btn_row, text="Done & Close", fg_color=FUTheme.PANEL_LIGHT_ALT,
-            hover_color=FUTheme.PANEL_ACCENT, text_color=FUTheme.TEXT_SECONDARY,
-            font=(FUTheme.FONT_FAMILY, 11), command=lambda: self._animate_modal_close(dialog),
-            height=38, corner_radius=8, width=110
+            btn_row, text="✓ Finish & Close", fg_color=FUTheme.FERTILE_GREEN,
+            hover_color=FUTheme.FERTILE_GREEN_HOVER, text_color=FUTheme.TEXT_WHITE,
+            font=(FUTheme.FONT_FAMILY, 12, "bold"), command=finish_done,
+            height=38, corner_radius=8, width=130
         ).pack(side="right")
 
+    @_building_dialog
     def open_scan_history_modal(self, event=None):
         """Interactive Scan History & Explorer modal with batch selector, live search, class filters, and CSV export."""
         dialog = ctk.CTkToplevel(self)
@@ -1830,8 +2588,7 @@ class OvaLensOperatorApp(ctk.CTk):
         ).pack(side="left", padx=(10, 4), pady=8)
 
         # Distinct Batches Query
-        distinct_batches = self.db.get_distinct_batches()
-        batch_ids = [b["batch_id"] for b in distinct_batches]
+        batch_ids = [self.current_batch_id]
         if self.current_batch_id not in batch_ids:
             batch_ids.insert(0, self.current_batch_id)
         batch_options = batch_ids + (["ALL (All Batches)"] if len(batch_ids) > 1 else [])
@@ -1845,6 +2602,19 @@ class OvaLensOperatorApp(ctk.CTk):
         )
         batch_dropdown.set(self.current_batch_id)
         batch_dropdown.pack(side="left", padx=(0, 10), pady=6)
+        def apply_batches(batches):
+            if not dialog.winfo_exists():
+                return
+            ids = [b["batch_id"] for b in batches]
+            if self.current_batch_id not in ids:
+                ids.insert(0, self.current_batch_id)
+            batch_dropdown.configure(values=ids + (["ALL (All Batches)"] if len(ids) > 1 else []))
+        try:
+            self._jobs.submit(self.db.get_distinct_batches, apply_batches,
+                              lambda error: self._log("[HISTORY ERROR] " + error))
+        except (queue.Full, RuntimeError):
+            self._log("[HISTORY ERROR] Background queue unavailable; retry shortly.")
+
 
         # Live Search Field
         search_entry = ctk.CTkEntry(
@@ -1879,21 +2649,18 @@ class OvaLensOperatorApp(ctk.CTk):
 
         def get_active_batch_id():
             val = batch_dropdown.get()
-            if "ALL" in val:
+            if val == "ALL (All Batches)":
                 return "ALL"
             return val
 
-        def update_tabs_and_stats():
-            b_id = get_active_batch_id()
-            all_b_scans = self.db.get_scans_by_batch(b_id, limit=5000, class_filter="ALL")
+        def update_tabs_and_stats(all_b_scans):
             n_tot = len(all_b_scans)
-            n_fert = sum(1 for s in all_b_scans if s["final_class"] == "FERTILE")
-            n_inf = sum(1 for s in all_b_scans if s["final_class"] == "INFERTILE")
-            n_abn = sum(1 for s in all_b_scans if s["final_class"] == "ABNORMAL")
-            fert_pct = (n_fert / max(1, n_tot)) * 100.0 if n_tot > 0 else 0.0
+            n_fert = sum(1 for s in all_b_scans if s["final_class"] == "FERTILE" and s["routing_action"] == "ACCEPT")
+            n_inf = sum(1 for s in all_b_scans if s["final_class"] == "INFERTILE" and s["routing_action"] == "REJECT")
+            fert_pct = (n_fert / max(1, n_fert + n_inf)) * 100.0 if n_tot > 0 else 0.0
 
             stats_summary_label.configure(
-                text=f"Total: {n_tot} • Fertile: {fert_pct:.1f}% • Penoy: ₱{n_inf*14:,.0f} • Cull: {n_abn}"
+                text=f"Latest {n_tot} scans • Fertile: {fert_pct:.1f}% • Potential Penoy: ₱{n_inf*14:,.0f}"
             )
 
             # Update tab label text
@@ -1903,17 +2670,30 @@ class OvaLensOperatorApp(ctk.CTk):
                 tab_btns["FERTILE"].configure(text=f"🟢 Fertile ({n_fert})")
             if "INFERTILE" in tab_btns:
                 tab_btns["INFERTILE"].configure(text=f"🟡 Infertile ({n_inf})")
-            if "ABNORMAL" in tab_btns:
-                tab_btns["ABNORMAL"].configure(text=f"🔴 Abnormal ({n_abn})")
 
+        history_generation = [0]
         def render_table(*args):
+            history_generation[0] += 1
+            generation = history_generation[0]
+            b_id, flt = get_active_batch_id(), current_filter[0]
+            query = search_entry.get().strip()
+            def read():
+                return (self.db.get_scans_by_batch(b_id, limit=5000, class_filter="ALL"),
+                        self.db.get_scans_by_batch(b_id, limit=50, class_filter=flt,
+                                                  search_query=query or None))
+            def apply(data):
+                if not dialog.winfo_exists() or generation != history_generation[0]:
+                    return
+                update_tabs_and_stats(data[0])
+                draw_table(data[1], b_id, flt)
+            try:
+                self._jobs.submit(read, apply, lambda error: self._log("[HISTORY ERROR] " + error))
+            except (queue.Full, RuntimeError) as exc:
+                self._log("[HISTORY ERROR] " + str(exc))
+
+        def draw_table(scans, b_id, flt):
             for child in table_container.winfo_children():
                 child.destroy()
-
-            b_id = get_active_batch_id()
-            flt = current_filter[0]
-            query = search_entry.get().strip()
-            scans = self.db.get_scans_by_batch(b_id, limit=250, class_filter=flt, search_query=query if query else None)
 
             if not scans:
                 empty = ctk.CTkLabel(
@@ -1936,17 +2716,12 @@ class OvaLensOperatorApp(ctk.CTk):
                     badge_fg = FUTheme.FERTILE_GREEN_CARD
                     badge_border = FUTheme.FERTILE_GREEN_BORDER
                     badge_text = FUTheme.FERTILE_GREEN_TEXT
-                    pill = "🟢 FERTILE"
-                elif cls_name == "INFERTILE":
+                    pill = "FERTILE"
+                else:
                     badge_fg = FUTheme.INFERTILE_AMBER_CARD
                     badge_border = FUTheme.INFERTILE_AMBER_BORDER
                     badge_text = FUTheme.INFERTILE_AMBER_TEXT
-                    pill = "🟡 INFERTILE"
-                else:
-                    badge_fg = FUTheme.ABNORMAL_RED_CARD
-                    badge_border = FUTheme.ABNORMAL_RED_BORDER
-                    badge_text = FUTheme.ABNORMAL_RED_TEXT
-                    pill = "🔴 ABNORMAL"
+                    pill = "INFERTILE"
 
                 row_card = ctk.CTkFrame(table_container, fg_color=FUTheme.PANEL_LIGHT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
                 row_card.pack(fill="x", pady=3, padx=4)
@@ -1994,7 +2769,6 @@ class OvaLensOperatorApp(ctk.CTk):
             render_table()
 
         def on_batch_change(new_val):
-            update_tabs_and_stats()
             render_table()
 
         batch_dropdown.configure(command=on_batch_change)
@@ -2005,7 +2779,6 @@ class OvaLensOperatorApp(ctk.CTk):
             ("ALL", "All"),
             ("FERTILE", "🟢 Fertile"),
             ("INFERTILE", "🟡 Infertile"),
-            ("ABNORMAL", "🔴 Abnormal"),
         ]
 
         for key, label in tabs_spec:
@@ -2019,7 +2792,6 @@ class OvaLensOperatorApp(ctk.CTk):
             btn.pack(side="left", padx=(0, 6))
             tab_btns[key] = btn
 
-        update_tabs_and_stats()
         render_table()
 
         # Bottom Actions / Export Toolbar
@@ -2027,23 +2799,12 @@ class OvaLensOperatorApp(ctk.CTk):
         b_bar.pack(fill="x", padx=16, pady=(0, 10))
 
         def export_current():
-            try:
-                b_id = get_active_batch_id()
-                flt = current_filter[0]
-                path = self.db.export_batch_csv(b_id, class_filter=flt)
-                toast_label.configure(text=f"✓ Exported {flt} scans to: {os.path.basename(path)}", text_color=FUTheme.FERTILE_GREEN_TEXT)
-                self._log(f"[EXPORT] Filtered CSV saved: {path}")
-            except Exception as e:
-                toast_label.configure(text=f"Export error: {e}", text_color=FUTheme.ABNORMAL_RED_TEXT)
+            b_id, flt = get_active_batch_id(), current_filter[0]
+            self._export_report(lambda: self.db.export_batch_csv(b_id, class_filter=flt), toast_label)
 
         def export_all():
-            try:
-                b_id = get_active_batch_id()
-                path = self.db.export_batch_csv(b_id, class_filter="ALL")
-                toast_label.configure(text=f"✓ Exported ALL batch scans to: {os.path.basename(path)}", text_color=FUTheme.FERTILE_GREEN_TEXT)
-                self._log(f"[EXPORT] Complete batch CSV saved: {path}")
-            except Exception as e:
-                toast_label.configure(text=f"Export error: {e}", text_color=FUTheme.ABNORMAL_RED_TEXT)
+            b_id = get_active_batch_id()
+            self._export_report(lambda: self.db.export_batch_csv(b_id, class_filter="ALL"), toast_label)
 
         ctk.CTkButton(
             b_bar, text="📄 Export Current Filter (CSV)", fg_color=FUTheme.PRIMARY_MAROON,

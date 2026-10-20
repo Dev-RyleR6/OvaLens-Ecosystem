@@ -15,6 +15,8 @@
 #define PIN_SERVO_PWM         18   // High-Torque Servo / Solenoid (MG996R)
 #define PIN_CANDLING_MOSFET   23   // 10W Cree LED Candling Light (PWM control)
 #define PIN_STATUS_LED         2   // Onboard Blue Status LED
+#define PIN_MOTOR_FWD          25  // DC motor forward direction (L298N IN1)
+#define PIN_MOTOR_EN           26  // DC motor enable / PWM speed
 
 // ==============================================================================
 // CONFIGURATION & DEBOUNCE
@@ -38,6 +40,11 @@ unsigned long servoResetTime = 0;
 bool servoActive = false;
 unsigned int activePulseDuration = DEFAULT_PULSE_MS;
 
+// Motor state
+bool motorRunning = false;
+bool motorStepPending = false;
+unsigned long motorStepEndTime = 0;
+
 // ==============================================================================
 // HARDWARE INTERRUPT SERVICE ROUTINE (ISR)
 // ==============================================================================
@@ -60,6 +67,10 @@ void setup() {
   pinMode(PIN_OPTICAL_TRIGGER, INPUT_PULLUP);
   pinMode(PIN_STATUS_LED, OUTPUT);
   pinMode(PIN_CANDLING_MOSFET, OUTPUT);
+  pinMode(PIN_MOTOR_FWD, OUTPUT);
+  pinMode(PIN_MOTOR_EN, OUTPUT);
+  digitalWrite(PIN_MOTOR_FWD, LOW);
+  digitalWrite(PIN_MOTOR_EN, LOW);
 
   // Default Candling Light (Full ON)
   analogWrite(PIN_CANDLING_MOSFET, 255);
@@ -111,7 +122,15 @@ void loop() {
     Serial.println("STATUS:SERVO_IDLE");
   }
 
-  // 4. Process Incoming Serial Commands from Edge App
+  // 4. Auto-stop motor after step duration
+  if (motorStepPending && currentMillis >= motorStepEndTime) {
+    motorStepPending = false;
+    motorRunning = false;
+    digitalWrite(PIN_MOTOR_EN, LOW);
+    Serial.println("EVENT:MOTOR_STEP_DONE");
+  }
+
+  // 5. Process Incoming Serial Commands from Edge App
   if (Serial.available() > 0) {
     String cmd = Serial.readStringUntil('\n');
     cmd.trim();
@@ -160,7 +179,33 @@ void loop() {
       Serial.print("RESP:STATUS:OPTICAL=");
       Serial.print(digitalRead(PIN_OPTICAL_TRIGGER) == LOW ? "DETECTED" : "CLEAR");
       Serial.print(",SERVO=");
-      Serial.println(servoActive ? "ACTIVE" : "IDLE");
+      Serial.print(servoActive ? "ACTIVE" : "IDLE");
+      Serial.print(",MOTOR=");
+      Serial.println(motorRunning ? "RUNNING" : "STOPPED");
+    }
+    else if (cmd == "CMD:MOTOR:START") {
+      digitalWrite(PIN_MOTOR_FWD, HIGH);
+      digitalWrite(PIN_MOTOR_EN, HIGH);
+      motorRunning = true;
+      motorStepPending = false;
+      Serial.println("RESP:ACK_MOTOR:START");
+    }
+    else if (cmd == "CMD:MOTOR:STOP") {
+      digitalWrite(PIN_MOTOR_EN, LOW);
+      motorRunning = false;
+      motorStepPending = false;
+      Serial.println("RESP:ACK_MOTOR:STOP");
+    }
+    else if (cmd.startsWith("CMD:MOTOR:STEP:")) {
+      unsigned int stepMs = cmd.substring(15).toInt();
+      stepMs = constrain(stepMs, 50, 10000);
+      digitalWrite(PIN_MOTOR_FWD, HIGH);
+      digitalWrite(PIN_MOTOR_EN, HIGH);
+      motorRunning = true;
+      motorStepPending = true;
+      motorStepEndTime = currentMillis + stepMs;
+      Serial.print("RESP:ACK_MOTOR_STEP:");
+      Serial.println(stepMs);
     }
   }
 }

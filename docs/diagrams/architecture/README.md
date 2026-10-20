@@ -35,7 +35,7 @@ flowchart LR
     subgraph OUTPUT["OUTPUT"]
         O1["1. OvaLens Hardware Setup\n- Stepper-Driven Conveyor\n- Fixed Candling Chamber\n- Servo Sorting Mechanism"]
         O2["2. OvaLens Software System\n- Raspberry Pi Control App\n- Web-Based Admin Dashboard"]
-        O3["3. Trained AI Model\n- Optimized YOLOv8 Architecture\n- Classifies: Fertile, Infertile, Abnormal"]
+        O3["3. Trained AI Model\n- Optimized YOLOv8 Architecture\n- Classifies: Fertile or Infertile"]
         O4["4. Empirical Results\n- Performance Documentation"]
         O5["5. Physical Candling Chamber"]
     end

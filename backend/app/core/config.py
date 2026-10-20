@@ -1,7 +1,7 @@
 import os
 from typing import List, Union
 from urllib.parse import quote_plus
-from pydantic import field_validator
+from pydantic import Field, field_validator
 # pyrefly: ignore [missing-import]
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -37,6 +37,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
     STORAGE_DIR: str = "storage/candling_scans"
+    MAX_SCAN_IMAGE_BYTES: int = Field(default=10 * 1024 * 1024, gt=0)
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

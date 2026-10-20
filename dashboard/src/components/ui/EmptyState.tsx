@@ -22,11 +22,11 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   return (
     <div
       className={cn(
-        'bg-white border border-slate-200/80 rounded-2xl p-8 sm:p-12 text-center max-w-md mx-auto my-6 shadow-2xs space-y-4 font-sans',
+        'bg-card border border-slate-200/80 rounded-2xl p-8 sm:p-12 text-center max-w-md mx-auto my-6  space-y-4 font-sans',
         className
       )}
     >
-      <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200 text-slate-400 mx-auto flex items-center justify-center shadow-2xs">
+      <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200 text-slate-400 mx-auto flex items-center justify-center ">
         <Icon className="w-6 h-6 text-slate-500" />
       </div>
 
@@ -43,7 +43,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         <div className="pt-2">
           <button
             onClick={onAction}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer btn-press"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#800000] hover:bg-[#6B0000] text-white text-xs font-bold  transition-colors cursor-pointer btn-press"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>{actionLabel}</span>
