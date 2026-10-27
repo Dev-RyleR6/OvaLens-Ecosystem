@@ -288,3 +288,138 @@ def test_operator_app_positional_station_resolution(hidden_ui):
         except tk.TclError:
             pass
 
+
+def test_discover_boards_filters_bluetooth_even_when_in_preferred(monkeypatch):
+    ports = [
+        SimpleNamespace(device="COM5", hwid=r"BTHENUM\{00001101-0000-1000-8000-00805F9B34FB}", description="Standard Serial over Bluetooth link (COM5)"),
+        SimpleNamespace(device="COM6", hwid=r"USB\VID_10C4", description="ESP32 Conveyor"),
+        SimpleNamespace(device="COM7", hwid=r"USB\VID_10C4", description="ESP32 Egg"),
+        SimpleNamespace(device="COM9", hwid=r"USB\VID_10C4", description="ESP32 Light"),
+    ]
+    monkeypatch.setattr("src.iot.three_board.list_ports.comports", lambda: ports)
+
+    probed = []
+    class MockWire:
+        def __init__(self, port):
+            self.port = port
+            probed.append(port)
+        def write(self, data):
+            return len(data)
+        def read(self, count):
+            if self.port == "COM6":
+                return b"PONG:CONVEYOR\nREADY:CONVEYOR_V3:PROTOCOL=3\n"
+            if self.port == "COM7":
+                return b"PONG:EGG_CONTROLLER\nREADY:EGG_CONTROLLER_V3:PROTOCOL=3\n"
+            if self.port == "COM9":
+                return b"PONG:LIGHT_CONTROLLER\nREADY:LIGHT_CONTROLLER_V3:PROTOCOL=3\n"
+            return b""
+        def close(self):
+            pass
+
+    found = discover_boards(preferred=("COM5", "COM7", "COM9"), serial_factory=lambda port, *a, **k: MockWire(port), timeout=0.1)
+    assert found == {"CONVEYOR": "COM6", "EGG_CONTROLLER": "COM7", "LIGHT_CONTROLLER": "COM9"}
+    # COM5 is Bluetooth and MUST NOT be probed despite being in preferred
+    assert "COM5" not in probed
+
+
+def test_board_link_preopen_dtr_rts_suppression():
+    dtr_when_opened = None
+    rts_when_opened = None
+
+    class MockPreOpenSerial:
+        def __init__(self, port=None, baudrate=115200, **kwargs):
+            self.port = port
+            self._dtr = None
+            self._rts = None
+            self._is_open = False
+        @property
+        def dtr(self):
+            return self._dtr
+        @dtr.setter
+        def dtr(self, val):
+            self._dtr = val
+        @property
+        def rts(self):
+            return self._rts
+        @rts.setter
+        def rts(self, val):
+            self._rts = val
+        def open(self):
+            nonlocal dtr_when_opened, rts_when_opened
+            self._is_open = True
+            dtr_when_opened = self._dtr
+            rts_when_opened = self._rts
+        def reset_input_buffer(self):
+            pass
+        def write(self, data):
+            return len(data)
+        def read(self, count):
+            time.sleep(0.01)
+            return b"READY:CONVEYOR_V2:PROTOCOL=2\nSTATE:IDLE\n"
+        def close(self):
+            self._is_open = False
+
+    link = BoardLink("CONVEYOR", "COM5", serial_factory=MockPreOpenSerial, protocol=2)
+    link.start()
+    try:
+        deadline = time.monotonic() + 1.5
+        while not link._status_complete and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert link.snapshot().connected is True
+        assert dtr_when_opened is False
+        assert rts_when_opened is False
+    finally:
+        link.stop()
+
+
+def test_board_link_delayed_reset_clears_telemetry_and_resets_window():
+    failures = []
+    link = BoardLink("CONVEYOR", "COM5", failures.append, protocol=3)
+    link.state.connected = True
+    now = time.monotonic()
+    link._started_at = now
+    link._receive("READY:CONVEYOR_V3:PROTOCOL=3", now)
+    link._receive("STATE:WAITING", now)
+    assert link._status_complete is True
+    link.state.telemetry["TEST_KEY"] = "OLD_VAL"
+
+    # Reset within startup settling window
+    link._receive("BOOT:CONVEYOR_V3", now + 0.3)
+    assert not failures
+    assert link._status_complete is False
+    assert link.snapshot().identified is False
+    assert "TEST_KEY" not in link.state.telemetry
+    assert link._started_at == now + 0.3  # window reset for clean re-handshake
+
+
+def test_release_manual_light_sends_clean_light_off_before_stopping():
+    mock_link = Mock()
+    mock_link.snapshot.return_value = SimpleNamespace(connected=True, error="", identified=True)
+    future = Future()
+    future.set_result({"LIGHT": "0"})
+    mock_link.command.return_value = future
+
+    station = EdgeStation(Mock(), Mock(), Mock(), "STATION-01")
+    station._manual_light_link = mock_link
+    station._manual_light_cancel.clear()
+
+    station.release_manual_light()
+
+    mock_link.command.assert_called_once_with("LIGHT_OFF")
+    mock_link.stop.assert_called_once()
+    assert station._manual_light_link is None
+
+
+def test_prepare_camera_alignment_releases_manual_light():
+    station = EdgeStation(Mock(), Mock(), Mock(), "STATION-01")
+    station.settings.rig_profile = "three_v3"
+    station.settings_error = ""
+    station.boards = None
+    mock_release = Mock()
+    station.release_manual_light = mock_release
+
+    with pytest.raises(RuntimeError, match="Check the cradle path"):
+        station.prepare_camera_alignment(False)
+    mock_release.assert_called_once()
+
+

@@ -128,6 +128,11 @@ class EdgeStation:
             if self._manual_light_link:
                 link = self._manual_light_link
                 self._manual_light_link = None
+                if owned:
+                    try:
+                        link.command("LIGHT_OFF").result(1.0)
+                    except Exception:
+                        pass
                 link.stop()
                 time.sleep(0.15)
             elif owned and self.light_link:
@@ -398,6 +403,7 @@ class EdgeStation:
         """Explicit idle alignment setup: connect, hold, slow jog speed and lamp."""
         with self._lock:
             self.require_idle()
+            self.release_manual_light()
             if not inspected:
                 raise RuntimeError("Check the cradle path is clear before connecting for alignment")
             if self.settings.rig_profile != "three_v3":

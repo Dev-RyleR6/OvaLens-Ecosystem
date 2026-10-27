@@ -113,12 +113,22 @@ class BoardLink:
             return  # Late command telemetry must not replace current position or fault state.
         if payload.startswith("BOOT:"):
             if self._status_complete:
-                if self._commands_dispatched == 0 and not self._pending and (now - self._started_at < 2.5 or (self._status_at > 0 and now - self._status_at < 1.0)):
+                if (self._commands_dispatched == 0 and not self._pending and self._queue.empty()
+                        and not self._halt.is_set() and (
+                            (self._started_at > 0 and now - self._started_at < 2.5) or
+                            (self._status_at > 0 and now - self._status_at < 1.0))):
                     self._status_complete = False
+                    self._started_at = now
                     with self._lock:
                         self.state.identified = False
+                        self.state.telemetry.clear()
                     return
                 self._fail("Board reset; inspect and reconnect")
+            else:
+                self._started_at = now
+                with self._lock:
+                    self.state.identified = False
+                    self.state.telemetry.clear()
             return
         if payload.startswith("READY:"):
             expected = f"READY:{self.role}_V{self.protocol}:PROTOCOL={self.protocol}"
@@ -198,7 +208,21 @@ class BoardLink:
                 if self._stop.is_set():
                     return
                 try:
-                    connection = factory(self.port, 115200, timeout=.02, write_timeout=.2)
+                    if hasattr(factory, "open"):
+                        try:
+                            connection = factory(port=None, baudrate=115200, timeout=.02, write_timeout=.2)
+                            connection.port = self.port
+                            if hasattr(connection, "dtr"):
+                                try:
+                                    connection.dtr = False
+                                    connection.rts = False
+                                except Exception:
+                                    pass
+                            connection.open()
+                        except (TypeError, AttributeError):
+                            connection = factory(self.port, 115200, timeout=.02, write_timeout=.2)
+                    else:
+                        connection = factory(self.port, 115200, timeout=.02, write_timeout=.2)
                     if hasattr(connection, "dtr"):
                         try:
                             connection.dtr = False
@@ -237,7 +261,7 @@ class BoardLink:
                     if connection.write(request) != len(request):
                         raise RuntimeError("Incomplete heartbeat write")
                     heartbeat = now
-                if now - self.snapshot().last_reply > 3.5 or (not self._status_complete and now - started > 5):
+                if now - self.snapshot().last_reply > 3.5 or (not self._status_complete and now - self._started_at > 5):
                     raise RuntimeError("Board response timeout")
                 if self._pending and now > self._pending[2]:
                     raise RuntimeError("Command completion timeout; do not retry motion")
@@ -255,7 +279,6 @@ class BoardLink:
                         if ident > 2147483647:
                             raise RuntimeError("Command ID exhausted; reconnect after inspection")
                         self._next_id += 1
-                        self._commands_dispatched += 1
                         self._pending = [ident, text, min(now + timeout, future.deadline), future, False]
                         self._command_values = {}
                         request = f"@{ident} {text}\n".encode("ascii")

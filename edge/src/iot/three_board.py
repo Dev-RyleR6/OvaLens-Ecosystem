@@ -13,9 +13,9 @@ def _is_ignored_port(port_info):
     desc = getattr(port_info, "description", "") or ""
     mfg = getattr(port_info, "manufacturer", "") or ""
     combined = f"{hwid} {desc} {mfg}".upper()
-    if "BTHENUM" in combined or "BLUETOOTH" in combined:
+    if "BTHENUM" in combined or "BLUETOOTH" in combined or "RFCOMM" in combined or "BTH\\" in combined:
         return True
-    if "PNP0501" in combined:
+    if "PNP050" in combined:
         return True
     return False
 
@@ -28,15 +28,23 @@ def discover_boards(ports=None, serial_factory=None, timeout=4, cancel=None, pre
     port_errors = {}
     automatic = ports is None
     discovered = []
+    ignored = set()
     try:
         for p in list_ports.comports():
-            if not _is_ignored_port(p):
-                dev = getattr(p, "device", None)
+            dev = getattr(p, "device", None)
+            if _is_ignored_port(p):
+                if dev:
+                    ignored.add(dev.casefold())
+            else:
                 if dev:
                     discovered.append(dev)
     except Exception:
         pass
-    candidates = list(ports) if ports is not None else list(preferred or ("COM5", "COM7", "COM9")) + discovered
+    if ports is not None:
+        candidates = list(ports)
+    else:
+        pref = [p for p in (preferred or ("COM5", "COM7", "COM9")) if p and p.casefold() not in ignored]
+        candidates = pref + discovered
     unique_ports = {}
     for port in candidates:
         if port:
@@ -47,7 +55,21 @@ def discover_boards(ports=None, serial_factory=None, timeout=4, cancel=None, pre
         connection = None
         for attempt in range(3):
             try:
-                connection = factory(port, 115200, timeout=.02, write_timeout=.2)
+                if hasattr(factory, "open"):
+                    try:
+                        connection = factory(port=None, baudrate=115200, timeout=.02, write_timeout=.2)
+                        connection.port = port
+                        if hasattr(connection, "dtr"):
+                            try:
+                                connection.dtr = False
+                                connection.rts = False
+                            except Exception:
+                                pass
+                        connection.open()
+                    except (TypeError, AttributeError):
+                        connection = factory(port, 115200, timeout=.02, write_timeout=.2)
+                else:
+                    connection = factory(port, 115200, timeout=.02, write_timeout=.2)
                 if hasattr(connection, "dtr"):
                     try:
                         connection.dtr = False
@@ -63,6 +85,8 @@ def discover_boards(ports=None, serial_factory=None, timeout=4, cancel=None, pre
             except Exception as exc:
                 err_msg = str(exc)
                 if attempt < 2 and ("denied" in err_msg.lower() or "busy" in err_msg.lower() or "permission" in err_msg.lower()):
+                    if cancel is not None and cancel.is_set():
+                        raise RuntimeError("Setup stopped. Retry detection when ready.")
                     time.sleep(0.3)
                     continue
                 port_errors[port] = err_msg
