@@ -80,10 +80,9 @@ def main():
         resources.callback(_stop_resource, sync)
         if not config.get("simulation", False):
             sync.start()
-        app = OvaLensOperatorApp(camera=camera, engine=engine, iot=None, db=db,
-                                 sync_worker=sync, chamber=None,
+        app = OvaLensOperatorApp(camera=camera, engine=engine, station=station,
+                                 db=db, sync_worker=sync,
                                  inference_worker=worker, device_id=device_id,
-                                 station=station,
                                  startup_config=config)
         try:
             app.mainloop()

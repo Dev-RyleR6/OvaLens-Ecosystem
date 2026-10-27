@@ -29,6 +29,7 @@ from ..core.inference_worker import InferenceWorker
 from ..core.capture_view import CaptureView
 from ..core.operator_flow import OperatorState, validate_batch_config
 from ..core.operator_cues import cycle_cue
+from ..core.station import EdgeStation
 from ..iot.serial_driver import ESP32SerialDriver
 from ..db.local_db import LocalDatabaseManager
 from ..sync.sync_worker import BackgroundSyncWorker
@@ -53,14 +54,18 @@ def _building_dialog(method):
 
 class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
     def __init__(self, camera: CameraGrabber, engine: InferenceEngine,
-                 iot: ESP32SerialDriver, db: LocalDatabaseManager,
-                 sync_worker: BackgroundSyncWorker,
-                 chamber: Optional[ChamberController] = None,
+                 iot: Optional[Any] = None, db: Optional[LocalDatabaseManager] = None,
+                 sync_worker: Optional[BackgroundSyncWorker] = None,
+                 chamber: Optional[Any] = None,
                  inference_worker: Optional[Any] = None,
                  device_id: str = "STATION-01-RP5",
                  startup_config: Optional[Dict[str, Any]] = None,
-                 fullscreen: bool = True, station=None):
+                 fullscreen: bool = True,
+                 station: Optional[EdgeStation] = None):
         super().__init__()
+
+        if station is None and isinstance(iot, EdgeStation):
+            station, iot = iot, None
 
         self.camera = camera
         self.station = station

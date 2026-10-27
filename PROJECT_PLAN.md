@@ -313,3 +313,6 @@ These features can be claimed by any agent using `python scripts/verify_and_comm
 - [x] **TASK-NEW-EDGE-UI-POLISH-01**: Improve native edge typography, operator visibility and minimum-size layouts; eliminate redundant Tk status/control updates. Verify with simulated GUI, measured before/after updates and repository gates.
 
 - [x] **TASK-NEW-EDGE-DESIGN-02**: Apply impeccable Operate guidance to the edge station: one compact record panel, aligned count rows, restrained semantic colour, clear camera empty state and consistent action hierarchy; preserve cached refreshes and verify minimum-size review controls.
+
+- [x] **TASK-NEW-EDGE-IOT-01**: Harden Edge IoT serial communication, Windows port retry backoff, Bluetooth port filtering, delayed auto-reset race prevention, clean manual light release, and station dependency architecture.
+

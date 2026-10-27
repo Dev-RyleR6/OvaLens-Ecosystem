@@ -31,6 +31,8 @@ class BoardLink:
         self._thread = None
         self._pending = None
         self._next_id = 1
+        self._commands_dispatched = 0
+        self._started_at = 0.0
         self._status_complete = False
         self._status_at = 0.0
         self._command_values = {}
@@ -68,6 +70,7 @@ class BoardLink:
             raise RuntimeError(state.error or f"{self.role} handshake is incomplete")
         future = Future()
         future.deadline = time.monotonic() + timeout
+        self._commands_dispatched += 1
         self._queue.put_nowait((text, timeout, future))
         return future
 
@@ -110,6 +113,11 @@ class BoardLink:
             return  # Late command telemetry must not replace current position or fault state.
         if payload.startswith("BOOT:"):
             if self._status_complete:
+                if self._commands_dispatched == 0 and not self._pending and (now - self._started_at < 2.5 or (self._status_at > 0 and now - self._status_at < 1.0)):
+                    self._status_complete = False
+                    with self._lock:
+                        self.state.identified = False
+                    return
                 self._fail("Board reset; inspect and reconnect")
             return
         if payload.startswith("READY:"):
@@ -181,16 +189,41 @@ class BoardLink:
 
     def _run(self):
         connection = None
+        self._started_at = time.monotonic()
         try:
             factory = self.serial_factory or getattr(serial, "Serial", None)
             if factory is None:
                 raise RuntimeError("PySerial is unavailable; install the edge requirements (pyserial)")
-            connection = factory(self.port, 115200, timeout=.02, write_timeout=.2)
+            for attempt in range(4):
+                if self._stop.is_set():
+                    return
+                try:
+                    connection = factory(self.port, 115200, timeout=.02, write_timeout=.2)
+                    if hasattr(connection, "dtr"):
+                        try:
+                            connection.dtr = False
+                            connection.rts = False
+                        except Exception:
+                            pass
+                    if hasattr(connection, "reset_input_buffer"):
+                        try:
+                            connection.reset_input_buffer()
+                        except Exception:
+                            pass
+                    break
+                except Exception as exc:
+                    err_msg = str(exc)
+                    if attempt < 3 and ("denied" in err_msg.lower() or "busy" in err_msg.lower() or "permission" in err_msg.lower()):
+                        if self._stop.wait(0.3):
+                            return
+                        continue
+                    raise
             with self._lock:
                 self.state.connected = True
                 self.state.last_reply = time.monotonic()
             # Opening an ESP32 port can reset it; wait for its boot without motion.
             started, heartbeat = time.monotonic(), 0.0
+            self._started_at = started
             buffer = bytearray()
             while not self._stop.is_set():
                 now = time.monotonic()
@@ -222,6 +255,7 @@ class BoardLink:
                         if ident > 2147483647:
                             raise RuntimeError("Command ID exhausted; reconnect after inspection")
                         self._next_id += 1
+                        self._commands_dispatched += 1
                         self._pending = [ident, text, min(now + timeout, future.deadline), future, False]
                         self._command_values = {}
                         request = f"@{ident} {text}\n".encode("ascii")

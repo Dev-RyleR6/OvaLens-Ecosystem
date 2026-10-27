@@ -8,6 +8,18 @@ ROLES = ("CONVEYOR", "EGG_CONTROLLER", "LIGHT_CONTROLLER")
 SerialException = getattr(serial, "SerialException", OSError)
 
 
+def _is_ignored_port(port_info):
+    hwid = getattr(port_info, "hwid", "") or ""
+    desc = getattr(port_info, "description", "") or ""
+    mfg = getattr(port_info, "manufacturer", "") or ""
+    combined = f"{hwid} {desc} {mfg}".upper()
+    if "BTHENUM" in combined or "BLUETOOTH" in combined:
+        return True
+    if "PNP0501" in combined:
+        return True
+    return False
+
+
 def discover_boards(ports=None, serial_factory=None, timeout=4, cancel=None, preferred=None):
     factory = serial_factory or getattr(serial, "Serial", None)
     if factory is None:
@@ -15,7 +27,16 @@ def discover_boards(ports=None, serial_factory=None, timeout=4, cancel=None, pre
     found = {}
     port_errors = {}
     automatic = ports is None
-    candidates = list(ports) if ports is not None else list(preferred or ("COM5", "COM7", "COM9")) + [p.device for p in list_ports.comports()]
+    discovered = []
+    try:
+        for p in list_ports.comports():
+            if not _is_ignored_port(p):
+                dev = getattr(p, "device", None)
+                if dev:
+                    discovered.append(dev)
+    except Exception:
+        pass
+    candidates = list(ports) if ports is not None else list(preferred or ("COM5", "COM7", "COM9")) + discovered
     unique_ports = {}
     for port in candidates:
         if port:

@@ -126,8 +126,10 @@ class EdgeStation:
             owned = not self._manual_light_cancel.is_set()
             self._manual_light_cancel.set()
             if self._manual_light_link:
-                self._manual_light_link.stop()
+                link = self._manual_light_link
                 self._manual_light_link = None
+                link.stop()
+                time.sleep(0.15)
             elif owned and self.light_link:
                 link = self.light_link
                 if link.command("LIGHT_OFF").result(3.5).get("LIGHT") != "0":
@@ -268,6 +270,7 @@ class EdgeStation:
         """One explicit inspected action; preserve remembered camera/calibration."""
         with self._lock:
             self.require_idle()
+            self.release_manual_light()
             if not inspected:
                 raise RuntimeError("Confirm the conveyor is empty, aligned and the gate checked.")
             self._check_setup_cancel(cancel)
