@@ -305,11 +305,16 @@ class EdgeStation:
                         self.boards = None
                         time.sleep(0.4)
                     progress("Connecting stepper, sorting gate and light")
-                    ports = discover_boards(cancel=cancel, preferred=(settings.conveyor_port,
-                        settings.servo_port, settings.light_port, "COM5", "COM7", "COM9"))
+                    if settings.rig_profile == "unified_v4":
+                        from ..iot.unified_board import discover_unified_board
+                        settings.conveyor_port = discover_unified_board(cancel=cancel,
+                            preferred=(settings.conveyor_port,))
+                    else:
+                        ports = discover_boards(cancel=cancel, preferred=(settings.conveyor_port,
+                            settings.servo_port, settings.light_port, "COM5", "COM7", "COM9"))
+                        settings.conveyor_port, settings.servo_port, settings.light_port = (
+                            ports["CONVEYOR"], ports["EGG_CONTROLLER"], ports["LIGHT_CONTROLLER"])
                     check()
-                    settings.conveyor_port, settings.servo_port, settings.light_port = (
-                        ports["CONVEYOR"], ports["EGG_CONTROLLER"], ports["LIGHT_CONTROLLER"])
                     self.settings = settings
                     self.connect(cancel=cancel)
                 check()
@@ -544,13 +549,15 @@ class EdgeStation:
             self.calibrated = True
             return "Calibration loaded and inspected for this connection. No conveyor motion started."
 
-    def start_cycle(self, batch_id, target, operator):
+    def start_cycle(self, batch_id, target, operator, operator_id=None):
         with self._lock:
             self.require_idle()
             self.release_manual_light()
             if self._camera_alignment_boards is not None:
                 raise RuntimeError("Finish camera alignment before sorting")
             batch_id, operator, target = validate_batch_config(batch_id, operator, target, "DAY_10")
+            if operator_id and not self.db.get_operator(operator_id):
+                raise ValueError("Choose an active registered operator before starting a new run.")
             if not self.calibrated or not self.boards:
                 raise RuntimeError("Validate calibration and holder alignment before sorting")
             if not str(self.inference.engine.engine_type).startswith("ONNX"):
@@ -562,6 +569,7 @@ class EdgeStation:
             self.cycle = kind(self.boards, self.camera, self.inference, self.db, self.settings,
                 self.device_id, str(uuid.uuid4()), batch_id, target, operator)
             self.calibrated = False  # Every batch starts from an inspected reference.
+            self.cycle.operator_id = operator_id
             self.cycle.start()
             return self.cycle
 

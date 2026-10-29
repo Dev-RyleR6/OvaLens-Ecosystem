@@ -5,6 +5,69 @@ from app.main import app
 client = TestClient(app)
 
 
+def test_station_operator_roster_is_minimal_authenticated_and_includes_active_roles():
+    from uuid import uuid4
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.models.user import UserModel, UserRole
+    identities = [uuid4() for _ in range(4)]
+    try:
+        with SessionLocal() as db:
+            for index, role in enumerate([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR, UserRole.OPERATOR]):
+                db.add(UserModel(user_id=identities[index], email=f"{identities[index]}@example.test",
+                    hashed_password="unused-test-hash", full_name="N" * 128 if index == 0 else "Same Name",
+                    role=role, is_active=index < 3))
+            db.commit()
+        assert client.get("/api/v1/operators").status_code in (401, 403)
+        assert client.get("/api/v1/operators", headers={"X-API-Key": "wrong"}).status_code in (401, 403)
+        result = client.get("/api/v1/operators", headers={"X-API-Key": settings.API_KEY})
+        assert result.status_code == 200
+        rows = {r["user_id"]: r for r in result.json()}
+        for identity in identities[:3]:
+            assert set(rows[str(identity)]) == {"user_id", "full_name", "role"}
+        assert str(identities[3]) not in rows
+        assert len(rows[str(identities[0])]["full_name"]) == 128
+    finally:
+        with SessionLocal() as db:
+            db.query(UserModel).filter(UserModel.user_id.in_(identities)).delete(synchronize_session=False)
+            db.commit()
+
+
+def test_registered_operator_offline_history_and_batch_audit_preserve_snapshot(edge_batch):
+    from uuid import uuid4
+    from app.core.database import SessionLocal
+    from app.models.user import UserModel, UserRole
+    from app.models.audit import AuditLogModel
+    from app.models.session import CandlingSessionModel
+    identity, session_id = uuid4(), str(uuid4())
+    payload, headers = edge_batch
+    original_name = "Operator " + "N" * 119
+    try:
+        with SessionLocal() as db:
+            db.add(UserModel(user_id=identity, email=f"{identity}@example.test", hashed_password="unused-test-hash",
+                             full_name="Renamed operator", role=UserRole.OPERATOR, is_active=False))
+            db.commit()
+        assert client.post("/api/v1/batches/register", headers=headers,
+            json={**payload, "operator_id": str(identity), "operator_name": original_name}).status_code == 200
+        session = {"session_id": session_id, "batch_id": payload["batch_id"], "device_id": payload["device_id"],
+            "stage": "DAY_10", "operator_name": original_name, "operator_id": str(identity),
+            "started_at": "2026-10-29T00:00:00Z"}
+        for _ in range(2):
+            response = client.post("/api/v1/sessions", headers=headers, json=session)
+            assert response.status_code == 200
+            assert response.json()["operator_id"] == str(identity)
+            assert response.json()["operator_name"] == original_name
+        with SessionLocal() as db:
+            audit = db.query(AuditLogModel).filter_by(entity_id=payload["batch_id"], action="BATCH_CREATED").one()
+            assert audit.details["operator_id"] == str(identity)
+        assert client.get(f"/api/v1/sessions/{session_id}").json()["operator_name"] == original_name
+    finally:
+        with SessionLocal() as db:
+            db.query(CandlingSessionModel).filter_by(session_id=session_id).delete()
+            db.query(UserModel).filter_by(user_id=identity).delete()
+            db.commit()
+
+
 @pytest.mark.parametrize("end,count,seconds,rate", [
     ("2026-10-29T08:10:00+08:00", 120, 600, 12),
     ("2026-10-29T00:00:00.500+00:00", 1, .5, 120),

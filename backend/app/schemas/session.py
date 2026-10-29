@@ -11,6 +11,7 @@ class SessionCreate(BaseModel):
     device_id: str = Field(..., max_length=64)
     stage: CandlingStage
     operator_name: str = Field(..., max_length=128)
+    operator_id: Optional[UUID] = None
     started_at: datetime
 
 
@@ -26,6 +27,7 @@ class SessionResponse(BaseModel):
     device_id: str
     stage: CandlingStage
     operator_name: str
+    operator_id: Optional[UUID] = None
     started_at: datetime
     ended_at: Optional[datetime]
     total_scanned: int

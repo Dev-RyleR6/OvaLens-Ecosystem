@@ -39,7 +39,7 @@ class StationReadiness:
     def _controllers(self):
         s = self.station
         s.boards.require_ready()
-        if s.settings.rig_profile == "three_v3":
+        if s.settings.rig_profile in {"three_v3", "unified_v4"}:
             egg = s.boards.egg.snapshot().telemetry
             conveyor = s.boards.conveyor.snapshot().telemetry
             if egg.get("PAUSED") != "1" or conveyor.get("PAUSED") != "1":
@@ -151,7 +151,7 @@ class StationReadiness:
         except Exception:
             return False
 
-    def start(self, batch_id, target, operator, cancel):
+    def start(self, batch_id, target, operator, cancel, operator_id=None):
         """Final background recheck, with no discovery, homing or preset replay."""
         s = self.station
         try:
@@ -167,7 +167,7 @@ class StationReadiness:
                 self.require_ready()
                 s._check_setup_cancel(cancel)
                 s._check_setup_cancel(s._setup_cancel)
-                cycle = s.start_cycle(batch_id, target, operator)
+                cycle = s.start_cycle(batch_id, target, operator, **({"operator_id": operator_id} if operator_id else {}))
                 s._check_setup_cancel(cancel)
                 s._check_setup_cancel(s._setup_cancel)
                 with self._lock:

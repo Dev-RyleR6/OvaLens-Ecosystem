@@ -232,12 +232,11 @@ def test_batch_setup_rejects_invalid_run_configuration(count, operator):
         validate_batch_config("TEST-BATCH", operator, count, "DAY_10")
 
 
-@pytest.mark.parametrize("operator", ["", "   ", "x" * 101])
-def test_startup_rejects_invalid_operator_name(operator):
-    app = SimpleNamespace(result=None, _status_label=Mock(),
-        _operator_entry=SimpleNamespace(get=lambda: operator))
-    StartupConfigWindow._on_start(app)
-    assert app.result is None and app._status_label.configure.called
+@pytest.mark.parametrize("operator", ["", "   ", "x" * 129])
+def test_run_setup_rejects_invalid_operator_name(operator):
+    from src.core.operator_flow import validate_batch_config
+    with pytest.raises(ValueError):
+        validate_batch_config("BATCH", operator, 10, "DAY_10")
 
 
 @pytest.mark.parametrize("ack,status", [({}, 200), ({"status": "success", "total_received": 1,

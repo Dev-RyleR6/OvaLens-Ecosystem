@@ -37,6 +37,7 @@ from ..sync.sync_worker import BackgroundSyncWorker
 from .station_settings import StationSettingsWindow
 from .camera_controls import CameraControlsPanel
 from .station_readiness import ReadinessFlow, StationReadinessPanel
+from .guided_setup import GuidedSetupFlow
 
 
 def _building_dialog(method):
@@ -53,7 +54,7 @@ def _building_dialog(method):
     return wrapped
 
 
-class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
+class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
     def __init__(self, camera: CameraGrabber, engine: InferenceEngine,
                  iot: Optional[Any] = None, db: Optional[LocalDatabaseManager] = None,
                  sync_worker: Optional[BackgroundSyncWorker] = None,
@@ -113,7 +114,12 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
         self.current_stage: str = str(cfg.get("stage", "DAY_10"))
         self.target_egg_count: int = int(cfg.get("egg_count", 500))
         self.incubator_id: str = "INCUBATOR-A1"
-        self.operator_name: str = str(cfg.get("operator", "Pedro Penduko"))
+        self.operator_name: str = "Choose operator"
+        self.operator_id = None
+        self._operator_roster_loaded = False
+        self._startup_guided_setup = True
+        self._setup_busy = False
+        self._operator_refresh_busy = False
         self.is_session_active: bool = False
         self.is_auto_cycle_running: bool = False
         self.scan_sequence: int = 0
@@ -728,16 +734,16 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
         self.station_status.pack(fill="x", padx=16, pady=(8, 4))
         self.setup_row = ctk.CTkFrame(self.station_strip, fg_color="transparent")
         setup_actions = ctk.CTkFrame(self.setup_row, fg_color="transparent")
-        setup_actions.pack(fill="x")
+        # Legacy inspection widgets remain available to Tools; the daily dialog owns their space.
         self.setup_inspected = ctk.BooleanVar(value=False)
         self.setup_check = ctk.CTkCheckBox(setup_actions, text="Conveyor empty, aligned; gate checked",
             font=(FUTheme.FONT_FAMILY, 14), variable=self.setup_inspected,
             command=lambda: self._set_session_active_state(False))
-        self.setup_check.pack(side="left", padx=4, pady=8)
+        # Daily inspection is confirmed in the guided preparation dialog.
         self.prepare_btn = ctk.CTkButton(setup_actions, text="Prepare station", width=155, height=36,
             font=(FUTheme.FONT_FAMILY, 13, "bold"), fg_color=FUTheme.PRIMARY_MAROON,
             hover_color=FUTheme.HOVER_MAROON, command=self.prepare_station)
-        self.prepare_btn.pack(side="right", padx=4, pady=8)
+        # The footer primary action owns daily preparation.
         self.setup_notice = ctk.CTkLabel(self.setup_row,
             text="Confirm an empty conveyor, then Prepare station. Connection can reset boards and move the gate to neutral; the belt stays stopped.",
             anchor="w", justify="left", wraplength=950, font=(FUTheme.FONT_FAMILY, 12),
@@ -1015,6 +1021,7 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
                      getattr(self, "_setup_busy", False), bool(getattr(station, "calibrated", False)),
                      bool(getattr(self, "_station_prepared", False)), bool(getattr(self, "_batch_record_ready", False)),
                      bool(getattr(station, "boards", None)), tuning, getattr(self, "_light_busy", False))
+        signature += (getattr(self, "operator_id", None),)
         if hasattr(self, "setup_row"):
             self._refresh_setup_controls(is_active)
         if signature == getattr(self, "_controls_signature", None):
@@ -1056,8 +1063,8 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
         needs_setup = (station is not None and not is_active and not getattr(self, "_batch_complete", False)
                        and (not getattr(self, "_batch_record_ready", False) or not
                             (station.calibrated and self.setup_inspected.get() if dual else getattr(self, "_station_prepared", False))))
-        self.session_btn.configure(state="disabled" if self._scan_busy or self._stopping or blocked or setup_busy or tuning or needs_setup or (self.inference_worker.busy and not self.is_auto_cycle_running) or (is_active and not self.is_auto_cycle_running) else "normal",
-                                   text="Preparing..." if setup_busy else "Stop sorting" if self.is_auto_cycle_running else "Start next batch" if getattr(self, "_batch_complete", False) else "Start sorting")
+        self.session_btn.configure(state="disabled" if self._scan_busy or self._stopping or blocked or setup_busy or tuning or (self.inference_worker.busy and not self.is_auto_cycle_running) or (is_active and not self.is_auto_cycle_running) else "normal",
+                                   text="Preparing..." if setup_busy else "Stop sorting" if self.is_auto_cycle_running else "Set up run" if not getattr(self, "_batch_record_ready", False) or not getattr(self, "operator_id", None) or getattr(self, "_batch_complete", False) else "Prepare station" if needs_setup else "Start sorting")
         self.scan_btn.configure(state="disabled" if busy or blocked or self._diagnostics_complete else "normal",
                                 text="Working…" if self._scan_busy else "Single Scan [SPACE]")
         self.cancel_btn.configure(state="disabled" if self._stopping else "normal",
@@ -1460,14 +1467,16 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
             self.stop_or_cancel_session()
             return
         if getattr(self, "_batch_complete", False):
+            self._prepare_after_selection = True
             self.open_batch_setup_dialog()
             return
         if (not self.station or self.simulation or self.grab_current() is not None
                 or self._scan_busy or self.current_session_id or self._finalization_failed or self.inference_worker.busy):
             self._log("[BLOCKED] Finish the current operation before starting sorting.")
             return
-        if not getattr(self, "_batch_record_ready", False):
-            self.setup_notice.configure(text="Choose or create a batch with its incubation details first.")
+        if not getattr(self, "_batch_record_ready", False) or (hasattr(self, "operator_id") and not self.operator_id):
+            self.setup_notice.configure(text="Choose a registered operator and batch first.")
+            self._prepare_after_selection = True
             self.open_batch_setup_dialog()
             return
         try:
@@ -1480,17 +1489,14 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
             if not self.station.calibrated or not self.setup_inspected.get():
                 self.setup_notice.configure(text="Prepare the saved two-board profile in Tools / Settings first.")
                 return
-            try:
-                self._activate_cycle(self.station.start_cycle(batch, target, operator))
-                self.setup_inspected.set(False)
-            except Exception as exc:
-                self.station.halt()
-                self.setup_notice.configure(text=str(exc))
+            self._submit_station_request(start=True, args=(batch, target, operator))
             return
         if not self.station.readiness.ready:
             self._station_prepared = False
             self.setup_notice.configure(text=self.station.readiness.reason)
             self._set_session_active_state(False)
+            if hasattr(self, "open_preparation_confirmation"):
+                self.open_preparation_confirmation()
             return
         self._submit_station_request(start=True, args=(batch, target, operator))
 
@@ -1692,6 +1698,7 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
         self.current_session_id = session_id
         batch_id, sequence = self.current_batch_id, self.scan_sequence + 1
         device_id, stage, operator = self.device_id, self.current_stage, self.operator_name
+        operator_id = getattr(self, "operator_id", None)
         scan_id = str(uuid.uuid4())
         view = getattr(self, "_diagnostic_view", None)
         # Keep the inference-owned snapshot alive through the queued disk write.
@@ -1703,7 +1710,9 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
             if generation != self._operation_generation:
                 return None
             if not self.db.get_session_stats(session_id):
-                self.db.create_session(session_id, batch_id, device_id, stage, operator)
+                if hasattr(self, "operator_id") and (not operator_id or not self.db.get_operator(operator_id)):
+                    raise ValueError("Choose an active registered operator before recording scans.")
+                self.db.create_session(session_id, batch_id, device_id, stage, operator, operator_id=operator_id)
             if generation != self._operation_generation:
                 return None
             image_path = self.db.save_scan_image(scan_id, image) if image is not None else None
@@ -1770,7 +1779,7 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
         if self.grab_current() is not None:
             self._log("[BLOCKED] Close the dialog before scanning.")
             return
-        if not self.simulation and not getattr(self, "_batch_record_ready", True):
+        if not self.simulation and (not getattr(self, "_batch_record_ready", True) or (hasattr(self, "operator_id") and not self.operator_id)):
             self._log("[BATCH] Choose or create a batch with its incubation details before saving scans.")
             self.open_batch_setup_dialog()
             return
@@ -1833,6 +1842,7 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
                           OperatorState.REVIEW)
 
     def trigger_manual_eject(self):
+        self._preparation_intent = None
         light_cancel = getattr(self, "_light_request_cancel", None)
         if light_cancel is not None:
             light_cancel.set()
@@ -2229,15 +2239,21 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
     def _restore_batch_selection(self):
         def load():
             prefs = self.db.get_batch_preferences()
-            return prefs, self.db.get_local_batch(prefs.get("batch_id", self.current_batch_id))
+            return prefs, self.db.get_local_batch(prefs.get("batch_id", self.current_batch_id)), self.db.get_operator_state()
         def restored(result):
-            prefs, batch = result
-            if (not isinstance(batch, dict) or self.current_session_id or self._closing
-                    or getattr(self, "_batch_setup_window", None) is not None):
+            prefs, batch, operator_state = result
+            if (self.current_session_id or self._closing or self._batch_record_ready or self._setup_busy
+                    or self.grab_current() is not None):
                 return
-            self._apply_batch_selection(batch, self._startup_operator or prefs.get("operator", self.operator_name),
-                                        prefs.get("egg_count", min(self.target_egg_count, batch["initial_egg_count"])))
-        self._jobs.submit(load, restored, lambda error: self._log("[BATCH] " + error))
+            self._apply_operator_state(operator_state)
+            if isinstance(batch, dict) and getattr(self, "_batch_setup_window", None) is None:
+                self._apply_batch_selection(batch, self.operator_name,
+                    prefs.get("egg_count", min(100000, batch["initial_egg_count"])))
+            if isinstance(operator_state, dict) and self._startup_guided_setup and not self.simulation:
+                if not self._batch_record_ready or not self.operator_id:
+                    self.after(0, self.open_batch_setup_dialog)
+                self.refresh_registered_operators()
+        self._jobs.submit(load, restored, lambda error: self._log("[SETUP] " + error))
 
 
     @_building_dialog

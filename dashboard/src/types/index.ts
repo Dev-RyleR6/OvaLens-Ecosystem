@@ -55,6 +55,7 @@ export interface BatchSummary extends Batch {
 }
 
 export interface SessionSummaryItem {
+  operator_id?: string | null;
   session_id: string;
   stage: string;
   operator_name: string;
@@ -157,6 +158,7 @@ export interface BatchForecastResponse {
 }
 
 export interface CandlingSession {
+  operator_id?: string | null;
   session_id: string;
   batch_id: string;
   device_id: string;

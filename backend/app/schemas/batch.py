@@ -18,7 +18,8 @@ class EdgeBatchRegister(BatchCreate):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
     batch_id: str = Field(..., min_length=1, max_length=64)
     device_id: str = Field(..., min_length=1, max_length=64)
-    operator_name: str = Field(..., min_length=1, max_length=100)
+    operator_name: str = Field(..., min_length=1, max_length=128)
+    operator_id: Optional[UUID] = None
     initial_egg_count: int = Field(..., gt=0, le=1000000, strict=True)
     notes: Optional[str] = Field(None, max_length=2000)
 
@@ -113,6 +114,7 @@ class SessionSummaryItem(BaseModel):
     session_id: UUID
     stage: str
     operator_name: str
+    operator_id: Optional[UUID] = None
     started_at: datetime
     ended_at: Optional[datetime] = None
     duration_seconds: Optional[float] = None

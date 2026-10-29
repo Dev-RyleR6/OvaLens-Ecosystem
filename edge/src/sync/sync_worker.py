@@ -143,7 +143,7 @@ class BackgroundSyncWorker:
             self.db.mark_batch_attempt(batch_id)
             blocked = None
             try:
-                payload = {key: batch[key] for key in (*BATCH_FIELDS, "device_id", "operator_name")}
+                payload = {key: batch[key] for key in (*BATCH_FIELDS, "device_id", "operator_name", "operator_id")}
                 response = requests.post(f"{self.api_base_url}/api/v1/batches/register", json=payload,
                     headers={"X-API-Key": self.api_key}, timeout=4.0)
                 if response.status_code == 409:
@@ -188,7 +188,7 @@ class BackgroundSyncWorker:
                 self._is_online = False
                 return
             payload = {key: session[key] for key in (
-                "session_id", "batch_id", "device_id", "stage", "operator_name", "started_at")}
+                "session_id", "batch_id", "device_id", "stage", "operator_name", "operator_id", "started_at")}
             if not self.register_session(payload):
                 return
             self._registered_sessions.add(session_id)
@@ -289,7 +289,7 @@ class BackgroundSyncWorker:
     @staticmethod
     def _session_payload(session):
         return {key: session[key] for key in (
-            "session_id", "batch_id", "device_id", "stage", "operator_name", "started_at")}
+            "session_id", "batch_id", "device_id", "stage", "operator_name", "operator_id", "started_at")}
 
     def _sync_session_ends(self):
         """Replay closed runs, including pre-upgrade runs, after every scan is acknowledged."""
@@ -315,7 +315,8 @@ class BackgroundSyncWorker:
                 expected = self._session_payload(session)
                 matches = all(str(body.get(key)) == str(expected[key]) for key in (
                     "session_id", "batch_id", "device_id", "stage", "operator_name"))
-                if (not matches or type(body.get("total_scanned")) is not int
+                if (not matches or (session.get("operator_id") and str(body.get("operator_id")) != session["operator_id"])
+                        or type(body.get("total_scanned")) is not int
                         or body["total_scanned"] != session["total_scanned"]
                         or datetime.fromisoformat(body.get("ended_at") or "") != datetime.fromisoformat(session["ended_at"])):
                     raise ValueError("Session completion acknowledgement does not match local records")
@@ -353,6 +354,16 @@ class BackgroundSyncWorker:
             pass
         return self.db.list_available_batches()
 
+    def fetch_operators(self):
+        """Refresh only on success; network/errors cannot erase the offline roster."""
+        if not self.api_key:
+            raise ValueError("Configure the station API key, then refresh registered staff.")
+        response = requests.get(f"{self.api_base_url}/api/v1/operators",
+                                headers={"X-API-Key": self.api_key}, timeout=4.0)
+        response.raise_for_status()
+        self.db.cache_operators(response.json())
+        return self.db.get_operator_state()
+
     def register_session(self, session_data: Dict[str, Any]) -> bool:
         """Register newly started session with central backend."""
         try:
@@ -368,7 +379,7 @@ class BackgroundSyncWorker:
             resp = requests.post(url, json=session_data, headers=headers, timeout=4.0)
             if resp.status_code in (200, 201):
                 body = resp.json()
-                if all(str(body.get(key)) == str(session_data[key])
+                if (not session_data.get("operator_id") or str(body.get("operator_id")) == str(session_data["operator_id"])) and all(str(body.get(key)) == str(session_data[key])
                        for key in ("session_id", "batch_id", "device_id", "stage", "operator_name")):
                     return True
                 self.last_error = "Session acknowledgement does not match local identity."

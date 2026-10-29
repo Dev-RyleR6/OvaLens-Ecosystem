@@ -159,14 +159,15 @@ updating firmware. See [wiring, calibration and verification](docs/EDGE_THREE_BO
 
 ### 1. Daily Startup Sequence
 
-1. Connect camera 0 and the three ESP32s; power the rig.
-2. Double-click **Start_OvaLens.cmd** in the repository root and enter the batch
-   details. The camera preview starts automatically using remembered controls.
-3. Check the empty conveyor, alignment and gate, then tick the inspection box.
-4. Click **Start sorting** once. The app connects and prepares the saved station
-   in the background. STOP remains available throughout preparation.
-5. Start the backend/dashboard when network reporting is needed. Sorting records
-   scans locally in SQLite and continues through network outages.
+1. Connect the camera and controllers for the explicitly saved rig profile; power the rig.
+2. Double-click **Start_OvaLens.cmd**. The preview and passive software checks start automatically.
+3. If setup opens, select registered staff and choose a saved batch or create one with its actual incubation details. Search by batch code or incubator. The run target defaults to the original egg count (up to 100,000); use **Change quantity** for a smaller run.
+4. Click **Prepare station**, inspect the empty conveyor, alignment and gate, then choose **Confirm & prepare**. Connection and readiness checks run in the background. STOP remains available. A setup opened from the primary action continues directly to this confirmation after saving.
+5. When the station reports Ready, click **Start sorting** separately. Preparation and batch selection never start sorting. The legacy two-board profile retains its preparation path under Tools / Settings.
+
+Register staff in **Dashboard > Users** using an administrator account. Active operators, managers and administrators appear in the station selector; selecting a name records attribution and does not log that person into the dashboard. The station needs its configured API key and one successful backend roster download before its first recorded run. Cached staff and batches remain available offline afterward; **Refresh staff** retries a failed download. The last selected registered operator is remembered independently of the batch. Older typed names require one explicit selection from the roster. Each run retains the selected user ID and original name even after a later account rename or deactivation.
+
+The backend applies the nullable session operator-ID migration automatically on startup. Update/restart it before using the updated station. Existing name-only sessions remain readable. Sorting records scans locally in SQLite and continues through network outages.
 
 ### 2. Conducting a Candling Run
 
@@ -178,7 +179,7 @@ updating firmware. See [wiring, calibration and verification](docs/EDGE_THREE_BO
    stroke before the stepper resumes, then holds its angle through gate exit.
 4. Low confidence or disagreement holds the egg for manual review. Review choices
    appear when needed; STOP halts the station and finalizes local records.
-5. At the target, final totals and **Start next batch** appear on the same screen.
+5. At the target, final totals and **Set up run** appear on the same screen.
    Configure the next batch, inspect the empty conveyor and Start sorting again.
 
 Defaults: camera **0**, **COM5 stepper**, **COM7 servo + IR**, **COM9 light**. Saved

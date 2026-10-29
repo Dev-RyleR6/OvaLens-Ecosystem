@@ -158,7 +158,9 @@ def test_zero_scan_session_finishes_without_fabricating_scans(tmp_path, monkeypa
 
 
 def test_saved_office_selection_uses_actual_backend_batch_id(hidden_ui, tmp_path):
+    from operator_helpers import select_staff
     app, _, _ = preview_app(tmp_path)
+    select_staff(app, "Tester")
     office = {"batch_id": "KAY-SAMPLE-BATCH", "batch_code": "Kay Sample Batch", "breed": "KAYUMANGGI",
         "incubator_id": "INC-1", "initial_egg_count": 1000, "set_date": "2026-01-01T00:00:00+08:00", "notes": None}
     def fetch():
@@ -171,8 +173,8 @@ def test_saved_office_selection_uses_actual_backend_batch_id(hidden_ui, tmp_path
         app.open_batch_setup_dialog()
         dialog = app._batch_setup_window
         pump(app, lambda: dialog.loaded and "KAY-SAMPLE-BATCH" in dialog.records)
-        dialog.mode.set("Existing batch")
-        dialog.change_mode("Existing batch")
+        dialog.mode.set("Choose batch")
+        dialog.change_mode("Choose batch")
         dialog.choose("Kay Sample Batch")
         app._animate_modal_close = lambda modal: modal.destroy()
         dialog.save.invoke()

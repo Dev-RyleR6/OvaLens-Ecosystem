@@ -11,6 +11,7 @@ from sqlalchemy.engine import Engine
 def run_migrations(engine: Engine) -> None:
     """Run idempotent schema updates on startup."""
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        conn.execute(text("ALTER TABLE candling_sessions ADD COLUMN IF NOT EXISTS operator_id UUID REFERENCES users(user_id) ON DELETE SET NULL;"))
         # 1. Update routingaction enum to include MANUAL_REVIEW if not present
         try:
             conn.execute(text("ALTER TYPE routingaction ADD VALUE IF NOT EXISTS 'MANUAL_REVIEW';"))

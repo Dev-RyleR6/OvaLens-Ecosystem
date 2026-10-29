@@ -41,7 +41,7 @@ def main():
     print("=" * 65)
     device_id = os.getenv("DEVICE_ID", "STATION-01-RP5")
     db = LocalDatabaseManager()
-    config = show_startup_config(device_id=device_id, operator_name=db.get_batch_preferences().get("operator", ""))
+    config = show_startup_config(device_id=device_id)
     if config is None:
         print("[EXIT] Startup cancelled.")
         return

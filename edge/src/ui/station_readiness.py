@@ -127,7 +127,7 @@ class ReadinessFlow:
         if not self.setup_inspected.get():
             self.setup_notice.configure(text="Confirm the conveyor is empty, aligned and the gate checked.")
             return
-        if self.station.settings.rig_profile != "three_v3":
+        if self.station.settings.rig_profile not in {"three_v3", "unified_v4"}:
             self.setup_notice.configure(text="Prepare the saved two-board profile in Tools / Settings.")
             return
         from ..core.operator_flow import validate_batch_config
@@ -180,11 +180,18 @@ class ReadinessFlow:
                 self.iot_status_badge.configure(text="SORTER: READY", text_color=FUTheme.FERTILE_GREEN_TEXT)
             self.refresh_readiness(force=True)
             self._set_session_active_state(self.is_session_active)
+        operator_id = getattr(self, "operator_id", None)
+        batch_id, target = self.current_batch_id, self.target_egg_count
         def work():
+            if hasattr(self, "operator_id") and (not operator_id or not self.db.get_operator(operator_id)):
+                raise ValueError("Choose an active registered operator; refresh staff in run setup.")
             if start:
-                return self.station.readiness.start(*args, request["cancel"])
+                if self.station.settings.rig_profile == "dual_v2":
+                    return self.station.start_cycle(*args, **({"operator_id": operator_id} if operator_id else {}))
+                return self.station.readiness.start(*args, request["cancel"],
+                    **({"operator_id": operator_id} if operator_id else {}))
             return self.station.readiness.prepare(True, request["cancel"], progress,
-                                                 batch_id=self.current_batch_id, target=self.target_egg_count)
+                                                 batch_id=batch_id, target=target)
         try:
             self._jobs.submit(work, finish, lambda error: finish(error=error))
         except (queue.Full, RuntimeError) as exc:

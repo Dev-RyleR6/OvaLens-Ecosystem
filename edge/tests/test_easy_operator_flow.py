@@ -135,6 +135,7 @@ def test_saved_dual_profile_requires_advanced_preparation(tmp_path):
     app.station.start_cycle.assert_not_called()
     app.station.calibrated = True
     app.toggle_auto_session()
+    app._jobs.finish()
     app.station.start_cycle.assert_called_once()
     app.station.prepare_for_sorting.assert_not_called()
 

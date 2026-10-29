@@ -10,6 +10,7 @@ from app.models.batch import BatchModel, BatchStage, BatchStatus
 from app.schemas.session import SessionCreate, SessionEnd, SessionResponse
 from app.api.deps import verify_api_key, get_current_user
 from app.core.exceptions import OvaLensAPIException
+from app.models.user import UserModel
 
 router = APIRouter(prefix="/sessions", tags=["Candling Sessions"])
 
@@ -45,12 +46,16 @@ def create_session(
     if existing:
         return existing
 
+    if payload.operator_id is not None and db.get(UserModel, payload.operator_id) is None:
+        raise OvaLensAPIException("Registered operator was not found.", 422, "INVALID_OPERATOR")
+
     session = CandlingSessionModel(
         session_id=payload.session_id,
         batch_id=payload.batch_id,
         device_id=payload.device_id,
         stage=payload.stage,
         operator_name=payload.operator_name,
+        operator_id=payload.operator_id,
         started_at=payload.started_at
     )
     # Update batch current stage

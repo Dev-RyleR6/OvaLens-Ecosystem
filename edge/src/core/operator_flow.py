@@ -19,8 +19,8 @@ def validate_batch_config(batch_id, operator, quantity, stage):
     batch_id, operator = str(batch_id).strip(), str(operator).strip()
     if not batch_id or len(batch_id) > 100:
         raise ValueError("Batch code must contain 1 to 100 characters.")
-    if not operator or len(operator) > 100:
-        raise ValueError("Operator name must contain 1 to 100 characters.")
+    if not operator or len(operator) > 128:
+        raise ValueError("Operator name must contain 1 to 128 characters.")
     try:
         count = int(quantity)
     except (ValueError, TypeError):

@@ -21,15 +21,9 @@ class StartupConfigWindow(ctk.CTk):
                      text_color=T.TEXT_PRIMARY).pack(anchor="w", padx=20, pady=(20, 4))
         ctk.CTkLabel(body, text=f"Foundation University · Station {device_id}",
                      font=(T.FONT_FAMILY, 12), text_color=T.TEXT_MUTED).pack(anchor="w", padx=20)
-        ctk.CTkLabel(body, text="Operator name", text_color=T.TEXT_PRIMARY,
-                     font=(T.FONT_FAMILY, 12, "bold")).pack(anchor="w", padx=20, pady=(20, 4))
-        self._operator_entry = ctk.CTkEntry(body, height=36, text_color=T.TEXT_PRIMARY,
-                                           fg_color=T.PANEL_LIGHT_ALT)
-        self._operator_entry.insert(0, operator_name)
-        self._operator_entry.pack(fill="x", padx=20)
         ctk.CTkLabel(body, text="Choose a saved batch or create one in Batch setup.\n"
                      "Batch details and scans save locally, including while offline.\n"
-                     "Prepare the empty conveyor, then Start sorting.", wraplength=520,
+                     "Select registered staff in run setup, confirm inspection, then prepare.", wraplength=520,
                      justify="left", text_color=T.TEXT_SECONDARY,
                      font=(T.FONT_FAMILY, 13)).pack(anchor="w", padx=20, pady=(16, 8))
         ctk.CTkCheckBox(body, text="Simulation preview only", variable=self._simulation_var,
@@ -44,12 +38,7 @@ class StartupConfigWindow(ctk.CTk):
                        hover_color=T.HOVER_MAROON, text_color=T.TEXT_WHITE, height=38).pack(side="right")
 
     def _on_start(self):
-        operator = self._operator_entry.get().strip()
-        if not operator or len(operator) > 100:
-            self._status_label.configure(text="Enter an operator name (1–100 characters).")
-            return
-        self.result = {"operator": operator, "stage": "DAY_10",
-                       "simulation": self._simulation_var.get(), "fullscreen": True}
+        self.result = {"stage": "DAY_10", "simulation": self._simulation_var.get(), "fullscreen": True}
         self.destroy()
 
     def _on_cancel(self):

@@ -19,6 +19,7 @@ class CandlingSessionModel(Base):
     device_id = Column(String(64), ForeignKey("devices.device_id", ondelete="RESTRICT"), nullable=False)
     stage = Column(Enum(CandlingStage), nullable=False)
     operator_name = Column(String(128), nullable=False)
+    operator_id = Column(PGUUID(as_uuid=True), ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     started_at = Column(DateTime(timezone=True), nullable=False)
     ended_at = Column(DateTime(timezone=True), nullable=True)
     total_scanned = Column(Integer, nullable=False, default=0)
