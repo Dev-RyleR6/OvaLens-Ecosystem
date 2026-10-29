@@ -5,6 +5,51 @@ from app.main import app
 client = TestClient(app)
 
 
+@pytest.mark.parametrize("end,count,seconds,rate", [
+    ("2026-10-29T08:10:00+08:00", 120, 600, 12),
+    ("2026-10-29T00:00:00.500+00:00", 1, .5, 120),
+    ("2026-10-29T00:00:00+00:00", 1, 0, None),
+    ("2026-10-29T00:10:00+00:00", 0, 600, 0),
+    (None, 120, None, None), ("bad", 120, None, None),
+    ("2026-10-28T23:59:00+00:00", 120, None, None),
+    ("2026-10-29T00:10:00", 120, None, None),
+])
+def test_session_metric_boundaries(end, count, seconds, rate):
+    from app.core.session_metrics import session_metrics
+    assert session_metrics("2026-10-29T00:00:00+00:00", end, count) == {
+        "duration_seconds": seconds, "eggs_per_minute": rate}
+
+
+def test_session_throughput_survives_duplicate_upload_and_completion(image_scan):
+    from datetime import datetime, timedelta
+    from uuid import uuid4
+
+    _, headers, _, payload = image_scan
+    scan = payload["scans"][0]
+    session_id = scan["session_id"]
+    url = f"/api/v1/sessions/{session_id}"
+    assert client.get(url).json()["duration_seconds"] is None
+    more = [{**scan, "scan_id": str(uuid4()), "sequence_number": index + 2} for index in range(119)]
+    for _ in range(2):
+        assert client.post("/api/v1/scans/sync", headers=headers, json={"scans": more}).status_code == 200
+    start = datetime.fromisoformat(client.get(url).json()["started_at"])
+    for _ in range(2):
+        response = client.put(url + "/end", headers=headers, json={"ended_at": (start + timedelta(seconds=600)).isoformat()})
+        assert response.status_code == 200
+        assert response.json()["total_scanned"] == 120
+        assert response.json()["duration_seconds"] == 600
+        assert response.json()["eggs_per_minute"] == 12
+    listed = client.get("/api/v1/sessions", params={"batch_id": scan["batch_id"], "limit": 200}).json()
+    assert next(item for item in listed if item["session_id"] == session_id)["eggs_per_minute"] == 12
+    analytics = client.get(f"/api/v1/batches/{scan['batch_id']}/analytics").json()
+    summary = next(item for item in analytics["sessions"] if item["session_id"] == session_id)
+    assert summary["duration_seconds"] == 600 and summary["eggs_per_minute"] == 12
+    for invalid in ((start - timedelta(seconds=1)).isoformat(), start.replace(tzinfo=None).isoformat()):
+        rejected = client.put(url + "/end", headers=headers, json={"ended_at": invalid})
+        assert rejected.status_code == 422 and rejected.json()["error"] == "INVALID_SESSION_END"
+        assert client.get(url).json()["duration_seconds"] == 600
+
+
 @pytest.fixture
 def image_scan(tmp_path, monkeypatch):
     from datetime import datetime, timezone

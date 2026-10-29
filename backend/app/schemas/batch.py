@@ -108,10 +108,15 @@ class FinalizeHatchPayload(BaseModel):
 
 
 class SessionSummaryItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     session_id: UUID
     stage: str
     operator_name: str
     started_at: datetime
+    ended_at: Optional[datetime] = None
+    duration_seconds: Optional[float] = None
+    eggs_per_minute: Optional[float] = None
     total_scanned: int
     fertile_count: int
     infertile_count: int

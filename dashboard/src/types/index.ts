@@ -59,6 +59,9 @@ export interface SessionSummaryItem {
   stage: string;
   operator_name: string;
   started_at: string;
+  ended_at?: string | null;
+  duration_seconds: number | null;
+  eggs_per_minute: number | null;
   total_scanned: number;
   fertile_count: number;
   infertile_count: number;
@@ -160,7 +163,9 @@ export interface CandlingSession {
   stage: 'DAY_10';
   operator_name: string;
   started_at: string;
-  ended_at?: string;
+  ended_at?: string | null;
+  duration_seconds: number | null;
+  eggs_per_minute: number | null;
   total_scanned: number;
   fertile_count: number;
   infertile_count: number;

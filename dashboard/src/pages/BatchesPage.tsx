@@ -20,6 +20,7 @@ import {
 import { apiClient } from '../api/client';
 import { BatchSummary, DuckBreed, BatchStage, CandlingSession } from '../types';
 import { ActionsMenu } from '../components/ActionsMenu';
+import { SessionThroughput } from '../components/SessionThroughput';
 import { BatchIncubationStatus } from '../components/BatchIncubationStatus';
 import { BatchProgressTimeline } from '../components/BatchProgressTimeline';
 import { Dialog } from '../components/ui/dialog';
@@ -44,6 +45,7 @@ export const BatchesPage: React.FC = () => {
   const [actionError, setActionError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [sessionError, setSessionError] = useState(false);
+  const [isSessionLoading, setIsSessionLoading] = useState(false);
   const [batches, setBatches] = useState<BatchSummary[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
@@ -115,6 +117,9 @@ export const BatchesPage: React.FC = () => {
   const selectedBatchId = selectedBatch?.batch_id;
   useEffect(() => {
     if (!isDrawerOpen || !selectedBatchId) return;
+    setBatchSessions([]);
+    setSessionError(false);
+    setIsSessionLoading(true);
     let active = true, busy = false;
     const refreshSessions = async () => {
       if (busy) return;
@@ -124,7 +129,7 @@ export const BatchesPage: React.FC = () => {
         if (active) { setBatchSessions(sessions); setSessionError(false); }
       } catch {
         if (active) setSessionError(true);
-      } finally { busy = false; }
+      } finally { busy = false; if (active) setIsSessionLoading(false); }
     };
     void refreshSessions();
     const timer = pollingInterval > 0 ? setInterval(() => { void refreshSessions(); }, pollingInterval * 1000) : undefined;
@@ -823,7 +828,7 @@ export const BatchesPage: React.FC = () => {
                 <span className="text-[10px] font-semibold text-slate-500">{batchSessions.length} recorded</span>
               </div>
 
-              {batchSessions.length > 0 ? (
+              {isSessionLoading ? <p role="status" className="text-sm text-muted-foreground">Loading saved runs…</p> : batchSessions.length > 0 ? (
                 <div className="space-y-2">
                   {batchSessions.map((s) => (
                     <div key={s.session_id} className="p-2.5 bg-card rounded-lg border border-slate-200 space-y-1.5 ">
@@ -831,7 +836,7 @@ export const BatchesPage: React.FC = () => {
                         <span className="font-bold text-foreground">{s.stage} Candling Run · {s.ended_at ? 'Finished' : 'In progress'}</span>
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded">
                           <Zap aria-hidden="true" className="w-3 h-3 text-emerald-600" />
-                          {s.total_scanned} eggs candled
+                          {s.total_scanned} scans recorded
                         </span>
                       </div>
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
@@ -843,11 +848,12 @@ export const BatchesPage: React.FC = () => {
                           {s.fertile_count} / {s.total_scanned} Fertile ({s.avg_inference_ms.toFixed(1)}ms)
                         </span>
                       </div>
+                      <SessionThroughput session={s} />
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-[11px] text-slate-400 italic">No candling sessions logged yet for this batch.</p>
+                <p className="text-sm text-muted-foreground">{sessionError ? 'Saved runs are unavailable. Close and reopen this batch to retry.' : 'No candling sessions logged yet for this batch.'}</p>
               )}
             </div>
 

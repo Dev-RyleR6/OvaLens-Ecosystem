@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-SESSION-THROUGHPUT-01**: Derive saved candling run duration and throughput, show Edge/dashboard summaries, and estimate capacity from a selected run with offline replay regression coverage.
+
 - [x] **TASK-NEW-EDGE-PREPUSH-01**: Verify the accumulated feature branch before publishing, align native three-board regression assertions with the 50-degree reject preset and three-second watchdog measured from the latest command, and initialize the native camera test window before shutdown.
 - [ ] **TASK-NEW-EDGE-LIGHT-TEST-01**: Add a simple standalone COM9-only light on/off diagnostic with bounded duration, v3 identity and output confirmation, synchronized serial boot and off/stop cleanup; verify without physical hardware.
 

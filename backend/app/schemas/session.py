@@ -33,4 +33,6 @@ class SessionResponse(BaseModel):
     infertile_count: int
     manual_review_count: int = 0
     avg_inference_ms: float
+    duration_seconds: Optional[float] = None
+    eggs_per_minute: Optional[float] = None
     created_at: datetime

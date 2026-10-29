@@ -11,6 +11,7 @@ from app.models.scan import EggScanModel, FertilityClass
 from app.models.settings import HatcherySettingsModel
 from app.models.audit import AuditLogModel
 from app.services.scan_metrics import scan_totals
+from app.core.session_metrics import session_metrics
 from app.schemas.batch import (
     BatchCreate, BatchUpdate, BatchSummaryResponse,
     BatchAnalyticsResponse, SessionSummaryItem, MilestoneCheckResponse, FinalizeHatchPayload
@@ -273,6 +274,8 @@ class BatchService:
                 stage=s.stage.value,
                 operator_name=s.operator_name,
                 started_at=s.started_at,
+                ended_at=s.ended_at,
+                **session_metrics(s.started_at, s.ended_at, recorded.scanned),
                 total_scanned=recorded.scanned,
                 fertile_count=recorded.fertile,
                 infertile_count=recorded.infertile,

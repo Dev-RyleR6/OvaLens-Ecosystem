@@ -29,6 +29,7 @@ from ..core.inference_worker import InferenceWorker
 from ..core.capture_view import CaptureView
 from ..core.operator_flow import OperatorState, validate_batch_config
 from ..core.operator_cues import cycle_cue
+from ..core.session_metrics import estimate_capacity, format_duration
 from ..core.station import EdgeStation
 from ..iot.serial_driver import ESP32SerialDriver
 from ..db.local_db import LocalDatabaseManager
@@ -1334,7 +1335,7 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
             automatic = station is not None and station.cycle is not None and station.cycle.session_id == session_id
             self._log("[STOPPED] " + ("Local session finalized." if stats else "No pending local session.")
                       + (" Gate passage is timed; inspect the output trays." if automatic else " Physical sorting was not performed."))
-            if self._diagnostics_complete and not self._closing and self.grab_current() is None:
+            if stats and not self._closing and self.grab_current() is None:
                 self.after(0, self.open_batch_completion_modal)
 
         def failed(error):
@@ -2446,26 +2447,57 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
 
     @_building_dialog
     def open_batch_completion_modal(self):
+        """Read persisted evidence off the GUI thread before showing the summary."""
+        session_id = self.current_session_id or getattr(self, "_last_session_id", None)
+        if not session_id or getattr(self, "_summary_loading", False):
+            return
+        self._summary_loading = True
+        generation = self._operation_generation
+
+        def loaded(stats):
+            self._summary_loading = False
+            if self._closing or generation != self._operation_generation:
+                return
+            if stats:
+                self._show_session_summary(stats)
+            else:
+                self._log("[REPORT] No recorded session is available.")
+
+        def failed(error):
+            self._summary_loading = False
+            if not self._closing:
+                self._log(f"[REPORT] Could not load saved run: {error}. Retry the summary.")
+
+        try:
+            self._jobs.submit(lambda: self.db.get_session_stats(session_id), loaded, failed)
+        except (queue.Full, RuntimeError) as exc:
+            failed(str(exc))
+
+    @_building_dialog
+    def _show_session_summary(self, stats):
         """Interactive Batch Completion Report dialog with 1-click local CSV export."""
         dialog = ctk.CTkToplevel(self)
-        dialog.title(f"Batch Complete — {self.current_batch_id}")
-        dialog.geometry("540x580")
+        self._session_summary_window = dialog
+        dialog.title(f"Run summary - {stats['batch_id']}")
+        height = min(740, self.winfo_screenheight() - 80)
+        dialog.geometry(f"540x{height}")
         dialog.configure(fg_color=FUTheme.BG_LIGHT)
         dialog.transient(self)
         dialog.grab_set()
-        self._center_window(dialog, 540, 580)
+        self._center_window(dialog, 540, height)
 
-        card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
+        card = ctk.CTkScrollableFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
         card.pack(fill="both", expand=True, padx=16, pady=16)
 
         # Header with Trophy / Check Icon
         ctk.CTkLabel(
-            card, text="Diagnostic Target Reached",
+            card, text="Run summary",
             font=(FUTheme.FONT_FAMILY, 17, "bold"), text_color=FUTheme.TEXT_PRIMARY
         ).pack(pady=(16, 2))
 
         ctk.CTkLabel(
-            card, text=f"Batch: {self.current_batch_code}  •  Stage: {self.current_stage}  •  Operator: {self.operator_name}",
+            card, text=f"Batch: {stats['batch_id']} / Stage: {stats['stage']} / Operator: {stats['operator_name']}",
+            wraplength=430,
             font=(FUTheme.FONT_FAMILY, 11), text_color=FUTheme.TEXT_MUTED
         ).pack(pady=(0, 14))
 
@@ -2475,39 +2507,69 @@ class OvaLensOperatorApp(ReadinessFlow, ctk.CTk):
         grid.columnconfigure(0, weight=1)
         grid.columnconfigure(1, weight=1)
 
-        pct = (self.fertile_count / max(1, self.fertile_count + self.infertile_count)) * 100.0
-        penoy_salvage_val = self.infertile_count * 14.00
+        pct = (stats['fertile_count'] / max(1, stats['fertile_count'] + stats['infertile_count'])) * 100.0
+        penoy_salvage_val = stats['infertile_count'] * 14.00
 
         # Tile 1: Total Processed
         t1 = ctk.CTkFrame(grid, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         t1.grid(row=0, column=0, padx=4, pady=4, sticky="nsew")
         ctk.CTkLabel(t1, text="SCANS RECORDED", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=10, pady=(6, 0))
-        ctk.CTkLabel(t1, text=f"{self.total_count} Eggs (100%)", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=10, pady=(0, 6))
+        ctk.CTkLabel(t1, text=f"{stats['total_scanned']} scans", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=10, pady=(0, 6))
 
         # Tile 2: Fertile Embryos
         t2 = ctk.CTkFrame(grid, fg_color=FUTheme.FERTILE_GREEN_CARD, corner_radius=8, border_width=1, border_color=FUTheme.FERTILE_GREEN_BORDER)
         t2.grid(row=0, column=1, padx=4, pady=4, sticky="nsew")
         ctk.CTkLabel(t2, text="FERTILE (ACCEPT)", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.FERTILE_GREEN_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
-        ctk.CTkLabel(t2, text=f"{self.fertile_count} ({pct:.1f}%)", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.FERTILE_GREEN_TEXT).pack(anchor="w", padx=10, pady=(0, 6))
+        ctk.CTkLabel(t2, text=f"{stats['fertile_count']} ({pct:.1f}%)", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.FERTILE_GREEN_TEXT).pack(anchor="w", padx=10, pady=(0, 6))
 
         # Tile 3: Penoy Salvage
         t3 = ctk.CTkFrame(grid, fg_color=FUTheme.INFERTILE_AMBER_CARD, corner_radius=8, border_width=1, border_color=FUTheme.INFERTILE_AMBER_BORDER)
         t3.grid(row=1, column=0, padx=4, pady=4, sticky="nsew")
         ctk.CTkLabel(t3, text="PENOY SALVAGE YIELD", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.INFERTILE_AMBER_TEXT).pack(anchor="w", padx=10, pady=(6, 0))
-        ctk.CTkLabel(t3, text=f"{self.infertile_count} eggs -> ₱{penoy_salvage_val:,.2f}", font=(FUTheme.FONT_FAMILY, 14, "bold"), text_color=FUTheme.INFERTILE_AMBER).pack(anchor="w", padx=10, pady=(0, 6))
+        ctk.CTkLabel(t3, text=f"{stats['infertile_count']} eggs -> ₱{penoy_salvage_val:,.2f}", font=(FUTheme.FONT_FAMILY, 14, "bold"), text_color=FUTheme.INFERTILE_AMBER).pack(anchor="w", padx=10, pady=(0, 6))
 
         # Tile 4: Manual review fallback
         t4 = ctk.CTkFrame(grid, fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         t4.grid(row=1, column=1, padx=4, pady=4, sticky="nsew")
         ctk.CTkLabel(t4, text="MANUAL REVIEW", font=(FUTheme.FONT_FAMILY, 9, "bold"), text_color=FUTheme.TEXT_MUTED).pack(anchor="w", padx=10, pady=(6, 0))
-        ctk.CTkLabel(t4, text=f"{self.review_count} Eggs", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=10, pady=(0, 6))
+        ctk.CTkLabel(t4, text=f"{stats['manual_review_count']} Eggs", font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=10, pady=(0, 6))
+
+        seconds, rate = stats["duration_seconds"], stats["eggs_per_minute"]
+        rate_text = "Unavailable" if rate is None else f"{rate:.1f} scans/min"
+        ctk.CTkLabel(card, text=f"Duration: {format_duration(seconds)} / Average: {rate_text}",
+                     font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_PRIMARY).pack(padx=16, pady=(0, 6))
+        ctk.CTkLabel(card, text="Counts include manual-review captures and rescans.\nDiagnostic runs reflect diagnostic pace.",
+                     wraplength=430, text_color=FUTheme.TEXT_MUTED).pack(padx=16, pady=(0, 8))
+        eligible = bool(stats.get("ended_at") and seconds is not None and seconds > 0 and stats["total_scanned"] > 0)
+        if eligible:
+            ctk.CTkLabel(card, text="Estimate for (minutes)", text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=20)
+            minutes = tk.StringVar(master=dialog, value="10")
+            entry = ctk.CTkEntry(card, textvariable=minutes, height=44)
+            entry.pack(fill="x", padx=20, pady=4)
+            estimate_label = ctk.CTkLabel(card, text="", wraplength=430, text_color=FUTheme.TEXT_PRIMARY)
+            estimate_label.pack(fill="x", padx=16, pady=(0, 6))
+            def update_estimate(*_):
+                value = estimate_capacity(stats["total_scanned"], seconds, minutes.get())
+                text = ("Enter a finite number of minutes greater than zero." if value is None else
+                        f"Estimated capacity at this run’s average pace: approximately {value:,} scans.")
+                estimate_label.configure(text=text)
+            minutes.trace_add("write", update_estimate)
+            update_estimate()
+            dialog._capacity_minutes = minutes
+            dialog._capacity_entry = entry
+            dialog._capacity_result = estimate_label
+            ctk.CTkLabel(card, text=f"Based on {stats['total_scanned']} scans in {format_duration(seconds)}.\nEstimates do not control the conveyor.",
+                         wraplength=430, text_color=FUTheme.TEXT_MUTED).pack(padx=16, pady=(0, 8))
+        else:
+            ctk.CTkLabel(card, text="Capacity estimates need a finalized run with positive duration and at least one scan.",
+                         wraplength=430, text_color=FUTheme.TEXT_MUTED).pack(padx=16, pady=(0, 8))
 
         # Export Status Toast
         status_msg = ctk.CTkLabel(card, text="", font=(FUTheme.FONT_FAMILY, 10, "bold"), text_color=FUTheme.FERTILE_GREEN_TEXT)
         status_msg.pack(pady=(0, 6))
 
         def export_csv():
-            session_id = self.current_session_id or getattr(self, "_last_session_id", None)
+            session_id = stats["session_id"]
             if not session_id:
                 status_msg.configure(text="No recorded session to export.")
                 return

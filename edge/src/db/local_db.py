@@ -607,11 +607,15 @@ class LocalDatabaseManager:
             conn.commit()
 
     def get_session_stats(self, session_id: str) -> Dict[str, Any]:
+        from ..core.session_metrics import session_metrics
+
         with self._get_connection() as conn:
             cursor = conn.execute("SELECT * FROM local_sessions WHERE session_id = ?;", (session_id,))
             row = cursor.fetchone()
             if row:
-                return dict(row)
+                stats = dict(row)
+                stats.update(session_metrics(stats["started_at"], stats["ended_at"], stats["total_scanned"]))
+                return stats
             return {}
 
     def get_recent_scans(self, limit: int = 20) -> List[Dict[str, Any]]:

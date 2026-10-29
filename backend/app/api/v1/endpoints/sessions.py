@@ -9,6 +9,7 @@ from app.models.session import CandlingSessionModel, CandlingStage
 from app.models.batch import BatchModel, BatchStage, BatchStatus
 from app.schemas.session import SessionCreate, SessionEnd, SessionResponse
 from app.api.deps import verify_api_key, get_current_user
+from app.core.exceptions import OvaLensAPIException
 
 router = APIRouter(prefix="/sessions", tags=["Candling Sessions"])
 
@@ -84,6 +85,10 @@ def end_session(
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Session '{session_id}' not found.")
 
+    if (payload.ended_at.utcoffset() is None or session.started_at.utcoffset() is None
+            or payload.ended_at < session.started_at):
+        raise OvaLensAPIException("Session end must be timezone-aware and at or after its start.",
+                                  status_code=422, error_code="INVALID_SESSION_END")
     session.ended_at = payload.ended_at
     db.commit()
     db.refresh(session)
