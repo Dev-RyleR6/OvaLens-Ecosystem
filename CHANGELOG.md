@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Dashboard**: center settings and preferences layout across viewports (2026-11-09)
 - **Dashboard**: refine dropdown UI and pagination controls with impeccable design standard (2026-11-09)
 - **Edge**: resolve camera staleness false abort, port locking, and add batch finish button (2026-10-15)
 - **Edge**: [TASK-NEW-EDGE-SERVO-STARTUP-01] synchronize servo diagnostic serial startup (2026-10-14)

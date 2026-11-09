@@ -360,7 +360,7 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl min-w-0 pb-8">
+    <div className="space-y-6 min-w-0 pb-8">
       {/* Page Header */}
       <div className="page-header">
         <div>
