@@ -260,3 +260,43 @@ def test_edge_rejects_removed_classes_and_stages(tmp_path):
         )
 
 
+
+
+def test_edge_telemetry_server_and_heartbeat_payload(tmp_path):
+    """Verify embedded Edge telemetry HTTP server and heartbeat integration."""
+    from src.core.edge_server import EdgeTelemetryServer
+    import urllib.request
+    import json
+
+    test_db_path = str(tmp_path / "test_telemetry.db")
+    db = LocalDatabaseManager(db_path=test_db_path)
+
+    server = EdgeTelemetryServer(
+        device_id="TEST-RIG-01",
+        host="127.0.0.1",
+        port=8099,
+        db=db
+    )
+    try:
+        server.start()
+        telemetry = server.get_telemetry()
+        assert telemetry["device_id"] == "TEST-RIG-01"
+        assert "camera" in telemetry
+        assert "ai_model" in telemetry
+        assert "iot_rig" in telemetry
+
+        # Probe the HTTP server
+        url = f"http://127.0.0.1:{server.port}/api/device"
+        req = urllib.request.urlopen(url, timeout=2.0)
+        assert req.status == 200
+        data = json.loads(req.read().decode("utf-8"))
+        assert data["status"] == "ok"
+        assert data["device"]["device_id"] == "TEST-RIG-01"
+
+        # Check health endpoint
+        health_req = urllib.request.urlopen(f"http://127.0.0.1:{server.port}/health", timeout=2.0)
+        assert health_req.status == 200
+        health_data = json.loads(health_req.read().decode("utf-8"))
+        assert health_data["status"] == "ONLINE"
+    finally:
+        server.stop()

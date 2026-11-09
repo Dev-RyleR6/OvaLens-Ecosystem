@@ -6,7 +6,11 @@ from .theme import FUTheme
 
 
 class StationSettingsWindow(ctk.CTkToplevel):
-    PROFILES = {"Three-board candling rig": "three_v3", "Two-board indexed rig": "dual_v2"}
+    PROFILES = {
+        "Single-board unified rig": "unified_v4",
+        "Three-board candling rig": "three_v3",
+        "Two-board indexed rig": "dual_v2",
+    }
     def __init__(self, app):
         super().__init__(app)
         self.app, self.station = app, app.station
@@ -223,13 +227,27 @@ class StationSettingsWindow(ctk.CTkToplevel):
         self.port_label.configure(text=value)
 
     def _rig_defaults(self):
-        settings = EdgeSettings.three_board() if self.PROFILES[self.profile.get()] == "three_v3" else EdgeSettings()
+        prof = self.PROFILES[self.profile.get()]
+        if prof == "unified_v4":
+            settings = EdgeSettings.unified_board()
+        elif prof == "three_v3":
+            settings = EdgeSettings.three_board()
+        else:
+            settings = EdgeSettings()
         self._fill(settings)
         self.notice.configure(text="Rig defaults loaded into the form. Select ports and confirm the camera, then Apply. Physical calibration is still required.")
 
     def _discover(self):
-        if self.PROFILES[self.profile.get()] != "three_v3":
-            self.notice.configure(text="Select the three-board rig before discovery.")
+        prof = self.PROFILES[self.profile.get()]
+        if prof == "unified_v4":
+            def found_unified(port):
+                self.entries["conveyor_port"].delete(0, "end")
+                self.entries["conveyor_port"].insert(0, port)
+                self.notice.configure(text=f"Unified ESP32 controller identified on {port}. Apply and Connect.")
+            self._job(self.station.discover, found_unified)
+            return
+        if prof != "three_v3":
+            self.notice.configure(text="Select the single-board or three-board rig before discovery.")
             return
         def found(ports):
             for key, role in (("conveyor_port", "CONVEYOR"), ("servo_port", "EGG_CONTROLLER"), ("light_port", "LIGHT_CONTROLLER")):

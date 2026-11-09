@@ -249,7 +249,7 @@ export const ScanExplorerPage: React.FC = () => {
               setClassFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="min-w-0 w-full h-11 px-3 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000]  cursor-pointer hover:border-slate-300 transition-colors"
+            className="min-w-0 w-full h-11 pl-3 pr-9 bg-card border border-border rounded-lg text-foreground font-medium focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 cursor-pointer hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
           >
             <option value="ALL">All Classes</option>
             <option value="FERTILE">Fertile (Accept)</option>
@@ -263,7 +263,7 @@ export const ScanExplorerPage: React.FC = () => {
               setBatchFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="min-w-0 w-full h-11 px-3 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000]  cursor-pointer hover:border-slate-300 transition-colors"
+            className="min-w-0 w-full h-11 pl-3 pr-9 bg-card border border-border rounded-lg text-foreground font-medium focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 cursor-pointer hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
           >
             <option value="ALL">All Batches</option>
             {batches.map((batch) => (
@@ -280,7 +280,7 @@ export const ScanExplorerPage: React.FC = () => {
               setConfidenceFilter(e.target.value as NonNullable<ScanSearchParams['confidence']>);
               setCurrentPage(1);
             }}
-            className="min-w-0 w-full h-11 px-3 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000]  cursor-pointer hover:border-slate-300 transition-colors"
+            className="min-w-0 w-full h-11 pl-3 pr-9 bg-card border border-border rounded-lg text-foreground font-medium focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 cursor-pointer hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
           >
             <option value="ALL">All Confidence Levels</option>
             <option value="HIGH">High Confidence (≥ 90%)</option>
@@ -481,7 +481,7 @@ export const ScanExplorerPage: React.FC = () => {
               setRowsPerPage(Number(e.target.value));
               setCurrentPage(1);
             }}
-            className="h-8 px-2 bg-card border border-slate-200 rounded text-slate-700 focus:outline-none focus:border-[#800000] cursor-pointer"
+            className="select-compact bg-card border border-border rounded-md text-foreground hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/20 transition-colors cursor-pointer"
           >
             <option value={8}>8</option>
             <option value={10}>10</option>

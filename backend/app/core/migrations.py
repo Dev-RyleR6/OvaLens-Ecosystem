@@ -43,7 +43,15 @@ def run_migrations(engine: Engine) -> None:
             "ALTER TABLE egg_scans ADD COLUMN IF NOT EXISTS vascular_index NUMERIC(5, 3);"
         ))
 
-        # 4. Indexes for fast query filtering
+        # 4. Add edge_url and telemetry columns to devices
+        conn.execute(text(
+            "ALTER TABLE devices ADD COLUMN IF NOT EXISTS edge_url VARCHAR(255);"
+        ))
+        conn.execute(text(
+            "ALTER TABLE devices ADD COLUMN IF NOT EXISTS telemetry JSON;"
+        ))
+
+        # 5. Indexes for fast query filtering
         conn.execute(text(
             "CREATE INDEX IF NOT EXISTS idx_scans_routing_action ON egg_scans(routing_action);"
         ))

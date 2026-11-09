@@ -76,7 +76,8 @@ def main():
                                     os.getenv("API_KEY", ""), device_id=device_id,
                                     device_name=os.getenv("DEVICE_NAME", device_id),
                                     hardware_platform=f"{platform.system()} {platform.machine()}",
-                                    model_version=engine.engine_type)
+                                    model_version=engine.engine_type,
+                                    telemetry_provider=getattr(station, "telemetry_server", None).get_telemetry if hasattr(station, "telemetry_server") else None)
         resources.callback(_stop_resource, sync)
         if not config.get("simulation", False):
             sync.start()

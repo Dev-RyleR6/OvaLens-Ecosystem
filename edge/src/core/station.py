@@ -7,6 +7,7 @@ from .sorting_cycle import SortingCycle
 from .operator_flow import validate_batch_config
 from ..iot.dual_board import BoardLink, DualBoardController
 from ..iot.three_board import ThreeBoardController, discover_boards
+from ..iot.unified_board import UnifiedBoardController, discover_unified_board
 from .three_board_cycle import ThreeBoardCycle
 from .readiness import StationReadiness
 
@@ -33,6 +34,12 @@ class EdgeStation:
         self._manual_light_cancel.set()
         self._manual_light_interval = 5.0
         self.readiness = StationReadiness(self)
+        from .edge_server import EdgeTelemetryServer
+        self.telemetry_server = EdgeTelemetryServer(self)
+        try:
+            self.telemetry_server.start()
+        except Exception as exc:
+            print(f"[EDGE SERVER WARNING] Could not start telemetry server: {exc}")
 
     @property
     def light_link(self):
@@ -49,8 +56,8 @@ class EdgeStation:
         with self._lock:
             self.require_idle()
             self._check_setup_cancel(cancel)
-            if self.settings.rig_profile != "three_v3":
-                raise RuntimeError("Manual light requires the three-board v3 light controller")
+            if self.settings.rig_profile not in {"three_v3", "unified_v4"}:
+                raise RuntimeError("Manual light requires the v3 or v4 light controller")
             if self.boards and self.boards.conveyor.snapshot().telemetry.get("BUSY") != "0":
                 raise RuntimeError("Stop the conveyor before switching the light")
             link = self.light_link
@@ -214,7 +221,9 @@ class EdgeStation:
             self.calibrated = False
             if self.boards:
                 self.boards.stop()
-            if self.settings.rig_profile == "three_v3":
+            if self.settings.rig_profile == "unified_v4":
+                self.boards = UnifiedBoardController(self.settings.conveyor_port)
+            elif self.settings.rig_profile == "three_v3":
                 self.boards = ThreeBoardController(self.settings.conveyor_port, self.settings.servo_port, self.settings.light_port)
             else:
                 self.boards = DualBoardController(self.settings.conveyor_port, self.settings.servo_port)
@@ -287,8 +296,8 @@ class EdgeStation:
             try:
                 if self.settings_error:
                     raise RuntimeError(self.settings_error + " Open Tools / Settings to correct it.")
-                if self.settings.rig_profile != "three_v3":
-                    raise RuntimeError("Use Tools / Settings to prepare the saved two-board profile.")
+                if self.settings.rig_profile not in {"three_v3", "unified_v4"}:
+                    raise RuntimeError("Use Tools / Settings to prepare the saved profile.")
                 check()
                 progress("Checking camera and saved settings")
                 settings = EdgeSettings.from_dict(self.settings.snapshot())
@@ -342,7 +351,7 @@ class EdgeStation:
             if not inspected:
                 raise RuntimeError("Confirm the conveyor is empty, aligned and the gate checked.")
             self.release_manual_light()
-            if self.settings.rig_profile != "three_v3" or not self.boards:
+            if self.settings.rig_profile not in {"three_v3", "unified_v4"} or not self.boards:
                 raise RuntimeError("Use defaults & detect first.")
             if self.camera.is_mock_mode or self.camera.last_error or self.camera.snapshot() is None:
                 raise RuntimeError("Check the live camera before preparing the conveyor.")
@@ -388,6 +397,8 @@ class EdgeStation:
             if self.boards:
                 self.boards.stop()
                 self.boards = None
+            if self.settings.rig_profile == "unified_v4":
+                return discover_unified_board()
             return discover_boards()
 
     def command(self, role, text, timeout=5):
@@ -411,8 +422,8 @@ class EdgeStation:
             self.release_manual_light()
             if not inspected:
                 raise RuntimeError("Check the cradle path is clear before connecting for alignment")
-            if self.settings.rig_profile != "three_v3":
-                raise RuntimeError("Camera alignment controls require the three-board v3 rig")
+            if self.settings.rig_profile not in {"three_v3", "unified_v4"}:
+                raise RuntimeError("Camera alignment controls require the v3 or v4 rig")
             if self.settings_error:
                 raise RuntimeError(self.settings_error + " Correct saved settings before alignment.")
             self._check_setup_cancel(cancel)
@@ -519,7 +530,7 @@ class EdgeStation:
             self.settings.validate()
             self.recovery = self.db.load_machine_state(self.device_id)
             self.boards.require_ready()
-            three = self.settings.rig_profile == "three_v3"
+            three = self.settings.rig_profile in {"three_v3", "unified_v4"}
             sensor = self.boards.servo.snapshot().telemetry.get("SENSOR") if three else self.boards.conveyor.snapshot().telemetry.get("IR_ACTIVE")
             if sensor != "0":
                 raise RuntimeError("Clear the chamber IR beam before validating the next holder")
@@ -565,7 +576,7 @@ class EdgeStation:
             if not getattr(self.inference.engine, "model_contract_verified", False):
                 raise RuntimeError("Verify ONNX dimensions and two-class metadata before sorting")
             self.boards.require_ready()
-            kind = ThreeBoardCycle if self.settings.rig_profile == "three_v3" else SortingCycle
+            kind = ThreeBoardCycle if self.settings.rig_profile in {"three_v3", "unified_v4"} else SortingCycle
             self.cycle = kind(self.boards, self.camera, self.inference, self.db, self.settings,
                 self.device_id, str(uuid.uuid4()), batch_id, target, operator)
             self.calibrated = False  # Every batch starts from an inspected reference.
@@ -586,6 +597,11 @@ class EdgeStation:
             self.boards.halt()
 
     def stop(self):
+        if hasattr(self, "telemetry_server") and self.telemetry_server:
+            try:
+                self.telemetry_server.stop()
+            except Exception:
+                pass
         self.halt()
         if self._manual_light_link:
             self._manual_light_link.stop()

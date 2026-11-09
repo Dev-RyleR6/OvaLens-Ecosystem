@@ -400,7 +400,7 @@ export const BatchesPage: React.FC = () => {
                 setBreedFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full min-w-0 h-11 pl-3 pr-8 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none"
+              className="w-full min-w-0 h-11 pl-3 pr-8 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none no-bg-chevron"
             >
               <option value="ALL">All Duck Breeds</option>
               <option value="KAYUMANGGI">IP-Kayumanggi</option>
@@ -417,7 +417,7 @@ export const BatchesPage: React.FC = () => {
                 setStageFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full min-w-0 h-11 pl-3 pr-8 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none"
+              className="w-full min-w-0 h-11 pl-3 pr-8 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none no-bg-chevron"
             >
               <option value="ALL">All Incubation Stages</option>
               <option value="SETTING">Setting (Day 0-9)</option>
@@ -435,7 +435,7 @@ export const BatchesPage: React.FC = () => {
                 setStatusFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full min-w-0 h-11 pl-3 pr-8 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none"
+              className="w-full min-w-0 h-11 pl-3 pr-8 bg-card border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#800000] focus:ring-2 focus:ring-[#800000]/10  cursor-pointer appearance-none no-bg-chevron"
             >
               <option value="ALL">All Statuses</option>
               <option value="INCUBATING">Incubating</option>
@@ -630,7 +630,7 @@ export const BatchesPage: React.FC = () => {
               setRowsPerPage(Number(e.target.value));
               setCurrentPage(1);
             }}
-            className="h-7 px-2 bg-card border border-slate-200 rounded text-slate-700 font-medium focus:outline-none"
+            className="select-compact bg-card border border-border rounded-md text-foreground hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/20 transition-colors cursor-pointer"
           >
             <option value={5}>5</option>
             <option value={10}>10</option>
@@ -686,7 +686,7 @@ export const BatchesPage: React.FC = () => {
               <select id="batchespage-field-2"
                 value={breed}
                 onChange={(e) => setBreed(e.target.value as DuckBreed)}
-                className="w-full min-w-0 h-11 px-3 text-xs bg-card border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-[#800000]"
+                className="w-full min-w-0 h-11 pl-3 pr-9 text-xs bg-card border border-border rounded-lg text-foreground font-medium focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 hover:border-slate-400 transition-colors cursor-pointer"
               >
                 <option value="KAYUMANGGI">IP-Kayumanggi</option>
                 <option value="ITIM">IP-Itim</option>

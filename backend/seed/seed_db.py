@@ -124,7 +124,19 @@ def seed_database(reset: bool = False):
                 last_heartbeat=datetime.now(timezone.utc),
                 conveyor_speed_cm_s=12.50,
                 conveyor_dist_cm=25.00,
-                servo_pulse_ms=250
+                servo_pulse_ms=250,
+                edge_url="http://127.0.0.1:8008",
+                telemetry={
+                    "hostname": "OvaLens-Edge-RP5",
+                    "ip_address": "192.168.1.120",
+                    "hardware_platform": "Raspberry Pi 5 (8GB)",
+                    "camera": {"index": 0, "identity": "Camera #0 (DirectShow)", "resolution": "1280x720", "fps": 30, "is_mock": False, "status": "Connected"},
+                    "ai_model": {"engine_type": "ONNX Runtime FP16", "model_version": "best_v3.onnx", "sort_confidence": 0.70, "iou_threshold": 0.45},
+                    "iot_rig": {"rig_profile": "unified_v4", "conveyor_port": "COM5", "servo_port": "COM7", "light_port": "COM9", "is_connected": True, "stepper_speed_us": 3000, "settle_ms": 1500, "fertile_angle": 180, "infertile_angle": 50, "neutral_angle": 90},
+                    "storage": {"unsynced_scans": 0, "mode": "SQLite WAL"},
+                    "active_batch_code": "BATCH-2026-08-KAY-01",
+                    "status": "ONLINE"
+                }
             )
             db.add(d1)
             print("  + Created Station: STATION-01-RP5")

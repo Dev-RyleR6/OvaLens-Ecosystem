@@ -219,6 +219,54 @@ export interface ScanSearchParams {
   offset?: number;
 }
 
+export interface DeviceTelemetry {
+  hostname?: string;
+  ip_address?: string;
+  edge_url?: string;
+  hardware_platform?: string;
+  os_version?: string;
+  python_version?: string;
+  status?: string;
+  uptime_seconds?: number;
+  camera?: {
+    index: number;
+    identity: string;
+    resolution: string;
+    fps: number;
+    is_mock: boolean;
+    status: string;
+  };
+  ai_model?: {
+    engine_type: string;
+    model_version: string;
+    confidence_threshold: number;
+    sort_confidence: number;
+    iou_threshold: number;
+    warmup_complete?: boolean;
+  };
+  iot_rig?: {
+    rig_profile: string;
+    conveyor_port: string;
+    servo_port: string;
+    light_port: string;
+    is_connected: boolean;
+    ports_status?: Record<string, string>;
+    stepper_speed_us?: number;
+    settle_ms?: number;
+    hold_ms?: number;
+    fertile_angle?: number;
+    infertile_angle?: number;
+    neutral_angle?: number;
+  };
+  storage?: {
+    unsynced_scans: number;
+    mode: string;
+  };
+  active_batch_code?: string;
+  active_operator?: string;
+  timestamp?: number;
+}
+
 export interface Device {
   device_id: string;
   device_name: string;
@@ -230,6 +278,8 @@ export interface Device {
   conveyor_speed_cm_s: number;
   conveyor_dist_cm: number;
   servo_pulse_ms: number;
+  edge_url?: string;
+  telemetry?: DeviceTelemetry;
   created_at: string;
 }
 

@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, DateTime, Enum, Numeric, Integer
+from sqlalchemy import Column, String, DateTime, Enum, Numeric, Integer, JSON
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -25,6 +25,8 @@ class DeviceModel(Base):
     conveyor_speed_cm_s = Column(Numeric(5, 2), nullable=False, default=10.00)
     conveyor_dist_cm = Column(Numeric(5, 2), nullable=False, default=25.00)
     servo_pulse_ms = Column(Integer, nullable=False, default=250)
+    edge_url = Column(String(255), nullable=True)
+    telemetry = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     sessions = relationship("CandlingSessionModel", back_populates="device")

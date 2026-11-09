@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 from app.models.device import DeviceStatus
 
@@ -9,6 +9,9 @@ class DeviceRegister(BaseModel):
     device_name: str = Field(..., max_length=128)
     hardware_platform: str = "Raspberry Pi 5"
     model_version: str = "yolov8n-onnx-v1.0"
+    ip_address: Optional[str] = None
+    edge_url: Optional[str] = None
+    telemetry: Optional[Dict[str, Any]] = None
     conveyor_speed_cm_s: float = 10.00
     conveyor_dist_cm: float = 25.00
     servo_pulse_ms: int = 250
@@ -17,6 +20,10 @@ class DeviceRegister(BaseModel):
 class DeviceHeartbeat(BaseModel):
     ip_address: Optional[str] = None
     status: DeviceStatus = DeviceStatus.ONLINE
+    edge_url: Optional[str] = None
+    hardware_platform: Optional[str] = None
+    model_version: Optional[str] = None
+    telemetry: Optional[Dict[str, Any]] = None
 
 
 class DeviceCalibrationUpdate(BaseModel):
@@ -40,4 +47,6 @@ class DeviceResponse(BaseModel):
     conveyor_speed_cm_s: float
     conveyor_dist_cm: float
     servo_pulse_ms: int
+    edge_url: Optional[str] = None
+    telemetry: Optional[Dict[str, Any]] = None
     created_at: datetime

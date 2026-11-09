@@ -23,11 +23,13 @@ class BackgroundSyncWorker:
     def __init__(self, db_manager: LocalDatabaseManager, api_base_url: str = "http://localhost:8000",
                  api_key: Optional[str] = None, sync_interval_s: float = 3.0,
                  device_id: Optional[str] = None, device_name: Optional[str] = None,
-                 hardware_platform: str = "Edge workstation", model_version: str = "unknown"):
+                 hardware_platform: str = "Edge workstation", model_version: str = "unknown",
+                 telemetry_provider: Optional[Any] = None):
         self.db = db_manager
         self.api_base_url = api_base_url.rstrip("/")
         self.api_key = api_key or os.getenv("API_KEY", "")
         self.sync_interval = sync_interval_s
+        self.telemetry_provider = telemetry_provider
 
         self._is_running = False
         self._thread: Optional[threading.Thread] = None
@@ -72,16 +74,37 @@ class BackgroundSyncWorker:
             return
         headers = {"X-API-Key": self.api_key}
         url = f"{self.api_base_url}/api/v1/devices/{quote(self.device_id, safe='')}/heartbeat"
+        telemetry = {}
+        if self.telemetry_provider:
+            try:
+                telemetry = self.telemetry_provider() or {}
+            except Exception:
+                pass
+        ip_addr = telemetry.get("ip_address")
+        edge_url = telemetry.get("edge_url")
+        hardware = telemetry.get("hardware_platform", self.hardware_platform)
+        model = telemetry.get("model_version", self.model_version)
+        status = telemetry.get("status", self.device_status)
+
+        payload = {
+            "status": status,
+            "ip_address": ip_addr,
+            "edge_url": edge_url,
+            "hardware_platform": hardware,
+            "model_version": model,
+            "telemetry": telemetry,
+        }
         try:
-            response = requests.post(url, json={"status": self.device_status}, headers=headers, timeout=3.0)
+            response = requests.post(url, json=payload, headers=headers, timeout=3.0)
             if response.status_code == 404:
                 # Register only unknown devices; never overwrite saved calibration on restart.
                 registration = requests.post(f"{self.api_base_url}/api/v1/devices/register", json={
                     "device_id": self.device_id, "device_name": self.device_name,
-                    "hardware_platform": self.hardware_platform, "model_version": self.model_version,
+                    "hardware_platform": hardware, "model_version": model,
+                    "ip_address": ip_addr, "edge_url": edge_url, "telemetry": telemetry,
                 }, headers=headers, timeout=3.0)
                 registration.raise_for_status()
-                response = requests.post(url, json={"status": self.device_status}, headers=headers, timeout=3.0)
+                response = requests.post(url, json=payload, headers=headers, timeout=3.0)
             response.raise_for_status()
             self.heartbeat_error = None
         except requests.RequestException as exc:

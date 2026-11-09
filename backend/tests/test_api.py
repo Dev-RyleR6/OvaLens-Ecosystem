@@ -1078,3 +1078,64 @@ def test_scan_override_persists_is_overridden_and_reason():
             db.query(EggScanModel).filter(EggScanModel.scan_id == scan_id).delete()
             db.query(CandlingSessionModel).filter(CandlingSessionModel.session_id == test_session_id).delete()
             db.commit()
+
+
+def test_real_edge_device_telemetry_and_live_probe():
+    from uuid import uuid4
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.models.device import DeviceModel
+
+    device_id = f"TEST-EDGE-{uuid4()}"
+    headers = {"X-API-Key": settings.API_KEY}
+    login = client.post("/api/v1/auth/login", json={"email": "admin@ovalens.fu.edu.ph", "password": "Admin@123"})
+    auth_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    sample_telemetry = {
+        "hostname": "OvaLens-Rig-01",
+        "ip_address": "192.168.1.50",
+        "camera": {"index": 0, "identity": "USB Camera DirectShow", "resolution": "1280x720", "fps": 30, "is_mock": False},
+        "ai_model": {"engine_type": "ONNX Runtime FP16", "model_version": "best_v3.onnx", "sort_confidence": 0.70},
+        "iot_rig": {"rig_profile": "unified_v4", "conveyor_port": "COM5", "servo_port": "COM7", "light_port": "COM9"},
+        "storage": {"unsynced_scans": 0, "mode": "SQLite WAL"},
+    }
+
+    try:
+        reg = client.post("/api/v1/devices/register", headers=headers, json={
+            "device_id": device_id,
+            "device_name": "Real Edge Station Rig",
+            "hardware_platform": "Windows 11 AMD64",
+            "model_version": "best_v3.onnx",
+            "ip_address": "192.168.1.50",
+            "edge_url": "http://192.168.1.50:8008",
+            "telemetry": sample_telemetry,
+        })
+        assert reg.status_code == 200
+        assert reg.json()["telemetry"]["hostname"] == "OvaLens-Rig-01"
+
+        # Update heartbeat with live status and updated telemetry
+        updated_telemetry = {**sample_telemetry, "storage": {"unsynced_scans": 2, "mode": "SQLite WAL"}}
+        hb = client.post(f"/api/v1/devices/{device_id}/heartbeat", headers=headers, json={
+            "status": "SCANNING",
+            "ip_address": "192.168.1.50",
+            "edge_url": "http://192.168.1.50:8008",
+            "telemetry": updated_telemetry,
+        })
+        assert hb.status_code == 200
+        assert hb.json()["status"] == "SCANNING"
+        assert hb.json()["telemetry"]["storage"]["unsynced_scans"] == 2
+
+        # Check authenticated GET /api/v1/devices/{device_id}
+        dev = client.get(f"/api/v1/devices/{device_id}", headers=auth_headers)
+        assert dev.status_code == 200
+        assert dev.json()["telemetry"]["iot_rig"]["rig_profile"] == "unified_v4"
+
+        # Check GET /api/v1/devices/{device_id}/live
+        live = client.get(f"/api/v1/devices/{device_id}/live", headers=auth_headers)
+        assert live.status_code == 200
+        assert live.json()["device_id"] == device_id
+        assert live.json()["telemetry"]["hostname"] == "OvaLens-Rig-01"
+    finally:
+        with SessionLocal() as db:
+            db.query(DeviceModel).filter(DeviceModel.device_id == device_id).delete()
+            db.commit()

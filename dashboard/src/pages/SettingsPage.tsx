@@ -898,7 +898,7 @@ export const SettingsPage: React.FC = () => {
               <select id="settingspage-field-9"
                 value={pollingInterval}
                 onChange={(e) => setPollingInterval(Number(e.target.value))}
-                className="w-full sm:w-72 text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
+                className="w-full sm:w-72 text-sm pl-3 pr-9 py-2.5 border border-border rounded-lg bg-card text-foreground font-medium hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors cursor-pointer"
               >
                 <option value={5}>5 seconds (Real-time Live Candling)</option>
                 <option value={10}>10 seconds (Standard Operational)</option>
@@ -910,7 +910,7 @@ export const SettingsPage: React.FC = () => {
 
             <div className="border-t border-slate-200 pt-4">
               <label htmlFor="dashboard-theme" className="block font-medium mb-2">Appearance</label>
-              <select id="dashboard-theme" value={theme} onChange={e => setTheme(e.target.value as 'light' | 'dark')} className="border border-slate-300 rounded-lg px-3 py-2 bg-card">
+              <select id="dashboard-theme" value={theme} onChange={e => setTheme(e.target.value as 'light' | 'dark')} className="border border-border rounded-lg pl-3 pr-9 py-2 bg-card text-foreground font-medium hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors cursor-pointer">
                 <option value="light">Light</option><option value="dark">Dark</option>
               </select>
             </div>
