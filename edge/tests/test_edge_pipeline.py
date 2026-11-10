@@ -265,13 +265,28 @@ def test_edge_rejects_removed_classes_and_stages(tmp_path):
 def test_edge_telemetry_server_and_heartbeat_payload(tmp_path):
     """Verify embedded Edge telemetry HTTP server and heartbeat integration."""
     from src.core.edge_server import EdgeTelemetryServer
+    from src.core.settings import EdgeSettings
+    from types import SimpleNamespace
     import urllib.request
     import json
 
     test_db_path = str(tmp_path / "test_telemetry.db")
     db = LocalDatabaseManager(db_path=test_db_path)
 
+    unified_station = SimpleNamespace(
+        device_id="TEST-RIG-01",
+        settings=EdgeSettings.unified_board(),
+        camera=None,
+        inference=None,
+        db=db,
+        boards=None,
+        cycle=None,
+        calibrated=True,
+        settings_error="",
+    )
+
     server = EdgeTelemetryServer(
+        station=unified_station,
         device_id="TEST-RIG-01",
         host="127.0.0.1",
         port=8099,
@@ -284,6 +299,13 @@ def test_edge_telemetry_server_and_heartbeat_payload(tmp_path):
         assert "camera" in telemetry
         assert "ai_model" in telemetry
         assert "iot_rig" in telemetry
+        assert telemetry["iot_rig"]["rig_profile"] == "unified_v4"
+        assert telemetry["iot_rig"]["conveyor_port"] == "COM5"
+        assert telemetry["iot_rig"]["servo_port"] == ""
+        assert telemetry["iot_rig"]["light_port"] == ""
+        assert telemetry["iot_rig"]["holder_steps"] == 1000
+        assert telemetry["iot_rig"]["sorter_steps"] == 367
+        assert telemetry["iot_rig"]["silent_idle_enabled"] is True
 
         # Probe the HTTP server
         url = f"http://127.0.0.1:{server.port}/api/device"

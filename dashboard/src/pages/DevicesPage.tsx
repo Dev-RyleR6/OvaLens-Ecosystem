@@ -383,9 +383,15 @@ export const DevicesPage: React.FC = () => {
                       </dl>
                     </div>
 
-                    <div className="pt-3 border-t border-border flex items-center justify-between text-[11px] text-slate-500">
-                      <span>Attributed Session:</span>
-                      <span className="font-medium text-foreground">{t?.active_batch_code || 'Idle (No Batch)'}</span>
+                    <div className="pt-3 border-t border-border space-y-1.5 text-[11px] text-slate-500">
+                      <div className="flex items-center justify-between">
+                        <span>Attributed Session:</span>
+                        <span className="font-medium text-foreground">{t?.active_batch_code || 'Idle (No Batch)'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Operator on Duty:</span>
+                        <span className="font-medium text-foreground">{t?.active_operator || 'Unassigned'}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -475,32 +481,113 @@ export const DevicesPage: React.FC = () => {
                       </div>
 
                       {/* Rig Profile & Serial Ports */}
-                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2 text-xs">
-                        <div className="flex items-center justify-between">
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2.5 text-xs">
+                        <div className="flex items-center justify-between gap-2">
                           <span className="text-slate-600 font-medium">Controller Profile:</span>
                           <span className="font-mono font-bold text-brand bg-white px-2 py-0.5 rounded border border-slate-200">
-                            {t?.iot_rig?.rig_profile === 'unified_v4' ? 'Unified Rig (v4)' : t?.iot_rig?.rig_profile === 'three_v3' ? 'Three-Board (v3)' : 'Dual-Board (v2)'}
+                            {(t?.iot_rig?.rig_profile ?? 'unified_v4') === 'unified_v4'
+                              ? 'Single-ESP32 Unified (v4)'
+                              : t?.iot_rig?.rig_profile === 'three_v3'
+                              ? 'Three-Board (v3)'
+                              : 'Dual-Board (v2)'}
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-1.5 text-[11px] pt-1">
-                          <div className="bg-white p-1.5 rounded border border-slate-200 text-center">
-                            <span className="text-slate-500 block text-[10px]">Stepper</span>
-                            <span className="font-mono font-semibold text-slate-800">{t?.iot_rig?.conveyor_port || 'COM5'}</span>
-                          </div>
-                          <div className="bg-white p-1.5 rounded border border-slate-200 text-center">
-                            <span className="text-slate-500 block text-[10px]">Servo</span>
-                            <span className="font-mono font-semibold text-slate-800">{t?.iot_rig?.servo_port || 'COM7'}</span>
-                          </div>
-                          <div className="bg-white p-1.5 rounded border border-slate-200 text-center">
-                            <span className="text-slate-500 block text-[10px]">Lamp</span>
-                            <span className="font-mono font-semibold text-slate-800">{t?.iot_rig?.light_port || 'COM9'}</span>
-                          </div>
-                        </div>
+                        {(t?.iot_rig?.rig_profile ?? 'unified_v4') === 'unified_v4' ? (
+                          <div className="space-y-2 pt-0.5">
+                            <div className="bg-white p-2 rounded border border-slate-200 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  aria-hidden="true"
+                                  className={`w-2 h-2 rounded-full shrink-0 ${
+                                    t?.iot_rig?.ports_status?.conveyor === 'CONNECTED' || t?.iot_rig?.is_connected
+                                      ? 'bg-emerald-500'
+                                      : 'bg-slate-400'
+                                  }`}
+                                />
+                                <div>
+                                  <span className="text-[10px] text-slate-500 block leading-tight">Unified Serial Bus (UNIFIED_V3)</span>
+                                  <span className="font-mono font-semibold text-slate-800 text-[11px]">
+                                    {t?.iot_rig?.conveyor_port || 'COM5'}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono">
+                                {t?.iot_rig?.ports_status?.conveyor || (t?.iot_rig?.is_connected ? 'CONNECTED' : 'IDLE')}
+                              </span>
+                            </div>
 
-                        <div className="text-[11px] text-slate-500 pt-0.5 flex justify-between">
-                          <span>Gate Angles:</span>
-                          <span className="font-medium text-slate-700">Fertile {t?.iot_rig?.fertile_angle ?? 180}° • Infertile {t?.iot_rig?.infertile_angle ?? 50}°</span>
+                            <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                              <div className="bg-white px-2 py-1.5 rounded border border-slate-200 flex justify-between">
+                                <span className="text-slate-500">Stepper / Sleep</span>
+                                <span className="font-mono font-semibold text-slate-800">GPIO 16/4/17</span>
+                              </div>
+                              <div className="bg-white px-2 py-1.5 rounded border border-slate-200 flex justify-between">
+                                <span className="text-slate-500">Gate Servo</span>
+                                <span className="font-mono font-semibold text-slate-800">GPIO 32</span>
+                              </div>
+                              <div className="bg-white px-2 py-1.5 rounded border border-slate-200 flex justify-between">
+                                <span className="text-slate-500">IR Sensor</span>
+                                <span className="font-mono font-semibold text-slate-800">GPIO 26</span>
+                              </div>
+                              <div className="bg-white px-2 py-1.5 rounded border border-slate-200 flex justify-between">
+                                <span className="text-slate-500">Candling Lamp</span>
+                                <span className="font-mono font-semibold text-slate-800">GPIO 27</span>
+                              </div>
+                            </div>
+                          </div>
+                        ) : t?.iot_rig?.rig_profile === 'three_v3' ? (
+                          <div className="grid grid-cols-3 gap-1.5 text-[11px] pt-1">
+                            <div className="bg-white p-1.5 rounded border border-slate-200 text-center">
+                              <span className="text-slate-500 block text-[10px]">Stepper</span>
+                              <span className="font-mono font-semibold text-slate-800">{t?.iot_rig?.conveyor_port || 'COM5'}</span>
+                              <span className="block text-[9px] text-slate-500 font-mono">{t?.iot_rig?.ports_status?.conveyor || 'IDLE'}</span>
+                            </div>
+                            <div className="bg-white p-1.5 rounded border border-slate-200 text-center">
+                              <span className="text-slate-500 block text-[10px]">Servo / IR</span>
+                              <span className="font-mono font-semibold text-slate-800">{t?.iot_rig?.servo_port || 'COM7'}</span>
+                              <span className="block text-[9px] text-slate-500 font-mono">{t?.iot_rig?.ports_status?.servo || 'IDLE'}</span>
+                            </div>
+                            <div className="bg-white p-1.5 rounded border border-slate-200 text-center">
+                              <span className="text-slate-500 block text-[10px]">Lamp</span>
+                              <span className="font-mono font-semibold text-slate-800">{t?.iot_rig?.light_port || 'COM9'}</span>
+                              <span className="block text-[9px] text-slate-500 font-mono">{t?.iot_rig?.ports_status?.light || 'IDLE'}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-1.5 text-[11px] pt-1">
+                            <div className="bg-white p-1.5 rounded border border-slate-200 text-center">
+                              <span className="text-slate-500 block text-[10px]">Conveyor / IR</span>
+                              <span className="font-mono font-semibold text-slate-800">{t?.iot_rig?.conveyor_port || 'COM5'}</span>
+                              <span className="block text-[9px] text-slate-500 font-mono">{t?.iot_rig?.ports_status?.conveyor || 'IDLE'}</span>
+                            </div>
+                            <div className="bg-white p-1.5 rounded border border-slate-200 text-center">
+                              <span className="text-slate-500 block text-[10px]">Servo Gate</span>
+                              <span className="font-mono font-semibold text-slate-800">{t?.iot_rig?.servo_port || 'COM7'}</span>
+                              <span className="block text-[9px] text-slate-500 font-mono">{t?.iot_rig?.ports_status?.servo || 'IDLE'}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="space-y-1 pt-1 border-t border-slate-200/80 text-[11px] text-slate-500">
+                          <div className="flex justify-between">
+                            <span>Gate Angles:</span>
+                            <span className="font-medium text-slate-700 font-mono">
+                              Fertile {t?.iot_rig?.fertile_angle ?? 180}° • Neutral {t?.iot_rig?.neutral_angle ?? 90}° • Infertile {t?.iot_rig?.infertile_angle ?? 50}°
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Step Geometry:</span>
+                            <span className="font-medium text-slate-700 font-mono">
+                              Holder {t?.iot_rig?.holder_steps ?? 1000} st • Sorter {t?.iot_rig?.sorter_steps ?? 367} st
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Capture Timing:</span>
+                            <span className="font-medium text-slate-700 font-mono">
+                              Settle {t?.iot_rig?.settle_ms ?? 1500} ms • Hold {t?.iot_rig?.hold_ms ?? 300} ms
+                            </span>
+                          </div>
                         </div>
                       </div>
 

@@ -79,21 +79,24 @@ class BackgroundSyncWorker:
             try:
                 telemetry = self.telemetry_provider() or {}
             except Exception:
-                pass
+                telemetry = {}
         ip_addr = telemetry.get("ip_address")
         edge_url = telemetry.get("edge_url")
         hardware = telemetry.get("hardware_platform", self.hardware_platform)
         model = telemetry.get("model_version", self.model_version)
         status = telemetry.get("status", self.device_status)
 
-        payload = {
-            "status": status,
-            "ip_address": ip_addr,
-            "edge_url": edge_url,
-            "hardware_platform": hardware,
-            "model_version": model,
-            "telemetry": telemetry,
-        }
+        payload = {"status": status}
+        if telemetry:
+            payload["telemetry"] = telemetry
+            if ip_addr:
+                payload["ip_address"] = ip_addr
+            if edge_url:
+                payload["edge_url"] = edge_url
+            if hardware:
+                payload["hardware_platform"] = hardware
+            if model:
+                payload["model_version"] = model
         try:
             response = requests.post(url, json=payload, headers=headers, timeout=3.0)
             if response.status_code == 404:

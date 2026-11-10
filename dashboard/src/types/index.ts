@@ -251,12 +251,25 @@ export interface DeviceTelemetry {
     light_port: string;
     is_connected: boolean;
     ports_status?: Record<string, string>;
+    holder_steps?: number;
+    sorter_steps?: number;
+    gate_clearance_steps?: number;
     stepper_speed_us?: number;
     settle_ms?: number;
     hold_ms?: number;
+    passage_ms?: number;
     fertile_angle?: number;
     infertile_angle?: number;
     neutral_angle?: number;
+    silent_idle_enabled?: boolean;
+    board_state?: {
+      fault?: string;
+      busy?: string;
+      sensor?: string;
+      light?: string;
+      position?: string;
+      reference_valid?: string;
+    };
   };
   storage?: {
     unsynced_scans: number;

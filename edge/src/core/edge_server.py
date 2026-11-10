@@ -219,12 +219,24 @@ class EdgeTelemetryServer:
         }
 
         # 4. IoT Rig Hardware Telemetry
+        rig_profile = getattr(settings, "rig_profile", "unified_v4")
         boards = getattr(station, "boards", None) if station else None
         ports_status = {}
+        board_state: Dict[str, str] = {}
+
         if boards and hasattr(boards, "conveyor"):
             try:
                 c_snap = boards.conveyor.snapshot()
                 ports_status["conveyor"] = "CONNECTED" if c_snap.connected else "DISCONNECTED"
+                if c_snap.telemetry:
+                    board_state = {
+                        "fault": str(c_snap.telemetry.get("FAULT", "NONE")),
+                        "busy": str(c_snap.telemetry.get("BUSY", "0")),
+                        "sensor": str(c_snap.telemetry.get("SENSOR", "0")),
+                        "light": str(c_snap.telemetry.get("LIGHT", "0")),
+                        "position": str(c_snap.telemetry.get("POSITION", "0")),
+                        "reference_valid": str(c_snap.telemetry.get("REFERENCE_VALID", "0")),
+                    }
             except Exception:
                 ports_status["conveyor"] = "DISCONNECTED"
         else:
@@ -248,19 +260,29 @@ class EdgeTelemetryServer:
         else:
             ports_status["light"] = "IDLE"
 
+        conveyor_port = getattr(settings, "conveyor_port", "") or "COM5"
+        servo_port = "" if rig_profile == "unified_v4" else (getattr(settings, "servo_port", "") or "COM7")
+        light_port = "" if rig_profile in ("unified_v4", "dual_v2") else (getattr(settings, "light_port", "") or "COM9")
+
         iot_rig_info = {
-            "rig_profile": getattr(settings, "rig_profile", "unified_v4"),
-            "conveyor_port": getattr(settings, "conveyor_port", "COM5"),
-            "servo_port": getattr(settings, "servo_port", "COM7"),
-            "light_port": getattr(settings, "light_port", "COM9"),
+            "rig_profile": rig_profile,
+            "conveyor_port": conveyor_port,
+            "servo_port": servo_port,
+            "light_port": light_port,
             "is_connected": boards is not None,
             "ports_status": ports_status,
+            "holder_steps": getattr(settings.calibration, "holder_steps", 1000),
+            "sorter_steps": getattr(settings.calibration, "sorter_steps", 367),
+            "gate_clearance_steps": getattr(settings.calibration, "gate_clearance_steps", 50),
             "stepper_speed_us": getattr(settings.calibration, "speed_us", 3000),
             "settle_ms": getattr(settings.calibration, "settle_ms", 1500),
             "hold_ms": getattr(settings.calibration, "hold_ms", 300),
+            "passage_ms": getattr(settings.calibration, "passage_ms", 500),
             "fertile_angle": getattr(settings.calibration, "fertile_angle", 180),
             "infertile_angle": getattr(settings.calibration, "infertile_angle", 50),
             "neutral_angle": getattr(settings.calibration, "neutral_angle", 90),
+            "silent_idle_enabled": rig_profile == "unified_v4",
+            "board_state": board_state,
         }
 
         # 5. Local Storage & Outbox

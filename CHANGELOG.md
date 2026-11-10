@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Dashboard**: align devices cockpit and edge telemetry with unified v4 single-esp32 hardware (2026-11-10)
 - **Dashboard**: elevate settings design with impeccable operate standards and tactile parameters (2026-11-09)
 - **Dashboard**: center settings and preferences layout across viewports (2026-11-09)
 - **Dashboard**: refine dropdown UI and pagination controls with impeccable design standard (2026-11-09)

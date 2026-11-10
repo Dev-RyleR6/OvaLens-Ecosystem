@@ -132,9 +132,29 @@ def seed_database(reset: bool = False):
                     "hardware_platform": "Raspberry Pi 5 (8GB)",
                     "camera": {"index": 0, "identity": "Camera #0 (DirectShow)", "resolution": "1280x720", "fps": 30, "is_mock": False, "status": "Connected"},
                     "ai_model": {"engine_type": "ONNX Runtime FP16", "model_version": "best_v3.onnx", "sort_confidence": 0.70, "iou_threshold": 0.45},
-                    "iot_rig": {"rig_profile": "unified_v4", "conveyor_port": "COM5", "servo_port": "COM7", "light_port": "COM9", "is_connected": True, "stepper_speed_us": 3000, "settle_ms": 1500, "fertile_angle": 180, "infertile_angle": 50, "neutral_angle": 90},
+                    "iot_rig": {
+                        "rig_profile": "unified_v4",
+                        "conveyor_port": "COM5",
+                        "servo_port": "",
+                        "light_port": "",
+                        "is_connected": True,
+                        "ports_status": {"conveyor": "CONNECTED", "servo": "CONNECTED", "light": "CONNECTED"},
+                        "holder_steps": 1000,
+                        "sorter_steps": 367,
+                        "gate_clearance_steps": 50,
+                        "stepper_speed_us": 3000,
+                        "settle_ms": 1500,
+                        "hold_ms": 300,
+                        "passage_ms": 500,
+                        "fertile_angle": 180,
+                        "infertile_angle": 50,
+                        "neutral_angle": 90,
+                        "silent_idle_enabled": True,
+                        "board_state": {"fault": "NONE", "busy": "0", "sensor": "0", "light": "0", "position": "0", "reference_valid": "1"}
+                    },
                     "storage": {"unsynced_scans": 0, "mode": "SQLite WAL"},
                     "active_batch_code": "BATCH-2026-08-KAY-01",
+                    "active_operator": "Pedro Penduko (Candling Operator)",
                     "status": "ONLINE"
                 }
             )
