@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Firmware**: [TASK-NEW-FW-APP-01] preserve explicit egg/servo port assignments, add the COM5/COM7 hardware launcher, and display deployed controller status replies (2026-10-02).
 
 ### Added
+- **Firmware**: add unified single-esp32 controller firmware and hardware diagnostic suite (2026-11-11)
 - **Edge**: [TASK-NEW-EDGE-GUIDED-SETUP-01] guide run setup with registered operators (2026-10-29)
 - **Edge**: [TASK-NEW-SESSION-THROUGHPUT-01] add saved candling throughput and capacity estimates (2026-10-29)
 - **Edge**: [TASK-NEW-EDGE-IOT-01] harden iot serial communication and clean station architecture (2026-10-28)
