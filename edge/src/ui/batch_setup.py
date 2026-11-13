@@ -338,7 +338,7 @@ class BatchSetupWindow(ctk.CTkToplevel):
             self.app._apply_batch_selection(batch, operator, target)
             self.app.operator_id = selected_operator["user_id"]
             self.app._set_session_active_state(False)
-            if self.continue_to_prepare and not self.app.simulation:
+            if self.continue_to_prepare:
                 self.app._animate_modal_close(self, on_close=lambda: self.app.after_idle(self.app.open_preparation_confirmation))
             else:
                 self.app._animate_modal_close(self)

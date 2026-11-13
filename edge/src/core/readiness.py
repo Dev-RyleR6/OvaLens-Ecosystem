@@ -57,7 +57,8 @@ class StationReadiness:
         if not (str(getattr(engine, "engine_type", "")).startswith("ONNX")
                 and getattr(engine, "model_contract_verified", False)
                 and getattr(engine, "warmup_complete", False)):
-            raise RuntimeError("Verified two-class ONNX model and startup warmup are required. Restart after correcting the model.")
+            raise RuntimeError(getattr(engine, "load_error", None) or
+                               "Verified two-class ONNX model and startup warmup are required. Restart after correcting the model.")
 
     def software_checks(self, progress=lambda message: None):
         """Disk/SQLite work runs on the operation worker, never on Tk."""

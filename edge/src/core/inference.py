@@ -87,7 +87,8 @@ class InferenceEngine:
 
         self.onnx_session: Optional[Any] = None
         self.yolo_model: Optional[Any] = None
-        self.engine_type = "MOCK"
+        self.engine_type = "UNAVAILABLE"
+        self.load_error = None
         self.model_contract_verified = False
         self.model_identity = {}
 
@@ -95,7 +96,8 @@ class InferenceEngine:
         self._warmup()
 
     def _load_engine(self):
-        """Try loading ONNX Runtime first, then PyTorch YOLOv8, then fallback."""
+        """Load real model weights; unavailable models never fabricate predictions."""
+        errors = []
         if _HAVE_ONNX and os.path.exists(self.onnx_path):
             try:
                 providers = ["CPUExecutionProvider"]
@@ -114,7 +116,13 @@ class InferenceEngine:
                 print(f"[SUCCESS] Loaded ONNX inference engine: {self.onnx_path}")
                 return
             except Exception as e:
-                print(f"[WARN] Failed to load ONNX session ({e}). Trying PyTorch fallback...")
+                errors.append(f"ONNX model could not load: {e}")
+                self.onnx_session = None
+                self.model_contract_verified = False
+                self.model_identity = {}
+        else:
+            errors.append("ONNX Runtime is not installed" if not _HAVE_ONNX else
+                          f"ONNX model file is missing: {self.onnx_path}")
 
         if _HAVE_YOLO and os.path.exists(self.pt_path):
             try:
@@ -123,10 +131,11 @@ class InferenceEngine:
                 print(f"[SUCCESS] Loaded PyTorch YOLO engine: {self.pt_path}")
                 return
             except Exception as e:
-                print(f"[WARN] Failed to load PyTorch YOLO ({e}).")
+                errors.append(f"PyTorch model could not load: {e}")
 
-        self.engine_type = "HEURISTIC_SIMULATION"
-        print("[WARN] Model weights not found. Running in Heuristic Simulation mode.")
+        self.engine_type = "UNAVAILABLE"
+        self.load_error = "Model unavailable. " + "; ".join(errors)
+        print(f"[ERROR] {self.load_error}")
 
     def _validate_onnx_contract(self):
         inputs, outputs = self.onnx_session.get_inputs(), self.onnx_session.get_outputs()
@@ -152,10 +161,21 @@ class InferenceEngine:
     def _warmup(self, passes: int = 3):
         """Execute dummy warmup passes to preload weights into CPU cache."""
         self.warmup_complete = False
+        if self.engine_type == "UNAVAILABLE":
+            return
         dummy = np.zeros((self.imgsz, self.imgsz, 3), dtype=np.uint8)
         print(f"[*] Warming up {self.engine_type} engine ({passes} passes)...")
-        for _ in range(passes):
-            self.predict(dummy)
+        try:
+            for _ in range(passes):
+                self.predict(dummy)
+        except Exception as exc:
+            self.engine_type = "UNAVAILABLE"
+            self.model_contract_verified = False
+            self.model_identity = {}
+            self.onnx_session = self.yolo_model = None
+            self.load_error = f"Model unavailable. Startup warmup failed: {exc}"
+            print(f"[ERROR] {self.load_error}")
+            return
         print("[OK] Warmup complete.")
         self.warmup_complete = passes >= 3
 
@@ -179,7 +199,9 @@ class InferenceEngine:
         elif self.engine_type == "PyTorch YOLOv8" and self.yolo_model:
             result = self._infer_pytorch(frame)
         else:
-            result = self._infer_heuristic(frame)
+            result = {"final_class": None, "confidence": 0.0,
+                      "routing_action": "MANUAL_REVIEW", "detections": [],
+                      "error_code": "MODEL_UNAVAILABLE", "error": self.load_error}
 
         latency_ms = max(1, int((time.perf_counter() - t_start) * 1000))
         result["inference_ms"] = latency_ms
@@ -329,45 +351,6 @@ class InferenceEngine:
 
         return {
             "final_class": final_cls,
-            "confidence": conf,
-            "routing_action": action,
-            "detections": detections
-        }
-
-    def _infer_heuristic(self, frame: np.ndarray) -> Dict[str, Any]:
-        """High-accuracy fallback using HSV Candling Luminance & Texture Analysis."""
-        h, w = frame.shape[:2]
-        center_crop = frame[h // 4 : 3 * h // 4, w // 4 : 3 * w // 4]
-        hsv = cv2.cvtColor(center_crop, cv2.COLOR_BGR2HSV)
-        v_channel = hsv[:, :, 2]
-        s_channel = hsv[:, :, 1]
-
-        mean_v = float(np.mean(v_channel))
-        std_v = float(np.std(v_channel))
-
-        # Biological heuristic:
-        # Fertile eggs exhibit dense internal blood webbing (higher variance and distinct saturation)
-        # All non-fertile Day 10 outcomes are classified as INFERTILE.
-        if mean_v > 130 and std_v < 30:
-            cls = "INFERTILE"
-            conf = 0.94
-        elif std_v >= 30 and mean_v > 60:
-            cls = "FERTILE"
-            conf = 0.92
-        else:
-            cls = "INFERTILE"
-            conf = 0.88
-
-        action = "ACCEPT" if cls == "FERTILE" else "REJECT"
-
-        detections = [{
-            "bbox": [0.50, 0.50, 0.45, 0.60],
-            "confidence": conf,
-            "class": cls
-        }]
-
-        return {
-            "final_class": cls,
             "confidence": conf,
             "routing_action": action,
             "detections": detections

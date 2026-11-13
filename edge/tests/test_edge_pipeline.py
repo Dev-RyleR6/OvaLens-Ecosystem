@@ -41,15 +41,15 @@ def test_candling_heuristics_and_vascularization():
     assert lum_info["vascular_index"] > 0.0
 
 
-def test_camera_mock_generation_and_lifecycle():
-    """Verify on-demand camera start/stop lifecycle and synthetic candling frame generator."""
+def test_camera_starts_without_frames_until_hardware_is_opened():
+    """An idle camera must not provide an invented preview or scan frame."""
     camera = CameraGrabber()
     assert camera.is_running is False
     assert camera.current_fps == 0.0
 
-    mock_frame = camera._generate_mock_candling_frame()
-    assert mock_frame is not None
-    assert mock_frame.shape == (720, 1280, 3)
+    assert camera.get_latest_frame() is None
+    assert camera.snapshot() is None
+    assert not camera.is_mock_mode
 
 
 def test_inference_engine_and_latency_benchmark():
@@ -127,15 +127,15 @@ def test_local_sqlite_wal_and_queue_diagnostics(tmp_path):
     assert remaining[0]["scan_id"] == s3
 
 
-def test_esp32_serial_mock_and_motor_commands():
-    """Verify non-blocking ESP32 commands (solenoid schedule, motor stepping, light PWM)."""
+def test_disconnected_esp32_rejects_commands():
+    """Disconnected hardware cannot silently accept motor or light commands."""
     iot = ESP32SerialDriver()
-    iot.schedule_ejection(delay_ms=2000, pulse_ms=250)
-    iot.set_conveyor(True)
-    iot.set_conveyor(False)
-    iot.set_candling_light(255)
-    iot.ping()
-    assert iot.is_connected is False  # Verified in Mock Actuator mode
+    for command in (lambda: iot.schedule_ejection(delay_ms=2000, pulse_ms=250),
+                    lambda: iot.set_conveyor(True), lambda: iot.set_conveyor(False),
+                    lambda: iot.set_candling_light(255), iot.ping):
+        with pytest.raises(ConnectionError, match="unavailable"):
+            command()
+    assert iot.is_connected is False
 
 
 def test_sync_worker_diagnostics(tmp_path):

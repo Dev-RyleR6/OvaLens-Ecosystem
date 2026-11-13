@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-HARDWAREONLY-01**: Remove operator simulation and synthetic camera/prediction fallbacks; report unavailable hardware/models, preserve readiness interlocks, and verify with test-only hardware mocks.
+
 - [x] **TASK-NEW-EDGE-GUIDED-SETUP-01**: Guide registered operator and batch selection, cache the staff roster offline, automate inspected profile-specific preparation, and require a separate Start sorting action; preserve durable operator attribution and legacy session replay.
 
 - [x] **TASK-NEW-SESSION-THROUGHPUT-01**: Derive saved candling run duration and throughput, show Edge/dashboard summaries, and estimate capacity from a selected run with offline replay regression coverage.

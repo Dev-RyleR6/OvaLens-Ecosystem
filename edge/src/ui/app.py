@@ -93,7 +93,6 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         self._camera_panel = None
         self._scan_busy = False
         self._stopping = False
-        self.simulation = bool((startup_config or {}).get("simulation", False))
 
         # Operational parameters from startup config
         cfg = startup_config or {}
@@ -890,7 +889,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         panel = getattr(self, "_camera_panel", None)
         profile = getattr(getattr(station, "settings", None), "rig_profile", None)
         return (station is not None and profile == "three_v3"
-                and not self.simulation and not self._closing and not self._stopping
+                and not self._closing and not self._stopping
                 and not self._scan_busy and not self.is_auto_cycle_running and not station.active
                 and not getattr(self, "_setup_busy", False) and not getattr(self, "_light_busy", False)
                 and not (panel is not None and panel.pending) and self.grab_current() is None)
@@ -946,7 +945,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             finished(str(exc), True)
 
     def _camera_tuning_allowed(self):
-        return (self.station is not None and not self.simulation and not self._closing
+        return (self.station is not None and not self._closing
                 and not self._stopping and not self._scan_busy and not self.current_session_id
                 and not self.is_session_active and not self.is_auto_cycle_running
                 and not self._finalization_failed and not self._pending_finalization_id
@@ -1074,7 +1073,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             self.tools_menu.entryconfigure(1, state=state)
             self.tools_menu.entryconfigure(3, state=state)
         if hasattr(self, "camera_controls_btn"):
-            self.camera_controls_btn.configure(state="disabled" if is_active or self._scan_busy or self._stopping or blocked or setup_busy or self._closing or self.simulation or station is None else "normal")
+            self.camera_controls_btn.configure(state="disabled" if is_active or self._scan_busy or self._stopping or blocked or setup_busy or self._closing or station is None else "normal")
         if blocked:
             self.cancel_btn.pack(side="left", padx=6, pady=13, after=self.eject_btn)
 
@@ -1470,7 +1469,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             self._prepare_after_selection = True
             self.open_batch_setup_dialog()
             return
-        if (not self.station or self.simulation or self.grab_current() is not None
+        if (not self.station or self.grab_current() is not None
                 or self._scan_busy or self.current_session_id or self._finalization_failed or self.inference_worker.busy):
             self._log("[BLOCKED] Finish the current operation before starting sorting.")
             return
@@ -1581,10 +1580,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
 
     def _auto_start_from_config(self):
         self._log("[READY] Batch configuration loaded. No motion starts automatically.")
-        if self.simulation:
-            self._log("[SIMULATION] Preview only: no hardware commands or saved scans.")
-        else:
-            self._log("[READY] Choose a batch, then prepare the empty conveyor. Tools contains diagnostics and settings.")
+        self._log("[READY] Choose a batch, then prepare the empty conveyor. Tools contains diagnostics and settings.")
 
     def _on_chamber_state_change(self, state: str, current: int, total: int):
         """ChamberController state callback — updates the cycle HUD (runs on main thread via after())."""
@@ -1672,7 +1668,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         if (final_cls not in {"FERTILE", "INFERTILE"} or not isinstance(conf, (int, float))
                 or not math.isfinite(conf) or not 0 <= conf <= 1 or not result.get("detections")):
             self._scan_failed("No trustworthy egg classification: "
-                              + result.get("error_code", "EGG_NOT_CONFIRMED"), OperatorState.REVIEW)
+                              + (result.get("error") or result.get("error_code", "EGG_NOT_CONFIRMED")), OperatorState.REVIEW)
             return
         action = "MANUAL_REVIEW" if conf < 0.75 else ("ACCEPT" if final_cls == "FERTILE" else "REJECT")
         latency = result.get("inference_ms", 0)
@@ -1684,11 +1680,11 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         self._latest_detections = result.get("detections", [])
         self._last_scan_result_time = time.monotonic()
 
-        if self.simulation or self.camera.is_mock_mode or not str(result.get("engine", "")).startswith("ONNX"):
+        if self.camera.is_mock_mode or not str(result.get("engine", "")).startswith("ONNX"):
             self._scan_busy = False
             self._update_result_banner(final_cls, conf, "PREVIEW_ONLY", latency)
             self._set_operation_state(OperatorState.READY, "PREVIEW ONLY - NO SCAN RECORDED")
-            self._log("[PREVIEW] Simulated/fallback results are not saved or routed.")
+            self._log("[PREVIEW] Unverified results are not saved or routed.")
             return
         generation = self._operation_generation
         new_session = self.current_session_id is None
@@ -1779,7 +1775,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         if self.grab_current() is not None:
             self._log("[BLOCKED] Close the dialog before scanning.")
             return
-        if not self.simulation and (not getattr(self, "_batch_record_ready", True) or (hasattr(self, "operator_id") and not self.operator_id)):
+        if (not getattr(self, "_batch_record_ready", True) or (hasattr(self, "operator_id") and not self.operator_id)):
             self._log("[BATCH] Choose or create a batch with its incubation details before saving scans.")
             self.open_batch_setup_dialog()
             return
@@ -2249,7 +2245,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             if isinstance(batch, dict) and getattr(self, "_batch_setup_window", None) is None:
                 self._apply_batch_selection(batch, self.operator_name,
                     prefs.get("egg_count", min(100000, batch["initial_egg_count"])))
-            if isinstance(operator_state, dict) and self._startup_guided_setup and not self.simulation:
+            if isinstance(operator_state, dict) and self._startup_guided_setup:
                 if not self._batch_record_ready or not self.operator_id:
                     self.after(0, self.open_batch_setup_dialog)
                 self.refresh_registered_operators()

@@ -252,7 +252,7 @@ The dashboard Overview includes recorded Day 10 classification and scans-versus-
 
 Classification totals are computed from persisted scan records, including their current manual overrides, rather than cached session counters. A scan event is not a unique egg: repeated scans can exceed the initial set count and can overstate Penoy quantity/value estimates. Awaiting-review counts are a subset of the two biological classifications. Forecasts use fixed breed assumptions and are estimates, not measured hatch outcomes or confirmed sales. Expand the exact-count tables below charts to inspect every value.
 
-When launched through `edge/launcher.py` in normal operation, the edge app sends an authenticated device heartbeat every 15 seconds on a separate background thread. Configure `API_BASE_URL`, `API_KEY`, and a unique `DEVICE_ID` in `edge/.env`; the API key must match the backend configuration. Unknown stations register automatically; existing station calibration is preserved. Explicit simulation does not report a production station online.
+When launched through `edge/launcher.py` in normal operation, the edge app sends an authenticated device heartbeat every 15 seconds on a separate background thread. Configure `API_BASE_URL`, `API_KEY`, and a unique `DEVICE_ID` in `edge/.env`; the API key must match the backend configuration. Unknown stations register automatically; existing station calibration is preserved.
 
 The dashboard checks device records every 15 seconds, independently of the data refresh preference, and expires online status after 90 seconds without a heartbeat. Closing the app or losing connectivity therefore changes its status after the expiry period. “Backend API” indicates server connectivity; “Edge app connections” indicates recent app heartbeats. Neither confirms physical camera, serial controller, or conveyor readiness. Device heartbeat failures appear as sync attention in the edge app and leave locally saved scans intact.
 
@@ -260,12 +260,12 @@ The dashboard checks device records every 15 seconds, independently of the data 
 
 1. **Camera Feed is Black / Blank**:
    - Verify `CAMERA_INDEX` in `edge/.env`. On Windows with multiple webcams, try index `1` or `2`.
-   - If the camera is unavailable, reconnect it and use **Tools > Retry camera preview**. Normal sorting never substitutes synthetic frames; preview simulation must be explicitly selected at startup.
+   - If the camera is unavailable, reconnect it and use **Tools > Retry camera preview**. The operator app never substitutes synthetic frames. A missing or invalid model reports **Model unavailable** and blocks sorting until corrected and restarted.
 
 2. **ESP32 Serial Connection Error**:
    - Check device manager for the COM port (e.g. `COM3` on Windows, `/dev/ttyUSB0` on Linux).
    - Verify baud rate is set to `115200`.
-   - If unplugged, the app automatically runs in **Mock Serial Mode** without crashing.
+   - If unplugged, the controller reports disconnected and sorting is blocked. Reconnect the correct board, verify its role, and prepare the station again; no mock controller is substituted.
 
 3. **Database Connection Refused**:
    - Ensure PostgreSQL service is running (`pg_isready`).

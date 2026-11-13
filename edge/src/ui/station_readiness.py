@@ -82,7 +82,7 @@ class ReadinessFlow:
         panel = getattr(self, "readiness_panel", None)
         if panel is None:
             return
-        visible = (not self.simulation and not self.current_session_id and not self._scan_busy
+        visible = (not self.current_session_id and not self._scan_busy
                    and not self._closing and not getattr(self, "_batch_complete", False)
                    and getattr(self, "_camera_panel", None) is None and getattr(self, "_diagnostic_view", None) is None)
         if visible != getattr(self, "_readiness_visible", None):
@@ -114,7 +114,7 @@ class ReadinessFlow:
                      getattr(self, "_setup_busy", False) or getattr(self, "_software_check_busy", False))
 
     def prepare_station(self):
-        if (not self.station or self.simulation or self._closing or self._stopping or self._scan_busy
+        if (not self.station or self._closing or self._stopping or self._scan_busy
                 or self.current_session_id or self.grab_current() is not None or self._finalization_failed
                 or self._pending_finalization_id is not None or self.inference_worker.busy
                 or getattr(self, "_setup_busy", False) or getattr(self, "_light_busy", False)

@@ -8,7 +8,6 @@ class StartupConfigWindow(ctk.CTk):
     def __init__(self, device_id="STATION-01-RP5", operator_name=""):
         super().__init__()
         self.device_id, self.result = device_id, None
-        self._simulation_var = ctk.BooleanVar(value=False)
         self.title("OvaLens — Open station")
         self.geometry("620x460")
         self.minsize(600, 440)
@@ -26,8 +25,6 @@ class StartupConfigWindow(ctk.CTk):
                      "Select registered staff in run setup, confirm inspection, then prepare.", wraplength=520,
                      justify="left", text_color=T.TEXT_SECONDARY,
                      font=(T.FONT_FAMILY, 13)).pack(anchor="w", padx=20, pady=(16, 8))
-        ctk.CTkCheckBox(body, text="Simulation preview only", variable=self._simulation_var,
-                        text_color=T.TEXT_PRIMARY).pack(anchor="w", padx=20, pady=(4, 16))
         self._status_label = ctk.CTkLabel(self, text="", text_color=T.REJECT_RED_TEXT)
         self._status_label.pack(fill="x", padx=24)
         actions = ctk.CTkFrame(self, fg_color="transparent")
@@ -38,7 +35,7 @@ class StartupConfigWindow(ctk.CTk):
                        hover_color=T.HOVER_MAROON, text_color=T.TEXT_WHITE, height=38).pack(side="right")
 
     def _on_start(self):
-        self.result = {"stage": "DAY_10", "simulation": self._simulation_var.get(), "fullscreen": True}
+        self.result = {"stage": "DAY_10", "fullscreen": True}
         self.destroy()
 
     def _on_cancel(self):

@@ -191,14 +191,14 @@ def test_cancelled_scan_does_not_write_or_update_ui(tmp_path):
     assert app.db.get_unsynced_count() == 0 and app.total_count == 0
 
 
-@pytest.mark.parametrize("kind", ["unknown", "simulation", "fallback"])
+@pytest.mark.parametrize("kind", ["unknown", "mock_camera", "fallback"])
 def test_untrustworthy_results_are_not_saved(tmp_path, kind):
     app = station(tmp_path)
     result = prediction()
     if kind == "unknown":
         result["final_class"] = None
-    elif kind == "simulation":
-        app.simulation = True
+    elif kind == "mock_camera":
+        app.camera.is_mock_mode = True
     else:
         result["engine"] = "HEURISTIC_SIMULATION"
     OvaLensOperatorApp._process_scan_result(app, result)

@@ -35,12 +35,19 @@ def test_startup_window_builds_and_cancels_without_hardware(hidden_ui):
         window.update_idletasks()
         assert window.result is None
         assert not hasattr(window, "_port_var")  # Board selection lives in station settings.
+        assert not hasattr(window, "_simulation_var")
         window._on_cancel()
     finally:
         try:
             window.destroy()
         except tk.TclError:
             pass
+
+
+def test_startup_opens_physical_station_without_simulation_option(hidden_ui):
+    window = StartupConfigWindow()
+    window._on_start()
+    assert window.result == {"stage": "DAY_10", "fullscreen": True}
 
 
 def test_operator_window_and_shutdown_without_hardware(hidden_ui):
