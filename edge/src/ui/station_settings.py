@@ -26,8 +26,8 @@ class StationSettingsWindow(ctk.CTkToplevel):
         ctk.CTkLabel(self, text="Station settings", font=(FUTheme.FONT_FAMILY, 22, "bold")).pack(anchor="w", padx=24, pady=(18, 4))
         ctk.CTkLabel(self, font=(FUTheme.FONT_FAMILY, 14), text="Tune while idle. Readback confirms a driver value; position and passage remain estimated.", wraplength=850).pack(anchor="w", padx=24)
         tabs = ctk.CTkTabview(self, fg_color=FUTheme.PANEL_LIGHT,
-                            segmented_button_selected_color=FUTheme.PRIMARY_MAROON,
-                            segmented_button_selected_hover_color=FUTheme.HOVER_MAROON,
+                            segmented_button_selected_color="#EEDADA",
+                            segmented_button_selected_hover_color="#E5C4C4",
                             text_color=FUTheme.TEXT_PRIMARY)
         tabs._segmented_button.configure(font=(FUTheme.FONT_FAMILY, 14, "bold"))
         tabs.pack(fill="both", expand=True, padx=20, pady=12)
@@ -138,8 +138,9 @@ class StationSettingsWindow(ctk.CTkToplevel):
                               font=(FUTheme.FONT_FAMILY, 14, "bold"),
                               fg_color=FUTheme.PRIMARY_MAROON if primary else FUTheme.PANEL_LIGHT_ALT,
                               hover_color=FUTheme.HOVER_MAROON if primary else FUTheme.PANEL_ACCENT,
-                              border_width=0 if primary else 1, border_color=FUTheme.BORDER,
-                              text_color=FUTheme.TEXT_WHITE if primary else FUTheme.TEXT_PRIMARY)
+                              border_width=0 if primary else 1, border_color=FUTheme.BORDER_CONTROL,
+                              text_color=FUTheme.TEXT_WHITE if primary else FUTheme.TEXT_PRIMARY,
+                              text_color_disabled=FUTheme.TEXT_DISABLED_ON_ACCENT if primary else FUTheme.TEXT_MUTED)
         button.pack(side=side or "top", anchor="w", padx=6, pady=4)
         self.buttons.append(button)
         return button

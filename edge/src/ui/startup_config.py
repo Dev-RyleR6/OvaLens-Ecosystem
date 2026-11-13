@@ -2,11 +2,14 @@
 from typing import Optional, Dict, Any
 import customtkinter as ctk
 from .theme import FUTheme as T
+from .desktop_style import configure_desktop, install_entry_focus
 
 
 class StartupConfigWindow(ctk.CTk):
     def __init__(self, device_id="STATION-01-RP5", operator_name=""):
+        configure_desktop()
         super().__init__()
+        install_entry_focus(self)
         self.device_id, self.result = device_id, None
         self.title("OvaLens — Open station")
         self.geometry("620x460")
@@ -30,7 +33,7 @@ class StartupConfigWindow(ctk.CTk):
         actions = ctk.CTkFrame(self, fg_color="transparent")
         actions.pack(fill="x", padx=24, pady=(4, 20))
         ctk.CTkButton(actions, text="Cancel", command=self._on_cancel, fg_color=T.PANEL_LIGHT_ALT,
-                       text_color=T.TEXT_PRIMARY, height=38).pack(side="left")
+                       text_color=T.TEXT_PRIMARY, height=38, text_color_disabled=T.TEXT_MUTED, border_color=T.BORDER_CONTROL, border_width=1).pack(side="left")
         ctk.CTkButton(actions, text="Open station", command=self._on_start, fg_color=T.PRIMARY_MAROON,
                        hover_color=T.HOVER_MAROON, text_color=T.TEXT_WHITE, height=38).pack(side="right")
 

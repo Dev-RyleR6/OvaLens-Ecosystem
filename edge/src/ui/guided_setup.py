@@ -94,7 +94,7 @@ class GuidedSetupFlow:
                 self.prepare_station()
             self._animate_modal_close(dialog, on_close=lambda: self.after_idle(prepare))
         cancel_button = ctk.CTkButton(actions, text="Cancel", height=44, fg_color=T.PANEL_LIGHT_ALT,
-                                     text_color=T.TEXT_PRIMARY, command=cancel)
+                                     text_color=T.TEXT_PRIMARY, command=cancel, text_color_disabled=T.TEXT_MUTED, border_color=T.BORDER_CONTROL, border_width=1)
         cancel_button.pack(side="left")
         button = ctk.CTkButton(actions, text="Confirm & prepare", height=44, fg_color=T.PRIMARY_MAROON,
                               hover_color=T.HOVER_MAROON, command=confirm)

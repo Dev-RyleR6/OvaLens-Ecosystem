@@ -16,7 +16,7 @@ class StationReadinessPanel(ctk.CTkFrame):
         ctk.CTkLabel(self, text="Station checks", anchor="w", text_color=FUTheme.TEXT_PRIMARY,
             font=(FUTheme.FONT_FAMILY, 18, "bold")).pack(fill="x", padx=24, pady=(20, 4))
         self.summary = ctk.CTkLabel(self, text="Not prepared",
-            anchor="w", justify="left", wraplength=300, font=(FUTheme.FONT_FAMILY, 13),
+            anchor="w", justify="left", wraplength=300, font=(FUTheme.FONT_FAMILY, FUTheme.FONT_BODY),
             text_color=FUTheme.TEXT_SECONDARY)
         self.summary.pack(fill="x", padx=24, pady=(0, 4))
         self.offline_note = ctk.CTkLabel(self, text="", anchor="w", height=18,
@@ -25,12 +25,12 @@ class StationReadinessPanel(ctk.CTkFrame):
         actions = ctk.CTkFrame(self, fg_color="transparent")
         actions.pack(fill="x", padx=24, pady=(0, 12))
         self.details = ctk.CTkButton(actions, text="Show details", width=124, height=32,
-            font=(FUTheme.FONT_FAMILY, 12), fg_color=FUTheme.PANEL_LIGHT_ALT,
+            font=(FUTheme.FONT_FAMILY, FUTheme.FONT_CONTROL), fg_color=FUTheme.PANEL_LIGHT_ALT,
             text_color=FUTheme.TEXT_SECONDARY, hover_color=FUTheme.PANEL_ACCENT,
-            command=self.toggle_details)
+            command=self.toggle_details, text_color_disabled=FUTheme.TEXT_MUTED, border_color=FUTheme.BORDER_CONTROL, border_width=1)
         self.details.pack(side="left")
         self.retry = ctk.CTkButton(actions, text="Recheck", width=92, height=32,
-            font=(FUTheme.FONT_FAMILY, 12), fg_color="transparent",
+            font=(FUTheme.FONT_FAMILY, FUTheme.FONT_CONTROL), fg_color="transparent",
             text_color=FUTheme.TEXT_SECONDARY, hover_color=FUTheme.PANEL_ACCENT,
             command=app.run_software_checks)
         self.retry.pack(side="right")

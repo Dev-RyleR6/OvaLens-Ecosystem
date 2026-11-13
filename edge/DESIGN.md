@@ -11,8 +11,10 @@ with no motion. STOP cancels late activation while retaining the saved record.
 
 Mode: **Operate**. The operator needs to see the egg, understand why the conveyor
 is stopped, and act safely. Foundation University maroon, green, red and slate
-are binding. Segoe UI is the native Windows typeface; labels use 12–14 px and
-counts use 20 px. Camera controls retain native driver terminology and readback.
+are binding. Use the bundled static Inter regular/bold family for explicit
+labels and native control defaults. Body text is 14 px, controls/labels 13 px,
+metadata at least 12 px and counts 20 px. Segoe UI (Windows) and DejaVu Sans
+(Linux) are logged fallbacks. Camera controls retain native terminology/readback.
 
 The camera well is the primary workspace. Its cycle message stays above the
 image. A single side panel groups the latest classification, aligned batch
@@ -21,12 +23,17 @@ than coloured metric cards. The empty camera well explains setup directly.
 
 Use the FU light desktop palette: off-white #F8FAFC, white #FFFFFF, borders
 #E2E8F0 and maroon #800000. The camera well stays dark with separate light text
-tokens. Segoe UI, quiet tinted result surfaces and generous spacing provide
+tokens. Inter, quiet tinted result surfaces and generous spacing provide
 the soft desktop character; avoid shadows, image assets and decorative timers.
 One header batch control includes registered operator context. Tools and window
 controls live in the header. The bottom action bar reserves a stable right-hand
 position for STOP; a single compact strip above it shows sorter, sync and camera
 status. Do not repeat the preparation instructions in a separate footer row.
+Control borders use #76869B rather than the structural divider color. Input
+placeholders remain readable; keyboard focus uses the FU maroon border. Light
+selected tabs keep dark text in their hover state. Neutral dropdowns use a light
+arrow surface so their dark chevron remains visible. Fonts register once for the
+process; no runtime download, system font install or decoration timer is needed.
 
 Daily operation uses Batch setup, empty-conveyor confirmation, Prepare station,
 then a separate Start sorting action. Camera preview and passive software/storage

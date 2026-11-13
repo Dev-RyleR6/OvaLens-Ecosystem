@@ -37,8 +37,8 @@ class BatchSetupWindow(ctk.CTkToplevel):
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.pack(side="bottom", fill="x", padx=20, pady=(8, 16))
         self.cancel = ctk.CTkButton(footer, text="Cancel", width=100, height=38,
-            fg_color=T.PANEL_LIGHT_ALT, border_width=1, border_color=T.BORDER,
-            command=self.close, text_color=T.TEXT_PRIMARY)
+            fg_color=T.PANEL_LIGHT_ALT, border_width=1, border_color=T.BORDER_CONTROL,
+            command=self.close, text_color=T.TEXT_PRIMARY, text_color_disabled=T.TEXT_MUTED)
         self.cancel.pack(side="left")
         self.save = ctk.CTkButton(footer, text="Use batch", height=38, fg_color=T.PRIMARY_MAROON,
             hover_color=T.HOVER_MAROON, text_color=T.TEXT_WHITE, command=self.apply, state="disabled")
@@ -57,15 +57,15 @@ class BatchSetupWindow(ctk.CTkToplevel):
         operator_actions.pack(fill="x", pady=4)
         ctk.CTkButton(operator_actions, text="Change operator", height=44,
                      fg_color=T.PANEL_LIGHT_ALT, text_color=T.TEXT_PRIMARY,
-                     command=self.change_operator).pack(side="left")
+                     command=self.change_operator, text_color_disabled=T.TEXT_MUTED, border_color=T.BORDER_CONTROL, border_width=1).pack(side="left")
         self.operator = ctk.CTkOptionMenu(self.operator_area, values=["Loading registered staff..."],
             command=self.choose_operator, height=44, fg_color=T.PANEL_LIGHT_ALT,
-            button_color=T.PRIMARY_MAROON, text_color=T.TEXT_PRIMARY)
+            button_color=T.PANEL_ACCENT, text_color=T.TEXT_PRIMARY, text_color_disabled=T.TEXT_MUTED, button_hover_color=T.PANEL_ACCENT)
         self.operator_status = ctk.CTkLabel(self.operator_area, text="", wraplength=450,
                                            justify="left", text_color=T.TEXT_MUTED)
         self.operator_status.pack(fill="x")
         ctk.CTkButton(operator_actions, text="Refresh staff", height=44, fg_color=T.PANEL_LIGHT_ALT,
-                     text_color=T.TEXT_PRIMARY, command=app.refresh_registered_operators).pack(side="left", padx=(8, 0))
+                     text_color=T.TEXT_PRIMARY, command=app.refresh_registered_operators, text_color_disabled=T.TEXT_MUTED, border_color=T.BORDER_CONTROL, border_width=1).pack(side="left", padx=(8, 0))
         self.mode = ctk.CTkSegmentedButton(self.body, values=["Choose batch", "Create batch"],
             selected_color="#EEDADA", selected_hover_color="#E5C4C4",
             unselected_color=T.PANEL_LIGHT_ALT, text_color=T.TEXT_PRIMARY, command=self.change_mode)
@@ -81,8 +81,8 @@ class BatchSetupWindow(ctk.CTkToplevel):
         self.search.pack(fill="x", pady=(2, 6))
         self.search_text.trace_add("write", lambda *_: self.populate_pick())
         self.pick = ctk.CTkOptionMenu(self.pick_frame, values=["Loading saved batches…"],
-            command=self.choose, fg_color=T.PANEL_LIGHT_ALT, button_color=T.PRIMARY_MAROON,
-            text_color=T.TEXT_PRIMARY, height=34)
+            command=self.choose, fg_color=T.PANEL_LIGHT_ALT, button_color=T.PANEL_ACCENT,
+            text_color=T.TEXT_PRIMARY, height=34, text_color_disabled=T.TEXT_MUTED, button_hover_color=T.PANEL_ACCENT)
         self.pick.pack(fill="x", pady=(2, 6))
         self.summary = ctk.CTkLabel(self.pick_frame, text="", text_color=T.TEXT_MUTED,
                                    wraplength=450, justify="left", anchor="w")
@@ -92,7 +92,7 @@ class BatchSetupWindow(ctk.CTkToplevel):
         self.code.pack(fill="x", pady=(0, 8))
         self.label(self.fields, "Duck breed")
         self.breed = ctk.CTkOptionMenu(self.fields, values=list(BREEDS.values()), command=lambda _: self.update_code(),
-            fg_color=T.PANEL_LIGHT_ALT, button_color=T.PRIMARY_MAROON, text_color=T.TEXT_PRIMARY, height=34)
+            fg_color=T.PANEL_LIGHT_ALT, button_color=T.PANEL_ACCENT, text_color=T.TEXT_PRIMARY, height=34, text_color_disabled=T.TEXT_MUTED, button_hover_color=T.PANEL_ACCENT)
         self.breed.set(BREEDS.get(app.current_breed, BREEDS["KAYUMANGGI"]))
         self.breed.pack(fill="x", pady=(2, 8))
         self.incubator = self.entry(self.fields, "Incubator ID")
@@ -106,7 +106,7 @@ class BatchSetupWindow(ctk.CTkToplevel):
         self.target_summary = ctk.CTkLabel(self.common, text="Run target: choose a batch", anchor="w", text_color=T.TEXT_PRIMARY)
         self.target_summary.pack(fill="x")
         ctk.CTkButton(self.common, text="Change quantity", height=44, fg_color=T.PANEL_LIGHT_ALT,
-                     text_color=T.TEXT_PRIMARY, command=self.change_quantity).pack(anchor="w", pady=4)
+                     text_color=T.TEXT_PRIMARY, command=self.change_quantity, text_color_disabled=T.TEXT_MUTED, border_color=T.BORDER_CONTROL, border_width=1).pack(anchor="w", pady=4)
         self.target = ctk.CTkEntry(self.common, height=44)
         self.update_code()
         app._jobs.submit(lambda: (app.db.list_available_batches(), app.db.get_batch_preferences(), app.db.get_operator_state()),

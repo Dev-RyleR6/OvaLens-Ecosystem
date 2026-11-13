@@ -82,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Capstone Manuscript Chapters 1, 2, 3, and References in `docs/manuscript/` with authentic proposal text and 15 APA 7th academic citations.
 
 ### Changed
+- **Edge**: [TASK-NEW-EDGE-TYPE-CONTRAST-01] unify native typography and improve control contrast (2026-11-13)
 - **Edge**: [TASK-NEW-EDGE-SOFT-DESKTOP-01] simplify the native operator desktop layout (2026-11-13)
 - **Edge**: [TASK-NEW-EDGE-STOPSCAN-01] classify only confirmed stopped eggs (2026-10-09)
 - **Firmware**: [TASK-NEW-FW-INSTALL-01] install and verify three-board v3 builds (2026-10-08)

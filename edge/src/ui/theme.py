@@ -40,24 +40,29 @@ class FUTheme:
     PANEL_LIGHT_ALT = "#F1F5F9"
     PANEL_ACCENT = "#E8EDF3"
     BORDER = "#E2E8F0"
-    BORDER_DARK = "#CBD5E1"
+    BORDER_CONTROL = "#76869B"
+    BORDER_DARK = BORDER_CONTROL
     DARKROOM_VIEWPORT = "#111317"     # Studio Viewport for Candling Stream
 
     # Separate light-workspace text from the dark camera well.
-    TEXT_PRIMARY = "#1E293B"
-    TEXT_SECONDARY = "#475569"
-    TEXT_MUTED = "#5B6B80"
-    TEXT_DIM = "#5B6B80"
+    TEXT_PRIMARY = "#172B42"
+    TEXT_SECONDARY = "#34465D"
+    TEXT_MUTED = "#4C6077"
+    TEXT_DIM = TEXT_MUTED
     VIEWPORT_TEXT = "#F1F5F9"
     VIEWPORT_MUTED = "#CBD5E1"
     TEXT_WHITE = "#FFFFFF"            # Pure White for dark buttons
+    TEXT_DISABLED_ON_ACCENT = "#D4BABA"
     TEXT_ACCENT = "#875A12"
 
     # Standard Typography
-    # Native Windows face: available offline, with real regular/bold weights.
+    # configure_desktop selects the shipped Inter face before Tk starts.
+    FONT_PREFERRED = "Inter"
     FONT_FAMILY = "Segoe UI"
     FONT_BODY = 14
-    FONT_LABEL = 12
+    FONT_LABEL = 13
+    FONT_CAPTION = 12
+    FONT_CONTROL = 13
     FONT_HEADING = 20
     FONT_METRIC = 24
 
