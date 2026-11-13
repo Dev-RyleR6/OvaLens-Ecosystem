@@ -1,5 +1,6 @@
 """TASK-NEW-EDGE-SOFT-DESKTOP-01: native layout, disclosure and readable controls."""
 import tkinter as tk
+from tkinter import ttk
 
 import customtkinter as ctk
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from test_camera_preview_ui import preview_app
 from test_startup_config import hidden_ui
 from src.core.batches import new_batch_record
+from src.ui.select_field import SelectField, STYLE
 
 
 def bounds(widget):
@@ -112,11 +114,17 @@ def check_readable(root):
     for widget in root.winfo_children():
         if not widget.winfo_ismapped():
             continue
-        if isinstance(widget, (ctk.CTkButton, ctk.CTkLabel, ctk.CTkOptionMenu)):
-            text = widget.cget("text") if not isinstance(widget, ctk.CTkOptionMenu) else widget.get()
+        if isinstance(widget, (ctk.CTkButton, ctk.CTkLabel, ctk.CTkOptionMenu, SelectField)):
+            text = widget.get() if isinstance(widget, (ctk.CTkOptionMenu, SelectField)) else widget.cget("text")
             if text and not (isinstance(widget, ctk.CTkButton) and widget.cget("state") == "disabled"):
-                foreground = luminance(color(widget, widget.cget("text_color")))
-                surface = luminance(background(widget))
+                if isinstance(widget, SelectField):
+                    style = ttk.Style(widget)
+                    state = widget._combo.state()
+                    foreground = luminance(color(widget, style.lookup(STYLE, 'foreground', state)))
+                    surface = luminance(color(widget, style.lookup(STYLE, 'fieldbackground', state)))
+                else:
+                    foreground = luminance(color(widget, widget.cget("text_color")))
+                    surface = luminance(background(widget))
                 ratio = (max(foreground, surface) + .05) / (min(foreground, surface) + .05)
                 assert ratio >= 4.5, (text, ratio)
         check_readable(widget)

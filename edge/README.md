@@ -293,6 +293,10 @@ Inter Regular/Bold are bundled locally for consistent typography in the workspac
 and forms. The two fonts add about 813 KiB, load once per process and require no
 network connection or system font installation. See [font provenance and license](src/ui/assets/fonts/README.md).
 
+Read-only native selectors provide bounded, scrolling choice lists and keyboard
+navigation. Programmatic field updates do not invoke hardware callbacks. Tools
+opens below its header control, and settings fits within the current workspace.
+
 - **Decoupled Quad-Thread Concurrency**:
   - **Thread 1 (Camera Grabber)**: Continuous background frame consumer with single-frame atomic buffer (DirectShow / V4L2) eliminating video delay.
   - **Thread 2 (Inference Engine)**: Pluggable ONNX Runtime FP16 / PyTorch inference engine with 3-pass warmup and geometric candling heuristics ($0.65 \le \text{AR} \le 1.45$).

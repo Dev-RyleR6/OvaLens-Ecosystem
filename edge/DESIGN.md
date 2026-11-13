@@ -35,6 +35,23 @@ selected tabs keep dark text in their hover state. Neutral dropdowns use a light
 arrow surface so their dark chevron remains visible. Fonts register once for the
 process; no runtime download, system font install or decoration timer is needed.
 
+Selectors use `SelectField`: a read-only native ttk.Combobox in the CTk layout,
+with white fields, dark values/arrows, a maroon focus border and an eight-row
+scrolling popup. All selectors share that treatment, including rig profiles and
+history filters; maroon fills identify actions rather than selection fields.
+Programmatic changes and linked StringVar writes never invoke a user callback.
+Closed-field wheel input scrolls the form without changing a selection; popup
+wheel input scrolls only the popup. Native arrows, Enter and Escape handle
+selection, and scan/stop letter shortcuts do not run while a picker has focus.
+
+Header context uses three aligned grid columns. Pause belongs beside the sorting
+action; manual light control sits near STOP on the right. Tools opens beneath its
+header control. Station settings is centered and clamped to the current workspace,
+with responsive help wrapping and fixed actions below its scrolling tabs. Camera
+auto/manual pairs share an inset group; blank numeric inputs use shared helper
+text. Status/result groups expand to fit wrapped messages instead of fixed-height
+text clipping. Keep panel separators quiet and selector boundaries distinct.
+
 Daily operation uses Batch setup, empty-conveyor confirmation, Prepare station,
 then a separate Start sorting action. Camera preview and passive software/storage
 checks start on opening; serial discovery waits for explicit empty-rig preparation.

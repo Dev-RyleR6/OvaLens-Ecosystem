@@ -1,5 +1,6 @@
 """Idle-only station settings, applied through the operation worker."""
 import customtkinter as ctk
+from .select_field import SelectField
 from serial.tools import list_ports
 from ..core.settings import EdgeSettings
 from .theme import FUTheme
@@ -16,7 +17,8 @@ class StationSettingsWindow(ctk.CTkToplevel):
         self.app, self.station = app, app.station
         self.title("OvaLens station settings")
         self.geometry("920x740")
-        self.minsize(800, 640)
+        app._center_window(self, 920, 740)
+        self.minsize(min(800, app.winfo_width() - 24), min(640, app.winfo_height() - 32))
         self.configure(fg_color=FUTheme.BG_LIGHT)
         self.transient(app)
         self.grab_set()
@@ -47,10 +49,10 @@ class StationSettingsWindow(ctk.CTkToplevel):
         connection = ctk.CTkScrollableFrame(tabs.tab("Connections"))
         connection.pack(fill="both", expand=True)
         self.profile = ctk.StringVar(value="Three-board candling rig")
-        self.profile_menu = ctk.CTkOptionMenu(connection, values=list(self.PROFILES), variable=self.profile,
-                          font=(FUTheme.FONT_FAMILY, 14), fg_color=FUTheme.PRIMARY_MAROON,
-                          button_color=FUTheme.HOVER_MAROON)
-        self.profile_menu.pack(anchor="w", padx=8, pady=8)
+        ctk.CTkLabel(connection, text="Rig profile", font=(FUTheme.FONT_FAMILY, FUTheme.FONT_LABEL, "bold"),
+                     text_color=FUTheme.TEXT_PRIMARY).pack(anchor="w", padx=8, pady=(8, 0))
+        self.profile_menu = SelectField(connection, values=list(self.PROFILES), variable=self.profile, font=(FUTheme.FONT_FAMILY, 14))
+        self.profile_menu.pack(fill="x", padx=8, pady=8)
         self._button(connection, "Load selected rig defaults", self._rig_defaults)
         self._entry(connection, "conveyor_port", "Conveyor ESP32 serial port", "")
         self._entry(connection, "servo_port", "Egg / servo ESP32 serial port", "")
@@ -117,6 +119,25 @@ class StationSettingsWindow(ctk.CTkToplevel):
         ctk.CTkButton(actions, text="STOP", fg_color="#DC2626", command=self.station.halt, width=75, height=40).pack(side="right", padx=4)
         self._fill(self.station.settings)
         self.protocol("WM_DELETE_WINDOW", self._close)
+        self._wrapped_labels = []
+        def collect(parent):
+            for child in parent.winfo_children():
+                if isinstance(child, ctk.CTkLabel) and child.cget("wraplength"):
+                    self._wrapped_labels.append(child)
+                collect(child)
+        collect(self)
+        self.bind("<Configure>", self._fit_text)
+        self._fit_text()
+
+    def _fit_text(self, event=None):
+        if event is not None and event.widget is not self:
+            return
+        width = max(240, self.winfo_width() - 112)
+        if width == getattr(self, "_text_width", None):
+            return
+        self._text_width = width
+        for label in self._wrapped_labels:
+            label.configure(wraplength=width)
 
     def _entry(self, parent, key, label, value):
         row = ctk.CTkFrame(parent, fg_color="transparent")

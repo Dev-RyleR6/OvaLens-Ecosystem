@@ -17,8 +17,10 @@ from typing import Optional, Dict, Any, List, Tuple
 import cv2
 import numpy as np
 import tkinter as tk
+from tkinter import ttk
 from PIL import Image, ImageTk
 import customtkinter as ctk
+from .select_field import SelectField
 
 from .theme import FUTheme, fit_caption
 from .desktop_style import configure_desktop, install_entry_focus
@@ -299,13 +301,13 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         # Typing in a dialog or editable field must never start a scan.
         if event.widget.winfo_toplevel() is not self or self.grab_current() is not None:
             return
-        if isinstance(event.widget, (tk.Entry, tk.Text, tk.Spinbox)):
+        if isinstance(event.widget, (tk.Entry, tk.Text, tk.Spinbox, ttk.Combobox)):
             return
         self.trigger_candling_scan()
         return "break"
 
     def _stop_shortcut(self, event):
-        if event.widget.winfo_toplevel() is not self or isinstance(event.widget, (tk.Entry, tk.Text, tk.Spinbox)):
+        if event.widget.winfo_toplevel() is not self or isinstance(event.widget, (tk.Entry, tk.Text, tk.Spinbox, ttk.Combobox)):
             return
         self.trigger_manual_eject()
         return "break"
@@ -366,14 +368,15 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         self.header_frame.pack(side="top", fill="x")
         navigation = ctk.CTkFrame(self.header_frame, fg_color="transparent")
         navigation.pack(fill="x", padx=24, pady=16)
+        navigation.grid_columnconfigure(1, weight=1)
         brand = ctk.CTkFrame(navigation, fg_color="transparent")
-        brand.pack(side="left", padx=(0, 32))
+        brand.grid(row=0, column=0, sticky="w", padx=(0, 32))
         ctk.CTkLabel(brand, text="OvaLens", font=(FUTheme.FONT_FAMILY, 24, "bold"),
                      text_color=FUTheme.PRIMARY_MAROON, anchor="w").pack(anchor="w")
         ctk.CTkLabel(brand, text="Foundation University · Day 10 candling",
                      font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED).pack(anchor="w")
         batch = ctk.CTkFrame(navigation, fg_color="transparent")
-        batch.pack(side="left")
+        batch.grid(row=0, column=1, sticky="w")
         self._batch_caption_font = ctk.CTkFont(family=FUTheme.FONT_FAMILY, size=13)
         self._operator_caption_font = ctk.CTkFont(family=FUTheme.FONT_FAMILY, size=12)
         self.batch_btn = ctk.CTkButton(batch, text="Choose batch", width=240, height=34,
@@ -386,7 +389,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             font=self._operator_caption_font, text_color=FUTheme.TEXT_MUTED, anchor="w", width=240)
         self.operator_label.pack(anchor="w", pady=(3, 0))
         self.header_actions = ctk.CTkFrame(navigation, fg_color="transparent")
-        self.header_actions.pack(side="right")
+        self.header_actions.grid(row=0, column=2, sticky="e", padx=(20, 0))
         self.kiosk_btn = ctk.CTkButton(self.header_actions,
             text="Windowed [F11]" if self.is_fullscreen else "Kiosk [F11]", width=116, height=34,
             font=(FUTheme.FONT_FAMILY, 12), fg_color=FUTheme.PANEL_LIGHT_ALT,
@@ -441,12 +444,11 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         self.main_container.grid_rowconfigure(0, weight=1)
 
         self.left_panel = ctk.CTkFrame(self.main_container, fg_color=FUTheme.PANEL_LIGHT,
-                                      corner_radius=12, border_width=0)
+                                      corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
         self.left_panel.grid(row=0, column=0, sticky="nsew")
         self.cycle_hud = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.PANEL_LIGHT,
                                      height=102, corner_radius=12)
         self.cycle_hud.pack(fill="x", padx=16, pady=(8, 0))
-        self.cycle_hud.pack_propagate(False)
         # Retained for state updates; the instruction itself carries emphasis.
         self.cycle_status_dot = ctk.CTkLabel(self.cycle_hud, text="", width=0)
         cue_body = ctk.CTkFrame(self.cycle_hud, fg_color="transparent")
@@ -490,13 +492,12 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
 
         # A compact side panel reserves more width for the camera.
         self.right_panel = ctk.CTkFrame(self.main_container, fg_color=FUTheme.PANEL_LIGHT,
-                                       width=360, corner_radius=12, border_width=0)
+                                       width=360, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
         self.right_panel.grid(row=0, column=1, sticky="nsew", padx=(20, 0))
         self.right_panel.pack_propagate(False)
         self.result_banner = ctk.CTkFrame(self.right_panel, fg_color="transparent",
                                          corner_radius=12, height=116, border_width=0)
         self.result_banner.pack(fill="x", padx=12, pady=(12, 0))
-        self.result_banner.pack_propagate(False)
         result_top = ctk.CTkFrame(self.result_banner, fg_color="transparent")
         result_top.pack(fill="x", padx=12, pady=(12, 6))
         self.result_badge = ctk.CTkLabel(result_top, text="Latest egg",
@@ -602,7 +603,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             font=(FUTheme.FONT_FAMILY, 13), fg_color=FUTheme.PANEL_LIGHT_ALT,
             text_color=FUTheme.TEXT_PRIMARY, hover_color=FUTheme.PANEL_ACCENT,
             command=self.toggle_manual_light, text_color_disabled=FUTheme.TEXT_MUTED, border_color=FUTheme.BORDER_CONTROL, border_width=1)
-        self.light_btn.pack(side="left", padx=8, pady=16)
+        self.light_btn.pack(side="right", padx=8, pady=16)
         self.scan_btn = ctk.CTkButton(self.footer_frame, text="Single Scan [SPACE]", height=44,
             text_color=FUTheme.TEXT_PRIMARY, fg_color=FUTheme.PANEL_LIGHT_ALT,
             command=self.trigger_candling_scan, text_color_disabled=FUTheme.TEXT_MUTED, border_color=FUTheme.BORDER_CONTROL, border_width=1)
@@ -684,7 +685,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             return
         self._pause_signature = signature
         if visible:
-            self.pause_btn.pack(side="left", padx=6, pady=13, after=self.eject_btn)
+            self.pause_btn.pack(side="left", padx=6, pady=13, after=self.session_btn)
         else:
             self.pause_btn.pack_forget()
         self.pause_btn.configure(text=text, state="normal" if allowed else "disabled")
@@ -785,7 +786,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
     def open_tools_menu(self):
         try:
             self.tools_menu.tk_popup(self.settings_btn.winfo_rootx(),
-                                     self.settings_btn.winfo_rooty() - 100)
+                                     self.settings_btn.winfo_rooty() + self.settings_btn.winfo_height() + 6)
         finally:
             self.tools_menu.grab_release()
 
@@ -2493,13 +2494,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             batch_ids.insert(0, self.current_batch_id)
         batch_options = batch_ids + (["ALL (All Batches)"] if len(batch_ids) > 1 else [])
 
-        batch_dropdown = ctk.CTkOptionMenu(
-            control_bar, values=batch_options, font=(FUTheme.FONT_FAMILY, FUTheme.FONT_CAPTION, "bold"),
-            fg_color=FUTheme.PRIMARY_MAROON, button_color=FUTheme.HOVER_MAROON,
-            text_color=FUTheme.TEXT_WHITE, dropdown_fg_color=FUTheme.PANEL_LIGHT,
-            dropdown_hover_color=FUTheme.PANEL_ACCENT, dropdown_text_color=FUTheme.TEXT_PRIMARY,
-            height=30, width=220
-        )
+        batch_dropdown = SelectField(control_bar, values=batch_options, font=(FUTheme.FONT_FAMILY, FUTheme.FONT_CAPTION, 'bold'), dropdown_fg_color=FUTheme.PANEL_LIGHT, dropdown_hover_color=FUTheme.PANEL_ACCENT, dropdown_text_color=FUTheme.TEXT_PRIMARY, height=30, width=220)
         batch_dropdown.set(self.current_batch_id)
         batch_dropdown.pack(side="left", padx=(0, 10), pady=6)
         def apply_batches(batches):
