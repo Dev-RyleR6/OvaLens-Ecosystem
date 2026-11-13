@@ -30,7 +30,7 @@ class CameraControlsPanel(ctk.CTkFrame):
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=18, pady=(12, 4))
         self.done = ctk.CTkButton(header, text="Done", width=65, height=34,
-            font=(FUTheme.FONT_FAMILY, 13), fg_color=FUTheme.PANEL_LIGHT_ALT,
+            font=(FUTheme.FONT_FAMILY, 13), fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
             hover_color=FUTheme.PANEL_ACCENT, command=self.close)
         self.done.pack(side="right")
         ctk.CTkLabel(header, text="Camera controls", font=(FUTheme.FONT_FAMILY, 20, "bold"),
@@ -45,13 +45,14 @@ class CameraControlsPanel(ctk.CTkFrame):
             button = ctk.CTkButton(actions, text=label, height=34, width=155,
                 font=(FUTheme.FONT_FAMILY, 13, "bold"),
                 fg_color=FUTheme.PRIMARY_MAROON if not save else FUTheme.PANEL_LIGHT_ALT,
+                text_color=FUTheme.TEXT_WHITE if not save else FUTheme.TEXT_PRIMARY,
                 hover_color=FUTheme.HOVER_MAROON if not save else FUTheme.PANEL_ACCENT,
                 border_width=0 if not save else 1, border_color=FUTheme.BORDER,
                 command=lambda save=save: self.apply(save))
             button.grid(row=0, column=column, padx=3, pady=4, sticky="ew")
             self.controls.append(button)
         restore = ctk.CTkButton(actions, text="Load saved settings", height=28,
-            font=(FUTheme.FONT_FAMILY, 13), fg_color=FUTheme.PANEL_LIGHT_ALT,
+            font=(FUTheme.FONT_FAMILY, 13), fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY,
             hover_color=FUTheme.PANEL_ACCENT, command=self.restore)
         restore.grid(row=1, column=0, columnspan=2, sticky="ew", padx=3, pady=4)
         self.controls.append(restore)
@@ -61,7 +62,7 @@ class CameraControlsPanel(ctk.CTkFrame):
         self.notice.pack(side="bottom", fill="x", padx=20, pady=6)
         self.section = ctk.CTkSegmentedButton(self, values=["Camera", "Cradle"],
             font=(FUTheme.FONT_FAMILY, 13), command=self._section,
-            selected_color=FUTheme.PRIMARY_MAROON, selected_hover_color=FUTheme.HOVER_MAROON,
+            selected_color="#EEDADA", selected_hover_color="#E5C4C4", text_color=FUTheme.PRIMARY_MAROON,
             unselected_color=FUTheme.PANEL_LIGHT_ALT, unselected_hover_color=FUTheme.PANEL_ACCENT,
             fg_color=FUTheme.PANEL_LIGHT_ALT)
         self.section.pack(fill="x", padx=18, pady=(0, 4))
@@ -77,7 +78,7 @@ class CameraControlsPanel(ctk.CTkFrame):
             if name in AUTO_CONTROLS:
                 control = ctk.CTkOptionMenu(row, values=["Unchanged", "On", "Off", "Saved value"],
                     width=140, height=34, font=(FUTheme.FONT_FAMILY, 13),
-                    fg_color=FUTheme.PANEL_LIGHT_ALT, button_color=FUTheme.PANEL_ACCENT,
+                    fg_color=FUTheme.PANEL_LIGHT_ALT, button_color=FUTheme.PANEL_ACCENT, text_color=FUTheme.TEXT_PRIMARY,
                     button_hover_color=FUTheme.BORDER_DARK, command=self._mode_changed)
                 self.modes[name] = control
             else:
@@ -102,7 +103,7 @@ class CameraControlsPanel(ctk.CTkFrame):
 
     def _slider(self, group, row, name):
         button = ctk.CTkButton(row, text="Range", width=52, height=30,
-            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
+            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT, text_color=FUTheme.TEXT_PRIMARY,
             command=lambda: self._toggle_range(name))
         button.pack(side="right", padx=4)
         slider = ctk.CTkSlider(group, from_=0, to=255, number_of_steps=255,
@@ -117,7 +118,7 @@ class CameraControlsPanel(ctk.CTkFrame):
             field.pack(side="left", padx=(0, 5))
             fields.append(field)
         set_button = ctk.CTkButton(editor, text="Set", width=48, height=30,
-            fg_color=FUTheme.PANEL_LIGHT_ALT, command=lambda: self._set_range(name))
+            fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_PRIMARY, command=lambda: self._set_range(name))
         set_button.pack(side="left")
         self.sliders[name] = slider
         self.range_fields[name] = (editor, *fields)
@@ -276,7 +277,7 @@ class CameraControlsPanel(ctk.CTkFrame):
         row.pack(fill="x", pady=8)
         ctk.CTkLabel(row, text="Steps per click", font=(FUTheme.FONT_FAMILY, 13)).pack(side="left")
         self.jog_steps = ctk.CTkOptionMenu(row, values=["10", "25", "50", "100", "250", "500", "1000"], width=100,
-            fg_color=FUTheme.PANEL_LIGHT_ALT, button_color=FUTheme.PANEL_ACCENT,
+            fg_color=FUTheme.PANEL_LIGHT_ALT, button_color=FUTheme.PANEL_ACCENT, text_color=FUTheme.TEXT_PRIMARY,
             button_hover_color=FUTheme.BORDER_DARK)
         self.jog_steps.set("25")
         self.jog_steps.pack(side="right")
@@ -286,7 +287,7 @@ class CameraControlsPanel(ctk.CTkFrame):
         self.jog_buttons = []
         for col, (label, direction) in enumerate((("Backward", -1), ("Forward", 1))):
             button = ctk.CTkButton(jogs, text=label, width=140, height=38,
-                fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
+                fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT, text_color=FUTheme.TEXT_PRIMARY,
                 command=lambda direction=direction: self._jog(direction))
             button.grid(row=0, column=col, sticky="ew", padx=3)
             self.jog_buttons.append(button)

@@ -1,7 +1,6 @@
 """
-Foundation University Industrial Pro Gray Theme Tokens for CustomTkinter Operator GUI
-Professional mid-tone charcoal and slate surfaces. Reduces eye strain, eliminates glare,
-masks touchscreen dust/fingerprints, and provides rich contrast for candling optics.
+Foundation University soft desktop palette for the native operator interface.
+Light neutral surfaces keep controls readable; the camera retains its dark well.
 """
 
 class FUTheme:
@@ -10,47 +9,49 @@ class FUTheme:
     DARK_MAROON = "#5C0000"
     LIGHT_MAROON = "#991B1B"
     HOVER_MAROON = "#6B0000"
-    PRIMARY_MAROON_BG = "#33181C"     # Rich maroon tint for preview cards
+    PRIMARY_MAROON_BG = "#FAEEEE"
     PRIMARY_MAROON_BORDER = "#800000" # Institutional maroon border
 
-    # Semantic Biological Classes (Luminous High Contrast for Gray Surfaces)
+    # Semantic results use readable text on quiet tinted surfaces.
     FERTILE_GREEN = "#357a38"         # Foundation University Agri-Green
-    FERTILE_GREEN_HOVER = "#16A34A"
-    FERTILE_GREEN_BG = "#133E25"      # Deep forest green badge container
-    FERTILE_GREEN_CARD = "#162D20"    # Subtle green card fill
-    FERTILE_GREEN_BORDER = "#1E5834"
-    FERTILE_GREEN_TEXT = "#4ADE80"    # High-contrast green text
+    FERTILE_GREEN_HOVER = "#28642D"
+    FERTILE_GREEN_BG = "#E5F2E7"
+    FERTILE_GREEN_CARD = "#F1F8F3"
+    FERTILE_GREEN_BORDER = "#C7DFCC"
+    FERTILE_GREEN_TEXT = "#28642D"
 
-    INFERTILE_AMBER = "#FBBF24"       # Penoy Amber Luminous
-    INFERTILE_AMBER_HOVER = "#F59E0B"
-    INFERTILE_AMBER_BG = "#4D2C0C"    # Deep amber badge container
-    INFERTILE_AMBER_CARD = "#332213"  # Subtle amber card fill
-    INFERTILE_AMBER_BORDER = "#6B3D10"
-    INFERTILE_AMBER_TEXT = "#FDE68A"  # High-contrast amber text
+    INFERTILE_AMBER = "#875A12"
+    INFERTILE_AMBER_HOVER = "#70490C"
+    INFERTILE_AMBER_BG = "#FBF0D9"
+    INFERTILE_AMBER_CARD = "#FFFAF0"
+    INFERTILE_AMBER_BORDER = "#EBDAB3"
+    INFERTILE_AMBER_TEXT = "#80530C"
 
     REJECT_RED = "#DC2626"
     REJECT_RED_HOVER = "#B91C1C"
-    REJECT_RED_BG = "#4C1D24"
-    REJECT_RED_CARD = "#33161A"
-    REJECT_RED_BORDER = "#6E222C"
-    REJECT_RED_TEXT = "#FECACA"
+    REJECT_RED_BG = "#FDECEC"
+    REJECT_RED_CARD = "#FFF5F5"
+    REJECT_RED_BORDER = "#F2CACA"
+    REJECT_RED_TEXT = "#A92020"
 
-    # Industrial Pro Gray Surfaces (Mid-Tone Charcoal & Slate)
-    BG_LIGHT = "#0F172A"              # FU dark slate canvas
-    PANEL_LIGHT = "#1E293B"           # FU dark slate cards
-    PANEL_LIGHT_ALT = "#1E2129"       # Inset Containers / Dropdown Surfaces (Deep Slate)
-    PANEL_ACCENT = "#353A47"          # Hover / Interactive Surface (Mid Slate)
-    BORDER = "#334155"                # FU dark slate border
-    BORDER_DARK = "#4F5768"           # Focus / Accent Border
+    # Native desktop surfaces follow the FU light theme.
+    BG_LIGHT = "#F8FAFC"
+    PANEL_LIGHT = "#FFFFFF"
+    PANEL_LIGHT_ALT = "#F1F5F9"
+    PANEL_ACCENT = "#E8EDF3"
+    BORDER = "#E2E8F0"
+    BORDER_DARK = "#CBD5E1"
     DARKROOM_VIEWPORT = "#111317"     # Studio Viewport for Candling Stream
 
-    # Typography (High-Contrast Off-White on Industrial Gray)
-    TEXT_PRIMARY = "#F1F3F7"          # Crisp Slate-50 Off-White (High contrast)
-    TEXT_SECONDARY = "#CBD2E0"        # Soft Silver Slate
-    TEXT_MUTED = "#A8B4C8"            # Readable secondary metadata on slate
-    TEXT_DIM = "#94A3B8"              # Quiet text with accessible contrast
+    # Separate light-workspace text from the dark camera well.
+    TEXT_PRIMARY = "#1E293B"
+    TEXT_SECONDARY = "#475569"
+    TEXT_MUTED = "#5B6B80"
+    TEXT_DIM = "#5B6B80"
+    VIEWPORT_TEXT = "#F1F5F9"
+    VIEWPORT_MUTED = "#CBD5E1"
     TEXT_WHITE = "#FFFFFF"            # Pure White for dark buttons
-    TEXT_ACCENT = "#FDE047"           # Gold / Amber highlight
+    TEXT_ACCENT = "#875A12"
 
     # Standard Typography
     # Native Windows face: available offline, with real regular/bold weights.
@@ -59,3 +60,17 @@ class FUTheme:
     FONT_LABEL = 12
     FONT_HEADING = 20
     FONT_METRIC = 24
+
+
+def fit_caption(text, measure, width):
+    """Keep long batch codes and staff names within their native header control."""
+    if measure(text) <= width:
+        return text
+    low, high = 0, len(text)
+    while low < high:
+        middle = (low + high + 1) // 2
+        if measure(text[:middle] + "…") <= width:
+            low = middle
+        else:
+            high = middle - 1
+    return text[:low] + "…"

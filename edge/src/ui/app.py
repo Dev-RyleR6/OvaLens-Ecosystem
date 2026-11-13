@@ -20,7 +20,7 @@ import tkinter as tk
 from PIL import Image, ImageTk
 import customtkinter as ctk
 
-from .theme import FUTheme
+from .theme import FUTheme, fit_caption
 from ..core.camera import CameraGrabber
 from ..core.inference import InferenceEngine
 from ..core.chamber_controller import ChamberController, ChamberState
@@ -154,10 +154,10 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             self.chamber.on_jam_detected = lambda: self._ui_events.put(self._on_jam_detected)
 
         # Window Configuration (Industrial Pro Gray Theme)
-        self.title("OvaLens — Automated Duck Egg Candling System (Foundation University)")
+        self.title("OvaLens — Candling station")
         self.geometry("1280x860")
         self.minsize(1024, 720)
-        ctk.set_appearance_mode("dark")
+        ctk.set_appearance_mode("light")
         self.configure(fg_color=FUTheme.BG_LIGHT)
         if self.is_fullscreen:
             try:
@@ -359,108 +359,43 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         self._log("[" + state.value + "] " + message)
 
     def _build_header(self):
-        self.header_frame = ctk.CTkFrame(
-            self, fg_color=FUTheme.PANEL_LIGHT, corner_radius=0, height=64,
-            border_width=1, border_color=FUTheme.BORDER
-        )
+        self.header_frame = ctk.CTkFrame(self, fg_color=FUTheme.PANEL_LIGHT, corner_radius=0)
         self.header_frame.pack(side="top", fill="x")
-
         navigation = ctk.CTkFrame(self.header_frame, fg_color="transparent")
-        navigation.pack(fill="x")
+        navigation.pack(fill="x", padx=24, pady=16)
+        brand = ctk.CTkFrame(navigation, fg_color="transparent")
+        brand.pack(side="left", padx=(0, 32))
+        ctk.CTkLabel(brand, text="OvaLens", font=(FUTheme.FONT_FAMILY, 24, "bold"),
+                     text_color=FUTheme.PRIMARY_MAROON, anchor="w").pack(anchor="w")
+        ctk.CTkLabel(brand, text="Foundation University · Day 10 candling",
+                     font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED).pack(anchor="w")
+        batch = ctk.CTkFrame(navigation, fg_color="transparent")
+        batch.pack(side="left")
+        self._batch_caption_font = ctk.CTkFont(family=FUTheme.FONT_FAMILY, size=13)
+        self._operator_caption_font = ctk.CTkFont(family=FUTheme.FONT_FAMILY, size=12)
+        self.batch_btn = ctk.CTkButton(batch, text="Choose batch", width=240, height=34,
+            font=self._batch_caption_font, fg_color=FUTheme.PANEL_LIGHT_ALT,
+            text_color=FUTheme.TEXT_PRIMARY, hover_color=FUTheme.PANEL_ACCENT,
+            corner_radius=8, command=self.open_batch_setup_dialog)
+        self.batch_btn.pack(anchor="w")
+        self.batch_setup_btn = self.batch_btn
+        self.operator_label = ctk.CTkLabel(batch, text="Operator: choose registered staff",
+            font=self._operator_caption_font, text_color=FUTheme.TEXT_MUTED, anchor="w", width=240)
+        self.operator_label.pack(anchor="w", pady=(3, 0))
+        self.header_actions = ctk.CTkFrame(navigation, fg_color="transparent")
+        self.header_actions.pack(side="right")
+        self.kiosk_btn = ctk.CTkButton(self.header_actions,
+            text="Windowed [F11]" if self.is_fullscreen else "Kiosk [F11]", width=116, height=34,
+            font=(FUTheme.FONT_FAMILY, 12), fg_color=FUTheme.PANEL_LIGHT_ALT,
+            text_color=FUTheme.TEXT_SECONDARY, hover_color=FUTheme.PANEL_ACCENT,
+            corner_radius=8, command=self.toggle_fullscreen)
+        self.kiosk_btn.pack(side="right", padx=(8, 0))
+        self.help_btn = ctk.CTkButton(self.header_actions, text="Guide", width=60, height=34,
+            font=(FUTheme.FONT_FAMILY, 13), fg_color="transparent",
+            text_color=FUTheme.TEXT_SECONDARY, hover_color=FUTheme.PANEL_ACCENT,
+            command=self.open_onboarding_guide)
+        self.help_btn.pack(side="left", padx=(0, 8))
 
-        # Left: University & Project Brand
-        brand_container = ctk.CTkFrame(navigation, fg_color="transparent")
-        brand_container.pack(side="left", padx=18, pady=10)
-
-        badge = ctk.CTkLabel(
-            brand_container, text=" FU ", fg_color=FUTheme.PRIMARY_MAROON,
-            text_color=FUTheme.TEXT_WHITE, font=(FUTheme.FONT_FAMILY, 13, "bold"),
-            corner_radius=6, padx=6, pady=2
-        )
-        badge.pack(side="left", padx=(0, 10))
-
-        title_box = ctk.CTkFrame(brand_container, fg_color="transparent")
-        title_box.pack(side="left")
-
-        title = ctk.CTkLabel(
-            title_box, text="OvaLens Edge Operator",
-            font=(FUTheme.FONT_FAMILY, FUTheme.FONT_HEADING, "bold"), text_color=FUTheme.TEXT_PRIMARY
-        )
-        title.pack(anchor="w")
-
-        subtitle = ctk.CTkLabel(
-            title_box, text="Foundation University • Team DevIn",
-            font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED
-        )
-        subtitle.pack(anchor="w")
-
-        # Center: Interactive Active Batch Setup Button with High Contrast
-        self.batch_btn = ctk.CTkButton(
-            navigation,
-            text=f"Batch: {self.current_batch_code}  ({self.current_stage})  ▾",
-            font=(FUTheme.FONT_FAMILY, 12, "bold"),
-            fg_color=FUTheme.PANEL_LIGHT_ALT,
-            text_color=FUTheme.TEXT_PRIMARY,
-            hover_color=FUTheme.PANEL_ACCENT,
-            border_width=1,
-            border_color=FUTheme.BORDER_DARK,
-            command=self.open_batch_setup_dialog,
-            height=36, corner_radius=8
-        )
-        self.batch_btn.pack(side="left", padx=(18, 8))
-
-        # Quick Onboarding / Help Guide Button
-        self.help_btn = ctk.CTkButton(
-            navigation,
-            text="Guide [F1]", width=100,
-            font=(FUTheme.FONT_FAMILY, 12, "bold"),
-            fg_color=FUTheme.PANEL_LIGHT_ALT,
-            text_color=FUTheme.TEXT_PRIMARY,
-            hover_color=FUTheme.PANEL_ACCENT,
-            border_width=1,
-            border_color=FUTheme.BORDER,
-            command=self.open_onboarding_guide,
-            height=36, corner_radius=8
-        )
-        self.help_btn.pack(side="left", padx=4)
-
-        # Fullscreen Kiosk Mode Button
-        self.kiosk_btn = ctk.CTkButton(
-            navigation,
-            text="Windowed [F11]" if self.is_fullscreen else "Kiosk [F11]", width=128,
-            font=(FUTheme.FONT_FAMILY, 12, "bold"),
-            fg_color=FUTheme.PANEL_LIGHT_ALT,
-            text_color=FUTheme.TEXT_SECONDARY,
-            hover_color=FUTheme.PANEL_ACCENT,
-            border_width=1,
-            border_color=FUTheme.BORDER,
-            command=self.toggle_fullscreen,
-            height=36, corner_radius=8
-        )
-        self.kiosk_btn.pack(side="left", padx=4)
-
-        # Right: Status Telemetry Badges
-        right_container = ctk.CTkFrame(self.header_frame, fg_color="transparent")
-        right_container.pack(fill="x", padx=18, pady=(0, 8))
-
-        self.fps_label = ctk.CTkLabel(
-            right_container, text="FPS: 0.0", font=(FUTheme.FONT_FAMILY, 12, "bold"), text_color=FUTheme.TEXT_MUTED
-        )
-        self.fps_label.pack(side="right", padx=8)
-
-        self.iot_status_badge = ctk.CTkLabel(
-            right_container, text="ESP32: STANDBY", fg_color=FUTheme.PANEL_LIGHT_ALT,
-            text_color=FUTheme.TEXT_SECONDARY, font=(FUTheme.FONT_FAMILY, 12, "bold"),
-            corner_radius=4, padx=8, pady=3
-        )
-        self.iot_status_badge.pack(side="left", padx=4)
-
-        self.net_status_badge = ctk.CTkLabel(
-            right_container, text="SYNC: ONLINE", fg_color=FUTheme.FERTILE_GREEN_BG,
-            text_color=FUTheme.FERTILE_GREEN_TEXT, font=(FUTheme.FONT_FAMILY, 12, "bold"),
-            corner_radius=4, padx=8, pady=3
-        )
-        self.net_status_badge.pack(side="left", padx=4)
 
     def _center_window(self, dialog, width: int, height: int):
         """Center modal dialog relative to root window and clamp to screen bounds."""
@@ -480,226 +415,142 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         dialog.minsize(min(target_w, 360), min(target_h, 280))
         self._animate_modal_open(dialog)
 
-    def _animate_modal_open(self, dialog, duration_ms: int = 150):
-        """Smooth alpha fade-in for CustomTkinter dialogs."""
-        try:
-            dialog.attributes("-alpha", 0.0)
-            steps = 6
-            step_time = max(15, duration_ms // steps)
-            for i in range(1, steps + 1):
-                alpha = i / steps
-                dialog.after(i * step_time, lambda a=alpha: dialog.winfo_exists() and dialog.attributes("-alpha", a))
-        except Exception:
-            pass
+    def _animate_modal_open(self, dialog, duration_ms=0):
+        """Native dialogs open without decorative animation timers."""
+        return
 
-    def _animate_modal_close(self, dialog, on_close=None, duration_ms: int = 140):
-        """Smooth alpha fade-out before destroying dialog."""
-        try:
-            steps = 5
-            step_time = max(15, duration_ms // steps)
-            for i in range(steps):
-                alpha = 1.0 - (i / steps)
-                dialog.after(i * step_time, lambda a=alpha: dialog.winfo_exists() and dialog.attributes("-alpha", a))
-
-            def finalize():
+    def _animate_modal_close(self, dialog, on_close=None, duration_ms=0):
+        """Defer close callbacks until Tk finishes the current UI event."""
+        def finalize():
+            try:
                 if on_close:
-                    try:
-                        on_close()
-                    except Exception:
-                        pass
+                    on_close()
+            finally:
                 if dialog.winfo_exists():
                     dialog.destroy()
-
-            dialog.after(duration_ms, finalize)
-        except Exception:
-            if on_close:
-                on_close()
-            if dialog.winfo_exists():
-                dialog.destroy()
+        dialog.after_idle(finalize)
 
     def _build_main_layout(self):
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
-        self.main_container.pack(fill="both", expand=True, padx=16, pady=12)
+        self.main_container.pack(fill="both", expand=True, padx=24, pady=20)
+        self.main_container.grid_columnconfigure(0, weight=1, minsize=490)
+        self.main_container.grid_columnconfigure(1, weight=0)
+        self.main_container.grid_rowconfigure(0, weight=1)
 
-        # Left Column: Live Candling Viewport & Conveyor Status HUD
-        self.left_panel = ctk.CTkFrame(
-            self.main_container, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12,
-            border_width=1, border_color=FUTheme.BORDER
-        )
-        self.left_panel.pack(side="left", fill="both", expand=True, padx=(0, 10))
-
-        # Top of Left Panel: Live Automated Cycle State Indicator
-        self.cycle_hud = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.PANEL_LIGHT_ALT, height=96, corner_radius=8)
-        self.cycle_hud.pack(fill="x", padx=10, pady=(10, 6))
+        self.left_panel = ctk.CTkFrame(self.main_container, fg_color=FUTheme.PANEL_LIGHT,
+                                      corner_radius=12, border_width=0)
+        self.left_panel.grid(row=0, column=0, sticky="nsew")
+        self.cycle_hud = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.PANEL_LIGHT,
+                                     height=102, corner_radius=12)
+        self.cycle_hud.pack(fill="x", padx=16, pady=(8, 0))
         self.cycle_hud.pack_propagate(False)
-
-        self.cycle_status_dot = ctk.CTkLabel(
-            self.cycle_hud, text="●", font=(FUTheme.FONT_FAMILY, 14, "bold"), text_color=FUTheme.TEXT_MUTED
-        )
-        self.cycle_status_dot.pack(side="left", padx=(12, 6))
-
-        self.camera_controls_btn = ctk.CTkButton(self.cycle_hud, text="Camera controls",
-            width=132, height=34, font=(FUTheme.FONT_FAMILY, 13),
-            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
-            border_width=1, border_color=FUTheme.BORDER, command=self.open_camera_controls)
-        self.camera_controls_btn.pack(side="right", padx=10)
-
+        # Retained for state updates; the instruction itself carries emphasis.
+        self.cycle_status_dot = ctk.CTkLabel(self.cycle_hud, text="", width=0)
         cue_body = ctk.CTkFrame(self.cycle_hud, fg_color="transparent")
-        cue_body.pack(side="left", fill="both", expand=True, padx=(0, 10), pady=8)
-        self.cycle_status_label = ctk.CTkLabel(
-            cue_body, text="Ready to prepare",
-            font=(FUTheme.FONT_FAMILY, 21, "bold"), text_color=FUTheme.TEXT_PRIMARY
-        )
-        self.cycle_status_label.configure(wraplength=340, justify="left", anchor="w")
+        cue_body.pack(fill="both", expand=True, pady=12)
+        self.cycle_status_label = ctk.CTkLabel(cue_body, text="Ready to prepare", anchor="w",
+            justify="left", font=(FUTheme.FONT_FAMILY, 22, "bold"), text_color=FUTheme.TEXT_PRIMARY)
         self.cycle_status_label.pack(fill="x")
-        self.cycle_detail_label = ctk.CTkLabel(cue_body, text="Choose a batch, then prepare the empty conveyor.",
+        self.cycle_detail_label = ctk.CTkLabel(cue_body, text="Choose a batch to begin.",
             font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_SECONDARY,
-            wraplength=340, justify="left", anchor="w")
-        self.cycle_detail_label.pack(fill="x")
+            justify="left", anchor="w")
+        self.cycle_detail_label.pack(fill="x", pady=(3, 0))
+        def wrap_cue(event):
+            width = max(160, event.width - 4)
+            self.cycle_status_label.configure(wraplength=width)
+            self.cycle_detail_label.configure(wraplength=width)
+        cue_body.bind("<Configure>", wrap_cue)
 
-        # Inner container with disabled propagation to lock video dimensions
-        self.video_container = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.DARKROOM_VIEWPORT, corner_radius=8)
-        self.video_container.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.video_container = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.DARKROOM_VIEWPORT,
+                                           corner_radius=8)
+        self.video_container.pack(fill="both", expand=True, padx=16, pady=(0, 12))
         self.video_container.pack_propagate(False)
-
-        def _on_video_resize(event):
+        def video_resize(event):
             if event.width > 50 and event.height > 50:
-                self._cached_container_w = event.width
-                self._cached_container_h = event.height
-        self.video_container.bind("<Configure>", _on_video_resize)
-
-        # Video HUD Canvas (Native Tkinter Label for 60 FPS zero-overhead rendering)
-        self.video_label = tk.Label(self.video_container, bg=FUTheme.DARKROOM_VIEWPORT, bd=0, highlightthickness=0)
-        self.video_label.place(relx=0.5, rely=0.5, anchor="center")
+                self._cached_container_w, self._cached_container_h = event.width, event.height
+        self.video_container.bind("<Configure>", video_resize)
+        self.video_label = tk.Label(self.video_container, bg=FUTheme.DARKROOM_VIEWPORT,
+                                    bd=0, highlightthickness=0)
+        self.video_label.place(relx=.5, rely=.5, anchor="center")
         self._current_photo = None
-
-        # Standby Overlay Container (rendered when camera is off)
         self.standby_frame = ctk.CTkFrame(self.video_container, fg_color="transparent")
-        self.standby_frame.place(relx=0.5, rely=0.5, anchor="center")
+        self.standby_frame.place(relx=.5, rely=.5, anchor="center")
+        camera_actions = ctk.CTkFrame(self.left_panel, fg_color="transparent")
+        camera_actions.pack(fill="x", padx=16, pady=(0, 12))
+        ctk.CTkLabel(camera_actions, text="Live camera", font=(FUTheme.FONT_FAMILY, 12),
+                     text_color=FUTheme.TEXT_MUTED).pack(side="left")
+        self.camera_controls_btn = ctk.CTkButton(camera_actions, text="Camera controls",
+            width=128, height=30, font=(FUTheme.FONT_FAMILY, 12),
+            fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_SECONDARY,
+            hover_color=FUTheme.PANEL_ACCENT, command=self.open_camera_controls)
+        self.camera_controls_btn.pack(side="right")
 
-        # Right column leaves enough room for the viewport at 1024px.
-        self.right_panel = ctk.CTkFrame(self.main_container, fg_color=FUTheme.PANEL_LIGHT, width=400,
-                                       corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
-        self.right_panel.pack(side="right", fill="both", padx=(0, 0))
+        # A compact side panel reserves more width for the camera.
+        self.right_panel = ctk.CTkFrame(self.main_container, fg_color=FUTheme.PANEL_LIGHT,
+                                       width=360, corner_radius=12, border_width=0)
+        self.right_panel.grid(row=0, column=1, sticky="nsew", padx=(20, 0))
         self.right_panel.pack_propagate(False)
-
-        # 1. Classification Result Banner (High Contrast Card)
-        self.result_banner = ctk.CTkFrame(
-            self.right_panel, fg_color="transparent", corner_radius=0, height=118,
-            border_width=0, border_color=FUTheme.BORDER
-        )
-        self.result_banner.pack(fill="x", padx=8, pady=(8, 6))
-        ctk.CTkFrame(self.right_panel, height=1, corner_radius=0, fg_color=FUTheme.BORDER).pack(fill="x", padx=16)
+        self.result_banner = ctk.CTkFrame(self.right_panel, fg_color="transparent",
+                                         corner_radius=12, height=116, border_width=0)
+        self.result_banner.pack(fill="x", padx=12, pady=(12, 0))
         self.result_banner.pack_propagate(False)
-
-        top_banner_row = ctk.CTkFrame(self.result_banner, fg_color="transparent")
-        top_banner_row.pack(fill="x", padx=16, pady=(14, 2))
-
-        self.result_badge = ctk.CTkLabel(
-            top_banner_row, text="STANDBY", font=(FUTheme.FONT_FAMILY, 12, "bold"),
-            fg_color=FUTheme.PANEL_LIGHT_ALT, text_color=FUTheme.TEXT_MUTED,
-            corner_radius=4, padx=8, pady=2
-        )
+        result_top = ctk.CTkFrame(self.result_banner, fg_color="transparent")
+        result_top.pack(fill="x", padx=12, pady=(12, 6))
+        self.result_badge = ctk.CTkLabel(result_top, text="Latest egg",
+            font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_SECONDARY,
+            fg_color=FUTheme.PANEL_LIGHT_ALT, corner_radius=6, padx=8)
         self.result_badge.pack(side="left")
-
-        self.latency_label = ctk.CTkLabel(
-            top_banner_row, text="Latency: -- ms", font=(FUTheme.FONT_FAMILY, 12, "bold"), text_color=FUTheme.TEXT_DIM
-        )
+        self.latency_label = ctk.CTkLabel(result_top, text="", font=(FUTheme.FONT_FAMILY, 12),
+                                         text_color=FUTheme.TEXT_MUTED)
         self.latency_label.pack(side="right")
-
-        self.result_title = ctk.CTkLabel(
-            self.result_banner, text="Ready to connect",
-            font=(FUTheme.FONT_FAMILY, 18, "bold"), text_color=FUTheme.TEXT_PRIMARY
-        )
-        self.result_title.configure(wraplength=360, justify="left", font=(FUTheme.FONT_FAMILY, 17, "bold"))
-        self.result_title.pack(anchor="w", padx=16, pady=(2, 1))
-
-        self.result_subtitle = ctk.CTkLabel(
-            self.result_banner, text="Choose a batch, confirm an empty conveyor, then Prepare station.",
-            font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_MUTED
-        )
-        self.result_subtitle.configure(wraplength=360, justify="left")
-        self.result_subtitle.pack(anchor="w", padx=16)
-
-        # 2. Live Batch Counters & Progress Panel
-        counters_frame = ctk.CTkFrame(
-            self.right_panel, fg_color="transparent", corner_radius=0, border_width=0
-        )
-        counters_frame.pack(fill="x", pady=(0, 10))
-
-        c_header = ctk.CTkFrame(counters_frame, fg_color="transparent")
-        c_header.pack(fill="x", padx=16, pady=(8, 4))
-
-        c_title = ctk.CTkLabel(
-            c_header, text="Batch progress", height=22, font=(FUTheme.FONT_FAMILY, 13, "bold"),
-            text_color=FUTheme.TEXT_PRIMARY
-        )
-        c_title.pack(side="left")
-
-        self.progress_pct_label = ctk.CTkLabel(
-            c_header, text="0.0%", height=22, font=(FUTheme.FONT_FAMILY, 12, "bold"),
-            text_color=FUTheme.TEXT_PRIMARY
-        )
+        self.result_title = ctk.CTkLabel(self.result_banner, text="Waiting for an egg",
+            font=(FUTheme.FONT_FAMILY, 20, "bold"), text_color=FUTheme.TEXT_PRIMARY,
+            anchor="w", justify="left", wraplength=300)
+        self.result_title.pack(fill="x", padx=12)
+        self.result_subtitle = ctk.CTkLabel(self.result_banner, text="Results appear during sorting.",
+            font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_SECONDARY,
+            wraplength=300, anchor="w", justify="left")
+        self.result_subtitle.pack(fill="x", padx=12, pady=(4, 0))
+        counters = self.counters_frame = ctk.CTkFrame(self.right_panel, fg_color="transparent")
+        counters.pack(fill="x", padx=24, pady=(12, 4))
+        heading = ctk.CTkFrame(counters, fg_color="transparent")
+        heading.pack(fill="x", pady=(0, 8))
+        ctk.CTkLabel(heading, text="Run progress", font=(FUTheme.FONT_FAMILY, 14, "bold"),
+                     text_color=FUTheme.TEXT_PRIMARY).pack(side="left")
+        self.progress_pct_label = ctk.CTkLabel(heading, text="0%", font=(FUTheme.FONT_FAMILY, 12),
+                                              text_color=FUTheme.TEXT_MUTED)
         self.progress_pct_label.pack(side="right")
-
-        # Throughput Speedometer & Remaining ETA
-        self.speed_eta_label = ctk.CTkLabel(
-            c_header, text="", height=22, font=(FUTheme.FONT_FAMILY, 12, "bold"),
-            text_color=FUTheme.TEXT_MUTED
-        )
-        self.speed_eta_label.pack(side="left", padx=(12, 0))
-
-        # Progress Bar
-        self.progress_bar = ctk.CTkProgressBar(
-            counters_frame, height=7, corner_radius=4, fg_color=FUTheme.PANEL_LIGHT_ALT,
-            progress_color=FUTheme.PRIMARY_MAROON
-        )
-        self.progress_bar.pack(fill="x", padx=16, pady=(0, 10))
-        self.progress_bar.set(0.0)
-
-        grid = ctk.CTkFrame(counters_frame, fg_color="transparent")
-        grid.pack(fill="x", padx=10, pady=(0, 8))
-
-        # Aligned count rows keep the record readable without decorative tiles.
-        self.box_total = self._create_count_row(grid, "Scanned", f"0 / {self.target_egg_count}", 0, FUTheme.TEXT_PRIMARY)
-        self.box_fertile = self._create_count_row(grid, "Fertile / accept", "0 (0%)", 1, FUTheme.FERTILE_GREEN_TEXT)
-        self.box_infertile = self._create_count_row(grid, "Infertile / penoy", "0", 2, FUTheme.INFERTILE_AMBER_TEXT)
-        self.box_review = self._create_count_row(grid, "Manual review", "0", 3, FUTheme.TEXT_PRIMARY)
-
-        ctk.CTkFrame(self.right_panel, height=1, corner_radius=0, fg_color=FUTheme.BORDER).pack(fill="x", padx=16)
-
-        # 3. Recent Scans Log
-        log_frame = ctk.CTkFrame(
-            self.right_panel, fg_color="transparent", corner_radius=0, border_width=0
-        )
-        log_frame.pack(fill="both", expand=True)
-
+        self.progress_bar = ctk.CTkProgressBar(counters, height=5, corner_radius=3,
+            fg_color=FUTheme.PANEL_LIGHT_ALT, progress_color=FUTheme.PRIMARY_MAROON)
+        self.progress_bar.pack(fill="x", pady=(0, 8))
+        self.progress_bar.set(0)
+        self.speed_eta_label = ctk.CTkLabel(heading, text="", height=16,
+            font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED, anchor="w")
+        self.speed_eta_label.pack(side="left", padx=(10, 0))
+        rows = ctk.CTkFrame(counters, fg_color="transparent")
+        rows.pack(fill="x")
+        self.box_total = self._create_count_row(rows, "Scanned", f"0 / {self.target_egg_count}", 0, FUTheme.TEXT_PRIMARY)
+        self.box_fertile = self._create_count_row(rows, "Fertile", "0 (0%)", 1, FUTheme.FERTILE_GREEN_TEXT)
+        self.box_infertile = self._create_count_row(rows, "Infertile / penoy", "0", 2, FUTheme.INFERTILE_AMBER_TEXT)
+        self.box_review = self._create_count_row(rows, "Needs review", "0", 3, FUTheme.TEXT_PRIMARY)
+        ctk.CTkFrame(self.right_panel, height=1, fg_color=FUTheme.BORDER).pack(fill="x", padx=24)
+        log_frame = ctk.CTkFrame(self.right_panel, fg_color="transparent")
+        log_frame.pack(fill="both", expand=True, padx=16, pady=(8, 12))
         log_header = ctk.CTkFrame(log_frame, fg_color="transparent")
-        log_header.pack(fill="x", padx=16, pady=(10, 4))
-
-        log_title = ctk.CTkLabel(
-            log_header, text="Recent activity", font=(FUTheme.FONT_FAMILY, 13, "bold"),
-            text_color=FUTheme.TEXT_PRIMARY
-        )
-        log_title.pack(side="left")
-
-        self.history_btn = ctk.CTkButton(
-            log_header, text="History [S]", font=(FUTheme.FONT_FAMILY, 12, "bold"),
-            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
-            border_width=1, border_color=FUTheme.BORDER,
-            text_color=FUTheme.TEXT_SECONDARY, command=self.open_scan_history_modal,
-            height=24, width=110, corner_radius=6
-        )
+        log_header.pack(fill="x", padx=8)
+        ctk.CTkLabel(log_header, text="Recent activity", font=(FUTheme.FONT_FAMILY, 13, "bold"),
+                     text_color=FUTheme.TEXT_PRIMARY).pack(side="left")
+        self.history_btn = ctk.CTkButton(log_header, text="History", width=76, height=30,
+            font=(FUTheme.FONT_FAMILY, 12), fg_color=FUTheme.PANEL_LIGHT_ALT,
+            text_color=FUTheme.TEXT_SECONDARY, hover_color=FUTheme.PANEL_ACCENT,
+            command=self.open_scan_history_modal)
         self.history_btn.pack(side="right")
-
-        # Compact Live Scans List Box
-        self.log_textbox = ctk.CTkTextbox(
-            log_frame, fg_color=FUTheme.PANEL_LIGHT, font=(FUTheme.FONT_FAMILY, 13),
-            text_color=FUTheme.TEXT_SECONDARY, corner_radius=8,
-            border_width=0
-        )
-        self.log_textbox.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+        self.log_textbox = ctk.CTkTextbox(log_frame, fg_color=FUTheme.PANEL_LIGHT,
+            font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_SECONDARY,
+            corner_radius=0, border_width=0)
+        self.log_textbox.pack(fill="both", expand=True, pady=(6, 0))
         self.log_textbox.configure(state="disabled")
+
 
     def _render_standby_hud(self):
         """Explain camera setup directly in the idle viewport."""
@@ -709,12 +560,12 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         # The camera well is the empty-state surface; no nested floating card.
         ctk.CTkLabel(self.standby_frame, text="Camera preview",
                      font=(FUTheme.FONT_FAMILY, 22, "bold"),
-                     text_color=FUTheme.TEXT_PRIMARY).pack(padx=24, pady=(16, 8))
-        ctk.CTkLabel(self.standby_frame, text="Camera 0 starts automatically.\nChoose a batch, then Prepare station on an empty conveyor.",
-                     font=(FUTheme.FONT_FAMILY, 14), text_color=FUTheme.TEXT_SECONDARY,
+                     text_color=FUTheme.VIEWPORT_TEXT).pack(padx=24, pady=(16, 8))
+        ctk.CTkLabel(self.standby_frame, text="Waiting for the camera.\nUse Tools to retry the connection.",
+                     font=(FUTheme.FONT_FAMILY, 14), text_color=FUTheme.VIEWPORT_MUTED,
                      justify="center").pack(padx=24, pady=(0, 16))
         ctk.CTkLabel(self.standby_frame, text="F1  Operator guide     Tools  Camera diagnostics",
-                     font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED).pack(padx=20, pady=(0, 16))
+                     font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.VIEWPORT_MUTED).pack(padx=20, pady=(0, 16))
 
     def _create_count_row(self, parent, label_text: str, value_text: str, row: int, color: str):
         parent.grid_columnconfigure(0, weight=1)
@@ -727,116 +578,44 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         return value
 
     def _build_footer(self):
-        self.station_strip = ctk.CTkFrame(self, fg_color=FUTheme.PANEL_LIGHT, corner_radius=0)
-        self.station_strip.pack(side="bottom", fill="x")
-        self.station_status = ctk.CTkLabel(self.station_strip, text="Boards disconnected | Camera idle", anchor="w", wraplength=950, justify="left", font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_SECONDARY)
-        self.station_status.pack(fill="x", padx=16, pady=(8, 4))
-        self.setup_row = ctk.CTkFrame(self.station_strip, fg_color="transparent")
-        setup_actions = ctk.CTkFrame(self.setup_row, fg_color="transparent")
-        # Legacy inspection widgets remain available to Tools; the daily dialog owns their space.
-        self.setup_inspected = ctk.BooleanVar(value=False)
-        self.setup_check = ctk.CTkCheckBox(setup_actions, text="Conveyor empty, aligned; gate checked",
-            font=(FUTheme.FONT_FAMILY, 14), variable=self.setup_inspected,
-            command=lambda: self._set_session_active_state(False))
-        # Daily inspection is confirmed in the guided preparation dialog.
-        self.prepare_btn = ctk.CTkButton(setup_actions, text="Prepare station", width=155, height=36,
-            font=(FUTheme.FONT_FAMILY, 13, "bold"), fg_color=FUTheme.PRIMARY_MAROON,
-            hover_color=FUTheme.HOVER_MAROON, command=self.prepare_station)
-        # The footer primary action owns daily preparation.
-        self.setup_notice = ctk.CTkLabel(self.setup_row,
-            text="Confirm an empty conveyor, then Prepare station. Connection can reset boards and move the gate to neutral; the belt stays stopped.",
-            anchor="w", justify="left", wraplength=950, font=(FUTheme.FONT_FAMILY, 12),
-            text_color=FUTheme.TEXT_SECONDARY)
-        self.setup_notice.pack(fill="x", pady=(0, 8))
-        review_row = self.review_row = ctk.CTkFrame(self.station_strip, fg_color="transparent")
-        ctk.CTkLabel(review_row, text="Operator review", font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED).pack(side="left", padx=4)
-        self.review_buttons = []
-        for label, classification in (("Confirm fertile", "FERTILE"), ("Confirm infertile", "INFERTILE"), ("Confirm empty", "EMPTY")):
-            button = ctk.CTkButton(review_row, text=label, width=145, height=34, font=(FUTheme.FONT_FAMILY, 13, "bold"), state="disabled",
-                fg_color=FUTheme.PRIMARY_MAROON, command=lambda c=classification: self._resolve_station_review(c))
-            button.pack(side="right", padx=4, pady=4)
-            self.review_buttons.append(button)
-        self.footer_frame = ctk.CTkFrame(
-            self, fg_color=FUTheme.PANEL_LIGHT, corner_radius=0, height=68,
-            border_width=1, border_color=FUTheme.BORDER
-        )
+        self.footer_frame = ctk.CTkFrame(self, fg_color=FUTheme.PANEL_LIGHT,
+                                        corner_radius=0, height=76)
         self.footer_frame.pack(side="bottom", fill="x")
-
-        # Automated Cycle Button (Starts Camera & Sorting Loop)
-        self.session_btn = ctk.CTkButton(
-            self.footer_frame, text="Start sorting", font=(FUTheme.FONT_FAMILY, 13, "bold"),
-            fg_color=FUTheme.PRIMARY_MAROON, hover_color=FUTheme.HOVER_MAROON,
-            text_color=FUTheme.TEXT_WHITE, command=self.toggle_auto_session,
-            width=155, height=44, corner_radius=8
-        )
-        self.session_btn.pack(side="left", padx=(14, 6), pady=13)
-
-        # Single Trigger Scan Button (Manual Override)
-        self.scan_btn = ctk.CTkButton(
-            self.footer_frame, text="Single Scan [SPACE]", font=(FUTheme.FONT_FAMILY, 14, "bold"),
-            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
-            border_width=1, border_color=FUTheme.BORDER_DARK,
-            text_color=FUTheme.TEXT_PRIMARY, command=self.trigger_candling_scan,
-            width=160, height=44, corner_radius=8
-        )
-
-        # Dedicated Terminate / Cancel / End Session Button (hidden in Standby, visible when active)
-        self.cancel_btn = ctk.CTkButton(
-            self.footer_frame, text="End Session [ESC]", font=(FUTheme.FONT_FAMILY, 14, "bold"),
-            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.REJECT_RED_BG,
-            border_width=1, border_color=FUTheme.BORDER_DARK,
-            text_color=FUTheme.TEXT_PRIMARY, command=self.open_end_session_modal,
-            width=155, height=44, corner_radius=8
-        )
-        # Note: Packed dynamically when a session/camera is started
-
-        # Manual Eject Button with High-Contrast Luminous Text
-        self.eject_btn = ctk.CTkButton(
-            self.footer_frame, text="STOP [R]", font=(FUTheme.FONT_FAMILY, 14, "bold"),
-            fg_color=FUTheme.REJECT_RED, hover_color=FUTheme.REJECT_RED_HOVER,
-            border_width=1, border_color=FUTheme.REJECT_RED_BORDER,
-            text_color=FUTheme.TEXT_WHITE, command=self.trigger_manual_eject,
-            width=100, height=44, corner_radius=8
-        )
-        self.eject_btn.pack(side="left", padx=6, pady=13)
-
+        self.session_btn = ctk.CTkButton(self.footer_frame, text="Start sorting", width=160, height=44,
+            font=(FUTheme.FONT_FAMILY, 14, "bold"), fg_color=FUTheme.PRIMARY_MAROON,
+            hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE,
+            command=self.toggle_auto_session, corner_radius=8)
+        self.session_btn.pack(side="left", padx=(24, 8), pady=16)
+        self.eject_btn = ctk.CTkButton(self.footer_frame, text="STOP [R]", width=112, height=44,
+            font=(FUTheme.FONT_FAMILY, 14, "bold"), fg_color=FUTheme.REJECT_RED,
+            hover_color=FUTheme.REJECT_RED_HOVER, text_color=FUTheme.TEXT_WHITE,
+            command=self.trigger_manual_eject, corner_radius=8)
+        self.eject_btn.pack(side="right", padx=(12, 24), pady=16)
+        self.pause_btn = ctk.CTkButton(self.footer_frame, text="Pause", width=108, height=44,
+            font=(FUTheme.FONT_FAMILY, 13), fg_color=FUTheme.PANEL_LIGHT_ALT,
+            text_color=FUTheme.TEXT_PRIMARY, hover_color=FUTheme.PANEL_ACCENT,
+            command=self.toggle_sorting_pause)
         self.light_btn = ctk.CTkButton(self.footer_frame, text="Turn light on", width=125, height=44,
             font=(FUTheme.FONT_FAMILY, 13), fg_color=FUTheme.PANEL_LIGHT_ALT,
-            hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER,
-            text_color=FUTheme.TEXT_PRIMARY, command=self.toggle_manual_light)
-        self.light_btn.pack(side="left", padx=6, pady=13)
-
-        self.pause_btn = ctk.CTkButton(self.footer_frame, text="Pause", width=105, height=44,
-            font=(FUTheme.FONT_FAMILY, 13, "bold"), fg_color=FUTheme.PANEL_LIGHT_ALT,
-            hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER,
-            text_color=FUTheme.TEXT_PRIMARY, command=self.toggle_sorting_pause)
-
-        # Dedicated Finish Batch Button (prominently revealed when batch/diagnostics complete)
-        self.finish_btn = ctk.CTkButton(
-            self.footer_frame, text="✓ Finish Batch", font=(FUTheme.FONT_FAMILY, 13, "bold"),
-            fg_color=FUTheme.FERTILE_GREEN, hover_color=FUTheme.FERTILE_GREEN_HOVER,
-            text_color=FUTheme.TEXT_WHITE, command=self.finish_current_batch,
-            width=140, height=44, corner_radius=8
-        )
-
-        # Batch Setup Quick Button
-        self.batch_setup_btn = ctk.CTkButton(
-            self.footer_frame, text="Batch setup", font=(FUTheme.FONT_FAMILY, 14, "bold"),
+            text_color=FUTheme.TEXT_PRIMARY, hover_color=FUTheme.PANEL_ACCENT,
+            command=self.toggle_manual_light)
+        self.light_btn.pack(side="left", padx=8, pady=16)
+        self.scan_btn = ctk.CTkButton(self.footer_frame, text="Single Scan [SPACE]", height=44,
+            text_color=FUTheme.TEXT_PRIMARY, fg_color=FUTheme.PANEL_LIGHT_ALT,
+            command=self.trigger_candling_scan)
+        self.cancel_btn = ctk.CTkButton(self.footer_frame, text="End Session [ESC]", width=155, height=44,
+            font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_PRIMARY,
             fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
-            border_width=1, border_color=FUTheme.BORDER_DARK,
-            text_color=FUTheme.TEXT_PRIMARY, command=self.open_batch_setup_dialog,
-            width=110, height=44, corner_radius=8
-        )
-        self.batch_setup_btn.pack(side="right", padx=(6, 14), pady=13)
-
-        # Conveyor Settings Button
-        self.settings_btn = ctk.CTkButton(
-            self.footer_frame, text="Tools", font=(FUTheme.FONT_FAMILY, 14),
-            fg_color=FUTheme.PANEL_LIGHT_ALT, border_width=1, border_color=FUTheme.BORDER,
+            command=self.open_end_session_modal)
+        self.finish_btn = ctk.CTkButton(self.footer_frame, text="Finish batch", width=132, height=44,
+            font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_WHITE,
+            fg_color=FUTheme.FERTILE_GREEN, hover_color=FUTheme.FERTILE_GREEN_HOVER,
+            command=self.finish_current_batch)
+        self.settings_btn = ctk.CTkButton(self.header_actions, text="Tools", width=72, height=34,
+            font=(FUTheme.FONT_FAMILY, 13), fg_color=FUTheme.PANEL_LIGHT_ALT,
             text_color=FUTheme.TEXT_SECONDARY, hover_color=FUTheme.PANEL_ACCENT,
-            command=self.open_tools_menu, width=100, height=42, corner_radius=8
-        )
-        self.settings_btn.pack(side="right", padx=6, pady=13)
+            command=self.open_tools_menu)
+        self.settings_btn.pack(side="left")
         self.tools_menu = tk.Menu(self, tearoff=False, bg=FUTheme.PANEL_LIGHT,
             fg=FUTheme.TEXT_PRIMARY, activebackground=FUTheme.PANEL_ACCENT,
             activeforeground=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 12))
@@ -844,6 +623,44 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         self.tools_menu.add_command(label="Settings", command=self.open_calibration_dialog)
         self.tools_menu.add_command(label="Retry camera preview", command=self._start_preview)
         self.tools_menu.add_command(label="Camera controls", command=self.open_camera_controls)
+
+        self.station_strip = ctk.CTkFrame(self, fg_color=FUTheme.BG_LIGHT, corner_radius=0)
+        self.station_strip.pack(side="bottom", fill="x")
+        status = ctk.CTkFrame(self.station_strip, fg_color="transparent")
+        status.pack(fill="x", padx=24, pady=6)
+        self.iot_status_badge = ctk.CTkLabel(status, text="Sorter: not prepared",
+            font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_SECONDARY)
+        self.iot_status_badge.pack(side="left", padx=(0, 24))
+        self.net_status_badge = ctk.CTkLabel(status, text="Sync: checking",
+            font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED)
+        self.net_status_badge.pack(side="left", padx=(0, 24))
+        self.station_status = ctk.CTkLabel(status, text="Camera idle", anchor="w",
+            font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED)
+        self.station_status.pack(side="left", fill="x", expand=True)
+        self.fps_label = ctk.CTkLabel(status, text="0 fps", font=(FUTheme.FONT_FAMILY, 12),
+                                     text_color=FUTheme.TEXT_MUTED)
+        self.fps_label.pack(side="right")
+        # Legacy controls remain for Tools; the inspection dialog owns daily preparation.
+        self.setup_row = ctk.CTkFrame(self.station_strip, fg_color="transparent")
+        self.setup_inspected = ctk.BooleanVar(value=False)
+        self.setup_check = ctk.CTkCheckBox(self.setup_row, text="Conveyor empty, aligned; gate checked",
+            variable=self.setup_inspected, command=lambda: self._set_session_active_state(False))
+        self.prepare_btn = ctk.CTkButton(self.setup_row, text="Prepare station", command=self.prepare_station)
+        self.setup_notice = ctk.CTkLabel(self.setup_row, text="Confirm an empty conveyor, then prepare.")
+        self.review_row = ctk.CTkFrame(self.station_strip, fg_color=FUTheme.INFERTILE_AMBER_CARD,
+                                      corner_radius=8)
+        ctk.CTkLabel(self.review_row, text="Review this egg", font=(FUTheme.FONT_FAMILY, 13, "bold"),
+                     text_color=FUTheme.INFERTILE_AMBER_TEXT).pack(side="left", padx=16)
+        self.review_buttons = []
+        for label, classification in (("Confirm fertile", "FERTILE"), ("Confirm infertile", "INFERTILE"), ("Confirm empty", "EMPTY")):
+            button = ctk.CTkButton(self.review_row, text=label, width=140, height=36,
+                font=(FUTheme.FONT_FAMILY, 13), state="disabled", fg_color=FUTheme.PANEL_LIGHT,
+                text_color=FUTheme.TEXT_PRIMARY, hover_color=FUTheme.PANEL_ACCENT,
+                border_width=1, border_color=FUTheme.INFERTILE_AMBER_BORDER,
+                command=lambda c=classification: self._resolve_station_review(c))
+            button.pack(side="right", padx=6, pady=10)
+            self.review_buttons.append(button)
+
 
     def _refresh_pause_control(self):
         if not hasattr(self, "pause_btn"):
@@ -1088,10 +905,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         if signature == getattr(self, "_setup_controls_signature", None):
             return
         self._setup_controls_signature = signature
-        if visible:
-            self.setup_row.pack(fill="x", padx=16)
-        else:
-            self.setup_row.pack_forget()
+        self.setup_row.pack_forget()
         batch_ready = getattr(self, "_batch_record_ready", False)
         self.setup_check.configure(state="disabled" if busy or self._scan_busy or self._stopping else "normal")
         self.prepare_btn.configure(state="normal" if allowed and self.setup_inspected.get() else "disabled",
@@ -1401,7 +1215,10 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         if recovery and recovery.get("state") not in {"COMPLETE", "CLEARED"}:
             parts.append("Recovery: inspect interrupted eggs before validating")
         parts.append("Camera: " + (self.camera.last_error or ("ready" if self.camera.is_running else "idle")))
-        label = " | ".join(parts)
+        self._station_details = " | ".join(parts)
+        label = ("Inspect interrupted eggs" if recovery and recovery.get("state") not in {"COMPLETE", "CLEARED"}
+                 else "Camera unavailable" if self.camera.last_error else
+                 "Camera connected" if self.camera.is_running else "Camera idle")
         if label != getattr(self, "_last_station_label", None):
             self.station_status.configure(text=label)
             self._last_station_label = label
@@ -1653,7 +1470,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         if signature == getattr(self, "_hud_signature", None):
             return
         self._hud_signature = signature
-        self.cycle_hud.configure(fg_color=hud_bg)
+        self.cycle_hud.configure(fg_color=FUTheme.PANEL_LIGHT)
         self.cycle_status_dot.configure(text=dot_icon, text_color=dot_color)
         self.cycle_status_label.configure(text=status_text, text_color=dot_color if dot_color != FUTheme.TEXT_MUTED else FUTheme.TEXT_PRIMARY)
         if hasattr(self, "cycle_detail_label"):
@@ -1861,19 +1678,19 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             badge_bg = FUTheme.FERTILE_GREEN_BG
             badge_text_color = FUTheme.FERTILE_GREEN_TEXT
             title_color = FUTheme.FERTILE_GREEN_TEXT
-            title_text = f"FERTILE — ACCEPT ({conf*100:.1f}%)"
-            sub_text = "Fertile prediction recorded • physical route not confirmed"
+            title_text = f"Fertile · {conf:.1%}"
+            sub_text = "Saved locally · physical route not confirmed"
         else:
             card_bg = FUTheme.INFERTILE_AMBER_CARD
             card_border = FUTheme.INFERTILE_AMBER_BORDER
             badge_bg = FUTheme.INFERTILE_AMBER_BG
             badge_text_color = FUTheme.INFERTILE_AMBER_TEXT
             title_color = FUTheme.INFERTILE_AMBER
-            title_text = f"INFERTILE — REJECT ({conf*100:.1f}%)"
-            sub_text = "Infertile prediction recorded • physical route not confirmed"
+            title_text = f"Infertile · {conf:.1%}"
+            sub_text = "Saved locally · physical route not confirmed"
 
         if action in {"MANUAL_REVIEW", "PREVIEW_ONLY"}:
-            title_text = f"{action.replace('_', ' ')} ({conf:.1%})"
+            title_text = f"{'Preview only' if action == 'PREVIEW_ONLY' else 'Needs review'} · {conf:.1%}"
             sub_text = "Inspect the egg manually; no physical route was requested."
             card_bg, card_border = FUTheme.INFERTILE_AMBER_CARD, FUTheme.INFERTILE_AMBER_BORDER
             badge_bg, badge_text_color = FUTheme.INFERTILE_AMBER_BG, FUTheme.INFERTILE_AMBER_TEXT
@@ -2080,7 +1897,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             return
         self.sync_worker.device_status = "SCANNING" if self._scan_busy or self.is_auto_cycle_running else "ONLINE"
         self._set_session_active_state(self.is_session_active or self._scan_busy or self._stopping)
-        self.fps_label.configure(text=f"FPS: {self.camera.current_fps:.1f}")
+        self.fps_label.configure(text=f"{self.camera.current_fps:.0f} fps")
         if not getattr(self, "_queue_count_pending", False):
             self._queue_count_pending = True
             def updated(count):
@@ -2103,22 +1920,22 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             count += pending_batches
         error = self.sync_worker.last_error or self.sync_worker.heartbeat_error
         if error:
-            text, color = "SYNC: ATTENTION", FUTheme.INFERTILE_AMBER
+            text, color = "Sync: needs attention", FUTheme.INFERTILE_AMBER
             if error != getattr(self, "_last_sync_error", None):
                 self._log("[SYNC] " + error)
         elif count is None:
-            text, color = "SYNC: QUEUE UNKNOWN", FUTheme.INFERTILE_AMBER
+            text, color = "Sync: queue unavailable", FUTheme.INFERTILE_AMBER
         elif self.sync_worker.is_online:
-            text, color = f"SYNC: ONLINE ({count} PENDING)", FUTheme.FERTILE_GREEN_TEXT
+            text, color = f"Sync: online · {count} pending", FUTheme.FERTILE_GREEN_TEXT
         else:
-            text, color = f"SYNC: OFFLINE ({count} PENDING)", FUTheme.TEXT_MUTED
+            text, color = f"Sync: offline · {count} pending", FUTheme.TEXT_MUTED
         self._last_sync_error = error
-        self.net_status_badge.configure(text=text, fg_color=FUTheme.PANEL_LIGHT_ALT,
+        self.net_status_badge.configure(text=text, fg_color="transparent",
                                         text_color=color)
         station = getattr(self, "station", None)
         ready = station is not None and (station.calibrated or station.active)
-        self.iot_status_badge.configure(text="SORTER: ACTIVE" if station and station.active else "SORTER: READY" if ready else "SORTER: SETUP NEEDED",
-                                        fg_color=FUTheme.PANEL_LIGHT_ALT,
+        self.iot_status_badge.configure(text="Sorter: active" if station and station.active else "Sorter: ready" if ready else "Sorter: not prepared",
+                                        fg_color="transparent",
                                         text_color=FUTheme.FERTILE_GREEN_TEXT if ready else FUTheme.INFERTILE_AMBER)
         if self.camera.last_error and self.camera.last_error != getattr(self, "_last_camera_error", None):
             self._log("[CAMERA ERROR] " + self.camera.last_error)
@@ -2226,7 +2043,8 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         self._diagnostics_complete = self._batch_complete = False
         self.setup_inspected.set(False)
         self.total_count = self.fertile_count = self.infertile_count = self.review_count = self.scan_sequence = 0
-        self.batch_btn.configure(text=f"Batch: {batch['batch_code']}  (DAY_10)  ▾")
+        self.batch_btn.configure(text=fit_caption("Batch: " + batch["batch_code"], self._batch_caption_font.measure, 216))
+        self.operator_label.configure(text=fit_caption("Operator: " + operator, self._operator_caption_font.measure, 240))
         self._update_counters_ui()
         self._render_standby_hud()
         self._set_operation_state(OperatorState.READY, "Choose a batch, then prepare the empty conveyor")

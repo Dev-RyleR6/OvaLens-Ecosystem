@@ -19,10 +19,22 @@ image. A single side panel groups the latest classification, aligned batch
 counts and recent events with spacing and thin dividers. Counts are rows rather
 than coloured metric cards. The empty camera well explains setup directly.
 
+Use the FU light desktop palette: off-white #F8FAFC, white #FFFFFF, borders
+#E2E8F0 and maroon #800000. The camera well stays dark with separate light text
+tokens. Segoe UI, quiet tinted result surfaces and generous spacing provide
+the soft desktop character; avoid shadows, image assets and decorative timers.
+One header batch control includes registered operator context. Tools and window
+controls live in the header. The bottom action bar reserves a stable right-hand
+position for STOP; a single compact strip above it shows sorter, sync and camera
+status. Do not repeat the preparation instructions in a separate footer row.
+
 Daily operation uses Batch setup, empty-conveyor confirmation, Prepare station,
 then a separate Start sorting action. Camera preview and passive software/storage
 checks start on opening; serial discovery waits for explicit empty-rig preparation.
-Show an inline scrollable readiness checklist in the idle right panel, retaining
+Show a compact readiness summary in the idle right panel, with Show details
+expanding the full scrollable checklist in that panel. Collapse restores run
+counts and recent activity. Blocking errors remain named in the compact summary;
+offline sync is explicitly non-blocking. Retain
 the camera preview and fixed STOP/footer controls at 1024×720. Backend offline is
 a warning; local storage, model and controller faults block Start. Preparation
 never starts a session or releases the belt. Final Start rechecks fresh status

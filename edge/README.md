@@ -284,6 +284,11 @@ remain on disk after upload; no automatic image cleanup is performed.
 
 ## 🌟 Key Subsystem Features
 
+The operator workspace uses a soft FU light palette with a dark camera preview,
+one header batch control, compact station status, and expandable readiness details.
+STOP stays at the right of the action bar. The layout uses existing native
+CustomTkinter widgets and adds no UI dependencies, image assets, or decoration timers.
+
 - **Decoupled Quad-Thread Concurrency**:
   - **Thread 1 (Camera Grabber)**: Continuous background frame consumer with single-frame atomic buffer (DirectShow / V4L2) eliminating video delay.
   - **Thread 2 (Inference Engine)**: Pluggable ONNX Runtime FP16 / PyTorch inference engine with 3-pass warmup and geometric candling heuristics ($0.65 \le \text{AR} \le 1.45$).

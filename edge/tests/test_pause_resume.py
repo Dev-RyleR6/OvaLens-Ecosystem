@@ -1,6 +1,7 @@
 """TASK-NEW-EDGE-PAUSE-01: same-session pause with simulated hardware only."""
 from unittest.mock import Mock
 from pathlib import Path
+from itertools import combinations
 import threading
 import time
 
@@ -226,11 +227,20 @@ def test_native_pause_resume_controls_preserve_current_session(hidden_ui, tmp_pa
             app.update()
             for control in (app.pause_btn, app.eject_btn, app.session_btn, app.light_btn, app.settings_btn, app.batch_setup_btn):
                 assert control.winfo_ismapped()
+                assert control.winfo_rootx() >= app.winfo_rootx()
+                assert control.winfo_rooty() >= app.winfo_rooty()
                 assert control.winfo_rootx() + control.winfo_width() <= app.winfo_rootx() + app.winfo_width()
-            controls = sorted((app.pause_btn, app.eject_btn, app.session_btn, app.light_btn,
-                               app.settings_btn, app.batch_setup_btn), key=lambda w: w.winfo_rootx())
-            assert all(left.winfo_rootx() + left.winfo_width() <= right.winfo_rootx()
-                       for left, right in zip(controls, controls[1:]))
+                assert control.winfo_rooty() + control.winfo_height() <= app.winfo_rooty() + app.winfo_height()
+            # Navigation and sorting controls occupy separate rows. Check actual
+            # rectangle overlap so both the header and footer stay usable.
+            controls = (app.pause_btn, app.eject_btn, app.session_btn, app.light_btn,
+                        app.settings_btn, app.batch_setup_btn)
+            for left, right in combinations(controls, 2):
+                separate_x = (left.winfo_rootx() + left.winfo_width() <= right.winfo_rootx()
+                              or right.winfo_rootx() + right.winfo_width() <= left.winfo_rootx())
+                separate_y = (left.winfo_rooty() + left.winfo_height() <= right.winfo_rooty()
+                              or right.winfo_rooty() + right.winfo_height() <= left.winfo_rooty())
+                assert separate_x or separate_y
         assert cycle_cue(cycle.status)[0] == "Sorting paused"
         app._finalize_automatic_batch = Mock()
         app.pause_btn.invoke()

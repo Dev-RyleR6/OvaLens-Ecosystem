@@ -1,7 +1,7 @@
 """Registered staff attribution and explicit, cancellable preparation entry."""
 import queue
 import customtkinter as ctk
-from .theme import FUTheme as T
+from .theme import FUTheme as T, fit_caption
 
 
 class GuidedSetupFlow:
@@ -11,6 +11,9 @@ class GuidedSetupFlow:
         selected = next((r for r in state["operators"] if r["user_id"] == state["selected_id"]), None)
         self.operator_id = selected["user_id"] if selected else None
         self.operator_name = selected["full_name"] if selected else "Choose operator"
+        if hasattr(self, "operator_label"):
+            self.operator_label.configure(text=fit_caption("Operator: " + self.operator_name,
+                self._operator_caption_font.measure, 240))
         self._operator_roster_loaded = bool(state.get("downloaded_at"))
         self._set_session_active_state(self.is_session_active)
 

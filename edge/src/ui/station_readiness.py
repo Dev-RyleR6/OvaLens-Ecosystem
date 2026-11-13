@@ -12,14 +12,29 @@ class StationReadinessPanel(ctk.CTkFrame):
     def __init__(self, app):
         super().__init__(app.right_panel, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12)
         self.app = app
-        ctk.CTkLabel(self, text="Station readiness", anchor="w",
-            font=(FUTheme.FONT_FAMILY, 19, "bold")).pack(fill="x", padx=20, pady=(18, 4))
-        self.summary = ctk.CTkLabel(self, text="Choose batch → Prepare station → Start sorting",
-            anchor="w", justify="left", wraplength=350, font=(FUTheme.FONT_FAMILY, 13),
+        self.expanded = False
+        ctk.CTkLabel(self, text="Station checks", anchor="w", text_color=FUTheme.TEXT_PRIMARY,
+            font=(FUTheme.FONT_FAMILY, 18, "bold")).pack(fill="x", padx=24, pady=(20, 4))
+        self.summary = ctk.CTkLabel(self, text="Not prepared",
+            anchor="w", justify="left", wraplength=300, font=(FUTheme.FONT_FAMILY, 13),
             text_color=FUTheme.TEXT_SECONDARY)
-        self.summary.pack(fill="x", padx=20, pady=(0, 10))
-        body = ctk.CTkScrollableFrame(self, fg_color="transparent", height=1)
-        body.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+        self.summary.pack(fill="x", padx=24, pady=(0, 4))
+        self.offline_note = ctk.CTkLabel(self, text="", anchor="w", height=18,
+            font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED)
+        self.offline_note.pack(fill="x", padx=24, pady=(0, 8))
+        actions = ctk.CTkFrame(self, fg_color="transparent")
+        actions.pack(fill="x", padx=24, pady=(0, 12))
+        self.details = ctk.CTkButton(actions, text="Show details", width=124, height=32,
+            font=(FUTheme.FONT_FAMILY, 12), fg_color=FUTheme.PANEL_LIGHT_ALT,
+            text_color=FUTheme.TEXT_SECONDARY, hover_color=FUTheme.PANEL_ACCENT,
+            command=self.toggle_details)
+        self.details.pack(side="left")
+        self.retry = ctk.CTkButton(actions, text="Recheck", width=92, height=32,
+            font=(FUTheme.FONT_FAMILY, 12), fg_color="transparent",
+            text_color=FUTheme.TEXT_SECONDARY, hover_color=FUTheme.PANEL_ACCENT,
+            command=app.run_software_checks)
+        self.retry.pack(side="right")
+        body = self.body = ctk.CTkScrollableFrame(self, fg_color="transparent", height=1)
         self.labels = {}
         for key, title in (("batch", "Batch"), ("settings", "Saved configuration"),
                            ("camera", "Camera"), ("model", "Classification model"),
@@ -28,18 +43,36 @@ class StationReadinessPanel(ctk.CTkFrame):
             row = ctk.CTkFrame(body, fg_color="transparent")
             row.pack(fill="x", pady=(3, 7))
             ctk.CTkLabel(row, text=title, anchor="w", font=(FUTheme.FONT_FAMILY, 14, "bold")).pack(fill="x")
-            value = ctk.CTkLabel(row, text="Checking", anchor="w", justify="left", wraplength=320,
+            value = ctk.CTkLabel(row, text="Checking", anchor="w", justify="left", wraplength=280,
                 font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_SECONDARY)
             value.pack(fill="x")
             self.labels[key] = value
-        self.retry = ctk.CTkButton(self, text="Recheck software", height=34,
-            fg_color=FUTheme.PANEL_LIGHT_ALT, border_width=1, border_color=FUTheme.BORDER,
-            hover_color=FUTheme.PANEL_ACCENT, command=app.run_software_checks)
-        self.retry.pack(fill="x", padx=20, pady=(0, 10))
         ctk.CTkLabel(body, text="Controller checks confirm communication. Inspect the belt, gate and lamp before preparing.",
-            anchor="w", justify="left", wraplength=350, font=(FUTheme.FONT_FAMILY, 12),
+            anchor="w", justify="left", wraplength=280, font=(FUTheme.FONT_FAMILY, 12),
             text_color=FUTheme.TEXT_MUTED).pack(fill="x", pady=(8, 14))
         self._signature = None
+
+    def show(self):
+        self.app.result_banner.pack_forget()
+        if self.expanded:
+            self.pack_forget()
+            self.body.pack(fill="both", expand=True, padx=16, pady=(0, 16))
+            self.place(x=0, y=0, relwidth=1, relheight=1)
+            self.lift()
+        else:
+            self.place_forget()
+            self.body.pack_forget()
+            self.pack(fill="x", before=self.app.counters_frame)
+
+    def hide(self):
+        self.pack_forget()
+        self.place_forget()
+        self.app.result_banner.pack(fill="x", padx=12, pady=(12, 0), before=self.app.counters_frame)
+
+    def toggle_details(self):
+        self.expanded = not self.expanded
+        self.details.configure(text="Hide details" if self.expanded else "Show details")
+        self.show()
 
     def render(self, rows, ready, busy):
         app = self.app
@@ -57,8 +90,21 @@ class StationReadinessPanel(ctk.CTkFrame):
             self.labels[key].configure(text=text, text_color=FUTheme.INFERTILE_AMBER
                 if state in {"Needs attention", "Warning"} else FUTheme.TEXT_SECONDARY)
         first_error = next((r.detail for r in rows if r.state == "Needs attention"), "")
-        self.summary.configure(text="Checking station. Keep the conveyor empty." if busy else
-            "Ready — press Start sorting when ready to feed eggs." if ready and batch_ready else first_error or app.station.readiness.reason)
+        if busy:
+            message = "Checking the station…"
+        elif first_error:
+            message = first_error
+        elif ready and batch_ready:
+            message = "All checks passed"
+        elif not batch_ready:
+            message = "Choose a batch to begin"
+        else:
+            message = "Not prepared · controllers checked during preparation"
+        self.summary.configure(text=message if len(message) <= 110 else message[:109] + "…",
+            text_color=FUTheme.INFERTILE_AMBER_TEXT if first_error else
+                       FUTheme.FERTILE_GREEN_TEXT if ready and batch_ready else FUTheme.TEXT_SECONDARY)
+        self.offline_note.configure(text="Sync needs attention · scans stay saved locally" if error else
+            "Offline · scans stay saved locally" if not online else "Connected to the backend")
         self.retry.configure(state="disabled" if busy else "normal")
 
 
@@ -88,10 +134,9 @@ class ReadinessFlow:
         if visible != getattr(self, "_readiness_visible", None):
             self._readiness_visible = visible
             if visible:
-                panel.place(x=0, y=0, relwidth=1, relheight=1)
-                panel.lift()
+                panel.show()
             else:
-                panel.place_forget()
+                panel.hide()
         if not visible:
             return
         now = time.monotonic()
@@ -108,7 +153,7 @@ class ReadinessFlow:
             self.setup_notice.configure(text=readiness.reason)
             self._update_cycle_hud("", FUTheme.INFERTILE_AMBER, "Check station", detail=readiness.reason)
         if was_ready != self._station_prepared:
-            self.iot_status_badge.configure(text="SORTER: READY" if self._station_prepared else "SORTER: SETUP NEEDED",
+            self.iot_status_badge.configure(text="Sorter: ready" if self._station_prepared else "Sorter: not prepared",
                 text_color=FUTheme.FERTILE_GREEN_TEXT if self._station_prepared else FUTheme.INFERTILE_AMBER)
         panel.render(readiness.rows(), self._station_prepared,
                      getattr(self, "_setup_busy", False) or getattr(self, "_software_check_busy", False))

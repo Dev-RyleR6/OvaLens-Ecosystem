@@ -12,7 +12,7 @@ class StartupConfigWindow(ctk.CTk):
         self.geometry("620x460")
         self.minsize(600, 440)
         self.configure(fg_color=T.BG_LIGHT)
-        ctk.set_appearance_mode("dark")
+        ctk.set_appearance_mode("light")
         self.protocol("WM_DELETE_WINDOW", self._on_cancel)
         body = ctk.CTkFrame(self, fg_color=T.PANEL_LIGHT, corner_radius=8)
         body.pack(fill="both", expand=True, padx=24, pady=(24, 12))

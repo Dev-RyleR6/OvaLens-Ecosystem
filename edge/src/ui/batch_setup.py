@@ -67,7 +67,7 @@ class BatchSetupWindow(ctk.CTkToplevel):
         ctk.CTkButton(operator_actions, text="Refresh staff", height=44, fg_color=T.PANEL_LIGHT_ALT,
                      text_color=T.TEXT_PRIMARY, command=app.refresh_registered_operators).pack(side="left", padx=(8, 0))
         self.mode = ctk.CTkSegmentedButton(self.body, values=["Choose batch", "Create batch"],
-            selected_color=T.PRIMARY_MAROON, selected_hover_color=T.HOVER_MAROON,
+            selected_color="#EEDADA", selected_hover_color="#E5C4C4",
             unselected_color=T.PANEL_LIGHT_ALT, text_color=T.TEXT_PRIMARY, command=self.change_mode)
         self.mode.pack(fill="x", padx=12, pady=12)
         self.mode.set("Choose batch")
