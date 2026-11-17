@@ -50,7 +50,7 @@ class StationReadiness:
     def _camera(self):
         camera = self.station.camera
         if camera.is_mock_mode or camera.last_error or camera.snapshot(copy=False) is None:
-            raise RuntimeError(camera.last_error or "Camera has no fresh real frame. Use Tools / Retry camera preview.")
+            raise RuntimeError(camera.last_error or "Camera has no fresh real frame. Use More / Retry camera preview.")
 
     def _model(self):
         engine = self.station.inference.engine
@@ -65,7 +65,7 @@ class StationReadiness:
         s = self.station
         def settings():
             if s.settings_error:
-                raise RuntimeError(s.settings_error + " Open Tools / Settings.")
+                raise RuntimeError(s.settings_error + " Open Settings.")
             s.settings.validate()
         checks = (("settings", "Saved configuration", settings, "Saved settings valid"),
                   ("camera", "Camera", self._camera, "Fresh camera frames available"),

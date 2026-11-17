@@ -1,6 +1,6 @@
 """
-Foundation University soft desktop palette for the native operator interface.
-Light neutral surfaces keep controls readable; the camera retains its dark well.
+Foundation University low-glare desktop palette for the native operator interface.
+Dim slate surfaces, distinct controls and high-contrast text support candling work.
 """
 
 class FUTheme:
@@ -9,53 +9,56 @@ class FUTheme:
     DARK_MAROON = "#5C0000"
     LIGHT_MAROON = "#991B1B"
     HOVER_MAROON = "#6B0000"
-    PRIMARY_MAROON_BG = "#FAEEEE"
-    PRIMARY_MAROON_BORDER = "#800000" # Institutional maroon border
+    PRIMARY_MAROON_BG = "#382532"
+    PRIMARY_MAROON_BORDER = "#D99AA6" # Institutional maroon border
 
     # Semantic results use readable text on quiet tinted surfaces.
     FERTILE_GREEN = "#357a38"         # Foundation University Agri-Green
     FERTILE_GREEN_HOVER = "#28642D"
-    FERTILE_GREEN_BG = "#E5F2E7"
-    FERTILE_GREEN_CARD = "#F1F8F3"
-    FERTILE_GREEN_BORDER = "#C7DFCC"
-    FERTILE_GREEN_TEXT = "#28642D"
+    FERTILE_GREEN_BG = "#214A36"
+    FERTILE_GREEN_CARD = "#18382C"
+    FERTILE_GREEN_BORDER = "#4F8A63"
+    FERTILE_GREEN_TEXT = "#A7E3B1"
 
     INFERTILE_AMBER = "#875A12"
     INFERTILE_AMBER_HOVER = "#70490C"
-    INFERTILE_AMBER_BG = "#FBF0D9"
-    INFERTILE_AMBER_CARD = "#FFFAF0"
-    INFERTILE_AMBER_BORDER = "#EBDAB3"
-    INFERTILE_AMBER_TEXT = "#80530C"
+    INFERTILE_AMBER_BG = "#4C3820"
+    INFERTILE_AMBER_CARD = "#332A20"
+    INFERTILE_AMBER_BORDER = "#A48244"
+    INFERTILE_AMBER_TEXT = "#F3CE85"
 
     REJECT_RED = "#DC2626"
     REJECT_RED_HOVER = "#B91C1C"
-    REJECT_RED_BG = "#FDECEC"
-    REJECT_RED_CARD = "#FFF5F5"
-    REJECT_RED_BORDER = "#F2CACA"
-    REJECT_RED_TEXT = "#A92020"
+    REJECT_RED_BG = "#492732"
+    REJECT_RED_CARD = "#38232D"
+    REJECT_RED_BORDER = "#B5707E"
+    REJECT_RED_TEXT = "#FFBAC2"
 
-    # Native desktop surfaces follow the FU light theme.
-    BG_LIGHT = "#F8FAFC"
-    PANEL_LIGHT = "#FFFFFF"
-    PANEL_LIGHT_ALT = "#F1F5F9"
-    PANEL_ACCENT = "#E9EDF1"
-    BORDER = "#E2E8F0"
-    BORDER_CONTROL = "#76869B"
-    SELECTION_BG = "#E8EDF2"
-    SELECTION_HOVER = "#DDE4EB"
+    # Legacy LIGHT names remain aliases for consumers; this station uses dim slate.
+    BG_LIGHT = "#0F172A"
+    PANEL_LIGHT = "#1E293B"
+    PANEL_LIGHT_ALT = "#29384D"
+    PANEL_ACCENT = "#374B65"
+    BORDER = "#475569"
+    BORDER_CONTROL = "#94A3B8"
+    SELECTION_BG = "#41546F"
+    SELECTION_HOVER = "#3B506C"
+    INPUT_BG = "#111D2E"
+    FOCUS = "#F4B2BF"
+    BRAND_TEXT = "#F4B2BF"
     BORDER_DARK = BORDER_CONTROL
     DARKROOM_VIEWPORT = "#111317"     # Studio Viewport for Candling Stream
 
     # Separate light-workspace text from the dark camera well.
-    TEXT_PRIMARY = "#20242B"
-    TEXT_SECONDARY = "#414852"
-    TEXT_MUTED = "#59616D"
+    TEXT_PRIMARY = "#F1F5F9"
+    TEXT_SECONDARY = "#D5DEE9"
+    TEXT_MUTED = "#C3CFDF"
     TEXT_DIM = TEXT_MUTED
     VIEWPORT_TEXT = "#F1F5F9"
     VIEWPORT_MUTED = "#CBD5E1"
     TEXT_WHITE = "#FFFFFF"            # Pure White for dark buttons
     TEXT_DISABLED_ON_ACCENT = "#D4BABA"
-    TEXT_ACCENT = "#875A12"
+    TEXT_ACCENT = "#F3CE85"
 
     # Standard Typography
     # configure_desktop selects the shipped Inter face before Tk starts.
@@ -63,8 +66,8 @@ class FUTheme:
     FONT_FAMILY = "Segoe UI"
     FONT_BODY = 14
     FONT_LABEL = 13
-    FONT_CAPTION = 12
-    FONT_CONTROL = 13
+    FONT_CAPTION = 13
+    FONT_CONTROL = 14
     FONT_HEADING = 20
     FONT_METRIC = 24
 

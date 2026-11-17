@@ -206,8 +206,9 @@ def test_settings_keyboard_navigation_and_disabled_actions(hidden_ui, tmp_path):
         camera._canvas.event_generate("<Return>")
         window.update()
         assert window.active_section == "Camera"
-        assert camera._canvas.cget("highlightcolor") == FUTheme.PRIMARY_MAROON
-        assert int(camera._canvas.cget("highlightthickness")) == 2
+        assert camera.cget("border_color") == FUTheme.FOCUS
+        assert camera.cget("border_width") == 2
+        assert int(camera._canvas.cget("highlightthickness")) == 0
         # Tk lazily loads traversal procedures; load before querying directly.
         window.tk.call("auto_load", "tk_focusNext")
         assert str(window.tk.call("tk_focusNext", str(camera._canvas))) == str(window.section_buttons["Detection"]._canvas)

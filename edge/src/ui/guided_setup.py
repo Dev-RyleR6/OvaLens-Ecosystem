@@ -2,6 +2,7 @@
 import queue
 import customtkinter as ctk
 from .theme import FUTheme as T, fit_caption
+from .desktop_style import finish_dialog_layout
 
 
 class GuidedSetupFlow:
@@ -47,20 +48,22 @@ class GuidedSetupFlow:
             self.open_batch_setup_dialog()
             return
         if self.station.settings.rig_profile == "dual_v2":
-            self.setup_notice.configure(text="Prepare the saved two-board profile in Tools / Settings, then Start sorting.")
+            self.setup_notice.configure(text="Prepare the saved two-board profile in Settings, then Start sorting.")
             return
         dialog = ctk.CTkToplevel(self)
         self._preparation_window = dialog
         dialog.title("Prepare station")
-        height = min(440, self.winfo_screenheight() - 80)
-        dialog.geometry(f"560x{height}")
+        height = min(560, self.winfo_screenheight() - 80)
+        dialog.geometry(f"680x{height}")
         dialog.transient(self)
         dialog.grab_set()
         dialog.configure(fg_color=T.BG_LIGHT)
-        self._center_window(dialog, 560, height)
-        body = ctk.CTkFrame(dialog, fg_color=T.PANEL_LIGHT)
+        self._center_window(dialog, 680, height)
+        actions = ctk.CTkFrame(dialog, fg_color="transparent")
+        actions.pack(side="bottom", fill="x", padx=40, pady=(12, 24))
+        body = ctk.CTkScrollableFrame(dialog, fg_color=T.PANEL_LIGHT)
         body.pack(fill="both", expand=True, padx=20, pady=20)
-        ctk.CTkLabel(body, text="Confirm inspection", font=(T.FONT_FAMILY, 20, "bold"),
+        ctk.CTkLabel(body, text="Inspect the empty station", font=(T.FONT_FAMILY, 20, "bold"),
                      text_color=T.TEXT_PRIMARY).pack(anchor="w", padx=20, pady=(20, 8))
         ctk.CTkLabel(body, text=f"{self.current_batch_code}\nOperator: {self.operator_name}\nRun target: {self.target_egg_count:,} scans",
                      wraplength=460, justify="left", anchor="w", text_color=T.TEXT_PRIMARY).pack(fill="x", padx=20)
@@ -72,8 +75,7 @@ class GuidedSetupFlow:
         check.pack(anchor="w", padx=20, pady=8)
         notice = ctk.CTkLabel(body, text="", text_color=T.REJECT_RED_TEXT)
         notice.pack(fill="x", padx=20)
-        actions = ctk.CTkFrame(body, fg_color="transparent")
-        actions.pack(fill="x", padx=20, pady=(4, 20))
+
         generation = self._operation_generation
         intent = object()
         self._preparation_intent = intent
@@ -92,13 +94,16 @@ class GuidedSetupFlow:
                 self._preparation_intent = None
                 self.setup_inspected.set(True)
                 self.prepare_station()
-            self._animate_modal_close(dialog, on_close=lambda: self.after_idle(prepare))
+            # CTk destruction flushes idle callbacks before releasing the grab.
+            # A timer runs after destruction, so preparation sees no modal grab.
+            self._animate_modal_close(dialog, on_close=lambda: self.after(0, prepare))
         cancel_button = ctk.CTkButton(actions, text="Cancel", height=44, fg_color=T.PANEL_LIGHT_ALT,
                                      text_color=T.TEXT_PRIMARY, command=cancel, text_color_disabled=T.TEXT_MUTED, border_color=T.BORDER_CONTROL, border_width=1)
         cancel_button.pack(side="left")
-        button = ctk.CTkButton(actions, text="Confirm & prepare", height=44, fg_color=T.PRIMARY_MAROON,
+        button = ctk.CTkButton(actions, text="Prepare station", height=44, fg_color=T.PRIMARY_MAROON,
                               hover_color=T.HOVER_MAROON, command=confirm)
         button.pack(side="right")
         dialog.inspected, dialog.confirm_button, dialog.notice = inspected, button, notice
         dialog.cancel_button = cancel_button
         dialog.protocol("WM_DELETE_WINDOW", cancel)
+        finish_dialog_layout(dialog)

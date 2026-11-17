@@ -87,7 +87,7 @@ class StationReadinessPanel(ctk.CTkFrame):
             return
         self._signature = signature
         for key, text, state in values:
-            self.labels[key].configure(text=text, text_color=FUTheme.INFERTILE_AMBER
+            self.labels[key].configure(text=text, text_color=FUTheme.INFERTILE_AMBER_TEXT
                 if state in {"Needs attention", "Warning"} else FUTheme.TEXT_SECONDARY)
         first_error = next((r.detail for r in rows if r.state == "Needs attention"), "")
         if busy:
@@ -151,10 +151,10 @@ class ReadinessFlow:
         if was_ready and not self._station_prepared:
             self.setup_inspected.set(False)
             self.setup_notice.configure(text=readiness.reason)
-            self._update_cycle_hud("", FUTheme.INFERTILE_AMBER, "Check station", detail=readiness.reason)
+            self._update_cycle_hud("", FUTheme.INFERTILE_AMBER_TEXT, "Check station", detail=readiness.reason)
         if was_ready != self._station_prepared:
             self.iot_status_badge.configure(text="Sorter: ready" if self._station_prepared else "Sorter: not prepared",
-                text_color=FUTheme.FERTILE_GREEN_TEXT if self._station_prepared else FUTheme.INFERTILE_AMBER)
+                text_color=FUTheme.FERTILE_GREEN_TEXT if self._station_prepared else FUTheme.INFERTILE_AMBER_TEXT)
         panel.render(readiness.rows(), self._station_prepared,
                      getattr(self, "_setup_busy", False) or getattr(self, "_software_check_busy", False))
 
@@ -173,7 +173,7 @@ class ReadinessFlow:
             self.setup_notice.configure(text="Confirm the conveyor is empty, aligned and the gate checked.")
             return
         if self.station.settings.rig_profile not in {"three_v3", "unified_v4"}:
-            self.setup_notice.configure(text="Prepare the saved two-board profile in Tools / Settings.")
+            self.setup_notice.configure(text="Prepare the saved two-board profile in Settings.")
             return
         from ..core.operator_flow import validate_batch_config
         try:
@@ -213,7 +213,7 @@ class ReadinessFlow:
                 self.setup_notice.configure(text="Preparation cancelled. Inspect and prepare again.")
             elif error:
                 self.setup_notice.configure(text=str(error))
-                self._update_cycle_hud("", FUTheme.INFERTILE_AMBER, "Check station", detail=str(error))
+                self._update_cycle_hud("", FUTheme.INFERTILE_AMBER_TEXT, "Check station", detail=str(error))
                 self._log("[READINESS] " + str(error))
             elif start:
                 self._activate_cycle(result)

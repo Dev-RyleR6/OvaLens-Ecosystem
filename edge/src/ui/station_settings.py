@@ -17,8 +17,8 @@ class StationSettingsWindow(ctk.CTkToplevel):
         super().__init__(app)
         self.app, self.station = app, app.station
         self.title("OvaLens station settings")
-        self.geometry("920x740")
-        app._center_window(self, 920, 740)
+        self.geometry("1000x800")
+        app._center_window(self, 1000, 800)
         self.minsize(min(800, app.winfo_width() - 24), min(640, app.winfo_height() - 32))
         self.configure(fg_color=FUTheme.BG_LIGHT)
         self.transient(app)
@@ -148,7 +148,7 @@ class StationSettingsWindow(ctk.CTkToplevel):
                                ("Load saved", self._restore)):
             self._button(actions, label, command, side="left")
         self.stop_button = ctk.CTkButton(actions, text="STOP", fg_color=FUTheme.REJECT_RED,
-            hover_color=FUTheme.REJECT_RED_HOVER, command=self.station.halt, width=75, height=40)
+            hover_color=FUTheme.REJECT_RED_HOVER, command=self.station.halt, width=75, height=44)
         self.stop_button.pack(side="right", padx=4)
         enable_button_keyboard(self.stop_button)
         self.done_button = ctk.CTkButton(actions, text="Done", width=72, height=40,
@@ -183,7 +183,7 @@ class StationSettingsWindow(ctk.CTkToplevel):
             selected = title == name
             self.section_buttons[title].configure(
                 fg_color=FUTheme.PANEL_LIGHT if selected else "transparent",
-                text_color=FUTheme.PRIMARY_MAROON if selected else FUTheme.TEXT_SECONDARY,
+                text_color=FUTheme.BRAND_TEXT if selected else FUTheme.TEXT_SECONDARY,
                 font=(FUTheme.FONT_FAMILY, 13, "bold" if selected else "normal"))
         self.sections[name].grid(row=0, column=0, sticky="nsew")
         self.active_section = name
@@ -207,7 +207,7 @@ class StationSettingsWindow(ctk.CTkToplevel):
         ctk.CTkLabel(row, text=label, anchor="w", justify="left", wraplength=300,
                      font=(FUTheme.FONT_FAMILY, 14), text_color=FUTheme.TEXT_SECONDARY).grid(row=0, column=0, sticky="w", padx=(0, 16))
         entry = ctk.CTkEntry(row, height=36, width=150, font=(FUTheme.FONT_FAMILY, 14),
-                            fg_color=FUTheme.PANEL_LIGHT, border_color=FUTheme.BORDER_CONTROL,
+                            fg_color=FUTheme.INPUT_BG, border_color=FUTheme.BORDER_CONTROL,
                             text_color=FUTheme.TEXT_PRIMARY)
         entry.grid(row=0, column=1, sticky="e", padx=(0, 8))
         entry.bind("<FocusIn>", lambda _: reveal_in_scroll_frame(entry), add="+")
@@ -217,12 +217,12 @@ class StationSettingsWindow(ctk.CTkToplevel):
 
     def _button(self, parent, label, command, side=None):
         primary = label == "Apply for this run"
-        button = ctk.CTkButton(parent, text=label, command=command, height=40,
+        button = ctk.CTkButton(parent, text=label, command=command, height=44 if primary else 40,
                               width=max(100, len(label) * 7 + 20),
                               font=(FUTheme.FONT_FAMILY, 14, "bold"),
                               fg_color=FUTheme.PRIMARY_MAROON if primary else FUTheme.PANEL_LIGHT_ALT,
                               hover_color=FUTheme.HOVER_MAROON if primary else FUTheme.PANEL_ACCENT,
-                              border_width=0 if primary else 1, border_color=FUTheme.BORDER_CONTROL,
+                              border_width=1, border_color=FUTheme.BORDER_CONTROL,
                               text_color=FUTheme.TEXT_WHITE if primary else FUTheme.TEXT_PRIMARY,
                               text_color_disabled=FUTheme.TEXT_DISABLED_ON_ACCENT if primary else FUTheme.TEXT_MUTED)
         button.pack(side=side or "top", anchor="w", padx=6, pady=4)

@@ -254,7 +254,7 @@ def test_simple_setup_main_screen_without_hardware(hidden_ui):
                 assert control.winfo_rootx() + control.winfo_width() <= app.winfo_rootx() + app.winfo_width()
             assert app.video_container.winfo_height() > 200
             assert not app.scan_btn.winfo_ismapped()
-            assert app.settings_btn.cget("text") == "Tools"
+            assert app.settings_btn.cget("text") == "Settings"
         assert app.session_btn.cget("state") == "normal"
         app.session_btn.invoke()
         dialog = app._preparation_window

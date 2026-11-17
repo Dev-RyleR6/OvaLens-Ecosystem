@@ -36,7 +36,9 @@ def test_readiness_panel_tracks_prepare_fault_and_retry_without_hardware(hidden_
         dialog.inspected.set(True)
         dialog.confirm_button.invoke()
         pump(app, lambda: not dialog.winfo_exists())
-        pump(app, lambda: not app._setup_busy)
+        # Closing schedules preparation on the next event turn; busy can still be
+        # false before that turn. Wait for the actual completed readiness state.
+        pump(app, lambda: app._station_prepared)
         assert station.readiness.ready and not app.is_auto_cycle_running, app.setup_notice.cget("text")
         assert app.session_btn.cget("state") == "normal"
         app.refresh_readiness(force=True)

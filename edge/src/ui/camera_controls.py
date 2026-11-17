@@ -60,12 +60,12 @@ class CameraControlsPanel(ctk.CTkFrame):
         restore.grid(row=1, column=0, columnspan=2, sticky="ew", padx=3, pady=4)
         self.controls.append(restore)
         self.notice = ctk.CTkLabel(self, text="Changes update the preview automatically.", height=18,
-            font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_SECONDARY,
+            font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_SECONDARY,
             wraplength=340, justify="left", anchor="w")
         self.notice.pack(side="bottom", fill="x", padx=20, pady=6)
         self.section = ctk.CTkSegmentedButton(self, values=["Camera", "Cradle"],
             font=(FUTheme.FONT_FAMILY, 13), command=self._section,
-            selected_color=FUTheme.SELECTION_BG, selected_hover_color=FUTheme.SELECTION_HOVER, text_color=FUTheme.PRIMARY_MAROON,
+            selected_color=FUTheme.SELECTION_BG, selected_hover_color=FUTheme.SELECTION_HOVER, text_color=FUTheme.TEXT_PRIMARY,
             unselected_color=FUTheme.PANEL_LIGHT_ALT, unselected_hover_color=FUTheme.PANEL_ACCENT,
             fg_color=FUTheme.PANEL_LIGHT_ALT)
         self.section.pack(fill="x", padx=18, pady=(0, 4))
@@ -92,7 +92,7 @@ class CameraControlsPanel(ctk.CTkFrame):
             control.pack(side="right")
             self.controls.append(control)
         ctk.CTkLabel(body, text="Sliders and automatic modes update the preview live. Typed values apply after a short pause. Range edits the tuning span, not camera-reported limits. Turn automatic mode Off to tune its manual value.",
-            wraplength=320, justify="left", font=(FUTheme.FONT_FAMILY, 12),
+            wraplength=320, justify="left", font=(FUTheme.FONT_FAMILY, 13),
             text_color=FUTheme.TEXT_MUTED).pack(fill="x", padx=6, pady=10)
         self._build_cradle()
         self.fill(self.base)
@@ -107,13 +107,13 @@ class CameraControlsPanel(ctk.CTkFrame):
             command=lambda: self._toggle_range(name), text_color_disabled=FUTheme.TEXT_MUTED, border_color=FUTheme.BORDER_CONTROL, border_width=1)
         button.pack(side="right", padx=4)
         slider = ctk.CTkSlider(group, from_=0, to=255, number_of_steps=255,
-            progress_color=FUTheme.PRIMARY_MAROON, button_color=FUTheme.TEXT_PRIMARY,
+            progress_color=FUTheme.BRAND_TEXT, button_color=FUTheme.TEXT_PRIMARY,
             command=lambda value: self._slider_changed(name, value))
         slider.pack(fill="x", pady=(6, 2), before=self.readbacks[name])
         editor = ctk.CTkFrame(group, fg_color="transparent")
         fields = []
         for label in ("Min", "Max"):
-            ctk.CTkLabel(editor, text=label, width=28, font=(FUTheme.FONT_FAMILY, 12)).pack(side="left")
+            ctk.CTkLabel(editor, text=label, width=28, font=(FUTheme.FONT_FAMILY, 13)).pack(side="left")
             field = ctk.CTkEntry(editor, width=75, height=30)
             field.pack(side="left", padx=(0, 5))
             fields.append(field)
@@ -266,7 +266,7 @@ class CameraControlsPanel(ctk.CTkFrame):
         body = self.cradle_body = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
         self.path_clear = ctk.BooleanVar(value=False)
         check = ctk.CTkCheckBox(body, text="Path clear; hands away from mechanism", variable=self.path_clear,
-            font=(FUTheme.FONT_FAMILY, 12), command=self._alignment_states,
+            font=(FUTheme.FONT_FAMILY, 13), command=self._alignment_states,
             fg_color=FUTheme.PRIMARY_MAROON, hover_color=FUTheme.HOVER_MAROON)
         check.pack(fill="x", pady=(6, 10))
         self.connect_alignment = ctk.CTkButton(body, text="Connect for alignment", height=36,
@@ -290,7 +290,7 @@ class CameraControlsPanel(ctk.CTkFrame):
             button.grid(row=0, column=col, sticky="ew", padx=3)
             self.jog_buttons.append(button)
         ctk.CTkLabel(body, text="Connect opens the saved COM ports, acknowledges startup/STOP faults, holds the conveyor and turns the lamp on. Each click makes one slow move, then holds again. The IR sensor can stop it early. Done turns the lamp off; re-inspect before sorting. STOP [R] cancels movement.",
-            wraplength=320, justify="left", font=(FUTheme.FONT_FAMILY, 12),
+            wraplength=320, justify="left", font=(FUTheme.FONT_FAMILY, 13),
             text_color=FUTheme.TEXT_SECONDARY).pack(fill="x", pady=10)
         self.controls.extend((check, self.connect_alignment, self.jog_steps, *self.jog_buttons))
         self._alignment_states()
@@ -345,7 +345,7 @@ class CameraControlsPanel(ctk.CTkFrame):
         ctk.CTkLabel(row, text=label, height=22, font=(FUTheme.FONT_FAMILY, 13),
                      text_color=FUTheme.TEXT_PRIMARY, anchor="w").pack(side="left")
         readback = ctk.CTkLabel(group, text="Driver: not checked", wraplength=315, height=18,
-            justify="left", anchor="w", font=(FUTheme.FONT_FAMILY, 12), text_color=FUTheme.TEXT_MUTED)
+            justify="left", anchor="w", font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_MUTED)
         readback.pack(fill="x", padx=8 if paired else 0, pady=(2, 6))
         self.readbacks[name] = readback
         return row

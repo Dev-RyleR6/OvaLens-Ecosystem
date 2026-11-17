@@ -126,8 +126,8 @@ def test_settings_fit_workspace_and_tools_open_below_header_button(hidden_ui, tm
         menu = app.tools_menu
         app.tools_menu = Mock()
         app.open_tools_menu()
-        app.tools_menu.tk_popup.assert_called_once_with(app.settings_btn.winfo_rootx(),
-            app.settings_btn.winfo_rooty() + app.settings_btn.winfo_height() + 6)
+        app.tools_menu.tk_popup.assert_called_once_with(app.more_btn.winfo_rootx(),
+            app.more_btn.winfo_rooty() + app.more_btn.winfo_height() + 6)
         app.tools_menu = menu
         window = StationSettingsWindow(app)
         window.update()

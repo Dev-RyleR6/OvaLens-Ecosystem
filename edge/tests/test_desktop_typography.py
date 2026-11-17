@@ -101,7 +101,7 @@ def test_actual_control_fonts_placeholder_edges_and_keyboard_focus(hidden_ui, tm
         original_border = entry.cget('border_color')
         entry.focus_force()
         app.update()
-        assert entry.cget('border_color') == FUTheme.PRIMARY_MAROON
+        assert entry.cget('border_color') == FUTheme.FOCUS
         entry.insert(0, '120')
         button.focus_force()
         app.update()

@@ -19,16 +19,16 @@ def _install_style(root):
     # The bundled Tk theme honors field/focus colors on Windows and Linux.
     if 'clam' in style.theme_names() and style.theme_use() != 'clam':
         style.theme_use('clam')
-    style.configure(STYLE, fieldbackground=T.PANEL_LIGHT, background=T.PANEL_LIGHT,
+    style.configure(STYLE, fieldbackground=T.INPUT_BG, background=T.PANEL_LIGHT_ALT,
                     foreground=T.TEXT_PRIMARY, arrowcolor=T.TEXT_SECONDARY,
-                    borderwidth=0, relief='flat', padding=(8, 4, 6, 4), arrowsize=13)
-    style.map(STYLE, fieldbackground=[('disabled', T.PANEL_LIGHT_ALT), ('readonly', T.PANEL_LIGHT)],
+                    borderwidth=0, relief='flat', bordercolor=T.INPUT_BG, lightcolor=T.INPUT_BG, darkcolor=T.INPUT_BG, padding=(8, 4, 6, 4), arrowsize=13)
+    style.map(STYLE, fieldbackground=[('disabled', T.PANEL_LIGHT_ALT), ('readonly', T.INPUT_BG)],
               background=[('disabled', T.PANEL_LIGHT_ALT), ('active', T.PANEL_ACCENT)],
               foreground=[('disabled', T.TEXT_MUTED), ('readonly', T.TEXT_PRIMARY)],
               selectbackground=[('readonly', T.PRIMARY_MAROON_BG)],
               selectforeground=[('readonly', T.TEXT_PRIMARY)],
               arrowcolor=[('disabled', T.TEXT_MUTED), ('readonly', T.TEXT_SECONDARY)])
-    for option, value in (('font', (T.FONT_FAMILY, -T.FONT_BODY)), ('background', T.PANEL_LIGHT),
+    for option, value in (('font', (T.FONT_FAMILY, -T.FONT_BODY)), ('background', T.INPUT_BG),
                           ('foreground', T.TEXT_PRIMARY), ('selectBackground', T.PRIMARY_MAROON),
                           ('selectForeground', T.TEXT_WHITE)):
         root.option_add('*TCombobox*Listbox.' + option, value)
@@ -58,7 +58,7 @@ class SelectField(ctk.CTkFrame):
                     'dropdown_hover_color', 'dropdown_text_color', 'dynamic_resizing', 'corner_radius'):
             kwargs.pop(key, None)
         super().__init__(master, width=width, height=height, corner_radius=8,
-                         fg_color=T.PANEL_LIGHT, border_width=1, border_color=T.BORDER_CONTROL, **kwargs)
+                         fg_color=T.INPUT_BG, border_width=1, border_color=T.BORDER_CONTROL, **kwargs)
         self._select_font = font if font is not None else ctk.CTkFont(size=T.FONT_BODY)
         self._select_command = command
         self._select_state = state
@@ -73,7 +73,7 @@ class SelectField(ctk.CTkFrame):
         self._combo.place(x=2, y=2, relwidth=1, relheight=1, width=-4, height=-4)
         root._ovalens_selects.add(self)
         self._combo.bind('<<ComboboxSelected>>', self._selected)
-        self._combo.bind('<FocusIn>', lambda _: super(SelectField, self).configure(border_color=T.PRIMARY_MAROON))
+        self._combo.bind('<FocusIn>', lambda _: super(SelectField, self).configure(border_color=T.FOCUS))
         self._combo.bind('<FocusOut>', lambda _: self._restore_border())
         self._combo.bind('<space>', self._open_from_keyboard)
         self._combo.bind('<Escape>', lambda _: 'break')
@@ -142,7 +142,7 @@ class SelectField(ctk.CTkFrame):
         if name == 'text_color':
             return T.TEXT_PRIMARY
         if name in {'button_color', 'button_hover_color'}:
-            return T.PANEL_LIGHT
+            return T.INPUT_BG
         return super().cget(name)
 
     def focus_set(self):

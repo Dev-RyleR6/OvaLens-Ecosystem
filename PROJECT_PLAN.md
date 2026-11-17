@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-DIM-USABILITY-03**: Replace glaring white surfaces with a contrast-verified dim slate desktop theme; clarify daily run steps and controls, enlarge and harden dialogs, and verify keyboard, visibility and safety controls without physical hardware.
+
 - [x] **TASK-NEW-EDGE-DESKTOP-FLOW-02**: Refine the native desktop workspace, neutral color hierarchy and task-based settings navigation; separate configuration from hardware maintenance and verify minimum-size controls without hardware.
 
 - [x] **TASK-NEW-EDGE-SELECT-LAYOUT-01**: Replace menu-style selectors with bounded native readonly pickers, align setup and camera fields, anchor Tools correctly, fit settings to the workspace and verify keyboard, selection, contrast and safety-control behavior.
