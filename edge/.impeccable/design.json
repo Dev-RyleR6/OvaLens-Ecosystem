@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-17T14:13:26.580582+00:00",
+  "title": "Design System: OvaLens Edge operator interface",
+  "extensions": {
+    "nativeToolkit": "CustomTkinter with native ttk selectors; no HTML/CSS component renderer.",
+    "focus": {
+      "button": "Tab traversal with a visible maroon outline. Enter and Space invoke the button with its disabled-state guard. Space does not propagate to the scan shortcut.",
+      "entry": "Maroon focus border; retain validation feedback on blur.",
+      "scroll": "Reveal the focused control within its scrollable form without changing the active section."
+    },
+    "windowSizes": [
+      {
+        "name": "normal inspection workspace",
+        "width": 1280,
+        "height": 860
+      },
+      {
+        "name": "minimum operation workspace",
+        "width": 1024,
+        "height": 720
+      }
+    ],
+    "elevation": "Flat tonal surfaces and thin borders; no decorative shadows.",
+    "navigation": {
+      "sections": [
+        "Connections",
+        "Camera",
+        "Detection",
+        "Calibration",
+        "Maintenance"
+      ],
+      "behavior": "Persistent left section navigation beside one scrollable task form. Driver readback scrolls with the Camera fields."
+    }
+  },
+  "components": [
+    {
+      "name": "Station settings field",
+      "kind": "input",
+      "refersTo": "station-field",
+      "description": "Aligned native entry with a readable control border and maroon keyboard focus; scrolls within its task form."
+    },
+    {
+      "name": "Settings navigation",
+      "kind": "nav",
+      "description": "Persistent task list with quiet selected surface and maroon selected text. Maintenance groups physical tests and alignment."
+    },
+    {
+      "name": "Fixed settings actions",
+      "kind": "button",
+      "description": "Apply for this run, Save defaults, Load saved, Done and STOP remain reachable outside the scrollable task form. Applying and remembering defaults remain distinct."
+    },
+    {
+      "name": "Camera workspace",
+      "kind": "custom",
+      "description": "Dark camera well with separate light text and cycle instructions above the preview. Give available workspace width to the image."
+    },
+    {
+      "name": "Record panel",
+      "kind": "card",
+      "description": "Compact light panel grouping the latest result, aligned counts and recent events with spacing and thin dividers."
+    },
+    {
+      "name": "Native selector",
+      "kind": "input",
+      "description": "Read-only ttk selector with neutral field, dark values and arrow, maroon focus border and an eight-row scrolling popup. Programmatic changes do not invoke user callbacks."
+    }
+  ],
+  "narrative": {
+    "overview": "Mode: **Operate**. Extend the established Foundation University workspace with\nrestrained light surfaces, a larger camera workspace and task-grouped settings.\nThe operator must see the egg, understand a stopped conveyor and act safely.\nThis is the native Edge desktop system; dashboard composition does not govern it.",
+    "dos": [
+      "**Do** keep camera evidence, cycle instructions and STOP visible at the minimum workspace size.",
+      "**Do** group configuration by operator task and place physical station tests in Maintenance.",
+      "**Do** pair status colors with explicit text and keep driver readback reachable by scrolling."
+    ],
+    "donts": [
+      "**Don't** equate preview, saved defaults or an unconfirmed hardware request with physical readiness.",
+      "**Don't** add decorative timers, image assets, shadows or additional camera streams."
+    ]
+  }
+}

@@ -65,7 +65,7 @@ class CameraControlsPanel(ctk.CTkFrame):
         self.notice.pack(side="bottom", fill="x", padx=20, pady=6)
         self.section = ctk.CTkSegmentedButton(self, values=["Camera", "Cradle"],
             font=(FUTheme.FONT_FAMILY, 13), command=self._section,
-            selected_color="#EEDADA", selected_hover_color="#E5C4C4", text_color=FUTheme.PRIMARY_MAROON,
+            selected_color=FUTheme.SELECTION_BG, selected_hover_color=FUTheme.SELECTION_HOVER, text_color=FUTheme.PRIMARY_MAROON,
             unselected_color=FUTheme.PANEL_LIGHT_ALT, unselected_hover_color=FUTheme.PANEL_ACCENT,
             fg_color=FUTheme.PANEL_LIGHT_ALT)
         self.section.pack(fill="x", padx=18, pady=(0, 4))

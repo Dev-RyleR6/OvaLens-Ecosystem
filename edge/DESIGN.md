@@ -1,4 +1,95 @@
+---
+name: OvaLens Edge operator interface
+description: Restrained Foundation University light workspace for safe native station operation.
+colors:
+  primary-maroon: "#800000"
+  dark-maroon: "#5C0000"
+  fertile-green: "#357a38"
+  reject-red: "#DC2626"
+  review-amber: "#875A12"
+  workspace: "#F8FAFC"
+  panel: "#FFFFFF"
+  panel-alt: "#F1F5F9"
+  panel-accent: "#E9EDF1"
+  border: "#E2E8F0"
+  border-control: "#76869B"
+  selection: "#E8EDF2"
+  selection-hover: "#DDE4EB"
+  ink: "#20242B"
+  ink-secondary: "#414852"
+  ink-muted: "#59616D"
+  viewport: "#111317"
+  viewport-text: "#F1F5F9"
+  viewport-muted: "#CBD5E1"
+typography:
+  body:
+    fontFamily: "Inter"
+    fontSize: "14px"
+  label:
+    fontFamily: "Inter"
+    fontSize: "13px"
+  caption:
+    fontFamily: "Inter"
+    fontSize: "12px"
+rounded:
+  main-panel: "8px"
+spacing:
+  workspace-margin: "20px"
+  panel-gap: "16px"
+components:
+  station-field:
+    backgroundColor: "{colors.panel}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.main-panel}"
+    width: "150px"
+    height: "36px"
+---
+
 # Edge operator interface
+
+## Overview
+
+Mode: **Operate**. Extend the established Foundation University workspace with
+restrained light surfaces, a larger camera workspace and task-grouped settings.
+The operator must see the egg, understand a stopped conveyor and act safely.
+This is the native Edge desktop system; dashboard composition does not govern it.
+
+## Colors
+
+Maroon anchors primary actions and keyboard focus. Green, amber and red carry
+result and safety meaning with accompanying text. Neutral ink supports the light
+workspace; separate light text serves the dark camera well. The frontmatter
+records the shared values from `src/ui/theme.py` and `assets/desktop_theme.json`.
+
+## Typography
+
+Use bundled static Inter regular and bold. Keep native camera terminology and
+readback legible. The established font sizes and platform fallback behavior are
+specified with the component guidance below.
+
+## Layout
+
+The main workspace has a horizontal margin (20px), vertical margin (16px) and
+panel gap (16px). Give available width to the camera; the record panel remains
+compact (360px). Station settings uses a persistent left navigation (164px) and
+scrollable task forms. Keep its aligned numeric fields (150px by 36px), wrapped
+help and driver readback in the form flow. Driver readback scrolls with the
+Camera fields rather than consuming a fixed area beneath them.
+
+## Elevation & Depth
+
+Use flat tonal surfaces and thin borders for hierarchy. Do not add shadows or
+decorative animation.
+
+## Shapes
+
+Main camera and record panels and the settings workspace use gently curved
+corners (8px). Preserve existing component-specific radii rather than applying
+one radius indiscriminately to every native control.
+
+## Components
+
+### Established operation and safety guidance
 
 Batch setup uses Existing batch, New batch and Complete details in one native
 dialog. Keep Save/Use and Cancel fixed below a scrollable form at 1024×720.
@@ -47,7 +138,7 @@ selection, and scan/stop letter shortcuts do not run while a picker has focus.
 Header context uses three aligned grid columns. Pause belongs beside the sorting
 action; manual light control sits near STOP on the right. Tools opens beneath its
 header control. Station settings is centered and clamped to the current workspace,
-with responsive help wrapping and fixed actions below its scrolling tabs. Camera
+with responsive help wrapping, persistent left section navigation and fixed actions below its scrollable forms. Camera
 auto/manual pairs share an inset group; blank numeric inputs use shared helper
 text. Status/result groups expand to fit wrapped messages instead of fixed-height
 text clipping. Keep panel separators quiet and selector boundaries distinct.
@@ -78,8 +169,9 @@ glow, fake instruments or ornamental animation.
 
 The footer reserves space for STOP and session controls at 1024×720. Review
 choices appear only when needed. History remains reachable while a review takes
-space from the event area. Settings are grouped by Connections, Camera, Detection
-and Calibration. No physical operation is implied by preview or a saved default.
+space from the event area. Settings are grouped by Connections, Camera, Detection,
+Calibration and Maintenance. Maintenance contains physical tests and alignment
+commands, separated from configuration fields. No physical operation is implied by preview or a saved default.
 
 Keep latest-only camera buffering, single scheduled inference, background I/O,
 and cached widget refreshes. Do not add timers, animation or image assets for
@@ -118,3 +210,31 @@ available. A pause completes current motion and classification before holding;
 never present an unconfirmed hold as Paused. Camera and manual light controls
 remain locked until the session ends. Cache button updates with the other footer
 controls and preserve their visibility at 1024 by 720.
+
+
+### Station settings navigation and actions
+
+Connections, Camera, Detection, Calibration and Maintenance remain visible in the
+left navigation while one scrollable section occupies the content area. Use a
+quiet selected surface with maroon text; hover and selection must retain readable
+contrast. Configuration values and physical commands have distinct task groups.
+The fixed actions are Apply for this run, Save defaults, Load saved, Done and
+STOP. Applying affects the current run; saving also remembers defaults. Neither
+implies that a physical operation occurred. Camera controls beside the preview
+retain their separate Apply now, Save as default and Load saved settings labels.
+
+### Keyboard operation
+
+Shared button keyboard support enables Tab traversal, a visible maroon focus
+outline, and Enter or Space activation with the disabled-state guard retained.
+Space activation must not propagate into the scan shortcut. Reveal focused
+controls inside scrollable forms without switching sections. Entry focus uses a
+maroon border while preserving validation feedback on blur.
+
+## Do's and Don'ts
+
+- **Do** keep camera evidence, cycle instructions and STOP visible at the minimum workspace size.
+- **Do** group configuration by operator task and place physical station tests in Maintenance.
+- **Do** pair status colors with explicit text and keep driver readback reachable by scrolling.
+- **Don't** equate preview, saved defaults or an unconfirmed hardware request with physical readiness.
+- **Don't** add decorative timers, image assets, shadows or additional camera streams.

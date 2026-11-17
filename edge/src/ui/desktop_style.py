@@ -72,3 +72,40 @@ def install_entry_focus(root):
 
     root.bind_class('Entry', '<FocusIn>', focus_in, add='+')
     root.bind_class('Entry', '<FocusOut>', focus_out, add='+')
+
+
+def reveal_in_scroll_frame(widget):
+    """Keep a keyboard-focused control in view without changing the active page."""
+    parent = widget.master
+    while parent is not None:
+        if isinstance(parent, ctk.CTkScrollableFrame):
+            canvas = parent._parent_canvas
+            extent = canvas.bbox("all")
+            if not extent:
+                return
+            total = max(1, extent[3] - extent[1])
+            top = widget.winfo_rooty() - parent.winfo_rooty()
+            bottom = top + widget.winfo_height()
+            visible_top = canvas.canvasy(0)
+            height = canvas.winfo_height()
+            if top < visible_top:
+                canvas.yview_moveto(max(0, top - 8) / total)
+            elif bottom > visible_top + height:
+                canvas.yview_moveto(max(0, bottom - height + 8) / total)
+            return
+        parent = getattr(parent, "master", None)
+
+
+def enable_button_keyboard(button):
+    """Give a CTk button native Tab traversal, a focus ring and key activation."""
+    canvas = button._canvas
+    canvas.configure(takefocus=lambda _path: int(button.cget("state") != "disabled"),
+                     highlightthickness=2, highlightcolor=FUTheme.PRIMARY_MAROON,
+                     highlightbackground=button._apply_appearance_mode(button._bg_color))
+    canvas.bind("<FocusIn>", lambda _: reveal_in_scroll_frame(button), add="+")
+    def activate(event):
+        button.invoke()  # CTk preserves its disabled-state guard.
+        return "break"  # Space must not propagate to the app's scan shortcut.
+    for key in ("<space>", "<Return>", "<KP_Enter>"):
+        canvas.bind(key, activate, add="+")
+    return button

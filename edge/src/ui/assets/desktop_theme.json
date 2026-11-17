@@ -29,15 +29,15 @@
       "#979DA2",
       "#565B5E"
     ],
-    "text_color": "#172B42"
+    "text_color": "#20242B"
   },
   "CTkEntry": {
     "corner_radius": 8,
     "border_width": 1,
     "fg_color": "#FFFFFF",
     "border_color": "#76869B",
-    "text_color": "#172B42",
-    "placeholder_text_color": "#4C6077"
+    "text_color": "#20242B",
+    "placeholder_text_color": "#59616D"
   },
   "CTkCheckBox": {
     "corner_radius": 5,
@@ -46,8 +46,8 @@
     "border_color": "#76869B",
     "hover_color": "#5C0000",
     "checkmark_color": "#FFFFFF",
-    "text_color": "#172B42",
-    "text_color_disabled": "#4C6077"
+    "text_color": "#20242B",
+    "text_color_disabled": "#59616D"
   },
   "CTkSwitch": {
     "corner_radius": 1000,
@@ -57,8 +57,8 @@
     "progress_color": "#800000",
     "button_color": "#FFFFFF",
     "button_hover_color": "#F1F5F9",
-    "text_color": "#172B42",
-    "text_color_disabled": "#4C6077"
+    "text_color": "#20242B",
+    "text_color_disabled": "#59616D"
   },
   "CTkRadioButton": {
     "corner_radius": 1000,
@@ -67,8 +67,8 @@
     "fg_color": "#800000",
     "border_color": "#76869B",
     "hover_color": "#5C0000",
-    "text_color": "#172B42",
-    "text_color_disabled": "#4C6077"
+    "text_color": "#20242B",
+    "text_color_disabled": "#59616D"
   },
   "CTkProgressBar": {
     "corner_radius": 1000,
@@ -104,44 +104,44 @@
     "fg_color": "#FFFFFF",
     "border_color": "#76869B",
     "button_color": "#F1F5F9",
-    "button_hover_color": "#E8EDF3",
-    "text_color": "#172B42",
-    "text_color_disabled": "#4C6077"
+    "button_hover_color": "#E9EDF1",
+    "text_color": "#20242B",
+    "text_color_disabled": "#59616D"
   },
   "CTkScrollbar": {
     "corner_radius": 1000,
     "border_spacing": 4,
     "fg_color": "transparent",
     "button_color": "#76869B",
-    "button_hover_color": "#34465D"
+    "button_hover_color": "#414852"
   },
   "CTkSegmentedButton": {
     "corner_radius": 6,
     "border_width": 2,
     "fg_color": "#F1F5F9",
-    "selected_color": "#EEDADA",
-    "selected_hover_color": "#E5C4C4",
+    "selected_color": "#E8EDF2",
+    "selected_hover_color": "#DDE4EB",
     "unselected_color": "#F1F5F9",
-    "unselected_hover_color": "#E8EDF3",
-    "text_color": "#172B42",
-    "text_color_disabled": "#4C6077"
+    "unselected_hover_color": "#E9EDF1",
+    "text_color": "#20242B",
+    "text_color_disabled": "#59616D"
   },
   "CTkTextbox": {
     "corner_radius": 6,
     "border_width": 0,
     "fg_color": "#FFFFFF",
     "border_color": "#76869B",
-    "text_color": "#172B42",
+    "text_color": "#20242B",
     "scrollbar_button_color": "#76869B",
-    "scrollbar_button_hover_color": "#34465D"
+    "scrollbar_button_hover_color": "#414852"
   },
   "CTkScrollableFrame": {
     "label_fg_color": "#F1F5F9"
   },
   "DropdownMenu": {
     "fg_color": "#FFFFFF",
-    "hover_color": "#E8EDF3",
-    "text_color": "#172B42"
+    "hover_color": "#E9EDF1",
+    "text_color": "#20242B"
   },
   "CTkFont": {
     "macOS": {

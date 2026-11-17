@@ -149,3 +149,90 @@ def test_light_workspace_and_camera_controls_keep_text_readable(hidden_ui, tmp_p
     finally:
         app.shutdown()
         app.mainloop()
+
+
+@pytest.mark.parametrize("size", ["1024x720", "1280x860"])
+def test_settings_sections_preserve_edits_and_fixed_safe_actions(hidden_ui, tmp_path, size):
+    from src.ui.station_settings import StationSettingsWindow
+    app, _, _ = preview_app(tmp_path)
+    try:
+        app.geometry(size)
+        app.deiconify()
+        app.update()
+        window = StationSettingsWindow(app)
+        window.update()
+        stop_position = bounds(window.stop_button)
+        window.entries["conveyor_port"].delete(0, "end")
+        window.entries["conveyor_port"].insert(0, "COM42")
+        for section in window.sections:
+            window.section_buttons[section].invoke()
+            window.update()
+            assert window.active_section == section
+            assert window.sections[section].winfo_ismapped()
+            contained(window.section_buttons[section], window)
+            for action in window.actions.winfo_children():
+                if isinstance(action, ctk.CTkButton):
+                    assert action.winfo_ismapped()
+                    contained(action, window)
+            assert bounds(window.stop_button) == stop_position
+            check_readable(window)
+        assert window.entries["conveyor_port"].get() == "COM42"
+        assert window._values().conveyor_port == "COM42"
+        window.pending = True
+        window.done_button.invoke()
+        assert window.winfo_exists()
+        assert "Wait" in window.notice.cget("text")
+        window.pending = False
+        window.done_button.invoke()
+        app.update()
+        assert not window.winfo_exists()
+    finally:
+        app.shutdown()
+        app.mainloop()
+
+
+def test_settings_keyboard_navigation_and_disabled_actions(hidden_ui, tmp_path):
+    from unittest.mock import Mock
+    from src.ui.station_settings import StationSettingsWindow
+    from src.ui.theme import FUTheme
+    app, _, _ = preview_app(tmp_path)
+    try:
+        app.deiconify()
+        app.update()
+        window = StationSettingsWindow(app)
+        window.update()
+        camera = window.section_buttons["Camera"]
+        camera._canvas.focus_force()
+        camera._canvas.event_generate("<Return>")
+        window.update()
+        assert window.active_section == "Camera"
+        assert camera._canvas.cget("highlightcolor") == FUTheme.PRIMARY_MAROON
+        assert int(camera._canvas.cget("highlightthickness")) == 2
+        # Tk lazily loads traversal procedures; load before querying directly.
+        window.tk.call("auto_load", "tk_focusNext")
+        assert str(window.tk.call("tk_focusNext", str(camera._canvas))) == str(window.section_buttons["Detection"]._canvas)
+        apply = window.buttons[-3]
+        callback = Mock()
+        apply.configure(command=callback)
+        apply._canvas.focus_force()
+        apply._canvas.event_generate("<space>")
+        window.update()
+        callback.assert_called_once()
+        apply.configure(state="disabled")
+        apply._canvas.event_generate("<Return>")
+        window.update()
+        callback.assert_called_once()
+        assert not app.inference_worker.submit.called
+        window._show_section("Maintenance")
+        window.update()
+        last = next(b for b in window.buttons if b.cget("text") == "Hold hardware pause")
+        last._canvas.focus_force()
+        window.update()
+        canvas = last.master._parent_canvas
+        assert canvas.canvasy(0) > 0
+        assert last.winfo_rooty() >= canvas.winfo_rooty()
+        assert last.winfo_rooty() + last.winfo_height() <= canvas.winfo_rooty() + canvas.winfo_height()
+        window._close()
+    finally:
+        app.shutdown()
+        app.mainloop()

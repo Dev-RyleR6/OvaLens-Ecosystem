@@ -38,16 +38,18 @@ class FUTheme:
     BG_LIGHT = "#F8FAFC"
     PANEL_LIGHT = "#FFFFFF"
     PANEL_LIGHT_ALT = "#F1F5F9"
-    PANEL_ACCENT = "#E8EDF3"
+    PANEL_ACCENT = "#E9EDF1"
     BORDER = "#E2E8F0"
     BORDER_CONTROL = "#76869B"
+    SELECTION_BG = "#E8EDF2"
+    SELECTION_HOVER = "#DDE4EB"
     BORDER_DARK = BORDER_CONTROL
     DARKROOM_VIEWPORT = "#111317"     # Studio Viewport for Candling Stream
 
     # Separate light-workspace text from the dark camera well.
-    TEXT_PRIMARY = "#172B42"
-    TEXT_SECONDARY = "#34465D"
-    TEXT_MUTED = "#4C6077"
+    TEXT_PRIMARY = "#20242B"
+    TEXT_SECONDARY = "#414852"
+    TEXT_MUTED = "#59616D"
     TEXT_DIM = TEXT_MUTED
     VIEWPORT_TEXT = "#F1F5F9"
     VIEWPORT_MUTED = "#CBD5E1"

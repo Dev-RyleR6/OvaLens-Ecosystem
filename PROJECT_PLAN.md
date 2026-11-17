@@ -216,6 +216,8 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-DESKTOP-FLOW-02**: Refine the native desktop workspace, neutral color hierarchy and task-based settings navigation; separate configuration from hardware maintenance and verify minimum-size controls without hardware.
+
 - [x] **TASK-NEW-EDGE-SELECT-LAYOUT-01**: Replace menu-style selectors with bounded native readonly pickers, align setup and camera fields, anchor Tools correctly, fit settings to the workspace and verify keyboard, selection, contrast and safety-control behavior.
 
 - [x] **TASK-NEW-EDGE-TYPE-CONTRAST-01**: Unify native controls and operator screens on bundled offline Inter fonts, improve text/control/selection contrast and keyboard focus feedback, and verify actual font resolution and minimum-size safety controls without hardware.

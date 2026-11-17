@@ -438,13 +438,13 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
 
     def _build_main_layout(self):
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
-        self.main_container.pack(fill="both", expand=True, padx=24, pady=20)
+        self.main_container.pack(fill="both", expand=True, padx=20, pady=16)
         self.main_container.grid_columnconfigure(0, weight=1, minsize=490)
         self.main_container.grid_columnconfigure(1, weight=0)
         self.main_container.grid_rowconfigure(0, weight=1)
 
         self.left_panel = ctk.CTkFrame(self.main_container, fg_color=FUTheme.PANEL_LIGHT,
-                                      corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
+                                      corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         self.left_panel.grid(row=0, column=0, sticky="nsew")
         self.cycle_hud = ctk.CTkFrame(self.left_panel, fg_color=FUTheme.PANEL_LIGHT,
                                      height=102, corner_radius=12)
@@ -492,8 +492,8 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
 
         # A compact side panel reserves more width for the camera.
         self.right_panel = ctk.CTkFrame(self.main_container, fg_color=FUTheme.PANEL_LIGHT,
-                                       width=360, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
-        self.right_panel.grid(row=0, column=1, sticky="nsew", padx=(20, 0))
+                                       width=360, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
+        self.right_panel.grid(row=0, column=1, sticky="nsew", padx=(16, 0))
         self.right_panel.pack_propagate(False)
         self.result_banner = ctk.CTkFrame(self.right_panel, fg_color="transparent",
                                          corner_radius=12, height=116, border_width=0)
@@ -624,7 +624,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             fg=FUTheme.TEXT_PRIMARY, activebackground=FUTheme.PANEL_ACCENT,
             activeforeground=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, -FUTheme.FONT_BODY))
         self.tools_menu.add_command(label="Single scan    Space", command=self.trigger_candling_scan)
-        self.tools_menu.add_command(label="Settings", command=self.open_calibration_dialog)
+        self.tools_menu.add_command(label="Station settings", command=self.open_calibration_dialog)
         self.tools_menu.add_command(label="Retry camera preview", command=self._start_preview)
         self.tools_menu.add_command(label="Camera controls", command=self.open_camera_controls)
 
@@ -950,7 +950,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         dialog.grab_set()
         self._center_window(dialog, 560, 630)
 
-        card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
+        card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         card.pack(fill="both", expand=True, padx=16, pady=16)
 
         # Header with Alert / Session Icon
@@ -1443,7 +1443,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         dialog.grab_set()
         self._center_window(dialog, 480, 260)
 
-        card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
+        card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         card.pack(fill="both", expand=True, padx=16, pady=16)
 
         ctk.CTkLabel(card, text="Conveyor jam detected",
@@ -1701,7 +1701,9 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             title_color = FUTheme.INFERTILE_AMBER
 
         self.result_banner.configure(fg_color=card_bg, border_color=card_border)
-        self.result_badge.configure(text=action, fg_color=badge_bg, text_color=badge_text_color)
+        self.result_badge.configure(text={"MANUAL_REVIEW": "Manual review", "PREVIEW_ONLY": "Preview only",
+            "ACCEPT": "Accept", "REJECT": "Reject"}.get(action, action.replace("_", " ").capitalize()),
+            fg_color=badge_bg, text_color=badge_text_color)
         self.latency_label.configure(text=f"Latency: {lat_ms}ms")
         self.result_title.configure(text=title_text, text_color=title_color)
         self.result_subtitle.configure(text=sub_text)
@@ -1970,7 +1972,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         dialog.grab_set()
         self._center_window(dialog, 480, 280)
 
-        card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
+        card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         card.pack(fill="both", expand=True, padx=16, pady=16)
 
         # Header with Warning Icon
@@ -2320,7 +2322,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         dialog.grab_set()
         self._center_window(dialog, 540, height)
 
-        card = ctk.CTkScrollableFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
+        card = ctk.CTkScrollableFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         card.pack(fill="both", expand=True, padx=16, pady=16)
 
         # Header with Trophy / Check Icon
@@ -2463,7 +2465,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         dialog.grab_set()
         self._center_window(dialog, 780, 700)
 
-        card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=12, border_width=1, border_color=FUTheme.BORDER)
+        card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         card.pack(fill="both", expand=True, padx=16, pady=16)
 
         # Header Row
