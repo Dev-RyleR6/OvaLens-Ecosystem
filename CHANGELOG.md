@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Firmware**: [TASK-NEW-FW-APP-01] preserve explicit egg/servo port assignments, add the COM5/COM7 hardware launcher, and display deployed controller status replies (2026-10-02).
 
 ### Added
+- **Edge**: [TASK-NEW-EDGE-LIGHT-DIALOG-04] add soft light appearance and resilient dialog sizing (2026-11-18)
 - **Edge**: [TASK-NEW-EDGE-DIM-USABILITY-03] improve low-glare desktop usability and run flow (2026-11-18)
 - **Edge**: [TASK-NEW-EDGE-DESKTOP-FLOW-02] refine desktop workspace and task-based settings (2026-11-17)
 - **Docs**: add black-box test plan, evaluation template, and review basis for capstone defense (2026-11-11)

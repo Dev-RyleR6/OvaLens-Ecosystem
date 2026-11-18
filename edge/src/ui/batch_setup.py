@@ -98,7 +98,7 @@ class BatchSetupWindow(ctk.CTkToplevel):
         self.common.pack(fill="x", pady=(0, 12))
         self._quantity_custom = False
         self.target = ctk.CTkEntry(self.common, height=44, width=120)
-        self.target.pack(side="right", padx=(16, 0))
+        self.target.pack(side="bottom", fill="x", pady=(8, 0))
         ctk.CTkLabel(self.common, text="Eggs to scan this run", anchor="w",
             font=(T.FONT_FAMILY, 14, "bold"), text_color=T.TEXT_PRIMARY).pack(fill="x")
         self.target_summary = ctk.CTkLabel(self.common, text="Choose a batch first", anchor="w", justify="left",

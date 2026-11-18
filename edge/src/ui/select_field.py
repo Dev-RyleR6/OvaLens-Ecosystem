@@ -15,6 +15,18 @@ def _install_style(root):
     if getattr(root, '_ovalens_selects', None) is not None:
         return
     root._ovalens_selects = WeakSet()
+    refresh_style(root)
+
+    def popup_wheel(event):
+        path = str(event.widget)
+        if any(path.startswith(str(field._combo) + '.') for field in root._ovalens_selects):
+            return 'break'
+    for event in ('<MouseWheel>', '<Button-4>', '<Button-5>'):
+        root.bind_class('Listbox', event, popup_wheel, add='+')
+
+
+def refresh_style(root):
+    """Update native fields and their popup lists when appearance changes."""
     style = ttk.Style(root)
     # The bundled Tk theme honors field/focus colors on Windows and Linux.
     if 'clam' in style.theme_names() and style.theme_use() != 'clam':
@@ -32,16 +44,6 @@ def _install_style(root):
                           ('foreground', T.TEXT_PRIMARY), ('selectBackground', T.PRIMARY_MAROON),
                           ('selectForeground', T.TEXT_WHITE)):
         root.option_add('*TCombobox*Listbox.' + option, value)
-
-    def popup_wheel(event):
-        # Let Tk's Listbox class scroll first, then keep CTk's bind_all handler
-        # from also moving the setup form underneath the open native picker.
-        path = str(event.widget)
-        if any(path.startswith(str(field._combo) + '.') for field in root._ovalens_selects):
-            return 'break'
-    for event in ('<MouseWheel>', '<Button-4>', '<Button-5>'):
-        root.bind_class('Listbox', event, popup_wheel, add='+')
-
 
 class SelectField(ctk.CTkFrame):
     """get/set/configure semantics match the former CTkOptionMenu selectors.

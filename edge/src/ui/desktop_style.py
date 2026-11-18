@@ -49,8 +49,18 @@ def configure_desktop():
     if not loaded:
         print(f'[UI] Bundled Inter unavailable; using {FUTheme.FONT_FAMILY}.')
     ctk.set_default_color_theme(str(ASSETS / 'desktop_theme.json'))
+    from .appearance import load_appearance, color_mapping
+    from .theme import DIM_PALETTE, LIGHT_PALETTE, set_palette
+    appearance = load_appearance()
+    set_palette(appearance)
+    if appearance == 'light':
+        mapping = color_mapping(DIM_PALETTE, LIGHT_PALETTE)
+        for section in ctk.ThemeManager.theme.values():
+            for key, value in section.items():
+                if 'color' in key and isinstance(value, str):
+                    section[key] = mapping.get(value.lower(), value)
     ctk.ThemeManager.theme['CTkFont']['family'] = FUTheme.FONT_FAMILY
-    ctk.set_appearance_mode('dark')
+    ctk.set_appearance_mode('light' if FUTheme.appearance == 'light' else 'dark')
     _configured = True
 
 

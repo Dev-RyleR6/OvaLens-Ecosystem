@@ -72,6 +72,36 @@ class FUTheme:
     FONT_METRIC = 24
 
 
+DIM_PALETTE = {key: value for key, value in vars(FUTheme).items()
+               if isinstance(value, str) and value.startswith('#')}
+LIGHT_PALETTE = dict(DIM_PALETTE, **{
+    'BG_LIGHT': '#EDF0F3', 'PANEL_LIGHT': '#F7F8FA',
+    'PANEL_LIGHT_ALT': '#E2E7ED', 'PANEL_ACCENT': '#D2DAE4',
+    'BORDER': '#A5AFBD', 'BORDER_CONTROL': '#657386', 'BORDER_DARK': '#657386',
+    'INPUT_BG': '#FAFBFC', 'SELECTION_BG': '#CFD8E4', 'SELECTION_HOVER': '#C2CDDC',
+    'TEXT_PRIMARY': '#182333', 'TEXT_SECONDARY': '#344256',
+    'TEXT_MUTED': '#465469', 'TEXT_DIM': '#465469',
+    'FOCUS': '#800000', 'BRAND_TEXT': '#800000',
+    'PRIMARY_MAROON_BG': '#F1DFE3', 'PRIMARY_MAROON_BORDER': '#800000',
+    'FERTILE_GREEN_BG': '#DEECE0', 'FERTILE_GREEN_CARD': '#E7F0E8',
+    'FERTILE_GREEN_BORDER': '#357a38', 'FERTILE_GREEN_TEXT': '#245C2A',
+    'INFERTILE_AMBER_BG': '#F3E8D4', 'INFERTILE_AMBER_CARD': '#F5EDDF',
+    'INFERTILE_AMBER_BORDER': '#875A12', 'INFERTILE_AMBER_TEXT': '#70490C',
+    'REJECT_RED_BG': '#F6E1E4', 'REJECT_RED_CARD': '#F8EAEC',
+    'REJECT_RED_BORDER': '#B91C1C', 'REJECT_RED_TEXT': '#9F1828',
+    'TEXT_ACCENT': '#70490C',
+})
+FUTheme.appearance = 'dim'
+
+
+def set_palette(appearance):
+    """Select visual tokens only; station and camera settings are untouched."""
+    palette = LIGHT_PALETTE if appearance == 'light' else DIM_PALETTE
+    for key, value in palette.items():
+        setattr(FUTheme, key, value)
+    FUTheme.appearance = 'light' if appearance == 'light' else 'dim'
+
+
 def fit_caption(text, measure, width):
     """Keep long batch codes and staff names within their native header control."""
     if measure(text) <= width:

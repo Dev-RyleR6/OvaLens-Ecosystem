@@ -332,3 +332,5 @@ These features can be claimed by any agent using `python scripts/verify_and_comm
 
 - [x] **TASK-NEW-EDGE-IOT-01**: Harden Edge IoT serial communication, Windows port retry backoff, Bluetooth port filtering, delayed auto-reset race prevention, clean manual light release, and station dependency architecture.
 
+
+- [x] **TASK-NEW-EDGE-LIGHT-DIALOG-04**: Add a soft light appearance alongside dim slate with readable controls; fit run setup dialogs to the display even when their parent is withdrawn, and verify theme switching and form reachability.

@@ -15,7 +15,7 @@ class StartupConfigWindow(ctk.CTk):
         self.geometry("720x520")
         self.minsize(600, 440)
         self.configure(fg_color=T.BG_LIGHT)
-        ctk.set_appearance_mode("dark")
+        ctk.set_appearance_mode("light" if T.appearance == "light" else "dark")
         self.protocol("WM_DELETE_WINDOW", self._on_cancel)
         body = ctk.CTkFrame(self, fg_color=T.PANEL_LIGHT, corner_radius=8)
         body.pack(fill="both", expand=True, padx=24, pady=(24, 12))
@@ -30,6 +30,11 @@ class StartupConfigWindow(ctk.CTk):
                      font=(T.FONT_FAMILY, 13)).pack(anchor="w", padx=20, pady=(16, 8))
         self._status_label = ctk.CTkLabel(self, text="", text_color=T.REJECT_RED_TEXT)
         self._status_label.pack(fill="x", padx=24)
+        from .appearance import appearance_picker
+        appearance_row = ctk.CTkFrame(self, fg_color="transparent")
+        appearance_row.pack(fill="x", padx=24, pady=8)
+        ctk.CTkLabel(appearance_row, text="Appearance", text_color=T.TEXT_PRIMARY).pack(side="left")
+        appearance_picker(appearance_row, self).pack(side="right")
         actions = ctk.CTkFrame(self, fg_color="transparent")
         actions.pack(fill="x", padx=24, pady=(4, 20))
         ctk.CTkButton(actions, text="Cancel", command=self._on_cancel, fg_color=T.PANEL_LIGHT_ALT,

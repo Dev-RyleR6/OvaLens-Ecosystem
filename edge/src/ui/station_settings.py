@@ -28,6 +28,12 @@ class StationSettingsWindow(ctk.CTkToplevel):
         self.buttons = []
         ctk.CTkLabel(self, text="Station settings", font=(FUTheme.FONT_FAMILY, 22, "bold")).pack(anchor="w", padx=24, pady=(18, 4))
         ctk.CTkLabel(self, font=(FUTheme.FONT_FAMILY, 14), text="Configure the idle station. Use Maintenance for physical tests and alignment.", wraplength=850).pack(anchor="w", padx=24)
+        from .appearance import appearance_picker
+        appearance_row = ctk.CTkFrame(self, fg_color="transparent")
+        appearance_row.pack(fill="x", padx=24, pady=(8, 0))
+        ctk.CTkLabel(appearance_row, text="Appearance", text_color=FUTheme.TEXT_PRIMARY).pack(side="left")
+        self.appearance = appearance_picker(appearance_row, app)
+        self.appearance.pack(side="right")
         workspace = ctk.CTkFrame(self, fg_color=FUTheme.PANEL_LIGHT, corner_radius=8,
                                  border_width=1, border_color=FUTheme.BORDER)
         workspace.pack(fill="both", expand=True, padx=20, pady=12)

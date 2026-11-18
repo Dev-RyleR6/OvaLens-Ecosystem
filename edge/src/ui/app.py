@@ -168,7 +168,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         self.title("OvaLens — Candling station")
         self.geometry("1280x860")
         self.minsize(1024, 720)
-        ctk.set_appearance_mode("dark")
+        ctk.set_appearance_mode("light" if FUTheme.appearance == "light" else "dark")
         self.configure(fg_color=FUTheme.BG_LIGHT)
         if self.is_fullscreen:
             try:
@@ -430,11 +430,21 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         rh = self.winfo_height()
 
         # Clamp dimensions to prevent modal overflowing lower-res screens / Raspberry Pi touchscreens
-        target_w = min(width, max(320, self.winfo_width() - 24))
-        target_h = min(height, max(300, self.winfo_height() - 32))
+        # A withdrawn/new parent can still report 1x1. Fit the display, never
+        # collapse a complete form to that transient parent measurement.
+        scale = dialog._get_window_scaling()
+        available_w = int(self.winfo_screenwidth() / scale) - 48
+        available_h = int(self.winfo_screenheight() / scale) - 80
+        # A usable desktop parent remains the preferred working area. Small
+        # launch/withdrawn parents must not dictate an unusable form size.
+        if rw / scale >= 800 and rh / scale >= 600:
+            available_w = min(available_w, int(rw / scale) - 24)
+            available_h = min(available_h, int(rh / scale) - 32)
+        target_w = min(width, available_w)
+        target_h = min(height, available_h)
 
-        x = rx + max(0, (rw - target_w) // 2)
-        y = ry + max(0, (rh - target_h) // 2)
+        x = max(0, min(rx + (rw - int(target_w * scale)) // 2, self.winfo_screenwidth() - int(target_w * scale)))
+        y = max(0, min(ry + (rh - int(target_h * scale)) // 2, self.winfo_screenheight() - int(target_h * scale) - 48))
         dialog.geometry(f"{target_w}x{target_h}+{x}+{y}")
         dialog.minsize(min(target_w, 880 if width >= 900 else 640), min(target_h, max(360, int(height * .75))))
         fit_dialog_content(dialog)

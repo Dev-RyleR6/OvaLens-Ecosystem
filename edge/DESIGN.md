@@ -1,72 +1,128 @@
 ---
 name: OvaLens Edge operator interface
-description: Restrained Foundation University dim slate workspace for safe native station operation.
+description: Foundation University native station workspace with Dim slate and Soft
+  light appearances.
 colors:
-  primary-maroon: "#800000"
-  dark-maroon: "#5C0000"
-  fertile-green: "#357a38"
-  reject-red: "#DC2626"
-  review-amber: "#875A12"
-  workspace: "#0F172A"
-  panel: "#1E293B"
-  panel-alt: "#29384D"
-  panel-accent: "#374B65"
-  border: "#475569"
-  border-control: "#94A3B8"
-  selection: "#41546F"
-  selection-hover: "#3B506C"
-  ink: "#F1F5F9"
-  ink-secondary: "#D5DEE9"
-  ink-muted: "#C3CFDF"
-  input: "#111D2E"
-  focus: "#F4B2BF"
-  brand-text: "#F4B2BF"
-  action-text: "#FFFFFF"
-  viewport: "#111317"
-  viewport-text: "#F1F5F9"
-  viewport-muted: "#CBD5E1"
+  primary-maroon: '#800000'
+  dark-maroon: '#5C0000'
+  fertile-green: '#357a38'
+  reject-red: '#DC2626'
+  review-amber: '#875A12'
+  workspace: '#0F172A'
+  panel: '#1E293B'
+  panel-alt: '#29384D'
+  panel-accent: '#374B65'
+  border: '#475569'
+  border-control: '#94A3B8'
+  selection: '#41546F'
+  selection-hover: '#3B506C'
+  ink: '#F1F5F9'
+  ink-secondary: '#D5DEE9'
+  ink-muted: '#C3CFDF'
+  input: '#111D2E'
+  focus: '#F4B2BF'
+  brand-text: '#F4B2BF'
+  action-text: '#FFFFFF'
+  viewport: '#111317'
+  viewport-text: '#F1F5F9'
+  viewport-muted: '#CBD5E1'
+  light-workspace: '#EDF0F3'
+  light-panel: '#F7F8FA'
+  light-panel-alt: '#E2E7ED'
+  light-panel-accent: '#D2DAE4'
+  light-border: '#A5AFBD'
+  light-border-control: '#657386'
+  light-selection: '#CFD8E4'
+  light-selection-hover: '#C2CDDC'
+  light-ink: '#182333'
+  light-ink-secondary: '#344256'
+  light-ink-muted: '#465469'
+  light-input: '#FAFBFC'
+  light-focus: '#800000'
+  light-brand-text: '#800000'
+  fertile-bg: '#214A36'
+  light-fertile-bg: '#DEECE0'
+  fertile-card: '#18382C'
+  light-fertile-card: '#E7F0E8'
+  fertile-border: '#4F8A63'
+  light-fertile-border: '#357a38'
+  fertile-text: '#A7E3B1'
+  light-fertile-text: '#245C2A'
+  review-bg: '#4C3820'
+  light-review-bg: '#F3E8D4'
+  review-card: '#332A20'
+  light-review-card: '#F5EDDF'
+  review-border: '#A48244'
+  light-review-border: '#875A12'
+  review-text: '#F3CE85'
+  light-review-text: '#70490C'
+  reject-bg: '#492732'
+  light-reject-bg: '#F6E1E4'
+  reject-card: '#38232D'
+  light-reject-card: '#F8EAEC'
+  reject-border: '#B5707E'
+  light-reject-border: '#B91C1C'
+  reject-text: '#FFBAC2'
+  light-reject-text: '#9F1828'
+  brand-bg: '#382532'
+  light-brand-bg: '#F1DFE3'
+  brand-border: '#D99AA6'
+  light-brand-border: '#800000'
+  accent-text: '#F3CE85'
+  light-accent-text: '#70490C'
 typography:
   body:
-    fontFamily: "Inter"
-    fontSize: "14px"
+    fontFamily: Inter
+    fontSize: 14px
   label:
-    fontFamily: "Inter"
-    fontSize: "13px"
+    fontFamily: Inter
+    fontSize: 13px
   caption:
-    fontFamily: "Inter"
-    fontSize: "13px"
+    fontFamily: Inter
+    fontSize: 13px
   control:
-    fontFamily: "Inter"
-    fontSize: "14px"
+    fontFamily: Inter
+    fontSize: 14px
   heading:
-    fontFamily: "Inter"
-    fontSize: "20px"
+    fontFamily: Inter
+    fontSize: 20px
     fontWeight: 700
   metric:
-    fontFamily: "Inter"
-    fontSize: "24px"
+    fontFamily: Inter
+    fontSize: 24px
 rounded:
-  main-panel: "8px"
+  main-panel: 8px
 spacing:
-  workspace-margin: "20px"
-  panel-gap: "16px"
+  workspace-margin: 20px
+  panel-gap: 16px
 components:
   button-primary:
-    backgroundColor: "{colors.primary-maroon}"
-    textColor: "{colors.action-text}"
-    rounded: "{rounded.main-panel}"
-    height: "44px"
+    backgroundColor: '{colors.primary-maroon}'
+    textColor: '{colors.action-text}'
+    rounded: '{rounded.main-panel}'
+    height: 44px
   button-secondary:
-    backgroundColor: "{colors.panel-alt}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.main-panel}"
-    height: "36px"
+    backgroundColor: '{colors.panel-alt}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.main-panel}'
+    height: 36px
   station-field:
-    backgroundColor: "{colors.input}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.main-panel}"
-    width: "150px"
-    height: "36px"
+    backgroundColor: '{colors.input}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.main-panel}'
+    width: 150px
+    height: 36px
+  station-field-light:
+    backgroundColor: '{colors.light-input}'
+    textColor: '{colors.light-ink}'
+    rounded: '{rounded.main-panel}'
+    width: 150px
+    height: 36px
+  button-secondary-light:
+    backgroundColor: '{colors.light-panel-alt}'
+    textColor: '{colors.light-ink}'
+    rounded: '{rounded.main-panel}'
+    height: 36px
 ---
 
 # Edge operator interface
@@ -74,16 +130,29 @@ components:
 ## Overview
 
 Mode: **Operate**. Extend the established Foundation University workspace with
-low-glare dim slate surfaces, a larger camera workspace and task-grouped settings.
+low-glare Dim slate or Soft light surfaces, a larger camera workspace and task-grouped settings.
 The operator must see the egg, understand a stopped conveyor and act safely.
 This is the native Edge desktop system; dashboard composition does not govern it.
 
 ## Colors
 
-Maroon anchors primary actions. Pale rose marks keyboard focus and brand text. Green, amber and red carry
-result and safety meaning with accompanying text. Light ink supports the dim slate
-workspace; separate light text serves the dark camera well. The frontmatter
+Maroon anchors primary actions in both appearances. Dim slate uses pale rose
+focus and brand text with light ink; Soft light uses maroon focus and brand text
+with dark ink. Green, amber and red carry result and safety meaning with
+accompanying text. Separate light text serves the fixed dark camera well. The frontmatter
 records the shared values from `src/ui/theme.py` and `assets/desktop_theme.json`.
+
+### Appearance selection
+
+Offer Dim slate and Soft light at startup and in Settings. Apply the selection
+live to existing controls and native selector styling; persist it separately at
+`edge/db/ui_appearance.json`. Invalid or unavailable preferences fall back to Dim
+slate. A preference write failure must not prevent the visual change. Appearance
+is independent of rig, camera and station configuration and must not start motion
+or change readiness. The camera well and its text stay dark in both appearances;
+solid FU maroon, fertile green and reject red actions retain their semantic fills
+and light action text. Soft light uses cool gray surfaces rather than broad pure
+white panels. Do not hardcode dim text, focus or field values into shared widgets.
 
 ## Typography
 
@@ -116,7 +185,7 @@ one radius indiscriminately to every native control.
 ### Established operation and safety guidance
 
 Batch setup uses Choose batch and Create batch in one native
-dialog. Keep Save/Use and Cancel fixed below a scrollable form at 1024Ã—720.
+dialog. Keep Save/Use and Cancel fixed below a scrollable form at 1024 by 720.
 Use plain labels, generated display codes and only the three Itik Pinas breeds.
 Separate original incubation inventory and actual set date from this run's target;
 never prefill either from scan counts or an assumed Day 10 date. Cached batches
@@ -136,22 +205,21 @@ image. A single side panel groups the latest classification, aligned batch
 counts and recent events with spacing and thin dividers. Counts are rows rather
 than coloured metric cards. The empty camera well explains setup directly.
 
-Use the FU dim slate desktop palette: workspace #0F172A, panel #1E293B, borders
-#475569 and maroon #800000. The camera well stays dark with separate light text
+Use the selected FU desktop appearance. Unprefixed frontmatter colors describe
+Dim slate; light-prefixed colors describe Soft light. The camera well stays dark with separate light text
 tokens. Inter, quiet tinted result surfaces and generous spacing provide
 the low-glare desktop character; avoid shadows, image assets and decorative timers.
 One header batch control includes registered operator context. Settings, More and window
 controls live in the header. The bottom action bar reserves a stable right-hand
 position for STOP; a single compact strip above it shows sorter, sync and camera
 status. The footer carries a concise three-step next-action cue matching the cycle heading.
-Control borders use #94A3B8 rather than the structural divider color. Input
-placeholders remain readable; keyboard focus uses the FU pale rose border. Slate
-selected tabs keep light text in their hover state. Neutral dropdowns use a slate
-arrow surface so their light chevron remains visible. Fonts register once for the
+Control borders use the appearance-specific control token rather than the
+structural divider color. Placeholders, selected tabs and dropdown arrows retain
+readable contrast in both appearances; keyboard focus uses the selected focus token. Fonts register once for the
 process; no runtime download, system font install or decoration timer is needed.
 
 Selectors use `SelectField`: a read-only native ttk.Combobox in the CTk layout,
-with dark inset fields, light values/arrows, a pale rose focus border and an eight-row
+with appearance-specific inset fields, readable values/arrows, a focus border and an eight-row
 scrolling popup. All selectors share that treatment, including rig profiles and
 history filters; maroon fills identify actions rather than selection fields.
 Programmatic changes and linked StringVar writes never invoke a user callback.
@@ -174,7 +242,7 @@ Show a compact readiness summary in the idle right panel, with Show details
 expanding the full scrollable checklist in that panel. Collapse restores run
 counts and recent activity. Blocking errors remain named in the compact summary;
 offline sync is explicitly non-blocking. Retain
-the camera preview and fixed STOP/footer controls at 1024Ã—720. Backend offline is
+the camera preview and fixed STOP/footer controls at 1024 by 720. Backend offline is
 a warning; local storage, model and controller faults block Start. Preparation
 never starts a session or releases the belt. Final Start rechecks fresh status
 and storage in the background without discovery or preset replay. Settings,
@@ -191,7 +259,7 @@ commands use neutral surfaces. Status always includes text; colour alone carries
 no instruction. Use plain command labels instead of decorative emoji, gradients,
 glow, fake instruments or ornamental animation.
 
-The footer reserves space for STOP and session controls at 1024Ã—720. Review
+The footer reserves space for STOP and session controls at 1024 by 720. Review
 choices appear only when needed. History remains reachable while a review takes
 space from the event area. Settings are grouped by Connections, Camera, Detection,
 Calibration and Maintenance. Maintenance contains physical tests and alignment
@@ -240,7 +308,7 @@ controls and preserve their visibility at 1024 by 720.
 
 Connections, Camera, Detection, Calibration and Maintenance remain visible in the
 left navigation while one scrollable section occupies the content area. Use a
-quiet selected surface with pale rose brand text; hover and selection must retain readable
+quiet selected surface with appearance-specific brand text; hover and selection must retain readable
 contrast. Configuration values and physical commands have distinct task groups.
 The fixed actions are Apply for this run, Save defaults, Load saved, Done and
 STOP. Applying affects the current run; saving also remembers defaults. Neither
@@ -249,11 +317,11 @@ retain their separate Apply now, Save as default and Load saved settings labels.
 
 ### Keyboard operation
 
-Shared button keyboard support enables Tab traversal, a visible pale rose focus
+Shared button keyboard support enables Tab traversal, a visible appearance-specific focus
 border, and Enter or Space activation with the disabled-state guard retained.
 Space activation must not propagate into the scan shortcut. Reveal focused
 controls inside scrollable forms without switching sections. Entry focus uses a
-pale rose border while preserving validation feedback on blur.
+appearance-specific focus border while preserving validation feedback on blur.
 
 ### Readable controls, flow and dialogs
 
@@ -272,11 +340,16 @@ same three-step next action. Diagnostic-only readiness names the single scan.
 Feed an egg only when the clear gate cue invites it.
 
 Run quantity remains editable for saved and new batches and pinned with setup
-actions. Operator and batch fields scroll above it. Preserve entered values and
+actions. Its label and summary sit above a full-width entry, avoiding compressed
+side-by-side copy. Operator and batch fields scroll above it. Preserve entered values and
 local-first activation semantics. Choose batch and Create batch are the current
 setup modes.
 
-Dialogs are centered and clamped to the available workspace. The shared minimum
+Dialogs are centered and clamped to the available workspace. A parent smaller
+than 800 by 600 logical pixels (including transient launch measurements) uses
+the display area instead of compressing a complete form. Otherwise use the
+available parent area. Respect Tk window scaling; reserve display margins of
+48px horizontally and 80px vertically, and usable-parent margins of 24px and 32px. The shared minimum
 width is 640px, or 880px for requested widths of at least 900px, clamped to available
 space. Settings requests 1000 by 800px with a workspace-clamped minimum of 800 by
 640px. Startup is separate: 720 by 520px, minimum 600 by 440px. Long forms scroll
@@ -286,6 +359,7 @@ history, end-session, exit and settings dialogs and the main workspace.
 
 This correction changes presentation and clarity. Preserve background hardware
 I/O, latest-only camera buffering and the single camera stream.
+
 ## Do's and Don'ts
 
 - **Do** keep camera evidence, cycle instructions and STOP visible at the minimum workspace size.
