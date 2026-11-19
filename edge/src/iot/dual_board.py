@@ -149,6 +149,10 @@ class BoardLink:
                 self._fail("Hardware event overflow; inspect rig")
             return
         if payload.startswith("ERROR:"):
+            if (self.role == "UNIFIED" and payload == "ERROR:INVALID_LINE" and ident is None
+                    and self._commands_dispatched == 0 and not self._status_complete):
+                # A startup delimiter can flush malformed bytes left in the ESP32 reader.
+                return
             if ident is None or (self._pending and ident == self._pending[0]):
                 self._fail(payload)
             return
@@ -258,13 +262,19 @@ class BoardLink:
                         raise RuntimeError("Incomplete emergency stop write")
                 if now - heartbeat >= .5:
                     request = b"STATUS\n" if self.snapshot().identified else b"HELLO\n"
+                    if self.role == "UNIFIED" and not self._status_complete:
+                        request = b"\n" + request
                     if connection.write(request) != len(request):
                         raise RuntimeError("Incomplete heartbeat write")
                     heartbeat = now
                 if now - self.snapshot().last_reply > 3.5 or (not self._status_complete and now - self._started_at > 5):
                     raise RuntimeError("Board response timeout")
                 if self._pending and now > self._pending[2]:
-                    raise RuntimeError("Command completion timeout; do not retry motion")
+                    command_id, command = self._pending[:2]
+                    raise RuntimeError(
+                        f"Command completion timeout on {self.port} for {command} "
+                        f"(ID {command_id}); do not retry motion"
+                    )
                 if not self._pending and self._status_complete and not self.snapshot().error:
                     try:
                         text, timeout, future = self._queue.get_nowait()

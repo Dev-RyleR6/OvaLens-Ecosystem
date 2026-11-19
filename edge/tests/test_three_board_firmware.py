@@ -1,4 +1,4 @@
-"""Execute the actual three-board sketches; physical ISR timing is a rig check."""
+"""Execute the actual three-board and unified sketches with simulated GPIO."""
 import os
 from pathlib import Path
 import shutil
@@ -16,7 +16,7 @@ def three_sketches(tmp_path_factory):
         pytest.skip("C++ firmware execution requires g++/clang++ or OVALENS_TEST_ZIG")
     prefix = [compiler] if compiler else [zig, "c++", "-nostdlib++"]
     build, result = tmp_path_factory.mktemp("three-firmware"), {}
-    for role in ("CONVEYOR", "EGG", "LIGHT"):
+    for role in ("CONVEYOR", "EGG", "LIGHT", "UNIFIED"):
         target = build / (role + (".exe" if os.name == "nt" else ""))
         command = prefix + ["-std=c++17", "-Wall", "-Wextra", "-Werror", f"-I{NATIVE}",
                             f"-DBOARD_{role}", str(NATIVE / "three_board_driver.cpp"), "-o", str(target)]
@@ -70,6 +70,25 @@ def test_sensor_confirmation_clearance_and_single_event(three_sketches):
     assert output.count("EVENT:EGG_DETECTED:1") == 1
     assert output.count("EVENT:EGG_CLEARED:1") == 1
     assert "PAUSED:1" in output and output.rstrip().endswith("STATE:WAITING")
+
+
+def test_unified_ir_stop_reports_holding_through_capture_and_clears(three_sketches):
+    output = run(
+        three_sketches, "UNIFIED", *ready("UNIFIED"),
+        "SEND @2 SETHOME", "SEND @3 ARM", "SEND @4 RESUME",
+        "SEND @5 ADVANCE:100", "TICKS 10", "PIN 26 0", "CLOCK 539",
+        "CLOCK 540", "TICKS 2", "SEND @6 STATUS", "SEND @7 LIGHT_ON",
+        "SEND @8 RESUME", "PIN 26 1", "CLOCK 890", "SEND @9 STATUS",
+    )
+    assert output.count("EVENT:EGG_DETECTED:1") == 1
+    assert "ID:5:OK:EGG_STOPPED" in output
+    for ident in (5, 6, 7):
+        assert f"ID:{ident}:PAUSED:1" in output
+        assert f"ID:{ident}:EGG_SEQ:1" in output
+        assert f"ID:{ident}:STATE:HOLDING" in output
+    assert "ID:7:LIGHT:1" in output
+    assert "EVENT:EGG_CLEARED:1" in output
+    assert output.rstrip().endswith("ID:9:STATE:WAITING")
 
 
 def test_servo_completion_presets_and_strict_number_parsing(three_sketches):

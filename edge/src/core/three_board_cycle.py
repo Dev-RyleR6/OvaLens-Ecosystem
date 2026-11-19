@@ -192,11 +192,21 @@ class ThreeBoardCycle(SortingCycle):
                 self.pending_capture["prediction"] = finite_evidence(view.result)
                 self.pending_capture["frame"] = view.identity()
 
+    def _reports_egg_hold(self, egg):
+        if egg.get("PAUSED") != "1":
+            return False
+        if egg.get("STATE") == "HOLDING":
+            return True
+        # Older unified firmware masks HOLDING with PAUSED. The caller still
+        # verifies the IR event/sequence and the conveyor's stopped position.
+        return (self.settings.rig_profile == "unified_v4" and egg.get("STATE") == "PAUSED"
+                and egg.get("BUSY") == "0" and egg.get("SENSOR") == "1")
+
     def _capture_health(self, lit=True):
         super()._capture_health()
         egg = self.boards.egg.snapshot().telemetry
         conveyor = self.boards.conveyor.snapshot().telemetry
-        if (egg.get("STATE") != "HOLDING" or egg.get("PAUSED") != "1"
+        if (not self._reports_egg_hold(egg)
                 or int(egg["EGG_SEQ"]) != self._last_egg_seq or conveyor.get("PAUSED") != "1"):
             raise RuntimeError("Egg hold or hardware pause changed during capture")
         if lit and self.boards.light.snapshot().telemetry.get("LIGHT") != "1":
@@ -248,14 +258,17 @@ class ThreeBoardCycle(SortingCycle):
             raise RuntimeError("Conveyor moved after reporting completion")
         self._events()
         seq = int(egg["EGG_SEQ"])
-        detected = egg.get("STATE") == "HOLDING" and egg.get("PAUSED") == "1"
+        detected = self._reports_egg_hold(egg)
         if detected:
             if conveyor.get("PAUSED") != "1" or seq != self._last_egg_seq + 1 or self._detected_events != {seq}:
                 raise RuntimeError("Egg sequence or hardware pause disagreement")
             self._last_egg_seq = seq
             self._detected_events.clear()
         elif actual != destination or seq != self._last_egg_seq or conveyor.get("PAUSED") != "0" or self._detected_events:
-            raise RuntimeError("Unexpected pause or lost sensor event")
+            raise RuntimeError(
+                f"Unexpected pause or lost sensor event (state {egg.get('STATE')}, "
+                f"sensor {egg.get('SENSOR')}, sequence {seq}, events {sorted(self._detected_events)})"
+            )
         self._checkpoint("STOPPED")
         return detected
 

@@ -169,11 +169,10 @@ void report(uint32_t id) {
   prefix(id); Serial.printf("FAULT:%s\n", protocol.fault ? protocol.faultCode : "NONE");
   prefix(id); Serial.printf("LAST_ID:%lu\n", (unsigned long)protocol.lastId);
 
-  // STATE is the final line of any report, required by BoardLink protocol
+  // STATE is the final line of the report. PAUSED independently reports transport hold.
   const char *stateStr = protocol.fault ? "FAULT"
                        : busyMotion     ? "MOVING"
                        : settling       ? "SETTLING"
-                       : softwarePause  ? "PAUSED"
                        : eggState == WAITING  ? "WAITING"
                        : eggState == HOLDING  ? "HOLDING"
                        : "CLEARING";

@@ -59,29 +59,25 @@ def discover_unified_board(ports=None, serial_factory=None, timeout=4, cancel=No
             deadline = time.monotonic() + timeout
             sent = 0.0
             buffer = bytearray()
-            pong, version = None, None
             while time.monotonic() < deadline:
                 if cancel is not None and cancel.is_set():
                     raise RuntimeError("Setup stopped. Retry detection when ready.")
                 now = time.monotonic()
                 if now - sent >= 0.25:
-                    for request in (b"PING\n", b"HELLO\n"):
-                        connection.write(request)
+                    request = b"\nHELLO\n"
+                    if connection.write(request) != len(request):
+                        break
                     sent = now
                 for byte in connection.read(256):
                     if byte == 10:
                         line = buffer.decode("ascii", errors="ignore").strip()
                         buffer.clear()
-                        if line.startswith("PONG:"):
-                            pong = line[5:]
-                        if line.startswith("READY:"):
-                            version = line[6:]
+                        if line == f"READY:{EXPECTED_VERSION}":
+                            return port
                     elif byte != 13:
                         buffer.append(byte)
                         if len(buffer) > 256:
                             buffer.clear()
-                if (pong == ROLE or version == EXPECTED_VERSION) or (pong == "CONVEYOR"):
-                    return port
         except (OSError, SerialException, UnicodeError):
             continue
         finally:

@@ -3,6 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import sys
 import threading
+import time
 
 import pytest
 
@@ -11,7 +12,23 @@ from src.core.settings import EdgeSettings, SettingsStore
 from src.core.station import EdgeStation
 from src.db.local_db import LocalDatabaseManager
 from src.iot.three_board import ROLES, ThreeBoardController, discover_boards
-from test_three_board import Wire
+from src.iot.unified_board import UnifiedBoardController, discover_unified_board
+from test_three_board import Wire, wait_for
+
+
+class UnifiedWire(Wire):
+    def __init__(self, *, silent=False):
+        super().__init__("UNIFIED", silent=silent)
+        self.stale_input = True
+        self.inbox.get_nowait()
+
+    def write(self, data):
+        if self.stale_input:
+            self.stale_input = False
+            self.emit("ERROR:INVALID_LINE\n")
+            if not data.startswith(b"\n"):
+                return len(data)
+        return super().write(data)
 
 
 def station_fixture(tmp_path, monkeypatch, roles=None):
@@ -42,6 +59,54 @@ def station_fixture(tmp_path, monkeypatch, roles=None):
 
 def commands(wires):
     return [line.split(" ", 1)[1] for wire in wires for line in wire.writes if line.startswith("@")]
+
+
+def test_unified_preparation_recovers_stale_input_on_the_correct_port(tmp_path, monkeypatch):
+    station, _, _, _ = station_fixture(tmp_path, monkeypatch)
+    station.settings = EdgeSettings.unified_board()
+    wrong_board = Wire("CONVEYOR")
+    discovery_wire = UnifiedWire()
+    live_wire = UnifiedWire()
+
+    def discover(**kwargs):
+        wires = {"COM-C": wrong_board, "COM-U": discovery_wire}
+        return discover_unified_board(wires, lambda port, *args, **options: wires[port], timeout=.1)
+
+    monkeypatch.setattr("src.iot.unified_board.discover_unified_board", discover)
+    monkeypatch.setattr("src.core.station.UnifiedBoardController",
+                        lambda port: UnifiedBoardController(port, lambda *args, **kwargs: live_wire))
+    try:
+        assert station.prepare_for_sorting(True, threading.Event()) == "Station ready"
+        assert station.settings.conveyor_port == "COM-U"
+        assert station.calibrated
+        assert wrong_board.closed and discovery_wire.closed
+        assert commands([live_wire]) == [
+            "ACK_FAULT", "LIGHT_OFF", "PAUSE", "SETHOME",
+            f"SPEED:{station.settings.calibration.speed_us}",
+            f"SET_NEUTRAL:{station.settings.calibration.neutral_angle}",
+            f"SET_FERTILE:{station.settings.calibration.fertile_angle}",
+            f"SET_INFERTILE:{station.settings.calibration.infertile_angle}",
+            "RESET", "LIGHT_OFF", "ARM",
+        ]
+        live_wire.emit("ERROR:INVALID_LINE\n")
+        wait_for(lambda: bool(station.boards.failure))
+        assert "ERROR:INVALID_LINE" in station.boards.failure
+    finally:
+        station.stop()
+
+
+def test_unified_timeout_identifies_command_and_stops_without_resending():
+    wire = UnifiedWire(silent=True)
+    controller = UnifiedBoardController("COM-U", lambda *args, **kwargs: wire)
+    controller.start()
+    try:
+        wait_for(lambda: controller.link._status_complete)
+        with pytest.raises(RuntimeError, match=r"COM-U for SETHOME \(ID 1\).*do not retry motion"):
+            controller.link.command("SETHOME", timeout=.2).result(1)
+        wait_for(lambda: "ESTOP" in wire.writes)
+        assert commands([wire]) == ["SETHOME"]
+    finally:
+        controller.stop()
 
 
 def test_defaults_detect_and_prepare_without_conveyor_travel(tmp_path, monkeypatch):

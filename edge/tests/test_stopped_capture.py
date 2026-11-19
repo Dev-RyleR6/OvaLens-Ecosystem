@@ -35,6 +35,39 @@ def held_cycle(tmp_path):
     return cycle, rig
 
 
+@pytest.mark.parametrize("arrival", ["confirmed", "missing_event", "beam_clear"])
+def test_legacy_unified_pause_requires_confirmed_arrival_before_lighting(tmp_path, monkeypatch, arrival):
+    cycle, rig = held_cycle(tmp_path)
+    cycle.settings.rig_profile = "unified_v4"
+    cycle._last_egg_seq = 0
+    rig.egg.values.update(STATE="WAITING", PAUSED="0", EGG_SEQ="0")
+    rig.conveyor.values["PAUSED"] = "0"
+    advance = rig.conveyor.command
+
+    def legacy_advance(command, timeout=3):
+        future = advance(command, timeout)
+        if command.startswith("ADVANCE:"):
+            rig.egg.values["STATE"] = "PAUSED"
+            if arrival == "missing_event":
+                rig.egg.events.get_nowait()
+            if arrival == "beam_clear":
+                rig.egg.values["SENSOR"] = "0"
+        return future
+
+    monkeypatch.setattr(rig.conveyor, "command", legacy_advance)
+    if arrival != "confirmed":
+        with pytest.raises(RuntimeError, match="hardware pause disagreement|lost sensor event"):
+            cycle._advance(150)
+        assert all(command != "LIGHT_ON" for _, command, _, _ in rig.trace)
+        return
+
+    assert cycle._advance(150)
+    cycle._collect_evidence = Mock(return_value=(prediction(), {}))
+    result, _ = ThreeBoardCycle._capture(cycle)
+    assert result["final_class"] == "FERTILE"
+    assert (rig.light.role, "LIGHT_ON", 100, 0) in rig.trace
+
+
 @pytest.mark.parametrize("result_hold", [0, 300, 1500])
 def test_capture_waits_after_lamp_before_fresh_frame_and_inference(tmp_path, result_hold):
     """TASK-NEW-EDGE-CAPTURE-SETTLE-01: the result pause cannot shorten settling."""
