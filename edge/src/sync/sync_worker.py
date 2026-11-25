@@ -198,7 +198,7 @@ class BackgroundSyncWorker:
         self.last_error = " | ".join(dict.fromkeys(errors)) or None
 
     def _sync_scan_records(self, session_id=None):
-        uncommitted = self.db.get_uncommitted_scans(limit=50, session_id=session_id)
+        uncommitted = self.db.get_uncommitted_scans(limit=50, session_id=session_id, uploadable_only=True)
         if not uncommitted:
             # Still ping health to update online status
             self._check_health()

@@ -333,6 +333,8 @@ These features can be claimed by any agent using `python scripts/verify_and_comm
 - [x] **TASK-NEW-EDGE-IOT-01**: Harden Edge IoT serial communication, Windows port retry backoff, Bluetooth port filtering, delayed auto-reset race prevention, clean manual light release, and station dependency architecture.
 - [ ] **TASK-NEW-EDGE-UNIFIED-SETUP-01**: Require exact unified firmware identity during discovery, recover from stale serial input before station preparation, and report the command and port on completion timeout.
 - [ ] **TASK-NEW-FW-UNIFIED-HOLD-01**: Report the unified controller's optical state independently from conveyor pause and support older firmware when the IR event and stopped telemetry confirm the hold.
+- [x] **TASK-NEW-EDGE-BATCH-REDO-01**: Set the unified and three-board infertile servo preset to 135 degrees, let operators cancel an active run while retaining saved scans, and allow a fresh run for the same batch after the summary.
+- [x] **TASK-NEW-EDGE-EXIT-PROGRESS-01**: Offer save or discard on exit during an active run, hold new run uploads until finalization, and recover locally saved scans after interrupted shutdown.
 
 
 - [x] **TASK-NEW-EDGE-LIGHT-DIALOG-04**: Add a soft light appearance alongside dim slate with readable controls; fit run setup dialogs to the display even when their parent is withdrawn, and verify theme switching and form reachability.

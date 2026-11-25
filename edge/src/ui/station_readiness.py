@@ -185,6 +185,8 @@ class ReadinessFlow:
 
     def _submit_station_request(self, start=False, args=None):
         request = {"generation": self._operation_generation, "cancel": threading.Event()}
+        if start:
+            request["previous_cycle"] = self.station.cycle
         self._setup_request = request
         self._setup_busy = True
         self._station_prepared = False

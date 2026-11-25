@@ -307,7 +307,7 @@ class SortingCycle:
         try:
             self._origin = int(self.boards.conveyor.snapshot().telemetry["POSITION"])
             self.db.create_session(self.session_id, self.batch_id, self.device_id, "DAY_10", self.operator,
-                                   operator_id=self.operator_id)
+                                   operator_id=self.operator_id, defer_sync=True)
             self._checkpoint("STARTED")
             # Operator aligned the NEXT holder one pitch before the chamber and cleared downstream.
             events = [(k.holder_steps, 1, "capture", 1)]

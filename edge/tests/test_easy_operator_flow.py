@@ -98,6 +98,29 @@ def test_stop_during_setup_never_starts_a_late_result(tmp_path, worker_finished)
         app._jobs.finish()
 
 
+def test_discard_covers_a_run_that_started_before_ui_activation(tmp_path):
+    app = simple_operator(tmp_path)
+    cycle = SimpleNamespace(session_id="started", active=False)
+
+    def start(*args):
+        app.db.create_session(cycle.session_id, app.current_batch_id, "station", "DAY_10", "Tester", defer_sync=True)
+        app.db.record_scan("scan", cycle.session_id, app.current_batch_id, 1, "FERTILE", .9, 15, "ACCEPT", [])
+        app.station.cycle = cycle
+        return cycle
+
+    app.station.start_cycle.side_effect = start
+    app._submit_station_request(start=True, args=(app.current_batch_id, app.target_egg_count, app.operator_name))
+    work, success, _ = app._jobs.work.pop(0)
+    result = work()
+    assert app.current_session_id is None and app.db.get_session_stats(cycle.session_id)
+    app.stop_or_cancel_session(discard=True)
+    success(result)
+    app._jobs.finish()
+    assert not app.db.get_session_stats(cycle.session_id)
+    assert not app.db.get_uncommitted_scans()
+    assert not app.is_auto_cycle_running and not app._finalization_failed
+
+
 @pytest.mark.parametrize("invalid", ["unchecked", "operator"])
 def test_setup_validation_runs_before_hardware(tmp_path, invalid):
     app = simple_operator(tmp_path)

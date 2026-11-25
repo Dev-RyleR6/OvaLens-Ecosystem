@@ -93,6 +93,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         self._inference_request_id = None
         self._pending_finalization_id = None
         self._finalization_failed = False
+        self._finalization_error = ""
         self._diagnostics_complete = False
         self._batch_complete = False
         self.device_id = device_id
@@ -243,14 +244,15 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             if not self._closing:
                 self.after(30, self._drain_operation_events)
 
-    def shutdown(self):
+    def shutdown(self, *, finalize_session=True):
         """Wait asynchronously for queued commits/cleanup before destroying Tk."""
         if self._closing:
             return
         if getattr(self, "_dialog_build_depth", 0):
-            self.after(50, self.shutdown)
+            self.after(50, lambda: self.shutdown(finalize_session=finalize_session))
             return
-        self.stop_or_cancel_session()
+        if finalize_session:
+            self.stop_or_cancel_session()
         self._closing = True
         self._operation_generation += 1
         done = threading.Event()
@@ -644,7 +646,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_PRIMARY,
             fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
             command=self.open_end_session_modal, text_color_disabled=FUTheme.TEXT_MUTED, border_color=FUTheme.BORDER_CONTROL, border_width=1)
-        self.finish_btn = ctk.CTkButton(self.footer_frame, text="Finish batch", width=132, height=44,
+        self.finish_btn = ctk.CTkButton(self.footer_frame, text="Run summary", width=132, height=44,
             font=(FUTheme.FONT_FAMILY, 13), text_color=FUTheme.TEXT_WHITE,
             fg_color=FUTheme.FERTILE_GREEN, hover_color=FUTheme.FERTILE_GREEN_HOVER,
             command=self.finish_current_batch)
@@ -887,18 +889,15 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             return
         self._controls_signature = signature
         if is_active:
-            # Reveal cancel buttons dynamically when active
             if self.is_auto_cycle_running:
                 self.cancel_btn.pack_forget()
-            else:
-                self.cancel_btn.pack(side="left", padx=6, pady=13, after=self.eject_btn)
-            if self.is_auto_cycle_running:
                 self.session_btn.configure(
-                    text="Stop sorting", fg_color=FUTheme.REJECT_RED,
+                    fg_color=FUTheme.REJECT_RED,
                     hover_color=FUTheme.REJECT_RED_HOVER
                 )
+            else:
+                self.cancel_btn.pack(side="left", padx=6, pady=13, after=self.eject_btn)
         else:
-            # Hide cancel buttons when in standby
             self.cancel_btn.pack_forget()
             self.session_btn.configure(
                 text="Start next batch" if getattr(self, "_batch_complete", False) else "Start sorting", fg_color=FUTheme.PRIMARY_MAROON,
@@ -923,7 +922,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
                        and (not getattr(self, "_batch_record_ready", False) or not
                             (station.calibrated and self.setup_inspected.get() if dual else getattr(self, "_station_prepared", False))))
         self.session_btn.configure(state="disabled" if self._scan_busy or self._stopping or blocked or setup_busy or tuning or (self.inference_worker.busy and not self.is_auto_cycle_running) or (is_active and not self.is_auto_cycle_running) else "normal",
-                                   text="Preparing..." if setup_busy else "Stop sorting" if self.is_auto_cycle_running else "Set up run" if not getattr(self, "_batch_record_ready", False) or not getattr(self, "operator_id", None) or getattr(self, "_batch_complete", False) else "Prepare station" if needs_setup else "Start sorting")
+                                   text="Preparing..." if setup_busy else "Cancel run" if self.is_auto_cycle_running else "Set up run" if not getattr(self, "_batch_record_ready", False) or not getattr(self, "operator_id", None) or getattr(self, "_batch_complete", False) else "Prepare station" if needs_setup else "Start sorting")
         self.scan_btn.configure(state="disabled" if busy or blocked or self._diagnostics_complete else "normal",
                                 text="Working…" if self._scan_busy else "Single Scan [SPACE]")
         self.cancel_btn.configure(state="disabled" if self._stopping else "normal",
@@ -934,7 +933,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
                     "Wait for the light switch to finish" if getattr(self, "_light_busy", False) else
                     "Save this run before starting another" if blocked else
                     "Sorting - Follow the camera instruction" if self.is_auto_cycle_running else
-                    "Run saved - Set up the next batch" if is_complete else
+                    "Run saved - Open the summary for run options" if is_complete else
                     "Step 1 of 3 - Choose operator and batch" if not getattr(self, "_batch_record_ready", False) or not getattr(self, "operator_id", None) else
                     "Step 2 of 3 - Inspect the empty station" if needs_setup else
                     "Step 3 of 3 - Ready to start sorting")
@@ -993,13 +992,14 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             self.stop_or_cancel_session()
             return
 
-        # If automated conveyor is currently moving, pause conveyor motor while modal is open
-        was_auto_running = self.is_auto_cycle_running
-        if was_auto_running:
-            self.chamber.stop() if self.chamber else None
+        session_id = self.current_session_id
+        cycle = getattr(getattr(self, "station", None), "cycle", None)
+        automatic = cycle is not None and cycle.session_id == session_id
+        if self.is_auto_cycle_running and self.chamber:
+            self.chamber.stop()
 
         dialog = ctk.CTkToplevel(self)
-        dialog.title(f"End Candling Session — {self.current_batch_id}")
+        dialog.title("Cancel sorting run" if automatic else "End candling session")
         dialog.geometry("760x700")
         dialog.configure(fg_color=FUTheme.BG_LIGHT)
         dialog.transient(self)
@@ -1018,7 +1018,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         icon_row.pack(fill="x", padx=16, pady=(16, 2))
 
         ctk.CTkLabel(
-            icon_row, text="End active candling session?",
+            icon_row, text="Cancel this sorting run?" if automatic else "End active candling session?",
             font=(FUTheme.FONT_FAMILY, 17, "bold"), text_color=FUTheme.TEXT_PRIMARY
         ).pack(side="left")
 
@@ -1027,6 +1027,13 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             text=f"Batch: {self.current_batch_code}  •  Breed: {self.current_breed}  •  Stage: {self.current_stage}\nOperator: {self.operator_name}  •  Device: {self.device_id}",
             font=(FUTheme.FONT_FAMILY, FUTheme.FONT_CAPTION), text_color=FUTheme.TEXT_MUTED, justify="left"
         ).pack(anchor="w", padx=16, pady=(2, 12))
+
+        if automatic:
+            ctk.CTkLabel(
+                content, text="Confirming stops the conveyor and keeps scans already saved. "
+                              "Use STOP to halt immediately.",
+                wraplength=510, justify="left", anchor="w", text_color=FUTheme.TEXT_SECONDARY,
+            ).pack(fill="x", padx=16, pady=(0, 12))
 
         # Metrics Summary Grid
         grid = ctk.CTkFrame(content, fg_color="transparent")
@@ -1094,13 +1101,13 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         add_dialog_stop(btn_row, self)
 
         def confirm_end():
-            self._animate_modal_close(
-                dialog,
-                on_close=lambda: (
-                    self.stop_or_cancel_session(),
-                    self._log(f"[OK] Session ended with {self.total_count} records saved.")
-                )
-            )
+            dialog.destroy()
+            if self._closing or self.current_session_id != session_id:
+                return
+            if automatic and cycle.status["state"] == "COMPLETE":
+                self._finalize_automatic_batch(cycle)
+            else:
+                self.stop_or_cancel_session()
 
         def resume():
             # Returning closes the dialog; it never sends a motion or resume command.
@@ -1108,20 +1115,20 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
 
         dialog.protocol("WM_DELETE_WINDOW", resume)
         ctk.CTkButton(
-            btn_row, text="Confirm and end session", fg_color=FUTheme.REJECT_RED_BG,
+            btn_row, text="Cancel run" if automatic else "Confirm and end session", fg_color=FUTheme.REJECT_RED_BG,
             hover_color=FUTheme.REJECT_RED_CARD, border_width=1, border_color=FUTheme.REJECT_RED_BORDER,
             text_color=FUTheme.REJECT_RED_TEXT, font=(FUTheme.FONT_FAMILY, 13, "bold"),
             command=confirm_end, height=44, corner_radius=8
         ).pack(side="left", fill="x", expand=True, padx=(0, 8))
 
         ctk.CTkButton(
-            btn_row, text="Return to session", fg_color=FUTheme.PANEL_LIGHT_ALT,
+            btn_row, text="Keep run" if automatic else "Return to session", fg_color=FUTheme.PANEL_LIGHT_ALT,
             hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER_CONTROL,
             text_color=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, 13),
             command=resume, height=44, corner_radius=8, width=140
         , text_color_disabled=FUTheme.TEXT_MUTED).pack(side="right")
 
-    def stop_or_cancel_session(self):
+    def stop_or_cancel_session(self, *, discard=False):
         """Keep failed finalization retryable; cancel predictions independently of storage."""
         if self._stopping:
             return
@@ -1139,7 +1146,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
                         or getattr(station, "light_link", None) is not None):
             station.halt()
         completed = getattr(self, "_automatic_complete_cycle", None)
-        if completed is not None and self.current_session_id == completed.session_id:
+        if not discard and completed is not None and self.current_session_id == completed.session_id:
             self._finalize_automatic_batch(completed)
             return
         self._operation_generation += 1
@@ -1182,16 +1189,27 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         self._set_operation_state(OperatorState.STOPPING, "STOPPING - FINALIZING LOCAL RECORDS")
 
         def finish():
+            nonlocal session_id
             if station is None and callable(getattr(self.camera, "request_stop", None)):
                 self.camera.stop()
+            if (station and not session_id and request and "previous_cycle" in request
+                    and station.cycle is not None and station.cycle is not request["previous_cycle"]):
+                # Start can create a session before its UI activation callback is delivered.
+                station.halt()
+                session_id = station.cycle.session_id
             if station and station.cycle and station.cycle.active:
                 station.cycle._thread.join(timeout=5)
                 if station.cycle.active:
                     raise RuntimeError("Sorting worker is still stopping; retry finalization")
             # Cancellation before the first queued write can legitimately leave
             # no local session. A database read error still enters recovery.
-            if session_id and self.db.get_session_stats(session_id):
-                return self.db.complete_session(session_id)
+            if session_id:
+                if discard:
+                    remaining = self.db.discard_open_session(session_id)
+                    if remaining:
+                        print(f"[STORAGE WARNING] Discarded run {session_id}; {remaining} local photo files remain.")
+                elif self.db.get_session_stats(session_id):
+                    return self.db.complete_session(session_id)
             return {}
 
         def finished(stats):
@@ -1215,7 +1233,8 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             self._set_operation_state(OperatorState.COMPLETE if self._diagnostics_complete else OperatorState.READY,
                                       "DIAGNOSTIC TARGET REACHED" if self._diagnostics_complete else "STOPPED - LOCAL RECORDS FINALIZED")
             automatic = station is not None and station.cycle is not None and station.cycle.session_id == session_id
-            self._log("[STOPPED] " + ("Local session finalized." if stats else "No pending local session.")
+            self._log("[STOPPED] " + ("Run progress discarded." if discard else
+                      "Local session finalized." if stats else "No pending local session.")
                       + (" Gate passage is timed; inspect the output trays." if automatic else " Physical sorting was not performed."))
             if stats and not self._closing and self.grab_current() is None:
                 self.after(0, self.open_batch_completion_modal)
@@ -1223,6 +1242,8 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         def failed(error):
             self._stopping = False
             self._finalization_failed = True
+            self._finalization_error = error
+            self._pending_finalization_id = session_id
             # Preserve identity so Retry cannot abandon an unfinished session.
             self._set_operation_state(OperatorState.RECOVERY, "FINALIZATION FAILED - RETRY END SESSION")
             self._log("[STORAGE ERROR] Session finalization failed: " + error)
@@ -1341,7 +1362,10 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         """Final Start consumes a fresh preparation; it never discovers or calibrates."""
         if getattr(self, "_setup_busy", False) or getattr(self, "_light_busy", False) or self._stopping or self._closing or getattr(self, "_camera_panel", None) is not None:
             return
-        if self.is_session_active or self.is_auto_cycle_running:
+        if self.is_auto_cycle_running:
+            self.open_end_session_modal()
+            return
+        if self.is_session_active:
             self.stop_or_cancel_session()
             return
         if getattr(self, "_batch_complete", False):
@@ -1428,7 +1452,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
                 stats["infertile_count"], stats["manual_review_count"])
             self._update_counters_ui()
             self._set_session_active_state(False)
-            self._update_cycle_hud("", FUTheme.FERTILE_GREEN_TEXT, "Batch complete", detail="Review the totals or start the next batch.")
+            self._update_cycle_hud("", FUTheme.FERTILE_GREEN_TEXT, "Batch complete", detail="Review the totals, redo this batch, or set up the next batch.")
             self.result_title.configure(text="Batch complete")
             self.result_badge.configure(text="COMPLETE")
             self.result_subtitle.configure(text=f"{self.total_count} scans saved locally. Inspect the output trays.")
@@ -1440,6 +1464,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
                 return
             self._stopping = False
             self._finalization_failed = True
+            self._finalization_error = error
             self._set_session_active_state(True)
             self._update_cycle_hud("", FUTheme.INFERTILE_AMBER_TEXT, "Retry finalization", detail=error)
         try:
@@ -1592,7 +1617,8 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             if not self.db.get_session_stats(session_id):
                 if hasattr(self, "operator_id") and (not operator_id or not self.db.get_operator(operator_id)):
                     raise ValueError("Choose an active registered operator before recording scans.")
-                self.db.create_session(session_id, batch_id, device_id, stage, operator, operator_id=operator_id)
+                self.db.create_session(session_id, batch_id, device_id, stage, operator,
+                                       operator_id=operator_id, defer_sync=True)
             if generation != self._operation_generation:
                 return None
             image_path = self.db.save_scan_image(scan_id, image) if image is not None else None
@@ -2025,69 +2051,97 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             pass
 
     @_building_dialog
-    @_building_dialog
     def confirm_exit_dialog(self):
-        """High-contrast modal confirmation prompt before stopping operations or shutting down."""
+        """Let the operator keep or discard an unfinished run before closing."""
+        existing = getattr(self, "_exit_dialog", None)
+        if existing is not None and existing.winfo_exists():
+            existing.lift()
+            return
+        session_id = self.current_session_id or self._pending_finalization_id
+        has_progress = bool(session_id or self.is_session_active or self.is_auto_cycle_running
+                            or self._scan_busy or self._stopping or getattr(self, "_setup_busy", False))
         dialog = ctk.CTkToplevel(self)
-        dialog.title("Confirm Exit — OvaLens Operator")
-        dialog.geometry("640x400")
+        self._exit_dialog = dialog
+        dialog.title("Exit OvaLens")
         dialog.configure(fg_color=FUTheme.BG_LIGHT)
         dialog.transient(self)
         dialog.grab_set()
-        self._center_window(dialog, 640, 400)
+        self._center_window(dialog, 720, 320)
 
         card = ctk.CTkFrame(dialog, fg_color=FUTheme.PANEL_LIGHT, corner_radius=8, border_width=1, border_color=FUTheme.BORDER)
         card.pack(fill="both", expand=True, padx=16, pady=16)
-
         btn_row = ctk.CTkFrame(card, fg_color="transparent")
         btn_row.pack(side="bottom", fill="x", padx=20, pady=20)
         add_dialog_stop(btn_row, self)
-        # Header with Warning Icon
-        ctk.CTkLabel(
-            card, text="Exit OvaLens?",
-            font=(FUTheme.FONT_FAMILY, 15, "bold"), text_color=FUTheme.TEXT_PRIMARY
-        ).pack(pady=(16, 6))
+        ctk.CTkLabel(card, text="Save run progress before exiting?" if has_progress else "Exit OvaLens?",
+                     anchor="w", font=(FUTheme.FONT_FAMILY, 18, "bold"),
+                     text_color=FUTheme.TEXT_PRIMARY).pack(fill="x", padx=20, pady=(20, 8))
+        message = ("Both choices stop the station. Save keeps this run’s scans in history and queues them for sync. "
+                   "Discard removes the current unsaved run. Use STOP to halt immediately." if has_progress
+                   else "Saved scans stay in history. Pending uploads resume when the app is open again.")
+        ctk.CTkLabel(card, text=message, anchor="w", justify="left", wraplength=540,
+                     text_color=FUTheme.TEXT_SECONDARY).pack(fill="x", padx=20)
+        notice = ctk.CTkLabel(card, text="", anchor="w", justify="left", wraplength=540,
+                              text_color=FUTheme.TEXT_SECONDARY)
+        notice.pack(fill="x", padx=20, pady=(12, 0))
+        working = False
 
-        if self.is_session_active or self.is_auto_cycle_running:
-            warning_box = ctk.CTkFrame(card, fg_color=FUTheme.INFERTILE_AMBER_BG, corner_radius=8)
-            warning_box.pack(fill="x", padx=16, pady=(0, 10))
-            ctk.CTkLabel(
-                warning_box,
-                text="ACTIVE DIAGNOSTIC SESSION\nPending local writes will finish before shutdown.",
-                font=(FUTheme.FONT_FAMILY, FUTheme.FONT_CAPTION, "bold"), text_color=FUTheme.INFERTILE_AMBER_TEXT,
-                justify="center", padx=10, pady=8
-            ).pack()
-            msg = "Local scans are saved to SQLite WAL.\nAre you sure you want to stop operations and exit?"
-        else:
-            msg = "Local records remain saved; unsynced records are retained.\nAre you sure you want to close the operator station?"
+        def keep_working():
+            if not working:
+                dialog.destroy()
 
-        ctk.CTkLabel(
-            card, text=msg, font=(FUTheme.FONT_FAMILY, FUTheme.FONT_CAPTION),
-            text_color=FUTheme.TEXT_MUTED, justify="center"
-        ).pack(pady=(0, 16))
+        def exit_station(discard=False):
+            nonlocal working
+            if working:
+                return
+            if discard and (self._stopping or
+                            (session_id and session_id != (self.current_session_id or self._pending_finalization_id))):
+                notice.configure(text="This run has been saved or is being saved. Choose Save and exit.",
+                                 text_color=FUTheme.REJECT_RED_TEXT)
+                return
+            working = True
+            for button in choices:
+                button.configure(state="disabled")
+            notice.configure(text="Discarding run progress…" if discard else "Saving and stopping…",
+                             text_color=FUTheme.TEXT_SECONDARY)
+            if not self._stopping:
+                self.stop_or_cancel_session(discard=discard)
 
+            def after_stop():
+                nonlocal working
+                if self._closing:
+                    return
+                if self._stopping:
+                    dialog.after(50, after_stop)
+                elif self._finalization_failed:
+                    working = False
+                    notice.configure(text=self._finalization_error, text_color=FUTheme.REJECT_RED_TEXT)
+                    for button in choices:
+                        button.configure(state="normal")
+                else:
+                    dialog.destroy()
+                    self.shutdown(finalize_session=False)
 
+            after_stop()
 
-        ctk.CTkButton(
-            btn_row, text="Return to app", fg_color=FUTheme.PANEL_LIGHT_ALT,
-            hover_color=FUTheme.PANEL_ACCENT, border_width=1, border_color=FUTheme.BORDER_CONTROL,
-            text_color=FUTheme.TEXT_PRIMARY, font=(FUTheme.FONT_FAMILY, FUTheme.FONT_CAPTION, "bold"),
-            command=lambda: self._animate_modal_close(dialog), width=160, height=44, corner_radius=8
-        , text_color_disabled=FUTheme.TEXT_MUTED).pack(side="left")
-
-        def do_exit():
-            def actual_shutdown():
-                print("\n[*] Shutting down OvaLens Edge Subsystems...")
-                self.shutdown()
-                print("[INFO] Waiting for shutdown cleanup.")
-            self._animate_modal_close(dialog, on_close=actual_shutdown)
-
-        ctk.CTkButton(
-            btn_row, text="Exit system", fg_color=FUTheme.PRIMARY_MAROON,
-            hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE,
-            font=(FUTheme.FONT_FAMILY, 13, "bold"), command=do_exit,
-            width=160, height=44, corner_radius=8
-        ).pack(side="right")
+        dialog.protocol("WM_DELETE_WINDOW", keep_working)
+        stay = ctk.CTkButton(btn_row, text="Keep working", width=124, height=44,
+            fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
+            border_width=1, border_color=FUTheme.BORDER_CONTROL, text_color=FUTheme.TEXT_PRIMARY,
+            text_color_disabled=FUTheme.TEXT_MUTED, command=keep_working)
+        stay.pack(side="left")
+        save = ctk.CTkButton(btn_row, text="Save and exit" if has_progress else "Exit OvaLens",
+            width=124, height=44, fg_color=FUTheme.PRIMARY_MAROON, hover_color=FUTheme.HOVER_MAROON,
+            text_color=FUTheme.TEXT_WHITE, text_color_disabled=FUTheme.TEXT_MUTED, command=exit_station)
+        save.pack(side="right")
+        choices = [stay, save]
+        if has_progress:
+            discard = ctk.CTkButton(btn_row, text="Discard and exit", width=146, height=44,
+                fg_color=FUTheme.REJECT_RED_BG, hover_color=FUTheme.REJECT_RED_CARD,
+                border_width=1, border_color=FUTheme.REJECT_RED_BORDER, text_color=FUTheme.REJECT_RED_TEXT,
+                text_color_disabled=FUTheme.TEXT_MUTED, command=lambda: exit_station(discard=True))
+            discard.pack(side="right", padx=8)
+            choices.append(discard)
 
     @_building_dialog
     def open_batch_setup_dialog(self):
@@ -2286,7 +2340,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             pass
 
     def finish_current_batch(self):
-        """Open the batch completion summary dialog and finalize batch state."""
+        """Open the saved run summary."""
         self.open_batch_completion_modal()
 
     @_building_dialog
@@ -2317,12 +2371,41 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         except (queue.Full, RuntimeError) as exc:
             failed(str(exc))
 
+    def _can_redo_batch(self, stats):
+        return bool(self.station is not None and self._batch_record_ready and not self._closing
+                    and not self.is_session_active and not self.current_session_id and not self._stopping
+                    and not self._scan_busy and not self._pending_finalization_id
+                    and not self._finalization_failed and not getattr(self, "_setup_busy", False)
+                    and stats.get("ended_at") and stats.get("session_id")
+                    and stats["session_id"] == getattr(self, "_last_session_id", None)
+                    and stats["batch_id"] == self.current_batch_id)
+
+    def _redo_batch(self, stats):
+        if not self._can_redo_batch(stats):
+            return
+        message = "Inspect the empty conveyor and gate, then prepare this batch again."
+        self.station.readiness.invalidate(message)
+        self._station_prepared = self._batch_complete = self._diagnostics_complete = False
+        self.setup_inspected.set(False)
+        self.setup_notice.configure(text=message)
+        self.total_count = self.fertile_count = self.infertile_count = self.review_count = self.scan_sequence = 0
+        self._update_counters_ui()
+        self.result_banner.configure(fg_color="transparent", border_color=FUTheme.BORDER)
+        self.result_badge.configure(text="Latest egg", fg_color=FUTheme.PANEL_LIGHT_ALT,
+                                    text_color=FUTheme.TEXT_SECONDARY)
+        self.latency_label.configure(text="")
+        self.result_title.configure(text="Waiting for an egg", text_color=FUTheme.TEXT_PRIMARY)
+        self.result_subtitle.configure(text="Results appear during sorting.")
+        self._set_operation_state(OperatorState.READY, message)
+        self._log(f"[BATCH] Prepare {self.current_batch_code} again to start a new run. Previous scans remain in history.")
+
     @_building_dialog
     def _show_session_summary(self, stats):
         """Interactive Batch Completion Report dialog with 1-click local CSV export."""
         dialog = ctk.CTkToplevel(self)
         self._session_summary_window = dialog
-        dialog.title(f"Run summary - {stats['batch_id']}")
+        batch_label = self.current_batch_code if stats["batch_id"] == self.current_batch_id else stats["batch_id"]
+        dialog.title(f"Run summary - {batch_label}")
         height = min(740, self.winfo_screenheight() - 80)
         dialog.geometry(f"760x{height}")
         dialog.configure(fg_color=FUTheme.BG_LIGHT)
@@ -2341,7 +2424,7 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
         ).pack(pady=(16, 2))
 
         ctk.CTkLabel(
-            card, text=f"Batch: {stats['batch_id']} / Stage: {stats['stage']} / Operator: {stats['operator_name']}",
+            card, text=f"Batch: {batch_label} / Stage: {stats['stage']} / Operator: {stats['operator_name']}",
             wraplength=430,
             font=(FUTheme.FONT_FAMILY, FUTheme.FONT_CAPTION), text_color=FUTheme.TEXT_MUTED
         ).pack(pady=(0, 14))
@@ -2428,9 +2511,20 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             command=export_csv, height=44, corner_radius=8
         , text_color_disabled=FUTheme.TEXT_MUTED).pack(fill="x", padx=16, pady=(0, 8))
 
+        can_redo = self._can_redo_batch(stats)
+        if can_redo:
+            ctk.CTkLabel(
+                actions, text="Redo batch resets progress for a new run. Previous scans stay in history.",
+                justify="left", wraplength=430, text_color=FUTheme.TEXT_SECONDARY,
+            ).pack(padx=16, pady=(0, 8))
+
         # Bottom Row
         btn_row = ctk.CTkFrame(actions, fg_color="transparent")
         btn_row.pack(fill="x", padx=16, pady=(0, 12))
+
+        def redo():
+            dialog.destroy()
+            self._redo_batch(stats)
 
         def start_next():
             self._batch_complete = False
@@ -2454,7 +2548,16 @@ class OvaLensOperatorApp(GuidedSetupFlow, ReadinessFlow, ctk.CTk):
             hover_color=FUTheme.HOVER_MAROON, text_color=FUTheme.TEXT_WHITE,
             font=(FUTheme.FONT_FAMILY, 13, "bold"), command=start_next,
             height=44, corner_radius=8
-        ).pack(side="left", fill="x", expand=True, padx=(0, 6))
+        ).pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        if can_redo:
+            ctk.CTkButton(
+                btn_row, text="Redo batch", width=116, height=44, corner_radius=8,
+                fg_color=FUTheme.PANEL_LIGHT_ALT, hover_color=FUTheme.PANEL_ACCENT,
+                border_width=1, border_color=FUTheme.BORDER_CONTROL,
+                text_color=FUTheme.TEXT_PRIMARY, text_color_disabled=FUTheme.TEXT_MUTED,
+                font=(FUTheme.FONT_FAMILY, 13), command=redo,
+            ).pack(side="left", padx=(0, 8))
 
         ctk.CTkButton(
             btn_row, text="Finish and close", fg_color=FUTheme.FERTILE_GREEN,

@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Firmware**: [TASK-NEW-FW-APP-01] preserve explicit egg/servo port assignments, add the COM5/COM7 hardware launcher, and display deployed controller status replies (2026-10-02).
 
 ### Added
+- **Edge**: [TASK-NEW-EDGE-EXIT-PROGRESS-01] save or discard unfinished runs on exit and recover interrupted progress (2026-11-25)
+- **Edge**: [TASK-NEW-EDGE-BATCH-REDO-01] add batch cancellation and redo with a 135-degree infertile preset (2026-11-25)
 - **Edge**: [TASK-NEW-EDGE-LIGHT-DIALOG-04] add soft light appearance and resilient dialog sizing (2026-11-18)
 - **Edge**: [TASK-NEW-EDGE-DIM-USABILITY-03] improve low-glare desktop usability and run flow (2026-11-18)
 - **Edge**: [TASK-NEW-EDGE-DESKTOP-FLOW-02] refine desktop workspace and task-based settings (2026-11-17)

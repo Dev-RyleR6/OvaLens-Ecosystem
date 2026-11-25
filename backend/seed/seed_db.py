@@ -147,7 +147,7 @@ def seed_database(reset: bool = False):
                         "hold_ms": 300,
                         "passage_ms": 500,
                         "fertile_angle": 180,
-                        "infertile_angle": 50,
+                        "infertile_angle": 135,
                         "neutral_angle": 90,
                         "silent_idle_enabled": True,
                         "board_state": {"fault": "NONE", "busy": "0", "sensor": "0", "light": "0", "position": "0", "reference_valid": "1"}

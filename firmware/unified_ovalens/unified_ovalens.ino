@@ -94,7 +94,7 @@ bool awaitingMoveCompletion = false, referenced = false;
 
 // Sorting Gate & IR Sensor State
 Servo gate;
-int angle = 90, neutral = 90, fertile = 180, infertile = 50;
+int angle = 90, neutral = 90, fertile = 180, infertile = 135;
 enum EggState { WAITING, HOLDING, CLEARING };
 EggState eggState = WAITING;
 bool settling = false, detecting = false, clearing = false;

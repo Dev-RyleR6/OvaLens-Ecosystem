@@ -279,7 +279,7 @@ class EdgeTelemetryServer:
             "hold_ms": getattr(settings.calibration, "hold_ms", 300),
             "passage_ms": getattr(settings.calibration, "passage_ms", 500),
             "fertile_angle": getattr(settings.calibration, "fertile_angle", 180),
-            "infertile_angle": getattr(settings.calibration, "infertile_angle", 50),
+            "infertile_angle": settings.calibration.infertile_angle,
             "neutral_angle": getattr(settings.calibration, "neutral_angle", 90),
             "silent_idle_enabled": rig_profile == "unified_v4",
             "board_state": board_state,

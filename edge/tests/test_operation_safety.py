@@ -245,6 +245,7 @@ def test_sync_rejection_or_partial_ack_never_clears_local_record(tmp_path, monke
     app = station(tmp_path)
     OvaLensOperatorApp._process_scan_result(app, prediction())
     app._jobs.finish()
+    app.db.complete_session(app.current_session_id)
     worker = BackgroundSyncWorker(app.db, api_key="test-key")
     worker._registered_sessions.add(app.current_session_id)
     monkeypatch.setattr("src.sync.sync_worker.requests.post", lambda *a, **k:
@@ -258,6 +259,7 @@ def test_duplicate_sync_ack_is_safe_and_session_identity_is_preserved(tmp_path, 
     app = station(tmp_path)
     OvaLensOperatorApp._process_scan_result(app, prediction())
     app._jobs.finish()
+    app.db.complete_session(app.current_session_id)
     sent = []
     def post(url, **kwargs):
         sent.append(kwargs["json"])
@@ -266,11 +268,14 @@ def test_duplicate_sync_ack_is_safe_and_session_identity_is_preserved(tmp_path, 
         return SimpleNamespace(status_code=200, json=lambda: {
             "status": "success", "total_received": 1, "synced_count": 0, "duplicates_ignored": 1})
     monkeypatch.setattr("src.sync.sync_worker.requests.post", post)
+    monkeypatch.setattr("src.sync.sync_worker.requests.put", lambda url, json, **kwargs:
+                        SimpleNamespace(status_code=200, json=lambda: {**sent[0], **json, "total_scanned": 1}))
     worker = BackgroundSyncWorker(app.db, api_key="test-key")
     worker._perform_sync()
     assert sent[0]["device_id"] == app.device_id
     assert sent[0]["operator_name"] == app.operator_name
     assert app.db.get_unsynced_count() == 0
+    assert worker.last_error is None
 
 
 def test_migration_is_once_only_when_legacy_column_cannot_be_dropped(tmp_path):

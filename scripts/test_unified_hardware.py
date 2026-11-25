@@ -19,6 +19,7 @@ import serial.tools.list_ports
 
 # Ensure edge module is in path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "edge"))
+from src.core.settings import PRODUCTION_INFERTILE_ANGLE
 from src.iot.unified_board import UnifiedBoardController
 
 DEFAULT_PORT = "COM5"
@@ -69,20 +70,32 @@ def toggle_lamp(ctrl):
     print(f">>> Lamp is now: {light_status}")
 
 
-def test_servo(ctrl):
+def test_servo(ctrl, fertile_angle=180, infertile_angle=PRODUCTION_INFERTILE_ANGLE, neutral_angle=90):
     print(">>> Testing Sorting Gate Servo...")
-    print(" -> Moving to Fertile Accept (180 deg)...")
+    ctrl.link.command(f"SET_FERTILE:{fertile_angle}").result(3.5)
+    ctrl.link.command(f"SET_INFERTILE:{infertile_angle}").result(3.5)
+    ctrl.link.command(f"SET_NEUTRAL:{neutral_angle}").result(3.5)
+
+    print(f" -> Moving to Fertile Accept ({fertile_angle} deg)...")
     ctrl.link.command("SORT:FERTILE").result(3.5)
     time.sleep(1.0)
 
-    print(" -> Moving to Infertile Reject (50 deg)...")
+    print(f" -> Moving to Infertile Reject ({infertile_angle} deg)...")
     ctrl.link.command("SORT:INFERTILE").result(3.5)
     time.sleep(1.0)
 
-    print(" -> Returning to Neutral (90 deg)...")
+    print(f" -> Returning to Neutral ({neutral_angle} deg)...")
     ctrl.link.command("RESET").result(3.5)
     time.sleep(0.5)
     print(">>> Servo Test Complete!")
+
+
+def set_servo_angle(ctrl, angle):
+    if not 0 <= angle <= 180:
+        raise ValueError("Servo angle must be between 0 and 180")
+    print(f">>> Moving Servo to {angle} deg...")
+    ctrl.link.command(f"SERVO:{angle}").result(3.5)
+    print(f">>> Servo at {angle} deg.")
 
 
 def test_ir(ctrl, duration=10):
@@ -129,6 +142,7 @@ def interactive_menu(ctrl):
 ======================================================
   [1]  Toggle Candling Lamp ON / OFF     (GPIO 27)
   [2]  Test Sorting Servo Gate           (GPIO 32)
+  [a]  Move Servo to Custom Angle (0-180)(GPIO 32)
   [3]  Live IR Sensor Test (10s)         (GPIO 26)
   [4]  Jog Stepper Forward (100 steps)   (GPIO 16, 4)
   [5]  Jog Stepper Reverse (100 steps)   (GPIO 16, 4)
@@ -140,7 +154,7 @@ def interactive_menu(ctrl):
     print(menu_text)
     while True:
         try:
-            choice = input("Enter choice [1, 2, 3, 4, 5, s, m, q]: ").strip().lower()
+            choice = input("Enter choice [1, 2, a, 3, 4, 5, s, m, q]: ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             print("\nExiting console.")
             break
@@ -154,6 +168,12 @@ def interactive_menu(ctrl):
             toggle_lamp(ctrl)
         elif choice == "2":
             test_servo(ctrl)
+        elif choice == "a":
+            try:
+                angle = int(input("Enter servo angle (0-180): ").strip())
+                set_servo_angle(ctrl, angle)
+            except ValueError as exc:
+                print(f"[!] Invalid angle: {exc}")
         elif choice == "3":
             test_ir(ctrl, duration=10)
         elif choice == "4":
@@ -163,14 +183,19 @@ def interactive_menu(ctrl):
         elif choice == "s":
             print_status(ctrl)
         else:
-            print("[!] Invalid option. Enter 1, 2, 3, 4, 5, s, or q.")
+            print("[!] Invalid option. Enter 1, 2, a, 3, 4, 5, s, or q.")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Test single-ESP32 production hardware")
     parser.add_argument("--port", default="", help="Serial port (default: auto-detect COM5)")
     parser.add_argument("--lamp", action="store_true", help="Toggle lamp ON for 2s then OFF")
-    parser.add_argument("--servo", action="store_true", help="Sweep servo 180 -> 50 -> 90")
+    parser.add_argument("--servo", action="store_true", help="Sweep servo fertile -> infertile -> neutral")
+    parser.add_argument("--fertile-angle", type=int, default=180, help="Fertile angle 0-180 (default: 180)")
+    parser.add_argument("--infertile-angle", type=int, default=PRODUCTION_INFERTILE_ANGLE,
+                        help="Infertile angle 0-180 (default: %(default)s)")
+    parser.add_argument("--neutral-angle", type=int, default=90, help="Neutral angle 0-180 (default: 90)")
+    parser.add_argument("--servo-angle", type=int, default=None, help="Move servo directly to angle 0-180")
     parser.add_argument("--ir", action="store_true", help="Monitor IR sensor for 10s")
     parser.add_argument("--stepper-fwd", action="store_true", help="Jog stepper forward 100 steps")
     parser.add_argument("--stepper-rev", action="store_true", help="Jog stepper reverse 100 steps")
@@ -191,8 +216,10 @@ def main():
             print("Turning Lamp OFF...")
             ctrl.link.command("LIGHT_OFF").result(3.5)
             print("Lamp test complete.")
+        elif args.servo_angle is not None:
+            set_servo_angle(ctrl, args.servo_angle)
         elif args.servo:
-            test_servo(ctrl)
+            test_servo(ctrl, fertile_angle=args.fertile_angle, infertile_angle=args.infertile_angle, neutral_angle=args.neutral_angle)
         elif args.ir:
             test_ir(ctrl, duration=10)
         elif args.stepper_fwd:

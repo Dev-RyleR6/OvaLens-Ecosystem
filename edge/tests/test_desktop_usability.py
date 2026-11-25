@@ -1,5 +1,6 @@
 """TASK-NEW-EDGE-DIM-USABILITY-03: glare, contrast, modal reachability and clear daily flow."""
 from types import SimpleNamespace
+from unittest.mock import Mock
 import customtkinter as ctk
 import pytest
 from test_camera_preview_ui import preview_app, hidden_ui
@@ -139,6 +140,127 @@ def test_operator_dialogs_keep_actions_and_text_usable_at_supported_sizes(hidden
             dialog.destroy()
             app.update()
         assert not app.is_auto_cycle_running and not app._setup_busy
+        assert not errors
+    finally:
+        app.shutdown()
+        app.mainloop()
+
+
+@pytest.mark.parametrize("complete", [False, True], ids=["cancelled", "completed"])
+def test_sorting_run_can_be_cancelled_and_redone_without_losing_scans(hidden_ui, tmp_path, complete):
+    app = station_preview(tmp_path)
+    errors = []
+    app.report_callback_exception = lambda *args: errors.append(args)
+    session_id, batch_id = "sorting-run", app.current_batch_id
+    app.db.create_session(session_id, batch_id, app.device_id, "DAY_10", app.operator_name)
+    app.db.record_scan("scan", session_id, batch_id, 1, "INFERTILE", .9, 15, "REJECT", [])
+    cycle = SimpleNamespace(session_id=session_id, count=1, routed=int(complete), latest_result=None,
+                            _thread=Mock(),
+                            active=not complete, status={"state": "COMPLETE" if complete else "SEARCHING"})
+
+    def stop_cycle():
+        cycle.active = False
+        cycle.status = {"state": "RECOVERY_REQUIRED"}
+
+    cycle.stop = Mock(side_effect=stop_cycle)
+    app.station.cycle = cycle
+    app.station.start_cycle = Mock()
+
+    def button(dialog, text):
+        return next(w for w in descendants(dialog) if isinstance(w, ctk.CTkButton) and w.cget("text") == text)
+
+    try:
+        app.geometry("1024x720")
+        app.deiconify()
+        app.update()
+        app._activate_cycle(cycle)
+        if complete:
+            app.db.complete_session(session_id)
+            app._finalize_automatic_batch(cycle)
+        else:
+            assert app.session_btn.cget("text") == "Cancel run"
+            app.session_btn.invoke()
+            app.update()
+            dialog = app.grab_current()
+            assert dialog.title() == "Cancel sorting run"
+            contained(button(dialog, "STOP"), dialog)
+            button(dialog, "Keep run").invoke()
+            app.update()
+            assert app.current_session_id == session_id
+            cycle.stop.assert_not_called()
+            app.session_btn.invoke()
+            button(app.grab_current(), "Cancel run").invoke()
+            cycle.stop.assert_called_once()
+
+        pump(app, lambda: getattr(app, "_session_summary_window", None) is not None)
+        app.update()
+        summary = app._session_summary_window
+        assert summary.title() == f"Run summary - {app.current_batch_code}"
+        redo = button(summary, "Redo batch")
+        contained(redo, summary)
+        previous = app.db.get_session_stats(session_id)
+        assert previous["ended_at"] and previous["total_scanned"] == app.total_count == 1
+        assert app._batch_complete == complete
+        redo.invoke()
+        assert not summary.winfo_exists()
+        assert app.current_batch_id == batch_id and app.target_egg_count == 100
+        assert app.total_count == app.scan_sequence == 0 and not app.setup_inspected.get()
+        assert app.current_session_id is None and not app.station.readiness.ready
+        assert app.session_btn.cget("text") == "Prepare station"
+        assert app.db.get_session_stats(session_id) == previous
+        assert len(app.db.get_uncommitted_scans(session_id=session_id)) == 1
+        app.station.start_cycle.assert_not_called()
+        assert not errors
+    finally:
+        app.shutdown()
+        app.mainloop()
+
+
+@pytest.mark.parametrize("choice", ["Save and exit", "Discard and exit", "previously saved run"])
+def test_exit_progress_choices_keep_discard_or_protect_scans(hidden_ui, tmp_path, choice):
+    app = station_preview(tmp_path)
+    session_id, batch_id = "exit-run", app.current_batch_id
+    already_saved = choice == "previously saved run"
+    app.db.create_session(session_id, batch_id, app.device_id, "DAY_10", app.operator_name,
+                          defer_sync=not already_saved)
+    app.db.record_scan("exit-scan", session_id, batch_id, 1, "INFERTILE", .9, 15, "REJECT", [])
+    app.current_session_id = session_id
+    app.is_session_active = True
+    errors = []
+    app.report_callback_exception = lambda *args: errors.append(args)
+
+    def open_exit():
+        app.confirm_exit_dialog()
+        app.update()
+        dialog = app.grab_current()
+        buttons = {w.cget("text"): w for w in descendants(dialog) if isinstance(w, ctk.CTkButton)}
+        for button in buttons.values():
+            contained(button, dialog)
+        assert set(buttons) == {"STOP", "Keep working", "Save and exit", "Discard and exit"}
+        return buttons
+
+    try:
+        app.geometry("1024x720")
+        app.deiconify()
+        app.update()
+        open_exit()["Keep working"].invoke()
+        assert not app._closing and app.current_session_id == session_id
+        assert not app.db.get_session_stats(session_id)["ended_at"]
+        buttons = open_exit()
+        if already_saved:
+            buttons["Discard and exit"].invoke()
+            pump(app, lambda: app._finalization_failed and buttons["Save and exit"].cget("state") == "normal")
+            assert not app._closing and "may have synced" in app._finalization_error
+            assert app.db.get_session_stats(session_id)["total_scanned"] == 1
+            choice = "Save and exit"
+        buttons[choice].invoke()
+        pump(app, lambda: app._closing)
+        stats = app.db.get_session_stats(session_id)
+        if choice == "Save and exit":
+            assert stats["ended_at"] and stats["total_scanned"] == 1
+            assert app.db.get_pending_scan_sessions()[0]["session_id"] == session_id
+        else:
+            assert not stats and not app.db.get_uncommitted_scans()
         assert not errors
     finally:
         app.shutdown()

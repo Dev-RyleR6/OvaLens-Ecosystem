@@ -104,8 +104,8 @@ void testServo() {
   gateServo.write(180);
   delay(1000);
 
-  Serial.println(" -> Moving to Infertile Reject (50 deg)...");
-  gateServo.write(50);
+  Serial.println(" -> Moving to Infertile Reject (135 deg)...");
+  gateServo.write(135);
   delay(1000);
 
   Serial.println(" -> Returning to Neutral (90 deg)...");

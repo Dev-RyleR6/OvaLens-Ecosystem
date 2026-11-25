@@ -11,8 +11,9 @@ import re
 import uuid
 import threading
 import time
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 
@@ -52,9 +53,9 @@ class LocalDatabaseManager:
                 conn.close()
 
     @contextmanager
-    def _process_access(self):
-        with open(self.db_path + ".lock", "a+b") as handle:
-            deadline = time.monotonic() + 10
+    def _process_access(self, lock_suffix=".lock", timeout=10):
+        with open(self.db_path + lock_suffix, "a+b") as handle:
+            deadline = time.monotonic() + timeout
             if os.name == "nt":
                 import msvcrt
                 def lock():
@@ -84,6 +85,24 @@ class LocalDatabaseManager:
                 yield
             finally:
                 unlock()
+
+    @contextmanager
+    def operator_session(self):
+        """Hold one operator process per database and save drafts left by a crash."""
+        with ExitStack() as stack:
+            try:
+                stack.enter_context(self._process_access(".operator.lock", timeout=0))
+            except TimeoutError as exc:
+                raise RuntimeError("OvaLens is already open for this station.") from exc
+            with self._get_connection() as conn:
+                conn.execute("""
+                    UPDATE local_sessions SET ended_at = MAX(started_at, COALESCE(
+                        (SELECT MAX(scanned_at) FROM local_scans WHERE session_id = local_sessions.session_id),
+                        started_at
+                    ))
+                    WHERE defer_sync = 1 AND NULLIF(ended_at, '') IS NULL;
+                """)
+            yield
 
     def _init_db(self):
         with self._get_connection() as conn:
@@ -124,6 +143,8 @@ class LocalDatabaseManager:
             """)
 
             session_columns = {r[1] for r in conn.execute("PRAGMA table_info(local_sessions);")}
+            if "defer_sync" not in session_columns:
+                conn.execute("ALTER TABLE local_sessions ADD COLUMN defer_sync INTEGER NOT NULL DEFAULT 0;")
             for column in ("end_synced_at", "sync_last_attempt_at", "sync_error"):
                 if column not in session_columns:
                     conn.execute(f"ALTER TABLE local_sessions ADD COLUMN {column} TEXT;")
@@ -425,15 +446,17 @@ class LocalDatabaseManager:
                 ])
         return filepath
 
-    def create_session(self, session_id: str, batch_id: str, device_id: str, stage: str, operator_name: str, operator_id=None) -> Dict[str, Any]:
+    def create_session(self, session_id: str, batch_id: str, device_id: str, stage: str,
+                       operator_name: str, operator_id=None, *, defer_sync=False) -> Dict[str, Any]:
         if stage != "DAY_10":
             raise ValueError("OvaLens supports only the DAY_10 candling stage.")
         started_at = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             conn.execute("""
-                INSERT INTO local_sessions (session_id, batch_id, device_id, stage, operator_name, started_at, operator_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?);
-            """, (session_id, batch_id, device_id, stage, operator_name, started_at, operator_id))
+                INSERT INTO local_sessions
+                    (session_id, batch_id, device_id, stage, operator_name, started_at, operator_id, defer_sync)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """, (session_id, batch_id, device_id, stage, operator_name, started_at, operator_id, int(defer_sync)))
             conn.commit()
 
         return {
@@ -573,7 +596,8 @@ class LocalDatabaseManager:
     def get_pending_scan_sessions(self, limit=5):
         with self._get_connection() as conn:
             return [dict(row) for row in conn.execute("""
-                SELECT s.* FROM local_sessions s WHERE EXISTS (
+                SELECT s.* FROM local_sessions s
+                WHERE (s.defer_sync = 0 OR NULLIF(s.ended_at, '') IS NOT NULL) AND EXISTS (
                     SELECT 1 FROM local_scans c WHERE c.session_id=s.session_id AND c.is_synced=0)
                 ORDER BY s.sync_last_attempt_at, s.started_at, s.session_id LIMIT ?;
             """, (limit,))]
@@ -606,15 +630,16 @@ class LocalDatabaseManager:
             return conn.execute("""SELECT COUNT(*) FROM local_sessions
                 WHERE ended_at IS NOT NULL AND ended_at<>'' AND end_synced_at IS NULL;""").fetchone()[0]
 
-    def get_uncommitted_scans(self, limit: int = 50, session_id=None) -> List[Dict[str, Any]]:
-        """Fetch pending unsynced scans for the background network worker."""
+    def get_uncommitted_scans(self, limit: int = 50, session_id=None, *, uploadable_only=False) -> List[Dict[str, Any]]:
+        """Fetch unsynced scans, optionally limited to those released for upload."""
         with self._get_connection() as conn:
             cursor = conn.execute("""
-                SELECT * FROM local_scans
-                WHERE is_synced = 0 AND (? IS NULL OR session_id=?)
+                SELECT c.* FROM local_scans c JOIN local_sessions s ON s.session_id = c.session_id
+                WHERE c.is_synced = 0 AND (? IS NULL OR c.session_id = ?)
+                    AND (? = 0 OR s.defer_sync = 0 OR NULLIF(s.ended_at, '') IS NOT NULL)
                 ORDER BY sequence_number ASC
                 LIMIT ?;
-            """, (session_id, session_id, limit))
+            """, (session_id, session_id, int(uploadable_only), limit))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 
@@ -699,6 +724,36 @@ class LocalDatabaseManager:
             except Exception:
                 pass
         return self.get_session_stats(session_id)
+
+    def discard_open_session(self, session_id: str) -> int:
+        """Remove a local draft and return the number of photos that could not be removed."""
+        with self._get_connection() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
+            session = conn.execute("SELECT defer_sync, ended_at FROM local_sessions WHERE session_id = ?;",
+                                   (session_id,)).fetchone()
+            if not session:
+                return 0
+            if (not session["defer_sync"] or session["ended_at"] or conn.execute(
+                    "SELECT 1 FROM local_scans WHERE session_id = ? AND is_synced = 1 LIMIT 1;",
+                    (session_id,)).fetchone()):
+                raise ValueError("This run is already saved or may have synced. Choose Save and exit to keep it.")
+            photos = conn.execute("""SELECT scan_id, image_path FROM local_scans
+                                     WHERE session_id = ? AND NULLIF(image_path, '') IS NOT NULL;""",
+                                  (session_id,)).fetchall()
+            conn.execute("DELETE FROM local_scans WHERE session_id = ?;", (session_id,))
+            conn.execute("DELETE FROM local_sessions WHERE session_id = ?;", (session_id,))
+
+        folder = Path(self.db_path).parent / "local_scans"
+        remaining = 0
+        for photo in photos:
+            try:
+                expected = folder / f"{uuid.UUID(photo['scan_id'])}.jpg"
+                if Path(photo["image_path"]).absolute() != expected:
+                    raise ValueError("Unexpected scan photo path")
+                expected.unlink(missing_ok=True)
+            except (OSError, ValueError):
+                remaining += 1
+        return remaining
 
 
 

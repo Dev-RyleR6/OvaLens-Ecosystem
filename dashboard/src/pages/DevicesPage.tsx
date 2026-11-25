@@ -573,7 +573,7 @@ export const DevicesPage: React.FC = () => {
                           <div className="flex justify-between">
                             <span>Gate Angles:</span>
                             <span className="font-medium text-slate-700 font-mono">
-                              Fertile {t?.iot_rig?.fertile_angle ?? 180}° • Neutral {t?.iot_rig?.neutral_angle ?? 90}° • Infertile {t?.iot_rig?.infertile_angle ?? 50}°
+                              Fertile {t?.iot_rig?.fertile_angle ?? 180}° • Neutral {t?.iot_rig?.neutral_angle ?? 90}° • Infertile {t?.iot_rig?.infertile_angle ?? 135}°
                             </span>
                           </div>
                           <div className="flex justify-between">

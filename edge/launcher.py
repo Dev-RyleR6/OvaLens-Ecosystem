@@ -52,6 +52,7 @@ def main():
 
     # Register cleanup as soon as each worker exists, including UI-build failures.
     with ExitStack() as resources:
+        resources.enter_context(db.operator_session())
         camera = CameraGrabber(camera_index=camera_index)
         resources.callback(_stop_resource, camera)
         engine = InferenceEngine()

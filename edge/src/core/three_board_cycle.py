@@ -363,7 +363,7 @@ class ThreeBoardCycle(SortingCycle):
             while not self.boards.egg.events.empty():
                 self.boards.egg.events.get_nowait()
             self.db.create_session(self.session_id, self.batch_id, self.device_id, "DAY_10", self.operator,
-                                   operator_id=self.operator_id)
+                                   operator_id=self.operator_id, defer_sync=True)
             self._checkpoint("STARTED")
             self._command(self.boards.egg, "ARM")
             last_arrival += self._pause_at_boundary(events)
