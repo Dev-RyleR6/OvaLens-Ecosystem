@@ -76,6 +76,47 @@ def local_run(db, batch="BATCH", count=1, closed=True):
     return session_id
 
 
+def test_unsaved_runs_stay_local_until_saved_or_discarded(tmp_path, monkeypatch):
+    db = LocalDatabaseManager(tmp_path / "scans.db")
+    backend = Backend(db, monkeypatch)
+    worker = BackgroundSyncWorker(db, api_key="test")
+    photo = tmp_path / "local_scans" / (str(uuid4()) + ".jpg")
+    photo.parent.mkdir()
+    photo.write_bytes(b"local test photo")
+    for run in ("keep", "discard"):
+        db.create_session(run, "BATCH", "DEVICE", "DAY_10", "Operator", defer_sync=True)
+        scan_id = photo.stem if run == "discard" else str(uuid4())
+        db.record_scan(scan_id, run, "BATCH", 1, "FERTILE", .8, 8, "ACCEPT", [],
+                       image_path=str(photo) if run == "discard" else None)
+
+    worker._perform_sync()
+    worker._sync_scan_records("discard")
+    assert not backend.sessions and not backend.scans
+    assert len(db.get_uncommitted_scans()) == 2
+
+    assert db.discard_open_session("discard") == 0 and not photo.exists()
+    db.complete_session("keep")
+    worker._perform_sync()
+    assert set(backend.sessions) == {"keep"} and len(backend.scans) == 1
+    assert not db.get_session_stats("discard")
+    with pytest.raises(ValueError, match="already saved"):
+        db.discard_open_session("keep")
+
+
+def test_station_restart_recovers_interrupted_draft_without_claiming_active_station(tmp_path):
+    db = LocalDatabaseManager(tmp_path / "scans.db")
+    other = LocalDatabaseManager(db.db_path)
+    with db.operator_session():
+        db.create_session("interrupted", "BATCH", "DEVICE", "DAY_10", "Operator", defer_sync=True)
+        db.record_scan(str(uuid4()), "interrupted", "BATCH", 1, "FERTILE", .8, 8, "ACCEPT", [])
+        with pytest.raises(RuntimeError, match="already open"), other.operator_session():
+            pytest.fail("A second operator process acquired the station")
+        assert not db.get_pending_scan_sessions()
+    with other.operator_session():
+        assert other.get_session_stats("interrupted")["ended_at"]
+        assert other.get_pending_scan_sessions()[0]["session_id"] == "interrupted"
+
+
 def test_completion_follows_all_metadata_packets_and_survives_restart(tmp_path, monkeypatch):
     db = LocalDatabaseManager(str(tmp_path / "scans.db"))
     session_id = local_run(db, count=51)
@@ -158,7 +199,9 @@ def test_zero_scan_session_finishes_without_fabricating_scans(tmp_path, monkeypa
 
 
 def test_saved_office_selection_uses_actual_backend_batch_id(hidden_ui, tmp_path):
+    from operator_helpers import select_staff
     app, _, _ = preview_app(tmp_path)
+    select_staff(app, "Tester")
     office = {"batch_id": "KAY-SAMPLE-BATCH", "batch_code": "Kay Sample Batch", "breed": "KAYUMANGGI",
         "incubator_id": "INC-1", "initial_egg_count": 1000, "set_date": "2026-01-01T00:00:00+08:00", "notes": None}
     def fetch():
@@ -171,8 +214,8 @@ def test_saved_office_selection_uses_actual_backend_batch_id(hidden_ui, tmp_path
         app.open_batch_setup_dialog()
         dialog = app._batch_setup_window
         pump(app, lambda: dialog.loaded and "KAY-SAMPLE-BATCH" in dialog.records)
-        dialog.mode.set("Existing batch")
-        dialog.change_mode("Existing batch")
+        dialog.mode.set("Choose batch")
+        dialog.change_mode("Choose batch")
         dialog.choose("Kay Sample Batch")
         app._animate_modal_close = lambda modal: modal.destroy()
         dialog.save.invoke()

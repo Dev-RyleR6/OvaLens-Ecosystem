@@ -163,6 +163,10 @@ test('device sliders are disabled and explained for read-only operators', () => 
     assert.ok(attribute(range, 'aria-describedby'));
   }
   assert.match(sources.DevicesPage, /Only administrators and managers can edit calibration records/);
+  assert.match(sources.DevicesPage, /Single-ESP32 Unified \(v4\)/);
+  assert.match(sources.DevicesPage, /Unified Serial Bus \(UNIFIED_V3\)/);
+  assert.match(sources.DevicesPage, /Operator on Duty:/);
+  assert.match(sources.DevicesPage, /Step Geometry:/);
 });
 
 test('finalizing hatch results preserves counts and scrolls within the viewport', () => {

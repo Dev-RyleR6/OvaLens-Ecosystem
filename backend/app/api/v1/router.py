@@ -1,7 +1,9 @@
 from fastapi import APIRouter
+from app.api.v1.endpoints import operators
 from app.api.v1.endpoints import auth, devices, batches, sessions, scans, analytics, reports, users, audit_logs, settings
 
 api_router = APIRouter()
+api_router.include_router(operators.router)
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
 api_router.include_router(audit_logs.router)

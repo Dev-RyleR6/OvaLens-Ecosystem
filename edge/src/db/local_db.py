@@ -11,8 +11,9 @@ import re
 import uuid
 import threading
 import time
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 
@@ -52,9 +53,9 @@ class LocalDatabaseManager:
                 conn.close()
 
     @contextmanager
-    def _process_access(self):
-        with open(self.db_path + ".lock", "a+b") as handle:
-            deadline = time.monotonic() + 10
+    def _process_access(self, lock_suffix=".lock", timeout=10):
+        with open(self.db_path + lock_suffix, "a+b") as handle:
+            deadline = time.monotonic() + timeout
             if os.name == "nt":
                 import msvcrt
                 def lock():
@@ -84,6 +85,24 @@ class LocalDatabaseManager:
                 yield
             finally:
                 unlock()
+
+    @contextmanager
+    def operator_session(self):
+        """Hold one operator process per database and save drafts left by a crash."""
+        with ExitStack() as stack:
+            try:
+                stack.enter_context(self._process_access(".operator.lock", timeout=0))
+            except TimeoutError as exc:
+                raise RuntimeError("OvaLens is already open for this station.") from exc
+            with self._get_connection() as conn:
+                conn.execute("""
+                    UPDATE local_sessions SET ended_at = MAX(started_at, COALESCE(
+                        (SELECT MAX(scanned_at) FROM local_scans WHERE session_id = local_sessions.session_id),
+                        started_at
+                    ))
+                    WHERE defer_sync = 1 AND NULLIF(ended_at, '') IS NULL;
+                """)
+            yield
 
     def _init_db(self):
         with self._get_connection() as conn:
@@ -124,6 +143,8 @@ class LocalDatabaseManager:
             """)
 
             session_columns = {r[1] for r in conn.execute("PRAGMA table_info(local_sessions);")}
+            if "defer_sync" not in session_columns:
+                conn.execute("ALTER TABLE local_sessions ADD COLUMN defer_sync INTEGER NOT NULL DEFAULT 0;")
             for column in ("end_synced_at", "sync_last_attempt_at", "sync_error"):
                 if column not in session_columns:
                     conn.execute(f"ALTER TABLE local_sessions ADD COLUMN {column} TEXT;")
@@ -143,6 +164,14 @@ class LocalDatabaseManager:
                 origin TEXT NOT NULL, created_at TEXT NOT NULL, synced_at TEXT,
                 last_attempt_at TEXT, sync_error TEXT);""")
             batch_columns = {r[1] for r in conn.execute("PRAGMA table_info(local_batches);")}
+            if "operator_id" not in batch_columns:
+                conn.execute("ALTER TABLE local_batches ADD COLUMN operator_id TEXT;")
+            if "operator_id" not in session_columns:
+                conn.execute("ALTER TABLE local_sessions ADD COLUMN operator_id TEXT;")
+            conn.execute("""CREATE TABLE IF NOT EXISTS operator_cache (
+                user_id TEXT PRIMARY KEY, full_name TEXT NOT NULL, role TEXT NOT NULL);""")
+            conn.execute("""CREATE TABLE IF NOT EXISTS operator_preferences (
+                id INTEGER PRIMARY KEY CHECK(id=1), selected_id TEXT, downloaded_at TEXT);""")
             if "sync_blocked" not in batch_columns:
                 conn.execute("ALTER TABLE local_batches ADD COLUMN sync_blocked INTEGER NOT NULL DEFAULT 0;")
                 conn.execute("""UPDATE local_batches SET sync_blocked=1 WHERE
@@ -188,13 +217,13 @@ class LocalDatabaseManager:
         conn.execute("UPDATE local_scans SET final_class = 'INFERTILE' WHERE final_class = 'ABNORMAL';")
         conn.execute("INSERT INTO local_schema_migrations (version) VALUES (?);", ("two_class_v1",))
 
-    def save_local_batch(self, record, device_id, operator_name):
+    def save_local_batch(self, record, device_id, operator_name, operator_id=None):
         from ..core.batches import validate_batch_record, same_batch
         values = validate_batch_record(record)
         if not isinstance(device_id, str) or not device_id.strip() or len(device_id) > 64:
             raise ValueError("A station ID is required to create a batch.")
-        if not isinstance(operator_name, str) or not operator_name.strip() or len(operator_name.strip()) > 100:
-            raise ValueError("Enter the operator name (1–100 characters).")
+        if not isinstance(operator_name, str) or not operator_name.strip() or len(operator_name.strip()) > 128:
+            raise ValueError("Enter the operator name (1–128 characters).")
         with self._get_connection() as conn:
             existing = conn.execute("SELECT * FROM local_batches WHERE batch_id=?;", (values["batch_id"],)).fetchone()
             if existing:
@@ -204,10 +233,10 @@ class LocalDatabaseManager:
             try:
                 conn.execute("""INSERT INTO local_batches
                     (batch_id,batch_code,breed,incubator_id,initial_egg_count,set_date,notes,
-                     device_id,operator_name,origin,created_at)
+                     device_id,operator_name,operator_id,origin,created_at)
                     VALUES (:batch_id,:batch_code,:breed,:incubator_id,:initial_egg_count,:set_date,:notes,
-                            :device_id,:operator_name,'LOCAL',:created_at);""",
-                    {**values, "device_id": device_id.strip(), "operator_name": operator_name.strip(),
+                            :device_id,:operator_name,:operator_id,'LOCAL',:created_at);""",
+                    {**values, "device_id": device_id.strip(), "operator_name": operator_name.strip(), "operator_id": operator_id,
                      "created_at": datetime.now(timezone.utc).isoformat()})
             except sqlite3.IntegrityError:
                 raise ValueError("Batch code already exists. Select the existing batch instead.") from None
@@ -272,6 +301,50 @@ class LocalDatabaseManager:
         with self._get_connection() as conn:
             row = conn.execute("SELECT data_json FROM batch_preferences WHERE id=1;").fetchone()
             return json.loads(row[0]) if row else {}
+
+    def cache_operators(self, records):
+        """Replace only a completely validated successful roster, including empty lists."""
+        from uuid import UUID
+        if not isinstance(records, list):
+            raise ValueError("Invalid operator roster")
+        values = []
+        seen = set()
+        for record in records:
+            identity = str(UUID(record["user_id"]))
+            name, role = record["full_name"], record["role"]
+            if identity in seen or not isinstance(name, str) or not name.strip() or len(name) > 128 or role not in {"ADMIN", "MANAGER", "OPERATOR"}:
+                raise ValueError("Invalid operator roster")
+            seen.add(identity)
+            values.append((identity, name.strip(), role))
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM operator_cache;")
+            conn.executemany("INSERT INTO operator_cache VALUES (?,?,?);", values)
+            conn.execute("""INSERT INTO operator_preferences(id,downloaded_at) VALUES(1,?)
+                ON CONFLICT(id) DO UPDATE SET downloaded_at=excluded.downloaded_at;""",
+                (datetime.now(timezone.utc).isoformat(),))
+            conn.commit()
+
+    def get_operator_state(self):
+        with self._get_connection() as conn:
+            prefs = conn.execute("SELECT * FROM operator_preferences WHERE id=1;").fetchone()
+            return {"operators": [dict(r) for r in conn.execute("SELECT * FROM operator_cache ORDER BY full_name,user_id;")],
+                    "selected_id": prefs["selected_id"] if prefs else None,
+                    "downloaded_at": prefs["downloaded_at"] if prefs else None}
+
+    def get_operator(self, operator_id):
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT * FROM operator_cache WHERE user_id=?;", (operator_id,)).fetchone()
+            return dict(row) if row else None
+
+    def select_operator(self, operator_id):
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT * FROM operator_cache WHERE user_id=?;", (operator_id,)).fetchone()
+            if row is None:
+                raise ValueError("Choose an active registered operator. Refresh the staff roster to retry.")
+            conn.execute("""INSERT INTO operator_preferences(id,selected_id) VALUES(1,?)
+                ON CONFLICT(id) DO UPDATE SET selected_id=excluded.selected_id;""", (operator_id,))
+            conn.commit()
+            return dict(row)
 
     def remember_batch_selection(self, batch_id, operator_name, target):
         from ..core.operator_flow import validate_batch_config
@@ -373,15 +446,17 @@ class LocalDatabaseManager:
                 ])
         return filepath
 
-    def create_session(self, session_id: str, batch_id: str, device_id: str, stage: str, operator_name: str) -> Dict[str, Any]:
+    def create_session(self, session_id: str, batch_id: str, device_id: str, stage: str,
+                       operator_name: str, operator_id=None, *, defer_sync=False) -> Dict[str, Any]:
         if stage != "DAY_10":
             raise ValueError("OvaLens supports only the DAY_10 candling stage.")
         started_at = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             conn.execute("""
-                INSERT INTO local_sessions (session_id, batch_id, device_id, stage, operator_name, started_at)
-                VALUES (?, ?, ?, ?, ?, ?);
-            """, (session_id, batch_id, device_id, stage, operator_name, started_at))
+                INSERT INTO local_sessions
+                    (session_id, batch_id, device_id, stage, operator_name, started_at, operator_id, defer_sync)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """, (session_id, batch_id, device_id, stage, operator_name, started_at, operator_id, int(defer_sync)))
             conn.commit()
 
         return {
@@ -390,6 +465,7 @@ class LocalDatabaseManager:
             "device_id": device_id,
             "stage": stage,
             "operator_name": operator_name,
+            "operator_id": operator_id,
             "started_at": started_at
         }
 
@@ -520,7 +596,8 @@ class LocalDatabaseManager:
     def get_pending_scan_sessions(self, limit=5):
         with self._get_connection() as conn:
             return [dict(row) for row in conn.execute("""
-                SELECT s.* FROM local_sessions s WHERE EXISTS (
+                SELECT s.* FROM local_sessions s
+                WHERE (s.defer_sync = 0 OR NULLIF(s.ended_at, '') IS NOT NULL) AND EXISTS (
                     SELECT 1 FROM local_scans c WHERE c.session_id=s.session_id AND c.is_synced=0)
                 ORDER BY s.sync_last_attempt_at, s.started_at, s.session_id LIMIT ?;
             """, (limit,))]
@@ -553,15 +630,16 @@ class LocalDatabaseManager:
             return conn.execute("""SELECT COUNT(*) FROM local_sessions
                 WHERE ended_at IS NOT NULL AND ended_at<>'' AND end_synced_at IS NULL;""").fetchone()[0]
 
-    def get_uncommitted_scans(self, limit: int = 50, session_id=None) -> List[Dict[str, Any]]:
-        """Fetch pending unsynced scans for the background network worker."""
+    def get_uncommitted_scans(self, limit: int = 50, session_id=None, *, uploadable_only=False) -> List[Dict[str, Any]]:
+        """Fetch unsynced scans, optionally limited to those released for upload."""
         with self._get_connection() as conn:
             cursor = conn.execute("""
-                SELECT * FROM local_scans
-                WHERE is_synced = 0 AND (? IS NULL OR session_id=?)
+                SELECT c.* FROM local_scans c JOIN local_sessions s ON s.session_id = c.session_id
+                WHERE c.is_synced = 0 AND (? IS NULL OR c.session_id = ?)
+                    AND (? = 0 OR s.defer_sync = 0 OR NULLIF(s.ended_at, '') IS NOT NULL)
                 ORDER BY sequence_number ASC
                 LIMIT ?;
-            """, (session_id, session_id, limit))
+            """, (session_id, session_id, int(uploadable_only), limit))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 
@@ -607,11 +685,15 @@ class LocalDatabaseManager:
             conn.commit()
 
     def get_session_stats(self, session_id: str) -> Dict[str, Any]:
+        from ..core.session_metrics import session_metrics
+
         with self._get_connection() as conn:
             cursor = conn.execute("SELECT * FROM local_sessions WHERE session_id = ?;", (session_id,))
             row = cursor.fetchone()
             if row:
-                return dict(row)
+                stats = dict(row)
+                stats.update(session_metrics(stats["started_at"], stats["ended_at"], stats["total_scanned"]))
+                return stats
             return {}
 
     def get_recent_scans(self, limit: int = 20) -> List[Dict[str, Any]]:
@@ -642,6 +724,36 @@ class LocalDatabaseManager:
             except Exception:
                 pass
         return self.get_session_stats(session_id)
+
+    def discard_open_session(self, session_id: str) -> int:
+        """Remove a local draft and return the number of photos that could not be removed."""
+        with self._get_connection() as conn:
+            conn.execute("BEGIN IMMEDIATE;")
+            session = conn.execute("SELECT defer_sync, ended_at FROM local_sessions WHERE session_id = ?;",
+                                   (session_id,)).fetchone()
+            if not session:
+                return 0
+            if (not session["defer_sync"] or session["ended_at"] or conn.execute(
+                    "SELECT 1 FROM local_scans WHERE session_id = ? AND is_synced = 1 LIMIT 1;",
+                    (session_id,)).fetchone()):
+                raise ValueError("This run is already saved or may have synced. Choose Save and exit to keep it.")
+            photos = conn.execute("""SELECT scan_id, image_path FROM local_scans
+                                     WHERE session_id = ? AND NULLIF(image_path, '') IS NOT NULL;""",
+                                  (session_id,)).fetchall()
+            conn.execute("DELETE FROM local_scans WHERE session_id = ?;", (session_id,))
+            conn.execute("DELETE FROM local_sessions WHERE session_id = ?;", (session_id,))
+
+        folder = Path(self.db_path).parent / "local_scans"
+        remaining = 0
+        for photo in photos:
+            try:
+                expected = folder / f"{uuid.UUID(photo['scan_id'])}.jpg"
+                if Path(photo["image_path"]).absolute() != expected:
+                    raise ValueError("Unexpected scan photo path")
+                expected.unlink(missing_ok=True)
+            except (OSError, ValueError):
+                remaining += 1
+        return remaining
 
 
 

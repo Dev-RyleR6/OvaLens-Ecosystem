@@ -216,6 +216,22 @@ python scripts/verify_and_commit.py --task <TASK_ID> -m "<type>(<scope>): <subje
 
 ## 🔮 4. Backlog for Potential New Features & Expansions
 
+- [x] **TASK-NEW-EDGE-DIM-USABILITY-03**: Replace glaring white surfaces with a contrast-verified dim slate desktop theme; clarify daily run steps and controls, enlarge and harden dialogs, and verify keyboard, visibility and safety controls without physical hardware.
+
+- [x] **TASK-NEW-EDGE-DESKTOP-FLOW-02**: Refine the native desktop workspace, neutral color hierarchy and task-based settings navigation; separate configuration from hardware maintenance and verify minimum-size controls without hardware.
+
+- [x] **TASK-NEW-EDGE-SELECT-LAYOUT-01**: Replace menu-style selectors with bounded native readonly pickers, align setup and camera fields, anchor Tools correctly, fit settings to the workspace and verify keyboard, selection, contrast and safety-control behavior.
+
+- [x] **TASK-NEW-EDGE-TYPE-CONTRAST-01**: Unify native controls and operator screens on bundled offline Inter fonts, improve text/control/selection contrast and keyboard focus feedback, and verify actual font resolution and minimum-size safety controls without hardware.
+
+- [x] **TASK-NEW-EDGE-SOFT-DESKTOP-01**: Simplify the native operator layout with a soft FU light palette, consolidated batch controls, compact station status and expandable readiness details; retain lightweight rendering, inspection, review and STOP behavior at supported window sizes.
+
+- [x] **TASK-NEW-EDGE-HARDWAREONLY-01**: Remove operator simulation and synthetic camera/prediction fallbacks; report unavailable hardware/models, preserve readiness interlocks, and verify with test-only hardware mocks.
+
+- [x] **TASK-NEW-EDGE-GUIDED-SETUP-01**: Guide registered operator and batch selection, cache the staff roster offline, automate inspected profile-specific preparation, and require a separate Start sorting action; preserve durable operator attribution and legacy session replay.
+
+- [x] **TASK-NEW-SESSION-THROUGHPUT-01**: Derive saved candling run duration and throughput, show Edge/dashboard summaries, and estimate capacity from a selected run with offline replay regression coverage.
+
 - [x] **TASK-NEW-EDGE-PREPUSH-01**: Verify the accumulated feature branch before publishing, align native three-board regression assertions with the 50-degree reject preset and three-second watchdog measured from the latest command, and initialize the native camera test window before shutdown.
 - [ ] **TASK-NEW-EDGE-LIGHT-TEST-01**: Add a simple standalone COM9-only light on/off diagnostic with bounded duration, v3 identity and output confirmation, synchronized serial boot and off/stop cleanup; verify without physical hardware.
 
@@ -313,3 +329,12 @@ These features can be claimed by any agent using `python scripts/verify_and_comm
 - [x] **TASK-NEW-EDGE-UI-POLISH-01**: Improve native edge typography, operator visibility and minimum-size layouts; eliminate redundant Tk status/control updates. Verify with simulated GUI, measured before/after updates and repository gates.
 
 - [x] **TASK-NEW-EDGE-DESIGN-02**: Apply impeccable Operate guidance to the edge station: one compact record panel, aligned count rows, restrained semantic colour, clear camera empty state and consistent action hierarchy; preserve cached refreshes and verify minimum-size review controls.
+
+- [x] **TASK-NEW-EDGE-IOT-01**: Harden Edge IoT serial communication, Windows port retry backoff, Bluetooth port filtering, delayed auto-reset race prevention, clean manual light release, and station dependency architecture.
+- [ ] **TASK-NEW-EDGE-UNIFIED-SETUP-01**: Require exact unified firmware identity during discovery, recover from stale serial input before station preparation, and report the command and port on completion timeout.
+- [ ] **TASK-NEW-FW-UNIFIED-HOLD-01**: Report the unified controller's optical state independently from conveyor pause and support older firmware when the IR event and stopped telemetry confirm the hold.
+- [x] **TASK-NEW-EDGE-BATCH-REDO-01**: Set the unified and three-board infertile servo preset to 135 degrees, let operators cancel an active run while retaining saved scans, and allow a fresh run for the same batch after the summary.
+- [x] **TASK-NEW-EDGE-EXIT-PROGRESS-01**: Offer save or discard on exit during an active run, hold new run uploads until finalization, and recover locally saved scans after interrupted shutdown.
+
+
+- [x] **TASK-NEW-EDGE-LIGHT-DIALOG-04**: Add a soft light appearance alongside dim slate with readable controls; fit run setup dialogs to the display even when their parent is withdrawn, and verify theme switching and form reachability.

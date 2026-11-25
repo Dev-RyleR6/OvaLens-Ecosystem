@@ -11,6 +11,7 @@ from app.models.scan import EggScanModel, FertilityClass
 from app.models.settings import HatcherySettingsModel
 from app.models.audit import AuditLogModel
 from app.services.scan_metrics import scan_totals
+from app.core.session_metrics import session_metrics
 from app.schemas.batch import (
     BatchCreate, BatchUpdate, BatchSummaryResponse,
     BatchAnalyticsResponse, SessionSummaryItem, MilestoneCheckResponse, FinalizeHatchPayload
@@ -22,7 +23,7 @@ class BatchService:
     @staticmethod
     def register_edge_batch(db: Session, payload) -> BatchModel:
         """Create once by permanent Edge ID; conflicting retries never overwrite inventory."""
-        values = payload.model_dump(exclude={"device_id", "operator_name"})
+        values = payload.model_dump(exclude={"device_id", "operator_name", "operator_id"})
         values.update(target_hatch_date=payload.set_date + timedelta(days=28),
                       current_stage=BatchStage.SETTING, status=BatchStatus.INCUBATING)
         inserted = db.execute(insert(BatchModel).values(**values).on_conflict_do_nothing()
@@ -35,7 +36,8 @@ class BatchService:
             raise DuplicateEntityException("Batch ID or code already exists with different details; saved Edge data must be reviewed.")
         if inserted:
             db.add(AuditLogModel(action="BATCH_CREATED", entity_type="BATCH", entity_id=batch.batch_id,
-                details={"source": "EDGE", "device_id": payload.device_id, "operator_name": payload.operator_name}))
+                details={"source": "EDGE", "device_id": payload.device_id, "operator_name": payload.operator_name,
+                         "operator_id": str(payload.operator_id) if payload.operator_id else None}))
         db.commit()
         db.refresh(batch)
         return batch
@@ -272,7 +274,10 @@ class BatchService:
                 session_id=s.session_id,
                 stage=s.stage.value,
                 operator_name=s.operator_name,
+                operator_id=s.operator_id,
                 started_at=s.started_at,
+                ended_at=s.ended_at,
+                **session_metrics(s.started_at, s.ended_at, recorded.scanned),
                 total_scanned=recorded.scanned,
                 fertile_count=recorded.fertile,
                 infertile_count=recorded.infertile,

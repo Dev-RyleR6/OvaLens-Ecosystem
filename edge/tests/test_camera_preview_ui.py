@@ -38,6 +38,7 @@ def preview_app(tmp_path):
     sync = SimpleNamespace(last_error=None, heartbeat_error=None, is_online=False, stop=Mock())
     app = OvaLensOperatorApp(camera, Mock(), None, db, sync, inference_worker=worker,
                             fullscreen=False, station=station)
+    app._startup_guided_setup = False  # Camera tests open only the surface under test.
     return app, camera, applied
 
 

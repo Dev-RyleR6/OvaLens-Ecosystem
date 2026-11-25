@@ -1,4 +1,4 @@
-"""Execute the actual three-board sketches; physical ISR timing is a rig check."""
+"""Execute the actual three-board and unified sketches with simulated GPIO."""
 import os
 from pathlib import Path
 import shutil
@@ -16,7 +16,7 @@ def three_sketches(tmp_path_factory):
         pytest.skip("C++ firmware execution requires g++/clang++ or OVALENS_TEST_ZIG")
     prefix = [compiler] if compiler else [zig, "c++", "-nostdlib++"]
     build, result = tmp_path_factory.mktemp("three-firmware"), {}
-    for role in ("CONVEYOR", "EGG", "LIGHT"):
+    for role in ("CONVEYOR", "EGG", "LIGHT", "UNIFIED"):
         target = build / (role + (".exe" if os.name == "nt" else ""))
         command = prefix + ["-std=c++17", "-Wall", "-Wextra", "-Werror", f"-I{NATIVE}",
                             f"-DBOARD_{role}", str(NATIVE / "three_board_driver.cpp"), "-o", str(target)]
@@ -72,11 +72,31 @@ def test_sensor_confirmation_clearance_and_single_event(three_sketches):
     assert "PAUSED:1" in output and output.rstrip().endswith("STATE:WAITING")
 
 
-def test_servo_completion_presets_and_strict_number_parsing(three_sketches):
-    output = run(three_sketches, "EGG", *ready("EGG"), "SEND @2 SORT:FERTILE", "CLOCK 1000",
+def test_unified_ir_stop_reports_holding_through_capture_and_clears(three_sketches):
+    output = run(
+        three_sketches, "UNIFIED", *ready("UNIFIED"),
+        "SEND @2 SETHOME", "SEND @3 ARM", "SEND @4 RESUME",
+        "SEND @5 ADVANCE:100", "TICKS 10", "PIN 26 0", "CLOCK 539",
+        "CLOCK 540", "TICKS 2", "SEND @6 STATUS", "SEND @7 LIGHT_ON",
+        "SEND @8 RESUME", "PIN 26 1", "CLOCK 890", "SEND @9 STATUS",
+    )
+    assert output.count("EVENT:EGG_DETECTED:1") == 1
+    assert "ID:5:OK:EGG_STOPPED" in output
+    for ident in (5, 6, 7):
+        assert f"ID:{ident}:PAUSED:1" in output
+        assert f"ID:{ident}:EGG_SEQ:1" in output
+        assert f"ID:{ident}:STATE:HOLDING" in output
+    assert "ID:7:LIGHT:1" in output
+    assert "EVENT:EGG_CLEARED:1" in output
+    assert output.rstrip().endswith("ID:9:STATE:WAITING")
+
+
+@pytest.mark.parametrize("role", ["EGG", "UNIFIED"])
+def test_servo_completion_presets_and_strict_number_parsing(three_sketches, role):
+    output = run(three_sketches, role, *ready(role), "SEND @2 SORT:FERTILE", "CLOCK 1000",
                  "SEND @3 SORT:INFERTILE", "CLOCK 1500", "SEND @4 SERVO:abc", "SEND @5 SERVO:181")
     assert "ID:2:OK:SERVO_DONE" in output and "ID:2:ANGLE:180" in output
-    assert "ID:3:ANGLE:50" in output
+    assert "ID:3:ANGLE:135" in output
     assert "ID:4:ERROR:INVALID_COMMAND" in output and "ID:5:ERROR:INVALID_COMMAND" in output
 
 
@@ -117,7 +137,7 @@ def test_reset_delay_counts_only_unpaused_time_and_new_sort_cancels_it(three_ske
                  "SEND @3 GATE_RESET_DELAY:100", "CLOCK 1100", "SEND STATUS", "SEND @4 RESUME",
                  "CLOCK 1150", "SEND @5 SORT:INFERTILE", "CLOCK 1650", "SEND STATUS")
     assert "EVENT:GATE_RESET_DONE" not in output
-    assert output.rstrip().endswith("STATE:WAITING") and "ID:5:ANGLE:50" in output
+    assert output.rstrip().endswith("STATE:WAITING") and "ID:5:ANGLE:135" in output
 
 
 def test_scheduled_reset_emits_done_only_after_settling(three_sketches):

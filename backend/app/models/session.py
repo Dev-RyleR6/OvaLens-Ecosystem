@@ -4,6 +4,7 @@ from sqlalchemy import Column, String, Integer, DateTime, Enum, ForeignKey, Nume
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
+from app.core.session_metrics import session_metrics
 
 
 class CandlingStage(str, enum.Enum):
@@ -18,6 +19,7 @@ class CandlingSessionModel(Base):
     device_id = Column(String(64), ForeignKey("devices.device_id", ondelete="RESTRICT"), nullable=False)
     stage = Column(Enum(CandlingStage), nullable=False)
     operator_name = Column(String(128), nullable=False)
+    operator_id = Column(PGUUID(as_uuid=True), ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     started_at = Column(DateTime(timezone=True), nullable=False)
     ended_at = Column(DateTime(timezone=True), nullable=True)
     total_scanned = Column(Integer, nullable=False, default=0)
@@ -30,3 +32,11 @@ class CandlingSessionModel(Base):
     batch = relationship("BatchModel", back_populates="sessions")
     device = relationship("DeviceModel", back_populates="sessions")
     scans = relationship("EggScanModel", back_populates="session", cascade="all, delete-orphan")
+
+    @property
+    def duration_seconds(self):
+        return session_metrics(self.started_at, self.ended_at, self.total_scanned)["duration_seconds"]
+
+    @property
+    def eggs_per_minute(self):
+        return session_metrics(self.started_at, self.ended_at, self.total_scanned)["eggs_per_minute"]

@@ -11,6 +11,7 @@ class SessionCreate(BaseModel):
     device_id: str = Field(..., max_length=64)
     stage: CandlingStage
     operator_name: str = Field(..., max_length=128)
+    operator_id: Optional[UUID] = None
     started_at: datetime
 
 
@@ -26,6 +27,7 @@ class SessionResponse(BaseModel):
     device_id: str
     stage: CandlingStage
     operator_name: str
+    operator_id: Optional[UUID] = None
     started_at: datetime
     ended_at: Optional[datetime]
     total_scanned: int
@@ -33,4 +35,6 @@ class SessionResponse(BaseModel):
     infertile_count: int
     manual_review_count: int = 0
     avg_inference_ms: float
+    duration_seconds: Optional[float] = None
+    eggs_per_minute: Optional[float] = None
     created_at: datetime

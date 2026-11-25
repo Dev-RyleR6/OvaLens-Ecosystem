@@ -35,12 +35,19 @@ def test_startup_window_builds_and_cancels_without_hardware(hidden_ui):
         window.update_idletasks()
         assert window.result is None
         assert not hasattr(window, "_port_var")  # Board selection lives in station settings.
+        assert not hasattr(window, "_simulation_var")
         window._on_cancel()
     finally:
         try:
             window.destroy()
         except tk.TclError:
             pass
+
+
+def test_startup_opens_physical_station_without_simulation_option(hidden_ui):
+    window = StartupConfigWindow()
+    window._on_start()
+    assert window.result == {"stage": "DAY_10", "fullscreen": True}
 
 
 def test_operator_window_and_shutdown_without_hardware(hidden_ui):
@@ -103,7 +110,7 @@ def test_startup_window_confirms_fullscreen_config(hidden_ui):
     window = StartupConfigWindow()
     try:
         window.update_idletasks()
-        window._operator_entry.insert(0, "Pedro Penduko")
+        assert not hasattr(window, "_operator_entry")  # Staff selection lives in guided run setup.
         window._on_start()
         assert window.result is not None
         assert window.result.get("fullscreen") is True
@@ -217,7 +224,7 @@ def test_simple_setup_main_screen_without_hardware(hidden_ui):
     station.settings = SimpleNamespace(rig_profile="three_v3")
     station.readiness = SimpleNamespace(ready=False, reason="Prepare station", rows=lambda: (),
         prepare=Mock(side_effect=prepare), software_checks=Mock(return_value=()))
-    def start(*args):
+    def start(*args, **kwargs):
         station.cycle = cycle
         return station.start_cycle(*args[:3])
     station.readiness.start = Mock(side_effect=start)
@@ -230,6 +237,8 @@ def test_simple_setup_main_screen_without_hardware(hidden_ui):
     app = OvaLensOperatorApp(camera, Mock(), None, db, sync, fullscreen=False,
                              inference_worker=worker, station=station)
     app.current_batch_id = "TEST-BATCH"
+    app.operator_id = "e47a7caa-4da2-4c28-8d5f-e54f38da7901"
+    app.operator_name = "Registered Worker"
     app._batch_record_ready = True  # This layout test starts with a selected complete batch.
     errors = []
     app.report_callback_exception = lambda *args: errors.append(args)
@@ -240,16 +249,19 @@ def test_simple_setup_main_screen_without_hardware(hidden_ui):
             app.update()
             app._set_session_active_state(False)
             app.update_idletasks()
-            for control in (app.session_btn, app.prepare_btn, app.setup_check, app.eject_btn, app.settings_btn):
+            for control in (app.session_btn, app.eject_btn, app.settings_btn):
                 assert control.winfo_ismapped()
                 assert control.winfo_rootx() + control.winfo_width() <= app.winfo_rootx() + app.winfo_width()
             assert app.video_container.winfo_height() > 200
             assert not app.scan_btn.winfo_ismapped()
-            assert app.settings_btn.cget("text") == "Tools"
-        assert app.session_btn.cget("state") == "disabled"
-        app.setup_inspected.set(True)
-        app._set_session_active_state(False)
-        app.prepare_btn.invoke()
+            assert app.settings_btn.cget("text") == "Settings"
+        assert app.session_btn.cget("state") == "normal"
+        app.session_btn.invoke()
+        dialog = app._preparation_window
+        dialog.inspected.set(True)
+        app._animate_modal_close = lambda window, on_close=None: (window.destroy(), on_close() if on_close else None)
+        dialog.confirm_button.invoke()
+        app.update()
         assert entered.wait(1)
         assert app._setup_busy and app.session_btn.cget("text") == "Preparing..."
         assert app.eject_btn.cget("state") == "normal"

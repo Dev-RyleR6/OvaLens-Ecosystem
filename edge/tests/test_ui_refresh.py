@@ -57,12 +57,12 @@ def test_session_identity_and_diagnostic_completion_invalidate_controls():
     assert app.session_btn.configure.call_args.kwargs['state'] == 'normal'
 
 
-def test_setup_locks_scanning_and_start_until_preparation_completes():
+def test_setup_action_remains_available_until_preparation_locks_controls():
     app = controls()
     app.station = SimpleNamespace(cycle=None, calibrated=False, boards=None)
     refresh = lambda: OvaLensOperatorApp._set_session_active_state(app, False)
     refresh()
-    assert app.session_btn.configure.call_args.kwargs['state'] == 'disabled'
+    assert app.session_btn.configure.call_args.kwargs['state'] == 'normal'
     app._setup_busy = True
     refresh()
     for button in (app.settings_btn, app.batch_setup_btn, app.scan_btn, app.session_btn):

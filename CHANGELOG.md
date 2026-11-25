@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Edge**: restore unified ESP32 station and capture flow (2026-11-19)
+- **Edge**: [TASK-NEW-EDGE-HARDWAREONLY-01] remove operator simulation and fabricated predictions (2026-11-13)
+- **Dashboard**: align devices cockpit and edge telemetry with unified v4 single-esp32 hardware (2026-11-10)
+- **Dashboard**: elevate settings design with impeccable operate standards and tactile parameters (2026-11-09)
+- **Dashboard**: center settings and preferences layout across viewports (2026-11-09)
+- **Dashboard**: refine dropdown UI and pagination controls with impeccable design standard (2026-11-09)
 - **Edge**: resolve camera staleness false abort, port locking, and add batch finish button (2026-10-15)
 - **Edge**: [TASK-NEW-EDGE-SERVO-STARTUP-01] synchronize servo diagnostic serial startup (2026-10-14)
 - **Edge**: [TASK-NEW-EDGE-SERVO-SIMPLE-01] remove IR requirements from servo test (2026-10-14)
@@ -35,6 +41,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Firmware**: [TASK-NEW-FW-APP-01] preserve explicit egg/servo port assignments, add the COM5/COM7 hardware launcher, and display deployed controller status replies (2026-10-02).
 
 ### Added
+- **Edge**: [TASK-NEW-EDGE-EXIT-PROGRESS-01] save or discard unfinished runs on exit and recover interrupted progress (2026-11-25)
+- **Edge**: [TASK-NEW-EDGE-BATCH-REDO-01] add batch cancellation and redo with a 135-degree infertile preset (2026-11-25)
+- **Edge**: [TASK-NEW-EDGE-LIGHT-DIALOG-04] add soft light appearance and resilient dialog sizing (2026-11-18)
+- **Edge**: [TASK-NEW-EDGE-DIM-USABILITY-03] improve low-glare desktop usability and run flow (2026-11-18)
+- **Edge**: [TASK-NEW-EDGE-DESKTOP-FLOW-02] refine desktop workspace and task-based settings (2026-11-17)
+- **Docs**: add black-box test plan, evaluation template, and review basis for capstone defense (2026-11-11)
+- **Firmware**: add unified single-esp32 controller firmware and hardware diagnostic suite (2026-11-11)
+- **Edge**: [TASK-NEW-EDGE-GUIDED-SETUP-01] guide run setup with registered operators (2026-10-29)
+- **Edge**: [TASK-NEW-SESSION-THROUGHPUT-01] add saved candling throughput and capacity estimates (2026-10-29)
+- **Edge**: [TASK-NEW-EDGE-IOT-01] harden iot serial communication and clean station architecture (2026-10-28)
 - **Edge**: [TASK-NEW-EDGE-PREPUSH-01] align native three-board regression assertions and window initialization (2026-10-20)
 - **Edge**: [TASK-NEW-EDGE-SERVO-TEST-01] add standalone COM7 servo diagnostic (2026-10-14)
 - **Edge**: [TASK-NEW-EDGE-STEPPER-TEST-01] add standalone COM5 stepper diagnostic (2026-10-14)
@@ -72,6 +88,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Capstone Manuscript Chapters 1, 2, 3, and References in `docs/manuscript/` with authentic proposal text and 15 APA 7th academic citations.
 
 ### Changed
+- **Edge**: [TASK-NEW-EDGE-SELECT-LAYOUT-01] improve native selectors and workspace positioning (2026-11-13)
+- **Edge**: [TASK-NEW-EDGE-TYPE-CONTRAST-01] unify native typography and improve control contrast (2026-11-13)
+- **Edge**: [TASK-NEW-EDGE-SOFT-DESKTOP-01] simplify the native operator desktop layout (2026-11-13)
 - **Edge**: [TASK-NEW-EDGE-STOPSCAN-01] classify only confirmed stopped eggs (2026-10-09)
 - **Firmware**: [TASK-NEW-FW-INSTALL-01] install and verify three-board v3 builds (2026-10-08)
 - **Edge**: [TASK-NEW-EDGE-DESIGN-02] focus operator design on camera and sorting (2026-10-07)

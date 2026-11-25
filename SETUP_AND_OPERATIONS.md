@@ -159,14 +159,15 @@ updating firmware. See [wiring, calibration and verification](docs/EDGE_THREE_BO
 
 ### 1. Daily Startup Sequence
 
-1. Connect camera 0 and the three ESP32s; power the rig.
-2. Double-click **Start_OvaLens.cmd** in the repository root and enter the batch
-   details. The camera preview starts automatically using remembered controls.
-3. Check the empty conveyor, alignment and gate, then tick the inspection box.
-4. Click **Start sorting** once. The app connects and prepares the saved station
-   in the background. STOP remains available throughout preparation.
-5. Start the backend/dashboard when network reporting is needed. Sorting records
-   scans locally in SQLite and continues through network outages.
+1. Connect the camera and controllers for the explicitly saved rig profile; power the rig.
+2. Double-click **Start_OvaLens.cmd**. The preview and passive software checks start automatically.
+3. If setup opens, select registered staff and choose a saved batch or create one with its actual incubation details. Search by batch code or incubator. The run target defaults to the original egg count (up to 100,000); use **Change quantity** for a smaller run.
+4. Click **Prepare station**, inspect the empty conveyor, alignment and gate, then choose **Confirm & prepare**. Connection and readiness checks run in the background. STOP remains available. A setup opened from the primary action continues directly to this confirmation after saving.
+5. When the station reports Ready, click **Start sorting** separately. Preparation and batch selection never start sorting. The legacy two-board profile retains its preparation path under Tools / Settings.
+
+Register staff in **Dashboard > Users** using an administrator account. Active operators, managers and administrators appear in the station selector; selecting a name records attribution and does not log that person into the dashboard. The station needs its configured API key and one successful backend roster download before its first recorded run. Cached staff and batches remain available offline afterward; **Refresh staff** retries a failed download. The last selected registered operator is remembered independently of the batch. Older typed names require one explicit selection from the roster. Each run retains the selected user ID and original name even after a later account rename or deactivation.
+
+The backend applies the nullable session operator-ID migration automatically on startup. Update/restart it before using the updated station. Existing name-only sessions remain readable. Sorting records scans locally in SQLite and continues through network outages.
 
 ### 2. Conducting a Candling Run
 
@@ -178,7 +179,7 @@ updating firmware. See [wiring, calibration and verification](docs/EDGE_THREE_BO
    stroke before the stepper resumes, then holds its angle through gate exit.
 4. Low confidence or disagreement holds the egg for manual review. Review choices
    appear when needed; STOP halts the station and finalizes local records.
-5. At the target, final totals and **Start next batch** appear on the same screen.
+5. At the target, final totals and **Set up run** appear on the same screen.
    Configure the next batch, inspect the empty conveyor and Start sorting again.
 
 Defaults: camera **0**, **COM5 stepper**, **COM7 servo + IR**, **COM9 light**. Saved
@@ -251,7 +252,7 @@ The dashboard Overview includes recorded Day 10 classification and scans-versus-
 
 Classification totals are computed from persisted scan records, including their current manual overrides, rather than cached session counters. A scan event is not a unique egg: repeated scans can exceed the initial set count and can overstate Penoy quantity/value estimates. Awaiting-review counts are a subset of the two biological classifications. Forecasts use fixed breed assumptions and are estimates, not measured hatch outcomes or confirmed sales. Expand the exact-count tables below charts to inspect every value.
 
-When launched through `edge/launcher.py` in normal operation, the edge app sends an authenticated device heartbeat every 15 seconds on a separate background thread. Configure `API_BASE_URL`, `API_KEY`, and a unique `DEVICE_ID` in `edge/.env`; the API key must match the backend configuration. Unknown stations register automatically; existing station calibration is preserved. Explicit simulation does not report a production station online.
+When launched through `edge/launcher.py` in normal operation, the edge app sends an authenticated device heartbeat every 15 seconds on a separate background thread. Configure `API_BASE_URL`, `API_KEY`, and a unique `DEVICE_ID` in `edge/.env`; the API key must match the backend configuration. Unknown stations register automatically; existing station calibration is preserved.
 
 The dashboard checks device records every 15 seconds, independently of the data refresh preference, and expires online status after 90 seconds without a heartbeat. Closing the app or losing connectivity therefore changes its status after the expiry period. “Backend API” indicates server connectivity; “Edge app connections” indicates recent app heartbeats. Neither confirms physical camera, serial controller, or conveyor readiness. Device heartbeat failures appear as sync attention in the edge app and leave locally saved scans intact.
 
@@ -259,12 +260,12 @@ The dashboard checks device records every 15 seconds, independently of the data 
 
 1. **Camera Feed is Black / Blank**:
    - Verify `CAMERA_INDEX` in `edge/.env`. On Windows with multiple webcams, try index `1` or `2`.
-   - If the camera is unavailable, reconnect it and use **Tools > Retry camera preview**. Normal sorting never substitutes synthetic frames; preview simulation must be explicitly selected at startup.
+   - If the camera is unavailable, reconnect it and use **Tools > Retry camera preview**. The operator app never substitutes synthetic frames. A missing or invalid model reports **Model unavailable** and blocks sorting until corrected and restarted.
 
 2. **ESP32 Serial Connection Error**:
    - Check device manager for the COM port (e.g. `COM3` on Windows, `/dev/ttyUSB0` on Linux).
    - Verify baud rate is set to `115200`.
-   - If unplugged, the app automatically runs in **Mock Serial Mode** without crashing.
+   - If unplugged, the controller reports disconnected and sorting is blocked. Reconnect the correct board, verify its role, and prepare the station again; no mock controller is substituted.
 
 3. **Database Connection Refused**:
    - Ensure PostgreSQL service is running (`pg_isready`).

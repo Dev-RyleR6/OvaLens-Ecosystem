@@ -196,6 +196,20 @@ export const apiClient = {
     return res.data;
   },
 
+  getDeviceLive: async (deviceId: string): Promise<{ device_id: string; is_live: boolean; edge_url: string; device: Device; telemetry: any }> => {
+    const res = await api.get<{ device_id: string; is_live: boolean; edge_url: string; device: Device; telemetry: any }>(`/devices/${deviceId}/live`);
+    return res.data;
+  },
+
+  getDeviceCameraSnapshot: async (deviceId: string): Promise<string | null> => {
+    try {
+      const res = await api.get(`/devices/${deviceId}/preview`, { responseType: 'blob' });
+      return URL.createObjectURL(res.data);
+    } catch {
+      return null;
+    }
+  },
+
   updateDeviceCalibration: async (deviceId: string, data: Partial<Device>): Promise<Device> => {
     const res = await api.patch<Device>(`/devices/${deviceId}`, data);
     return res.data;

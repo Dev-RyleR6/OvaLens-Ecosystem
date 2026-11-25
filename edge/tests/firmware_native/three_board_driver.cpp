@@ -2,7 +2,9 @@
 #include "ESP32Servo.h"
 #include <stdlib.h>
 #include <string.h>
-#if defined(BOARD_CONVEYOR)
+#if defined(BOARD_UNIFIED)
+#include "../../../firmware/unified_ovalens/unified_ovalens.ino"
+#elif defined(BOARD_CONVEYOR)
 #include "../../../firmware/three_board/conveyor_esp32/conveyor_esp32.ino"
 #elif defined(BOARD_EGG)
 #include "../../../firmware/three_board/egg_controller_esp32/egg_controller_esp32.ino"
@@ -12,7 +14,7 @@
 
 int main(int argc, char **argv) {
   if (argc > 1 && !strcmp(argv[1], "fail-init")) {
-#if defined(BOARD_CONVEYOR)
+#if defined(BOARD_CONVEYOR) || defined(BOARD_UNIFIED)
     failTimer = true;
 #elif defined(BOARD_EGG)
     failServo = true;
@@ -30,7 +32,7 @@ int main(int argc, char **argv) {
       if (sscanf(line, "PIN %d %d", &pin, &value) == 2 && pin >= 0 && pin < 64) pinValues[pin] = value;
       loop();
     } else if (!strncmp(line, "TICKS ", 6)) {
-#if defined(BOARD_CONVEYOR)
+#if defined(BOARD_CONVEYOR) || defined(BOARD_UNIFIED)
       int count = atoi(line + 6);
       for (int i = 0; i < count; ++i) { if (pulseTimer && timer.running) pulseTick(); loop(); }
 #endif

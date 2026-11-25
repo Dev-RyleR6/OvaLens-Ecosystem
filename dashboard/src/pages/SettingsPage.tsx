@@ -17,6 +17,10 @@ import {
   RefreshCw,
   Eye,
   EyeOff,
+  Sun,
+  Moon,
+  Clock,
+  Layers,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -229,6 +233,9 @@ export const SettingsPage: React.FC = () => {
     if (originalFacility.electricity_kwh_rate_php !== kwhRate) {
       diffs.push({ label: 'Electricity Rate', oldValue: `₱${Number(originalFacility.electricity_kwh_rate_php).toFixed(2)}/kWh`, newValue: `₱${Number(kwhRate).toFixed(2)}/kWh` });
     }
+    if (originalFacility.kwh_saved_per_culled_egg !== kwhSavedPerEgg) {
+      diffs.push({ label: 'Energy Saved per Egg', oldValue: `${Number(originalFacility.kwh_saved_per_culled_egg).toFixed(2)} kWh`, newValue: `${Number(kwhSavedPerEgg).toFixed(2)} kWh` });
+    }
     if (originalFacility.confidence_threshold !== confidenceThreshold) {
       diffs.push({ label: 'AI Confidence Threshold', oldValue: `${Number(originalFacility.confidence_threshold * 100).toFixed(0)}%`, newValue: `${Number(confidenceThreshold * 100).toFixed(0)}%` });
     }
@@ -360,7 +367,7 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl min-w-0 pb-8">
+    <div className="space-y-6 min-w-0 pb-10">
       {/* Page Header */}
       <div className="page-header">
         <div>
@@ -372,42 +379,46 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="page-actions border-b border-border pb-3" role="group" aria-label="Settings sections">
-        {canManage && <button
-          type="button"
-          aria-pressed={activeTab === 'facility'}
-          onClick={() => handleTabChange('facility')}
-          className={activeTab === 'facility' ? 'primary-action' : 'secondary-action'}
-        >
-          <Building aria-hidden="true" className="w-4 h-4" />
-          <span>Facility & Economics</span>
-        </button>}
+      <div className="page-actions border-b border-border pb-3 flex flex-wrap gap-2" role="group" aria-label="Settings sections">
+        {canManage && (
+          <button
+            type="button"
+            aria-pressed={activeTab === 'facility'}
+            onClick={() => handleTabChange('facility')}
+            className={activeTab === 'facility' ? 'primary-action shadow-xs' : 'secondary-action'}
+          >
+            <Building aria-hidden="true" className="w-4 h-4" />
+            <span>Facility &amp; Economics</span>
+          </button>
+        )}
 
         <button
           type="button"
           aria-pressed={activeTab === 'account'}
           onClick={() => handleTabChange('account')}
-          className={activeTab === 'account' ? 'primary-action' : 'secondary-action'}
+          className={activeTab === 'account' ? 'primary-action shadow-xs' : 'secondary-action'}
         >
           <UserIcon aria-hidden="true" className="w-4 h-4" />
-          <span>My Profile & Password</span>
+          <span>My Profile &amp; Password</span>
         </button>
 
-        {canManage && <button
-          type="button"
-          aria-pressed={activeTab === 'backups'}
-          onClick={() => handleTabChange('backups')}
-          className={activeTab === 'backups' ? 'primary-action' : 'secondary-action'}
-        >
-          <HardDrive aria-hidden="true" className="w-4 h-4" />
-          <span>Database Backups</span>
-        </button>}
+        {canManage && (
+          <button
+            type="button"
+            aria-pressed={activeTab === 'backups'}
+            onClick={() => handleTabChange('backups')}
+            className={activeTab === 'backups' ? 'primary-action shadow-xs' : 'secondary-action'}
+          >
+            <HardDrive aria-hidden="true" className="w-4 h-4" />
+            <span>Database Backups</span>
+          </button>
+        )}
 
         <button
           type="button"
           aria-pressed={activeTab === 'preferences'}
           onClick={() => handleTabChange('preferences')}
-          className={activeTab === 'preferences' ? 'primary-action' : 'secondary-action'}
+          className={activeTab === 'preferences' ? 'primary-action shadow-xs' : 'secondary-action'}
         >
           <Sliders aria-hidden="true" className="w-4 h-4" />
           <span>Display preferences</span>
@@ -425,43 +436,72 @@ export const SettingsPage: React.FC = () => {
           isRetrying={isLoading}
         />
       )}
-      {canManage && activeTab === 'facility' && isLoading && !originalFacility && <div role="status" aria-busy="true" className="fu-card p-6 space-y-4"><p className="text-slate-600">Loading facility settings…</p><div aria-hidden="true" className="h-24 bg-slate-100 rounded animate-pulse" /></div>}
-      {canManage && activeTab === 'facility' && isError && originalFacility && <div role="alert" className="feedback-warning space-y-3"><p>Facility settings could not be refreshed. Previously loaded values and your edits are retained and may be out of date.</p><button type="button" onClick={() => { void fetchSettings(); }} disabled={isLoading} className="secondary-action"><RefreshCw aria-hidden="true" />Retry</button></div>}
-      {canManage && activeTab === 'facility' && isLoading && originalFacility && <p role="status" className="text-slate-600">Refreshing facility settings…</p>}
+      {canManage && activeTab === 'facility' && isLoading && !originalFacility && (
+        <div role="status" aria-busy="true" className="fu-card p-6 space-y-4">
+          <p className="text-slate-600">Loading facility settings…</p>
+          <div aria-hidden="true" className="h-24 bg-slate-100 dark:bg-slate-800 rounded animate-pulse" />
+        </div>
+      )}
+      {canManage && activeTab === 'facility' && isError && originalFacility && (
+        <div role="alert" className="feedback-warning space-y-3">
+          <p>Facility settings could not be refreshed. Previously loaded values and your edits are retained and may be out of date.</p>
+          <button type="button" onClick={() => { void fetchSettings(); }} disabled={isLoading} className="secondary-action">
+            <RefreshCw aria-hidden="true" />
+            Retry
+          </button>
+        </div>
+      )}
+      {canManage && activeTab === 'facility' && isLoading && originalFacility && (
+        <p role="status" className="text-slate-600">Refreshing facility settings…</p>
+      )}
+
       {canManage && activeTab === 'facility' && originalFacility && (
         <form onSubmit={(e) => { e.preventDefault(); setIsConfirmOpen(true); }} className="space-y-6">
           {saveError && <p role="alert" className="p-4 bg-red-50 text-red-800 border border-red-300 rounded-xl">{saveError}</p>}
           {saveSuccess && (
-            <div role="status" className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-emerald-800 text-sm font-medium">
-              <CheckCircle2 aria-hidden="true" className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div role="status" className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-2.5 text-emerald-800 dark:text-emerald-300 text-sm font-medium">
+              <CheckCircle2 aria-hidden="true" className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>Facility settings successfully saved to PostgreSQL database!</span>
             </div>
           )}
 
           {/* Section 1: Facility Branding */}
-          <div className="fu-card p-5">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-              <Building aria-hidden="true" className="w-4 h-4 text-brand" />
-              <h2 className="section-heading">Institution & Facility Profile</h2>
+          <div className="fu-card p-6">
+            <div className="flex items-start justify-between gap-4 pb-4 mb-5 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
+                  <Building aria-hidden="true" className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="section-heading text-base font-semibold text-foreground">Institution &amp; Facility Profile</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Primary hatchery identification printed on session records and official certificates.</p>
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label htmlFor="settingspage-field-1" className="block text-sm font-medium text-slate-700 mb-1">Facility Name</label>
-                <input id="settingspage-field-1"
+                <label htmlFor="settingspage-field-1" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                  Facility Name
+                </label>
+                <input
+                  id="settingspage-field-1"
                   type="text"
                   value={facilityName}
                   onChange={(e) => setFacilityName(e.target.value)}
-                  className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
+                  className="w-full min-h-11 px-3.5 py-2.5 text-sm bg-card border border-border rounded-lg text-foreground font-medium placeholder:text-muted-foreground/60 hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors shadow-xs"
                   required
                 />
               </div>
               <div>
-                <label htmlFor="settingspage-field-2" className="block text-sm font-medium text-slate-700 mb-1">Institution Name (e.g. Foundation University)</label>
-                <input id="settingspage-field-2"
+                <label htmlFor="settingspage-field-2" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                  Institution Name (e.g. Foundation University)
+                </label>
+                <input
+                  id="settingspage-field-2"
                   type="text"
                   value={institution}
                   onChange={(e) => setInstitution(e.target.value)}
-                  className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
+                  className="w-full min-h-11 px-3.5 py-2.5 text-sm bg-card border border-border rounded-lg text-foreground font-medium placeholder:text-muted-foreground/60 hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors shadow-xs"
                   required
                 />
               </div>
@@ -469,132 +509,240 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {/* Section 2: Economic Salvage Values */}
-          <div className="fu-card p-5">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-              <Coins aria-hidden="true" className="w-4 h-4 text-amber-600" />
-              <div>
-                <h2 className="section-heading">Economic Valuation & Utility Tariffs</h2>
-                <p className="text-sm text-slate-500">Commercial market prices used for Day 10 salvage and energy cost reduction calculations.</p>
+          <div className="fu-card p-6">
+            <div className="flex items-start justify-between gap-4 pb-4 mb-5 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                  <Coins aria-hidden="true" className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="section-heading text-base font-semibold text-foreground">Economic Valuation &amp; Utility Tariffs</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Commercial market prices used for Day 10 Penoy salvage and incubator electricity savings.</p>
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label htmlFor="settingspage-day-10-penoy-unit-price" className="block text-sm font-medium text-slate-700 mb-1">Day-10 Penoy Unit Price (₱)</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-2">
+                <label htmlFor="settingspage-day-10-penoy-unit-price" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Day-10 Penoy Unit Price
+                </label>
                 <div className="relative">
-                  <span aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-600 font-semibold">₱</span>
-                  <input id="settingspage-day-10-penoy-unit-price"
+                  <div aria-hidden="true" className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted-foreground font-semibold text-sm">
+                    ₱
+                  </div>
+                  <input
+                    id="settingspage-day-10-penoy-unit-price"
                     type="number"
                     step="0.50"
                     min="0"
                     value={penoyPrice}
                     onChange={(e) => setPenoyPrice(Number(e.target.value))}
-                    className="w-full text-sm pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
+                    className="w-full min-h-11 pl-9 pr-3.5 py-2.5 text-sm bg-card border border-border rounded-lg text-foreground font-medium tabular-nums hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors shadow-xs"
                     required
                   />
                 </div>
+                <p className="text-[11px] text-muted-foreground">Culled Day 10 salvage market value.</p>
               </div>
 
-              <div>
-                <label htmlFor="settingspage-day-28-duckling-selling-price" className="block text-sm font-medium text-slate-700 mb-1">Day-28 Duckling Selling Price (₱)</label>
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-2">
+                <label htmlFor="settingspage-day-28-duckling-selling-price" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Day-28 Duckling Selling Price
+                </label>
                 <div className="relative">
-                  <span aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-600 font-semibold">₱</span>
-                  <input id="settingspage-day-28-duckling-selling-price"
+                  <div aria-hidden="true" className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted-foreground font-semibold text-sm">
+                    ₱
+                  </div>
+                  <input
+                    id="settingspage-day-28-duckling-selling-price"
                     type="number"
                     step="1.00"
                     min="0"
                     value={ducklingPrice}
                     onChange={(e) => setDucklingPrice(Number(e.target.value))}
-                    className="w-full text-sm pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
+                    className="w-full min-h-11 pl-9 pr-3.5 py-2.5 text-sm bg-card border border-border rounded-lg text-foreground font-medium tabular-nums hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors shadow-xs"
                     required
                   />
                 </div>
+                <p className="text-[11px] text-muted-foreground">Hatched Day 28 duckling selling price.</p>
               </div>
 
-              <div>
-                <label htmlFor="settingspage-electricity-tariff-rate-kwh" className="block text-sm font-medium text-slate-700 mb-1">Electricity Tariff Rate (₱/kWh)</label>
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-2">
+                <label htmlFor="settingspage-electricity-tariff-rate-kwh" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Electricity Tariff Rate
+                </label>
                 <div className="relative">
-                  <span aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-600 font-semibold">₱</span>
-                  <input id="settingspage-electricity-tariff-rate-kwh"
+                  <div aria-hidden="true" className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted-foreground font-semibold text-sm">
+                    ₱
+                  </div>
+                  <input
+                    id="settingspage-electricity-tariff-rate-kwh"
                     type="number"
                     step="0.10"
                     min="0"
                     value={kwhRate}
                     onChange={(e) => setKwhRate(Number(e.target.value))}
-                    className="w-full text-sm pl-7 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
+                    className="w-full min-h-11 pl-9 pr-14 py-2.5 text-sm bg-card border border-border rounded-lg text-foreground font-medium tabular-nums hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors shadow-xs"
                     required
                   />
+                  <div aria-hidden="true" className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-xs text-muted-foreground font-medium">
+                    /kWh
+                  </div>
                 </div>
+                <p className="text-[11px] text-muted-foreground">Institutional utility tariff per kWh.</p>
+              </div>
+
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-2">
+                <label htmlFor="settingspage-kwh-saved-per-culled-egg" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Energy Saved per Egg
+                </label>
+                <div className="relative">
+                  <input
+                    id="settingspage-kwh-saved-per-culled-egg"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={kwhSavedPerEgg}
+                    onChange={(e) => setKwhSavedPerEgg(Number(e.target.value))}
+                    className="w-full min-h-11 pl-3.5 pr-16 py-2.5 text-sm bg-card border border-border rounded-lg text-foreground font-medium tabular-nums hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors shadow-xs"
+                    required
+                  />
+                  <div aria-hidden="true" className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-xs text-muted-foreground font-medium">
+                    kWh/egg
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Energy avoided by culling Day 10 Penoy.</p>
               </div>
             </div>
           </div>
 
           {/* Section 3: AI & Hardware Conveyor Calibration */}
-          <div className="fu-card p-5">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-              <Zap aria-hidden="true" className="w-4 h-4 text-emerald-600" />
-              <h2 className="section-heading">AI Vision & Conveyor Sorter Parameters</h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <div className="flex flex-wrap justify-between items-center gap-2 mb-1">
-                  <label htmlFor="settingspage-yolov8-confidence-threshold" className="text-sm font-medium text-slate-700">YOLOv8 Confidence Threshold</label>
-                  <span className="text-sm font-bold text-slate-900">{(confidenceThreshold * 100).toFixed(0)}%</span>
+          <div className="fu-card p-6">
+            <div className="flex items-start justify-between gap-4 pb-4 mb-5 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <Zap aria-hidden="true" className="w-4 h-4" />
                 </div>
-                <input id="settingspage-yolov8-confidence-threshold"
+                <div>
+                  <h2 className="section-heading text-base font-semibold text-foreground">AI Vision &amp; Conveyor Sorter Parameters</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Real-time classification confidence cutoff and physical actuator timing offsets.</p>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <label htmlFor="settingspage-yolov8-confidence-threshold" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    YOLOv8 Cutoff Confidence
+                  </label>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand/10 text-brand border border-brand/20 tabular-nums">
+                    {(confidenceThreshold * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <input
+                  id="settingspage-yolov8-confidence-threshold"
                   type="range"
-                  min="0.75"
+                  min="0.70"
                   max="0.99"
                   step="0.01"
                   value={confidenceThreshold}
                   onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
-                  className="w-full accent-[#800000] cursor-pointer"
+                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-[#800000]"
                 />
+                <div className="flex justify-between items-center text-[11px] text-muted-foreground font-mono">
+                  <span>70% (Min)</span>
+                  <span>85% (Standard)</span>
+                  <span>99% (Max)</span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Scans below this score trigger <span className="font-semibold text-amber-600 dark:text-amber-400">Manual Review</span> diverter routing.
+                </p>
               </div>
 
-              <div>
-                <label htmlFor="settingspage-field-3" className="block text-sm font-medium text-slate-700 mb-1">Conveyor Speed (cm/s)</label>
-                <input id="settingspage-field-3"
-                  type="number"
-                  step="0.5"
-                  min="1"
-                  value={conveyorSpeed}
-                  onChange={(e) => setConveyorSpeed(Number(e.target.value))}
-                  className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
-                />
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-3">
+                <label htmlFor="settingspage-field-3" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Conveyor Belt Speed
+                </label>
+                <div className="relative">
+                  <input
+                    id="settingspage-field-3"
+                    type="number"
+                    step="0.5"
+                    min="1"
+                    value={conveyorSpeed}
+                    onChange={(e) => setConveyorSpeed(Number(e.target.value))}
+                    className="w-full min-h-11 pl-3.5 pr-14 py-2.5 text-sm bg-card border border-border rounded-lg text-foreground font-medium tabular-nums hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors shadow-xs"
+                  />
+                  <div aria-hidden="true" className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-xs text-muted-foreground font-medium">
+                    cm/s
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Linear sorting belt translation speed for servo optical synchronization.
+                </p>
               </div>
 
-              <div>
-                <label htmlFor="settingspage-field-4" className="block text-sm font-medium text-slate-700 mb-1">Sensor to Chute Distance (cm)</label>
-                <input id="settingspage-field-4"
-                  type="number"
-                  step="1.0"
-                  min="5"
-                  value={conveyorDistance}
-                  onChange={(e) => setConveyorDistance(Number(e.target.value))}
-                  className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
-                />
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-3">
+                <label htmlFor="settingspage-field-4" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Optical Sensor to Chute
+                </label>
+                <div className="relative">
+                  <input
+                    id="settingspage-field-4"
+                    type="number"
+                    step="1.0"
+                    min="5"
+                    value={conveyorDistance}
+                    onChange={(e) => setConveyorDistance(Number(e.target.value))}
+                    className="w-full min-h-11 pl-3.5 pr-12 py-2.5 text-sm bg-card border border-border rounded-lg text-foreground font-medium tabular-nums hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors shadow-xs"
+                  />
+                  <div aria-hidden="true" className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-xs text-muted-foreground font-medium">
+                    cm
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Distance from optical trip-beam to physical penoy diverter chute flap.
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="page-actions justify-end pt-2">
-            <button
-              type="button"
-              onClick={fetchSettings}
-              disabled={isLoading || isSaving}
-              className="secondary-action"
-            >
-              <RefreshCw aria-hidden="true" />
-              Reset to Saved
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving || isLoading}
-              className="primary-action"
-            >
-              <Save aria-hidden="true" className="w-4 h-4" />
-              <span>{isSaving ? 'Saving Changes...' : 'Save Facility Constants'}</span>
-            </button>
+          {/* Action Footer */}
+          <div className="fu-card p-4 flex flex-wrap items-center justify-between gap-4 border border-border shadow-xs">
+            <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+              {calculateDiffs().length > 0 ? (
+                <>
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
+                  <span className="font-medium text-foreground">
+                    {calculateDiffs().length} unsaved parameter {calculateDiffs().length === 1 ? 'change' : 'changes'} pending
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                  <span>All facility constants synchronized with database</span>
+                </>
+              )}
+            </div>
+
+            <div className="page-actions">
+              <button
+                type="button"
+                onClick={fetchSettings}
+                disabled={isLoading || isSaving}
+                className="secondary-action"
+              >
+                <RefreshCw aria-hidden="true" />
+                Reset to Saved
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving || isLoading}
+                className="primary-action"
+              >
+                <Save aria-hidden="true" className="w-4 h-4" />
+                <span>{isSaving ? 'Saving Changes...' : 'Save Facility Constants'}</span>
+              </button>
+            </div>
           </div>
         </form>
       )}
@@ -605,15 +753,15 @@ export const SettingsPage: React.FC = () => {
       {activeTab === 'account' && (
         <div className="space-y-6">
           {/* Account Details Card */}
-          <div className="fu-card p-5">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border mb-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <div aria-hidden="true" className="shrink-0 w-10 h-10 rounded-full bg-[#800000]/10 border border-[#800000]/20 flex items-center justify-center text-brand font-bold text-base">
+          <div className="fu-card p-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-border mb-5">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div aria-hidden="true" className="shrink-0 w-12 h-12 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand font-bold text-lg shadow-xs">
                   {user?.full_name?.charAt(0).toUpperCase() || 'U'}
                 </div>
                 <div className="min-w-0">
-                  <h2 className="font-semibold text-foreground [overflow-wrap:anywhere]">{user?.full_name}</h2>
-                  <p className="text-slate-600 [overflow-wrap:anywhere]">{user?.email}</p>
+                  <h2 className="text-lg font-semibold text-foreground [overflow-wrap:anywhere]">{user?.full_name}</h2>
+                  <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{user?.email}</p>
                 </div>
               </div>
 
@@ -624,13 +772,13 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                <span className="text-slate-500 block mb-0.5">Account ID</span>
-                <span className="font-mono text-slate-800 break-all">{user?.user_id}</span>
+              <div className="bg-muted/40 p-3.5 rounded-lg border border-border">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1">Account ID</span>
+                <span className="font-mono text-sm text-foreground break-all">{user?.user_id}</span>
               </div>
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                <span className="text-slate-500 block mb-0.5">Registration Date</span>
-                <span className="text-slate-800">
+              <div className="bg-muted/40 p-3.5 rounded-lg border border-border">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1">Registration Date</span>
+                <span className="text-sm text-foreground font-medium">
                   {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Official Hatchery Account'}
                 </span>
               </div>
@@ -638,38 +786,48 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {/* Edit Profile Name Form */}
-          <div className="fu-card p-5">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-              <UserIcon aria-hidden="true" className="w-4 h-4 text-brand" />
-              <h2 className="section-heading">Edit Profile Information</h2>
+          <div className="fu-card p-6">
+            <div className="flex items-start justify-between gap-4 pb-4 mb-5 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
+                  <UserIcon aria-hidden="true" className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="section-heading text-base font-semibold text-foreground">Edit Profile Information</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Update your display name as it appears across hatchery logs and exported certificates.</p>
+                </div>
+              </div>
             </div>
 
             {profileSuccess && (
-              <div role="status" className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-emerald-800 text-sm font-medium">
-                <CheckCircle2 aria-hidden="true" className="w-4 h-4 text-emerald-600 shrink-0" />
+              <div role="status" className="mb-4 p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-2.5 text-emerald-800 dark:text-emerald-300 text-sm font-medium">
+                <CheckCircle2 aria-hidden="true" className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>Profile name updated successfully!</span>
               </div>
             )}
 
             {profileError && (
-              <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-800 text-sm font-medium">
-                <AlertTriangle aria-hidden="true" className="w-4 h-4 text-red-600 shrink-0" />
+              <div role="alert" className="mb-4 p-3.5 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2.5 text-red-800 dark:text-red-300 text-sm font-medium">
+                <AlertTriangle aria-hidden="true" className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
                 <span>{profileError}</span>
               </div>
             )}
 
             <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div>
-                <label htmlFor="settingspage-field-5" className="block text-sm font-medium text-slate-700 mb-1">Display Name / Research Title</label>
-                <input id="settingspage-field-5"
+                <label htmlFor="settingspage-field-5" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                  Display Name / Research Title
+                </label>
+                <input
+                  id="settingspage-field-5"
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="e.g. Engr. Ryle Gabotero (Lead Researcher)"
-                  className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
+                  className="w-full min-h-11 px-3.5 py-2.5 text-sm bg-card border border-border rounded-lg text-foreground font-medium placeholder:text-muted-foreground/60 hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors shadow-xs"
                   required
                 />
-                <p className="text-sm text-slate-600 mt-1">This name will appear on candling session records and official PDF certificates.</p>
+                <p className="text-xs text-muted-foreground mt-1.5">This name will appear on candling session records and official PDF certificates.</p>
               </div>
 
               <div className="page-actions justify-end">
@@ -686,39 +844,46 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {/* Change Password Form */}
-          <div className="fu-card p-5">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-              <Key aria-hidden="true" className="w-4 h-4 text-amber-600" />
-              <div>
-                <h2 className="section-heading">Change Account Password</h2>
-                <p className="text-sm text-slate-500">Ensure your new password contains at least 6 characters.</p>
+          <div className="fu-card p-6">
+            <div className="flex items-start justify-between gap-4 pb-4 mb-5 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                  <Key aria-hidden="true" className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="section-heading text-base font-semibold text-foreground">Change Account Password</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Ensure your new password contains at least 6 characters.</p>
+                </div>
               </div>
             </div>
 
             {passwordSuccess && (
-              <div role="status" className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-emerald-800 text-sm font-medium">
-                <CheckCircle2 aria-hidden="true" className="w-4 h-4 text-emerald-600 shrink-0" />
+              <div role="status" className="mb-4 p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-2.5 text-emerald-800 dark:text-emerald-300 text-sm font-medium">
+                <CheckCircle2 aria-hidden="true" className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>Password changed successfully! Keep your new credentials secure.</span>
               </div>
             )}
 
             {passwordError && (
-              <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-800 text-sm font-medium">
-                <AlertTriangle aria-hidden="true" className="w-4 h-4 text-red-600 shrink-0" />
+              <div role="alert" className="mb-4 p-3.5 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2.5 text-red-800 dark:text-red-300 text-sm font-medium">
+                <AlertTriangle aria-hidden="true" className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
                 <span>{passwordError}</span>
               </div>
             )}
 
             <form onSubmit={handleChangePassword} className="space-y-4 max-w-lg">
               <div>
-                <label htmlFor="settingspage-field-6" className="block text-sm font-medium text-slate-700 mb-1">Current Password</label>
+                <label htmlFor="settingspage-field-6" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                  Current Password
+                </label>
                 <div className="relative">
-                  <input id="settingspage-field-6"
+                  <input
+                    id="settingspage-field-6"
                     type={showCurrentPassword ? 'text' : 'password'}
                     autoComplete="current-password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full text-sm px-3 py-2 pr-12 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
+                    className="w-full min-h-11 px-3.5 py-2.5 pr-12 text-sm bg-card border border-border rounded-lg text-foreground font-medium placeholder:text-muted-foreground/60 hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors shadow-xs"
                     placeholder="Enter current password"
                     required
                   />
@@ -735,14 +900,17 @@ export const SettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="settingspage-field-7" className="block text-sm font-medium text-slate-700 mb-1">New Password</label>
+                <label htmlFor="settingspage-field-7" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                  New Password
+                </label>
                 <div className="relative">
-                  <input id="settingspage-field-7"
+                  <input
+                    id="settingspage-field-7"
                     type={showNewPassword ? 'text' : 'password'}
                     autoComplete="new-password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full text-sm px-3 py-2 pr-12 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
+                    className="w-full min-h-11 px-3.5 py-2.5 pr-12 text-sm bg-card border border-border rounded-lg text-foreground font-medium placeholder:text-muted-foreground/60 hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors shadow-xs"
                     placeholder="Minimum 6 characters"
                     required
                   />
@@ -759,13 +927,16 @@ export const SettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="settingspage-field-8" className="block text-sm font-medium text-slate-700 mb-1">Confirm New Password</label>
-                <input id="settingspage-field-8"
+                <label htmlFor="settingspage-field-8" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                  Confirm New Password
+                </label>
+                <input
+                  id="settingspage-field-8"
                   type="password"
                   autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
+                  className="w-full min-h-11 px-3.5 py-2.5 text-sm bg-card border border-border rounded-lg text-foreground font-medium placeholder:text-muted-foreground/60 hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors shadow-xs"
                   placeholder="Re-enter new password"
                   required
                 />
@@ -791,18 +962,23 @@ export const SettingsPage: React.FC = () => {
       {/* ========================================================================= */}
       {canManage && activeTab === 'backups' && (
         <div className="space-y-6">
-          <div className="fu-card p-5">
-            <div className="section-header pb-4 border-b border-border">
-              <div className="flex items-start gap-2 min-w-0">
-                <Database aria-hidden="true" className="w-5 h-5 text-brand shrink-0 mt-0.5" />
+          <div className="fu-card p-6">
+            <div className="section-header pb-4 mb-5 border-b border-border">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0 mt-0.5">
+                  <Database aria-hidden="true" className="w-4 h-4" />
+                </div>
                 <div>
-                  <h2 className="section-heading">Automated PostgreSQL Database Snapshots</h2>
-                  <p className="text-sm text-slate-500">Generate gzip-compressed JSON archives of all batches, scans, users, and audit logs.</p>
+                  <h2 className="section-heading text-base font-semibold text-foreground">Automated PostgreSQL Database Snapshots</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Generate gzip-compressed JSON archives of all batches, scans, users, and audit logs.</p>
                 </div>
               </div>
 
               <div className="page-actions">
-                <button type="button" onClick={() => { void fetchBackupsList(); }} disabled={isLoadingBackups} className="secondary-action"><RefreshCw aria-hidden="true" />{isLoadingBackups ? 'Refreshing…' : 'Refresh archives'}</button>
+                <button type="button" onClick={() => { void fetchBackupsList(); }} disabled={isLoadingBackups} className="secondary-action">
+                  <RefreshCw aria-hidden="true" />
+                  {isLoadingBackups ? 'Refreshing…' : 'Refresh archives'}
+                </button>
                 <button type="button" onClick={handleCreateBackup} disabled={isCreatingBackup} className="primary-action">
                   <Database aria-hidden="true" />
                   <span>{isCreatingBackup ? 'Generating Snapshot…' : 'Create Backup Snapshot'}</span>
@@ -810,8 +986,26 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            {backupError && <div role="alert" className="mt-4 p-4 bg-red-50 text-red-800 border border-red-300 rounded-xl space-y-3"><p>{backupError}</p><button type="button" onClick={handleCreateBackup} disabled={isCreatingBackup} className="secondary-action"><RefreshCw aria-hidden="true" />Retry creating backup</button></div>}
-            {downloadError && <div role="alert" className="mt-4 p-4 bg-red-50 text-red-800 border border-red-300 rounded-xl space-y-3 [overflow-wrap:anywhere]"><p>{downloadError}</p>{failedDownload && <button type="button" onClick={() => { void handleDownloadBackup(failedDownload); }} disabled={Boolean(downloadingBackup)} className="secondary-action"><Download aria-hidden="true" />Retry download</button>}</div>}
+            {backupError && (
+              <div role="alert" className="mt-4 p-4 bg-red-50 text-red-800 border border-red-300 rounded-xl space-y-3">
+                <p>{backupError}</p>
+                <button type="button" onClick={handleCreateBackup} disabled={isCreatingBackup} className="secondary-action">
+                  <RefreshCw aria-hidden="true" />
+                  Retry creating backup
+                </button>
+              </div>
+            )}
+            {downloadError && (
+              <div role="alert" className="mt-4 p-4 bg-red-50 text-red-800 border border-red-300 rounded-xl space-y-3 [overflow-wrap:anywhere]">
+                <p>{downloadError}</p>
+                {failedDownload && (
+                  <button type="button" onClick={() => { void handleDownloadBackup(failedDownload); }} disabled={Boolean(downloadingBackup)} className="secondary-action">
+                    <Download aria-hidden="true" />
+                    Retry download
+                  </button>
+                )}
+              </div>
+            )}
             {downloadingBackup && <p role="status" className="mt-4 text-slate-600 [overflow-wrap:anywhere]">Downloading {downloadingBackup}…</p>}
             {backupSuccess && (
               <div role="status" className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-emerald-800 text-sm font-medium">
@@ -821,18 +1015,30 @@ export const SettingsPage: React.FC = () => {
             )}
 
             <div className="mt-5">
-              <h3 className="font-semibold text-foreground mb-3">Available Backup Archives</h3>
+              <h3 className="font-semibold text-foreground mb-3 text-sm">Available Backup Archives</h3>
 
-              {backupListError && <div role="alert" className="feedback-warning mb-4 space-y-3"><p>{backupListError}</p><button type="button" onClick={() => { void fetchBackupsList(); }} disabled={isLoadingBackups} className="secondary-action"><RefreshCw aria-hidden="true" />Retry loading archives</button></div>}
-              {isLoadingBackups && <div role="status" aria-busy="true" className="py-4 text-slate-600">{hasLoadedBackups ? 'Refreshing backup catalog… Previously loaded archives remain visible.' : 'Loading backup catalog…'}</div>}
+              {backupListError && (
+                <div role="alert" className="feedback-warning mb-4 space-y-3">
+                  <p>{backupListError}</p>
+                  <button type="button" onClick={() => { void fetchBackupsList(); }} disabled={isLoadingBackups} className="secondary-action">
+                    <RefreshCw aria-hidden="true" />
+                    Retry loading archives
+                  </button>
+                </div>
+              )}
+              {isLoadingBackups && (
+                <div role="status" aria-busy="true" className="py-4 text-slate-600">
+                  {hasLoadedBackups ? 'Refreshing backup catalog… Previously loaded archives remain visible.' : 'Loading backup catalog…'}
+                </div>
+              )}
               {hasLoadedBackups && backups.length === 0 ? (
-                <div className="py-8 text-center text-slate-600 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="py-8 text-center text-slate-600 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
                   No backup archives found. Click "Create Backup Snapshot" to generate the first archive.
                 </div>
               ) : hasLoadedBackups && backups.length > 0 ? (
                 <div className="table-scroll bordered-table" tabIndex={0} role="region" aria-label="Backup archives table, scroll horizontally on smaller screens" aria-busy={isLoadingBackups}>
                   <table className="w-full min-w-[680px] text-left">
-                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                    <thead className="bg-muted/40 text-muted-foreground font-semibold border-b border-border">
                       <tr>
                         <th scope="col" className="px-4 py-2.5">Archive Filename</th>
                         <th scope="col" className="px-4 py-2.5">Size</th>
@@ -840,12 +1046,19 @@ export const SettingsPage: React.FC = () => {
                         <th scope="col" className="px-4 py-2.5 text-right">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-border">
                       {backups.map((b) => (
-                        <tr key={b.filename} className="hover:bg-slate-50/80">
-                          <td className="px-4 py-3 font-mono text-slate-800 font-medium max-w-80 [overflow-wrap:anywhere]">{b.filename}</td>
-                          <td className="px-4 py-3 text-slate-600">{b.file_size_kb} KB</td>
-                          <td className="px-4 py-3 text-slate-500">{new Date(b.created_at).toLocaleString()}</td>
+                        <tr key={b.filename} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-3 font-mono text-foreground font-medium max-w-80 [overflow-wrap:anywhere]">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-brand/10 text-brand uppercase border border-brand/20">
+                                JSON.GZ
+                              </span>
+                              <span>{b.filename}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground tabular-nums">{b.file_size_kb} KB</td>
+                          <td className="px-4 py-3 text-muted-foreground tabular-nums">{new Date(b.created_at).toLocaleString()}</td>
                           <td className="px-4 py-3 text-right">
                             <button
                               type="button"
@@ -875,53 +1088,87 @@ export const SettingsPage: React.FC = () => {
       {activeTab === 'preferences' && (
         <form onSubmit={handleSavePreferences} className="space-y-6">
           {prefSaved && (
-            <div role="status" className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-emerald-800 text-sm font-medium">
-              <CheckCircle2 aria-hidden="true" className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div role="status" className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-2.5 text-emerald-800 dark:text-emerald-300 text-sm font-medium">
+              <CheckCircle2 aria-hidden="true" className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>Display and notification preferences saved to browser storage!</span>
             </div>
           )}
 
-          <div className="fu-card p-5 space-y-5">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-              <Sliders aria-hidden="true" className="w-4 h-4 text-brand" />
-              <div>
-                <h2 className="section-heading">Display preferences</h2>
-                <p className="text-sm text-slate-500">Choose the scan refresh interval, appearance, and table spacing.</p>
+          <div className="fu-card p-6 space-y-6">
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
+                  <Sliders aria-hidden="true" className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="section-heading text-base font-semibold text-foreground">Display preferences</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Choose the scan refresh interval, appearance, and table spacing.</p>
+                </div>
               </div>
             </div>
 
-            {/* Polling Interval */}
-            <div>
-              <label htmlFor="settingspage-field-9" className="block text-sm font-medium text-slate-700 mb-1">
-                Background Data Polling Frequency
-              </label>
-              <select id="settingspage-field-9"
-                value={pollingInterval}
-                onChange={(e) => setPollingInterval(Number(e.target.value))}
-                className="w-full sm:w-72 text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-[#800000] focus:border-[#800000] outline-none text-slate-900"
-              >
-                <option value={5}>5 seconds (Real-time Live Candling)</option>
-                <option value={10}>10 seconds (Standard Operational)</option>
-                <option value={30}>30 seconds (Low Network Usage)</option>
-                <option value={0}>Manual Refresh Only</option>
-              </select>
-              <p className="text-sm text-slate-600 mt-1">Controls how often the dashboard polls PostgreSQL for active egg scans.</p>
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Polling Interval */}
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <Clock aria-hidden="true" className="w-4 h-4 text-brand" />
+                  <label htmlFor="settingspage-field-9" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Background Data Polling Frequency
+                  </label>
+                </div>
+                <select
+                  id="settingspage-field-9"
+                  value={pollingInterval}
+                  onChange={(e) => setPollingInterval(Number(e.target.value))}
+                  className="w-full text-sm pl-3.5 pr-9 py-2.5 border border-border rounded-lg bg-card text-foreground font-medium hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors cursor-pointer shadow-xs"
+                >
+                  <option value={5}>5 seconds (Real-time Live Candling)</option>
+                  <option value={10}>10 seconds (Standard Operational)</option>
+                  <option value={30}>30 seconds (Low Network Usage)</option>
+                  <option value={0}>Manual Refresh Only</option>
+                </select>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Controls how often the dashboard automatically polls PostgreSQL for active egg scans and candling heartbeats.
+                </p>
+              </div>
 
-            <div className="border-t border-slate-200 pt-4">
-              <label htmlFor="dashboard-theme" className="block font-medium mb-2">Appearance</label>
-              <select id="dashboard-theme" value={theme} onChange={e => setTheme(e.target.value as 'light' | 'dark')} className="border border-slate-300 rounded-lg px-3 py-2 bg-card">
-                <option value="light">Light</option><option value="dark">Dark</option>
-              </select>
+              {/* Theme Appearance */}
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  {theme === 'dark' ? <Moon aria-hidden="true" className="w-4 h-4 text-brand" /> : <Sun aria-hidden="true" className="w-4 h-4 text-brand" />}
+                  <label htmlFor="dashboard-theme" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Theme Appearance
+                  </label>
+                </div>
+                <select
+                  id="dashboard-theme"
+                  value={theme}
+                  onChange={(e) => setTheme(e.target.value as 'light' | 'dark')}
+                  className="w-full text-sm pl-3.5 pr-9 py-2.5 border border-border rounded-lg bg-card text-foreground font-medium hover:border-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 transition-colors cursor-pointer shadow-xs"
+                >
+                  <option value="light">Light Slate (Standard Daylight)</option>
+                  <option value="dark">Dark Slate (Hatchery Candling Room)</option>
+                </select>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Dark slate reduces glare during darkroom candling operations; Light slate optimizes contrast for daytime administrative work.
+                </p>
+              </div>
             </div>
 
             {/* Table Density */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:items-start justify-between pt-3 border-t border-slate-100">
-              <div>
-                <span className="text-sm font-semibold text-slate-900 block">Scan Explorer Table Density</span>
-                <span className="text-sm text-slate-500">Choose tighter or more spacious table rows.</span>
+            <div className="p-4 rounded-lg bg-muted/30 border border-border/80 flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Layers aria-hidden="true" className="w-4 h-4 text-brand" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                    Scan Explorer Table Density
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Choose tighter spacing for high-volume scan data inspection, or comfortable spacing for standard monitors.
+                </p>
               </div>
-              <div className="page-actions" role="group" aria-label="Table density">
+              <div className="page-actions shrink-0" role="group" aria-label="Table density">
                 <button
                   type="button"
                   onClick={() => setTableDensity('compact')}

@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-18T00:00:00+08:00",
+  "title": "Design System: OvaLens Edge operator interface",
+  "extensions": {
+    "nativeToolkit": "CustomTkinter with native ttk selectors; no HTML/CSS component renderer.",
+    "focus": {
+      "button": "Tab traversal with the active appearance focus token CTk border at 2px, restored on blur. No Canvas highlight rectangle. Enter and Space invoke with disabled guards; Space is consumed.",
+      "entry": "Use the active appearance focus token; retain validation feedback on blur.",
+      "scroll": "Reveal the focused control within its scrollable form without changing the active section.",
+      "checkbox": "Tab traversal with visible CTk border; Space and Enter toggle with disabled guards."
+    },
+    "windowSizes": [
+      {
+        "name": "normal inspection workspace",
+        "width": 1280,
+        "height": 860
+      },
+      {
+        "name": "minimum operation workspace",
+        "width": 1024,
+        "height": 720
+      }
+    ],
+    "elevation": "Flat tonal surfaces and thin borders; no decorative shadows.",
+    "navigation": {
+      "sections": [
+        "Connections",
+        "Camera",
+        "Detection",
+        "Calibration",
+        "Maintenance"
+      ],
+      "behavior": "Persistent left section navigation beside one scrollable task form. Driver readback scrolls with the Camera fields."
+    },
+    "controlSizing": {
+      "auxiliary": "{components.button-secondary.height}",
+      "primary": "{components.button-primary.height}",
+      "settingsNavigation": "40px"
+    },
+    "dialogs": {
+      "largeMinimumWidth": "880px for requested widths of at least 900px, workspace-clamped",
+      "generalMinimumWidth": "640px, workspace-clamped",
+      "behavior": "Scrollable forms above fixed actions; run quantity pinned with setup actions; STOP in guide, history, end-session, exit and settings; Escape invokes native close guards.",
+      "settings": "1000 by 800px request, 800 by 640px workspace-clamped minimum",
+      "parentFallback": "Use display area when parent is smaller than 800 by 600 logical pixels; otherwise clamp usable parent. Respect window scaling and display/parent margins.",
+      "quantity": "Pinned setup footer with label and summary above a full-width editable quantity entry; forms scroll above."
+    },
+    "flow": {
+      "safety": "Preserve background I/O and single camera stream",
+      "header": "Settings directly in header; More for diagnostics",
+      "ready": "Heading follows actual batch/operator/preparation state; footer shows the same three-step next action"
+    },
+    "colorMeta": {
+      "focus": {
+        "displayName": "Pale rose focus",
+        "token": "{colors.focus}",
+        "role": "primary"
+      },
+      "brand-text": {
+        "displayName": "Readable institutional brand text",
+        "token": "{colors.brand-text}",
+        "role": "primary"
+      }
+    },
+    "appearances": {
+      "default": "dim",
+      "choices": [
+        "Dim slate",
+        "Soft light"
+      ],
+      "tokens": {
+        "dim": {
+          "workspace": "{colors.workspace}",
+          "panel": "{colors.panel}",
+          "panel-alt": "{colors.panel-alt}",
+          "panel-accent": "{colors.panel-accent}",
+          "border": "{colors.border}",
+          "border-control": "{colors.border-control}",
+          "selection": "{colors.selection}",
+          "selection-hover": "{colors.selection-hover}",
+          "ink": "{colors.ink}",
+          "ink-secondary": "{colors.ink-secondary}",
+          "ink-muted": "{colors.ink-muted}",
+          "input": "{colors.input}",
+          "focus": "{colors.focus}",
+          "brand-text": "{colors.brand-text}",
+          "fertile-bg": "{colors.fertile-bg}",
+          "fertile-card": "{colors.fertile-card}",
+          "fertile-border": "{colors.fertile-border}",
+          "fertile-text": "{colors.fertile-text}",
+          "review-bg": "{colors.review-bg}",
+          "review-card": "{colors.review-card}",
+          "review-border": "{colors.review-border}",
+          "review-text": "{colors.review-text}",
+          "reject-bg": "{colors.reject-bg}",
+          "reject-card": "{colors.reject-card}",
+          "reject-border": "{colors.reject-border}",
+          "reject-text": "{colors.reject-text}",
+          "brand-bg": "{colors.brand-bg}",
+          "brand-border": "{colors.brand-border}",
+          "accent-text": "{colors.accent-text}"
+        },
+        "light": {
+          "workspace": "{colors.light-workspace}",
+          "panel": "{colors.light-panel}",
+          "panel-alt": "{colors.light-panel-alt}",
+          "panel-accent": "{colors.light-panel-accent}",
+          "border": "{colors.light-border}",
+          "border-control": "{colors.light-border-control}",
+          "selection": "{colors.light-selection}",
+          "selection-hover": "{colors.light-selection-hover}",
+          "ink": "{colors.light-ink}",
+          "ink-secondary": "{colors.light-ink-secondary}",
+          "ink-muted": "{colors.light-ink-muted}",
+          "input": "{colors.light-input}",
+          "focus": "{colors.light-focus}",
+          "brand-text": "{colors.light-brand-text}",
+          "fertile-bg": "{colors.light-fertile-bg}",
+          "fertile-card": "{colors.light-fertile-card}",
+          "fertile-border": "{colors.light-fertile-border}",
+          "fertile-text": "{colors.light-fertile-text}",
+          "review-bg": "{colors.light-review-bg}",
+          "review-card": "{colors.light-review-card}",
+          "review-border": "{colors.light-review-border}",
+          "review-text": "{colors.light-review-text}",
+          "reject-bg": "{colors.light-reject-bg}",
+          "reject-card": "{colors.light-reject-card}",
+          "reject-border": "{colors.light-reject-border}",
+          "reject-text": "{colors.light-reject-text}",
+          "brand-bg": "{colors.light-brand-bg}",
+          "brand-border": "{colors.light-brand-border}",
+          "accent-text": "{colors.light-accent-text}"
+        }
+      },
+      "selection": "Startup and Settings; apply live to controls and native selectors; persist independently in edge/db/ui_appearance.json; invalid preferences fall back to dim; write failure does not block visual change.",
+      "fixed": "Camera well and its text; FU solid action fills and action text. Appearance does not change rig, camera, readiness or motion."
+    }
+  },
+  "components": [
+    {
+      "name": "Station settings field",
+      "kind": "input",
+      "refersTo": "station-field",
+      "description": "Aligned native entry with a readable control border and the active appearance focus token keyboard focus; scrolls within its task form."
+    },
+    {
+      "name": "Settings navigation",
+      "kind": "nav",
+      "description": "Persistent task list with quiet selected surface and the active appearance brand-text token selected text. Maintenance groups physical tests and alignment."
+    },
+    {
+      "name": "Fixed settings actions",
+      "kind": "button",
+      "description": "Apply for this run, Save defaults, Load saved, Done and STOP remain reachable outside the scrollable task form. Applying and remembering defaults remain distinct."
+    },
+    {
+      "name": "Camera workspace",
+      "kind": "custom",
+      "description": "Dark camera well with separate light text and cycle instructions above the preview. Give available workspace width to the image."
+    },
+    {
+      "name": "Record panel",
+      "kind": "card",
+      "description": "Compact appearance-specific panel grouping the latest result, aligned counts and recent events with spacing and thin dividers."
+    },
+    {
+      "name": "Native selector",
+      "kind": "input",
+      "description": "Read-only ttk selector with neutral field, appearance-specific readable values and arrow, the active appearance focus token border and an eight-row scrolling popup. Programmatic changes do not invoke user callbacks."
+    }
+  ],
+  "narrative": {
+    "overview": "Mode: Operate. Dim slate and Soft light support low-glare native station operation with readable controls, spacious dialogs and clear next actions. The camera well remains dark. Preserve all existing operating and safety guidance.",
+    "dos": [
+      "**Do** keep camera evidence, cycle instructions and STOP visible at the minimum workspace size.",
+      "**Do** group configuration by operator task and place physical station tests in Maintenance.",
+      "**Do** pair status colors with explicit text and keep driver readback reachable by scrolling."
+    ],
+    "donts": [
+      "**Don't** equate preview, saved defaults or an unconfirmed hardware request with physical readiness.",
+      "**Don't** add decorative timers, image assets, shadows or additional camera streams."
+    ]
+  }
+}

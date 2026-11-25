@@ -103,11 +103,12 @@ class SortingCycle:
     allow_empty_capture = True
 
     def __init__(self, boards, camera, inference, db, settings, device_id, session_id,
-                 batch_id, target, operator):
+                 batch_id, target, operator, operator_id=None):
         self.boards, self.camera, self.inference, self.db = boards, camera, inference, db
         self.settings = type(settings).from_dict(settings.snapshot())
         self.device_id, self.session_id, self.batch_id = device_id, session_id, batch_id
         self.target, self.operator = target, operator
+        self.operator_id = operator_id
         self.holders = []
         self.count = 0
         self.routed = 0
@@ -305,7 +306,8 @@ class SortingCycle:
         k = self.settings.calibration
         try:
             self._origin = int(self.boards.conveyor.snapshot().telemetry["POSITION"])
-            self.db.create_session(self.session_id, self.batch_id, self.device_id, "DAY_10", self.operator)
+            self.db.create_session(self.session_id, self.batch_id, self.device_id, "DAY_10", self.operator,
+                                   operator_id=self.operator_id, defer_sync=True)
             self._checkpoint("STARTED")
             # Operator aligned the NEXT holder one pitch before the chamber and cleared downstream.
             events = [(k.holder_steps, 1, "capture", 1)]

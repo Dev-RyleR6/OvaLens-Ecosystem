@@ -191,14 +191,14 @@ def test_cancelled_scan_does_not_write_or_update_ui(tmp_path):
     assert app.db.get_unsynced_count() == 0 and app.total_count == 0
 
 
-@pytest.mark.parametrize("kind", ["unknown", "simulation", "fallback"])
+@pytest.mark.parametrize("kind", ["unknown", "mock_camera", "fallback"])
 def test_untrustworthy_results_are_not_saved(tmp_path, kind):
     app = station(tmp_path)
     result = prediction()
     if kind == "unknown":
         result["final_class"] = None
-    elif kind == "simulation":
-        app.simulation = True
+    elif kind == "mock_camera":
+        app.camera.is_mock_mode = True
     else:
         result["engine"] = "HEURISTIC_SIMULATION"
     OvaLensOperatorApp._process_scan_result(app, result)
@@ -232,12 +232,11 @@ def test_batch_setup_rejects_invalid_run_configuration(count, operator):
         validate_batch_config("TEST-BATCH", operator, count, "DAY_10")
 
 
-@pytest.mark.parametrize("operator", ["", "   ", "x" * 101])
-def test_startup_rejects_invalid_operator_name(operator):
-    app = SimpleNamespace(result=None, _status_label=Mock(),
-        _operator_entry=SimpleNamespace(get=lambda: operator))
-    StartupConfigWindow._on_start(app)
-    assert app.result is None and app._status_label.configure.called
+@pytest.mark.parametrize("operator", ["", "   ", "x" * 129])
+def test_run_setup_rejects_invalid_operator_name(operator):
+    from src.core.operator_flow import validate_batch_config
+    with pytest.raises(ValueError):
+        validate_batch_config("BATCH", operator, 10, "DAY_10")
 
 
 @pytest.mark.parametrize("ack,status", [({}, 200), ({"status": "success", "total_received": 1,
@@ -246,6 +245,7 @@ def test_sync_rejection_or_partial_ack_never_clears_local_record(tmp_path, monke
     app = station(tmp_path)
     OvaLensOperatorApp._process_scan_result(app, prediction())
     app._jobs.finish()
+    app.db.complete_session(app.current_session_id)
     worker = BackgroundSyncWorker(app.db, api_key="test-key")
     worker._registered_sessions.add(app.current_session_id)
     monkeypatch.setattr("src.sync.sync_worker.requests.post", lambda *a, **k:
@@ -259,6 +259,7 @@ def test_duplicate_sync_ack_is_safe_and_session_identity_is_preserved(tmp_path, 
     app = station(tmp_path)
     OvaLensOperatorApp._process_scan_result(app, prediction())
     app._jobs.finish()
+    app.db.complete_session(app.current_session_id)
     sent = []
     def post(url, **kwargs):
         sent.append(kwargs["json"])
@@ -267,11 +268,14 @@ def test_duplicate_sync_ack_is_safe_and_session_identity_is_preserved(tmp_path, 
         return SimpleNamespace(status_code=200, json=lambda: {
             "status": "success", "total_received": 1, "synced_count": 0, "duplicates_ignored": 1})
     monkeypatch.setattr("src.sync.sync_worker.requests.post", post)
+    monkeypatch.setattr("src.sync.sync_worker.requests.put", lambda url, json, **kwargs:
+                        SimpleNamespace(status_code=200, json=lambda: {**sent[0], **json, "total_scanned": 1}))
     worker = BackgroundSyncWorker(app.db, api_key="test-key")
     worker._perform_sync()
     assert sent[0]["device_id"] == app.device_id
     assert sent[0]["operator_name"] == app.operator_name
     assert app.db.get_unsynced_count() == 0
+    assert worker.last_error is None
 
 
 def test_migration_is_once_only_when_legacy_column_cannot_be_dropped(tmp_path):

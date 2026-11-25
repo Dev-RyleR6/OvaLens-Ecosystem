@@ -24,7 +24,7 @@ class ESP32SerialDriver:
         self._lock = threading.Lock()
 
         self._on_egg_detected_callback: Optional[Callable[[], None]] = None
-        self._is_mock_mode = False
+        self.last_error = None
         self._last_heartbeat = 0.0
 
     def start(self, on_egg_detected: Optional[Callable[[], None]] = None):
@@ -48,19 +48,20 @@ class ESP32SerialDriver:
         if self.port:
             try:
                 self.ser = serial.Serial(self.port, self.baudrate, timeout=self.timeout)
-                self._is_mock_mode = False
+                self.last_error = None
                 print(f"[SUCCESS] Connected to ESP32 on {self.port} @ {self.baudrate} baud.")
                 return
             except Exception as e:
-                print(f"[WARN] Could not open Serial port {self.port} ({e}). Entering Mock Serial mode.")
+                self.last_error = f"ESP32 unavailable on {self.port}: {e}"
+                raise ConnectionError(self.last_error) from e
 
-        self._is_mock_mode = True
-        print("[WARN] No physical ESP32 detected. Running in Mock Actuator mode.")
+        self.last_error = "ESP32 unavailable; connect the controller and select its serial port."
+        raise ConnectionError(self.last_error)
 
     def _read_loop(self):
         """Background thread parsing incoming serial lines."""
         while self._is_running:
-            if not self._is_mock_mode and self.ser and self.ser.is_open:
+            if self.ser and self.ser.is_open:
                 try:
                     if self.ser.in_waiting > 0:
                         line = self.ser.readline().decode("utf-8", errors="ignore").strip()
@@ -69,9 +70,10 @@ class ESP32SerialDriver:
                     else:
                         time.sleep(0.01)
                 except Exception as e:
-                    print(f"[WARN] Serial read error ({e}). Attempting reconnect...")
-                    time.sleep(1.0)
-                    self._connect()
+                    self.last_error = f"ESP32 disconnected: {e}"
+                    print(f"[ERROR] {self.last_error}")
+                    self.stop()
+                    return
             else:
                 time.sleep(0.05)
 
@@ -110,20 +112,21 @@ class ESP32SerialDriver:
         self._send_raw("CMD:PING\n")
 
     def _send_raw(self, cmd: str):
-        if not self._is_mock_mode and self.ser and self.ser.is_open:
+        if self.ser and self.ser.is_open:
             with self._lock:
                 try:
                     self.ser.write(cmd.encode("utf-8"))
                     self.ser.flush()
                 except Exception as e:
-                    print(f"[ERROR] Serial write failure ({e})")
+                    self.last_error = f"Serial write failure: {e}"
+                    self.stop()
+                    raise ConnectionError(self.last_error) from e
         else:
-            # Mock mode pass-through
-            pass
+            raise ConnectionError(self.last_error or "ESP32 unavailable; command was not sent.")
 
     @property
     def is_connected(self) -> bool:
-        return (not self._is_mock_mode) and (self.ser is not None) and self.ser.is_open
+        return (self.ser is not None) and self.ser.is_open
 
     def stop(self):
         """Close serial connection and terminate worker thread."""

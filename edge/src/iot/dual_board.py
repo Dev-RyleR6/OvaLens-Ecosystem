@@ -31,6 +31,8 @@ class BoardLink:
         self._thread = None
         self._pending = None
         self._next_id = 1
+        self._commands_dispatched = 0
+        self._started_at = 0.0
         self._status_complete = False
         self._status_at = 0.0
         self._command_values = {}
@@ -68,6 +70,7 @@ class BoardLink:
             raise RuntimeError(state.error or f"{self.role} handshake is incomplete")
         future = Future()
         future.deadline = time.monotonic() + timeout
+        self._commands_dispatched += 1
         self._queue.put_nowait((text, timeout, future))
         return future
 
@@ -110,7 +113,22 @@ class BoardLink:
             return  # Late command telemetry must not replace current position or fault state.
         if payload.startswith("BOOT:"):
             if self._status_complete:
+                if (self._commands_dispatched == 0 and not self._pending and self._queue.empty()
+                        and not self._halt.is_set() and (
+                            (self._started_at > 0 and now - self._started_at < 2.5) or
+                            (self._status_at > 0 and now - self._status_at < 1.0))):
+                    self._status_complete = False
+                    self._started_at = now
+                    with self._lock:
+                        self.state.identified = False
+                        self.state.telemetry.clear()
+                    return
                 self._fail("Board reset; inspect and reconnect")
+            else:
+                self._started_at = now
+                with self._lock:
+                    self.state.identified = False
+                    self.state.telemetry.clear()
             return
         if payload.startswith("READY:"):
             expected = f"READY:{self.role}_V{self.protocol}:PROTOCOL={self.protocol}"
@@ -131,6 +149,10 @@ class BoardLink:
                 self._fail("Hardware event overflow; inspect rig")
             return
         if payload.startswith("ERROR:"):
+            if (self.role == "UNIFIED" and payload == "ERROR:INVALID_LINE" and ident is None
+                    and self._commands_dispatched == 0 and not self._status_complete):
+                # A startup delimiter can flush malformed bytes left in the ESP32 reader.
+                return
             if ident is None or (self._pending and ident == self._pending[0]):
                 self._fail(payload)
             return
@@ -181,16 +203,55 @@ class BoardLink:
 
     def _run(self):
         connection = None
+        self._started_at = time.monotonic()
         try:
             factory = self.serial_factory or getattr(serial, "Serial", None)
             if factory is None:
                 raise RuntimeError("PySerial is unavailable; install the edge requirements (pyserial)")
-            connection = factory(self.port, 115200, timeout=.02, write_timeout=.2)
+            for attempt in range(4):
+                if self._stop.is_set():
+                    return
+                try:
+                    if hasattr(factory, "open"):
+                        try:
+                            connection = factory(port=None, baudrate=115200, timeout=.02, write_timeout=.2)
+                            connection.port = self.port
+                            if hasattr(connection, "dtr"):
+                                try:
+                                    connection.dtr = False
+                                    connection.rts = False
+                                except Exception:
+                                    pass
+                            connection.open()
+                        except (TypeError, AttributeError):
+                            connection = factory(self.port, 115200, timeout=.02, write_timeout=.2)
+                    else:
+                        connection = factory(self.port, 115200, timeout=.02, write_timeout=.2)
+                    if hasattr(connection, "dtr"):
+                        try:
+                            connection.dtr = False
+                            connection.rts = False
+                        except Exception:
+                            pass
+                    if hasattr(connection, "reset_input_buffer"):
+                        try:
+                            connection.reset_input_buffer()
+                        except Exception:
+                            pass
+                    break
+                except Exception as exc:
+                    err_msg = str(exc)
+                    if attempt < 3 and ("denied" in err_msg.lower() or "busy" in err_msg.lower() or "permission" in err_msg.lower()):
+                        if self._stop.wait(0.3):
+                            return
+                        continue
+                    raise
             with self._lock:
                 self.state.connected = True
                 self.state.last_reply = time.monotonic()
             # Opening an ESP32 port can reset it; wait for its boot without motion.
             started, heartbeat = time.monotonic(), 0.0
+            self._started_at = started
             buffer = bytearray()
             while not self._stop.is_set():
                 now = time.monotonic()
@@ -201,13 +262,19 @@ class BoardLink:
                         raise RuntimeError("Incomplete emergency stop write")
                 if now - heartbeat >= .5:
                     request = b"STATUS\n" if self.snapshot().identified else b"HELLO\n"
+                    if self.role == "UNIFIED" and not self._status_complete:
+                        request = b"\n" + request
                     if connection.write(request) != len(request):
                         raise RuntimeError("Incomplete heartbeat write")
                     heartbeat = now
-                if now - self.snapshot().last_reply > 3.5 or (not self._status_complete and now - started > 5):
+                if now - self.snapshot().last_reply > 3.5 or (not self._status_complete and now - self._started_at > 5):
                     raise RuntimeError("Board response timeout")
                 if self._pending and now > self._pending[2]:
-                    raise RuntimeError("Command completion timeout; do not retry motion")
+                    command_id, command = self._pending[:2]
+                    raise RuntimeError(
+                        f"Command completion timeout on {self.port} for {command} "
+                        f"(ID {command_id}); do not retry motion"
+                    )
                 if not self._pending and self._status_complete and not self.snapshot().error:
                     try:
                         text, timeout, future = self._queue.get_nowait()

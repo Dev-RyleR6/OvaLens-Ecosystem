@@ -258,7 +258,7 @@ the incubation batch remains active until its hatch outcome is finalized.
 
 Real automatic scans and manual Single Scan captures save the exact classified
 camera snapshot as a quality-95 JPEG beside SQLite, in
-`edge/db/local_scans/<scan-id>.jpg`. Preview frames and simulation are not saved.
+`edge/db/local_scans/<scan-id>.jpg`. Preview frames are not saved.
 The disk write runs on the capture/storage worker before the scan is committed;
 a failed photo write prevents that capture from being counted or released.
 
@@ -284,13 +284,26 @@ remain on disk after upload; no automatic image cleanup is performed.
 
 ## 🌟 Key Subsystem Features
 
+The operator workspace uses a soft FU light palette with a dark camera preview,
+one header batch control, compact station status, and expandable readiness details.
+STOP stays at the right of the action bar. The layout uses existing native
+CustomTkinter widgets and adds no UI dependencies, image assets, or decoration timers.
+
+Inter Regular/Bold are bundled locally for consistent typography in the workspace
+and forms. The two fonts add about 813 KiB, load once per process and require no
+network connection or system font installation. See [font provenance and license](src/ui/assets/fonts/README.md).
+
+Read-only native selectors provide bounded, scrolling choice lists and keyboard
+navigation. Programmatic field updates do not invoke hardware callbacks. Tools
+opens below its header control, and settings fits within the current workspace.
+
 - **Decoupled Quad-Thread Concurrency**:
   - **Thread 1 (Camera Grabber)**: Continuous background frame consumer with single-frame atomic buffer (DirectShow / V4L2) eliminating video delay.
   - **Thread 2 (Inference Engine)**: Pluggable ONNX Runtime FP16 / PyTorch inference engine with 3-pass warmup and geometric candling heuristics ($0.65 \le \text{AR} \le 1.45$).
   - **Thread 3 (IoT Serial Driver)**: Non-blocking PySerial ESP32 driver with delayed ejection timer calculation ($\Delta t = D/v$).
   - **Thread 4 (Local Storage & Sync)**: SQLite WAL mode persistence with background HTTP REST sync worker (`POST /api/v1/scans/sync`).
 - **CustomTkinter 60 FPS Desktop GUI**: Operator interface with real-time HUD, live camera overlay, Day-10 Penoy counter, and manual override triggers (`[SPACEBAR]` and `[R]`).
-- **Explicit Simulation**: Synthetic camera preview requires selecting simulation at startup. Camera failure in normal mode reports an error and stops accepting frames.
+- **Physical station only**: The operator launcher uses the connected camera and real model weights. Missing cameras or models report an unavailable state; there are no synthetic frames or heuristic prediction fallbacks. Sorting requires a verified two-class ONNX model and three successful warmup passes.
 
 ---
 

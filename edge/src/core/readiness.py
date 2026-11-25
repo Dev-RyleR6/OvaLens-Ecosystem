@@ -39,7 +39,7 @@ class StationReadiness:
     def _controllers(self):
         s = self.station
         s.boards.require_ready()
-        if s.settings.rig_profile == "three_v3":
+        if s.settings.rig_profile in {"three_v3", "unified_v4"}:
             egg = s.boards.egg.snapshot().telemetry
             conveyor = s.boards.conveyor.snapshot().telemetry
             if egg.get("PAUSED") != "1" or conveyor.get("PAUSED") != "1":
@@ -50,21 +50,22 @@ class StationReadiness:
     def _camera(self):
         camera = self.station.camera
         if camera.is_mock_mode or camera.last_error or camera.snapshot(copy=False) is None:
-            raise RuntimeError(camera.last_error or "Camera has no fresh real frame. Use Tools / Retry camera preview.")
+            raise RuntimeError(camera.last_error or "Camera has no fresh real frame. Use More / Retry camera preview.")
 
     def _model(self):
         engine = self.station.inference.engine
         if not (str(getattr(engine, "engine_type", "")).startswith("ONNX")
                 and getattr(engine, "model_contract_verified", False)
                 and getattr(engine, "warmup_complete", False)):
-            raise RuntimeError("Verified two-class ONNX model and startup warmup are required. Restart after correcting the model.")
+            raise RuntimeError(getattr(engine, "load_error", None) or
+                               "Verified two-class ONNX model and startup warmup are required. Restart after correcting the model.")
 
     def software_checks(self, progress=lambda message: None):
         """Disk/SQLite work runs on the operation worker, never on Tk."""
         s = self.station
         def settings():
             if s.settings_error:
-                raise RuntimeError(s.settings_error + " Open Tools / Settings.")
+                raise RuntimeError(s.settings_error + " Open Settings.")
             s.settings.validate()
         checks = (("settings", "Saved configuration", settings, "Saved settings valid"),
                   ("camera", "Camera", self._camera, "Fresh camera frames available"),
@@ -151,7 +152,7 @@ class StationReadiness:
         except Exception:
             return False
 
-    def start(self, batch_id, target, operator, cancel):
+    def start(self, batch_id, target, operator, cancel, operator_id=None):
         """Final background recheck, with no discovery, homing or preset replay."""
         s = self.station
         try:
@@ -167,7 +168,7 @@ class StationReadiness:
                 self.require_ready()
                 s._check_setup_cancel(cancel)
                 s._check_setup_cancel(s._setup_cancel)
-                cycle = s.start_cycle(batch_id, target, operator)
+                cycle = s.start_cycle(batch_id, target, operator, **({"operator_id": operator_id} if operator_id else {}))
                 s._check_setup_cancel(cancel)
                 s._check_setup_cancel(s._setup_cancel)
                 with self._lock:

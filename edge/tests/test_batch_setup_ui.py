@@ -2,6 +2,7 @@
 from test_camera_preview_ui import preview_app, hidden_ui
 from test_live_camera_ui import pump
 from test_session_sync import local_run
+from operator_helpers import select_staff
 
 
 def fill(widget, value):
@@ -10,6 +11,7 @@ def fill(widget, value):
 
 
 def open_setup(app):
+    select_staff(app)
     app.sync_worker.fetch_active_batches = lambda: app.db.list_available_batches()
     app.deiconify()
     app.open_batch_setup_dialog()
@@ -27,7 +29,7 @@ def test_new_batch_saves_offline_with_separate_inventory_and_remembers_selection
     app, _, _ = preview_app(tmp_path)
     try:
         dialog = open_setup(app)
-        assert dialog.mode.get() == "New batch"
+        assert dialog.mode.get() == "Create batch"
         assert dialog.original_count.get() == dialog.set_date.get() == dialog.incubator.get() == ""
         for size in ("1024x720", "1280x860"):
             app.geometry(size)
@@ -38,8 +40,8 @@ def test_new_batch_saves_offline_with_separate_inventory_and_remembers_selection
         fill(dialog.incubator, "FARM-INC-7")
         fill(dialog.set_date, "2026-01-01")
         fill(dialog.original_count, 100)
+        dialog.change_quantity()
         fill(dialog.target, 20)
-        fill(dialog.operator, "Worker Jay")
         identity = dialog.draft_id
         dialog.apply()
         pump(app, lambda: app.current_batch_id == identity)
@@ -70,6 +72,7 @@ def test_legacy_details_preserve_prior_scan_and_do_not_infer_inventory(hidden_ui
         fill(dialog.incubator, "INC-7")
         fill(dialog.set_date, "2026-01-01")
         fill(dialog.original_count, 100)
+        dialog.change_quantity()
         fill(dialog.target, 10)
         dialog.apply()
         pump(app, lambda: app._batch_record_ready)
@@ -88,6 +91,7 @@ def test_invalid_or_failed_save_never_activates_a_batch_and_stop_cancels_late_se
         fill(dialog.incubator, "INC-7")
         fill(dialog.set_date, "2026-01-01")
         fill(dialog.original_count, 10)
+        dialog.change_quantity()
         fill(dialog.target, 11)
         dialog.apply()
         assert "cannot exceed" in dialog.notice.cget("text") and app.current_batch_id == previous

@@ -5,6 +5,114 @@ from app.main import app
 client = TestClient(app)
 
 
+def test_station_operator_roster_is_minimal_authenticated_and_includes_active_roles():
+    from uuid import uuid4
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.models.user import UserModel, UserRole
+    identities = [uuid4() for _ in range(4)]
+    try:
+        with SessionLocal() as db:
+            for index, role in enumerate([UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR, UserRole.OPERATOR]):
+                db.add(UserModel(user_id=identities[index], email=f"{identities[index]}@example.test",
+                    hashed_password="unused-test-hash", full_name="N" * 128 if index == 0 else "Same Name",
+                    role=role, is_active=index < 3))
+            db.commit()
+        assert client.get("/api/v1/operators").status_code in (401, 403)
+        assert client.get("/api/v1/operators", headers={"X-API-Key": "wrong"}).status_code in (401, 403)
+        result = client.get("/api/v1/operators", headers={"X-API-Key": settings.API_KEY})
+        assert result.status_code == 200
+        rows = {r["user_id"]: r for r in result.json()}
+        for identity in identities[:3]:
+            assert set(rows[str(identity)]) == {"user_id", "full_name", "role"}
+        assert str(identities[3]) not in rows
+        assert len(rows[str(identities[0])]["full_name"]) == 128
+    finally:
+        with SessionLocal() as db:
+            db.query(UserModel).filter(UserModel.user_id.in_(identities)).delete(synchronize_session=False)
+            db.commit()
+
+
+def test_registered_operator_offline_history_and_batch_audit_preserve_snapshot(edge_batch):
+    from uuid import uuid4
+    from app.core.database import SessionLocal
+    from app.models.user import UserModel, UserRole
+    from app.models.audit import AuditLogModel
+    from app.models.session import CandlingSessionModel
+    identity, session_id = uuid4(), str(uuid4())
+    payload, headers = edge_batch
+    original_name = "Operator " + "N" * 119
+    try:
+        with SessionLocal() as db:
+            db.add(UserModel(user_id=identity, email=f"{identity}@example.test", hashed_password="unused-test-hash",
+                             full_name="Renamed operator", role=UserRole.OPERATOR, is_active=False))
+            db.commit()
+        assert client.post("/api/v1/batches/register", headers=headers,
+            json={**payload, "operator_id": str(identity), "operator_name": original_name}).status_code == 200
+        session = {"session_id": session_id, "batch_id": payload["batch_id"], "device_id": payload["device_id"],
+            "stage": "DAY_10", "operator_name": original_name, "operator_id": str(identity),
+            "started_at": "2026-10-29T00:00:00Z"}
+        for _ in range(2):
+            response = client.post("/api/v1/sessions", headers=headers, json=session)
+            assert response.status_code == 200
+            assert response.json()["operator_id"] == str(identity)
+            assert response.json()["operator_name"] == original_name
+        with SessionLocal() as db:
+            audit = db.query(AuditLogModel).filter_by(entity_id=payload["batch_id"], action="BATCH_CREATED").one()
+            assert audit.details["operator_id"] == str(identity)
+        assert client.get(f"/api/v1/sessions/{session_id}").json()["operator_name"] == original_name
+    finally:
+        with SessionLocal() as db:
+            db.query(CandlingSessionModel).filter_by(session_id=session_id).delete()
+            db.query(UserModel).filter_by(user_id=identity).delete()
+            db.commit()
+
+
+@pytest.mark.parametrize("end,count,seconds,rate", [
+    ("2026-10-29T08:10:00+08:00", 120, 600, 12),
+    ("2026-10-29T00:00:00.500+00:00", 1, .5, 120),
+    ("2026-10-29T00:00:00+00:00", 1, 0, None),
+    ("2026-10-29T00:10:00+00:00", 0, 600, 0),
+    (None, 120, None, None), ("bad", 120, None, None),
+    ("2026-10-28T23:59:00+00:00", 120, None, None),
+    ("2026-10-29T00:10:00", 120, None, None),
+])
+def test_session_metric_boundaries(end, count, seconds, rate):
+    from app.core.session_metrics import session_metrics
+    assert session_metrics("2026-10-29T00:00:00+00:00", end, count) == {
+        "duration_seconds": seconds, "eggs_per_minute": rate}
+
+
+def test_session_throughput_survives_duplicate_upload_and_completion(image_scan):
+    from datetime import datetime, timedelta
+    from uuid import uuid4
+
+    _, headers, _, payload = image_scan
+    scan = payload["scans"][0]
+    session_id = scan["session_id"]
+    url = f"/api/v1/sessions/{session_id}"
+    assert client.get(url).json()["duration_seconds"] is None
+    more = [{**scan, "scan_id": str(uuid4()), "sequence_number": index + 2} for index in range(119)]
+    for _ in range(2):
+        assert client.post("/api/v1/scans/sync", headers=headers, json={"scans": more}).status_code == 200
+    start = datetime.fromisoformat(client.get(url).json()["started_at"])
+    for _ in range(2):
+        response = client.put(url + "/end", headers=headers, json={"ended_at": (start + timedelta(seconds=600)).isoformat()})
+        assert response.status_code == 200
+        assert response.json()["total_scanned"] == 120
+        assert response.json()["duration_seconds"] == 600
+        assert response.json()["eggs_per_minute"] == 12
+    listed = client.get("/api/v1/sessions", params={"batch_id": scan["batch_id"], "limit": 200}).json()
+    assert next(item for item in listed if item["session_id"] == session_id)["eggs_per_minute"] == 12
+    analytics = client.get(f"/api/v1/batches/{scan['batch_id']}/analytics").json()
+    summary = next(item for item in analytics["sessions"] if item["session_id"] == session_id)
+    assert summary["duration_seconds"] == 600 and summary["eggs_per_minute"] == 12
+    for invalid in ((start - timedelta(seconds=1)).isoformat(), start.replace(tzinfo=None).isoformat()):
+        rejected = client.put(url + "/end", headers=headers, json={"ended_at": invalid})
+        assert rejected.status_code == 422 and rejected.json()["error"] == "INVALID_SESSION_END"
+        assert client.get(url).json()["duration_seconds"] == 600
+
+
 @pytest.fixture
 def image_scan(tmp_path, monkeypatch):
     from datetime import datetime, timezone
@@ -969,4 +1077,65 @@ def test_scan_override_persists_is_overridden_and_reason():
         with SessionLocal() as db:
             db.query(EggScanModel).filter(EggScanModel.scan_id == scan_id).delete()
             db.query(CandlingSessionModel).filter(CandlingSessionModel.session_id == test_session_id).delete()
+            db.commit()
+
+
+def test_real_edge_device_telemetry_and_live_probe():
+    from uuid import uuid4
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.models.device import DeviceModel
+
+    device_id = f"TEST-EDGE-{uuid4()}"
+    headers = {"X-API-Key": settings.API_KEY}
+    login = client.post("/api/v1/auth/login", json={"email": "admin@ovalens.fu.edu.ph", "password": "Admin@123"})
+    auth_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    sample_telemetry = {
+        "hostname": "OvaLens-Rig-01",
+        "ip_address": "192.168.1.50",
+        "camera": {"index": 0, "identity": "USB Camera DirectShow", "resolution": "1280x720", "fps": 30, "is_mock": False},
+        "ai_model": {"engine_type": "ONNX Runtime FP16", "model_version": "best_v3.onnx", "sort_confidence": 0.70},
+        "iot_rig": {"rig_profile": "unified_v4", "conveyor_port": "COM5", "servo_port": "COM7", "light_port": "COM9"},
+        "storage": {"unsynced_scans": 0, "mode": "SQLite WAL"},
+    }
+
+    try:
+        reg = client.post("/api/v1/devices/register", headers=headers, json={
+            "device_id": device_id,
+            "device_name": "Real Edge Station Rig",
+            "hardware_platform": "Windows 11 AMD64",
+            "model_version": "best_v3.onnx",
+            "ip_address": "192.168.1.50",
+            "edge_url": "http://192.168.1.50:8008",
+            "telemetry": sample_telemetry,
+        })
+        assert reg.status_code == 200
+        assert reg.json()["telemetry"]["hostname"] == "OvaLens-Rig-01"
+
+        # Update heartbeat with live status and updated telemetry
+        updated_telemetry = {**sample_telemetry, "storage": {"unsynced_scans": 2, "mode": "SQLite WAL"}}
+        hb = client.post(f"/api/v1/devices/{device_id}/heartbeat", headers=headers, json={
+            "status": "SCANNING",
+            "ip_address": "192.168.1.50",
+            "edge_url": "http://192.168.1.50:8008",
+            "telemetry": updated_telemetry,
+        })
+        assert hb.status_code == 200
+        assert hb.json()["status"] == "SCANNING"
+        assert hb.json()["telemetry"]["storage"]["unsynced_scans"] == 2
+
+        # Check authenticated GET /api/v1/devices/{device_id}
+        dev = client.get(f"/api/v1/devices/{device_id}", headers=auth_headers)
+        assert dev.status_code == 200
+        assert dev.json()["telemetry"]["iot_rig"]["rig_profile"] == "unified_v4"
+
+        # Check GET /api/v1/devices/{device_id}/live
+        live = client.get(f"/api/v1/devices/{device_id}/live", headers=auth_headers)
+        assert live.status_code == 200
+        assert live.json()["device_id"] == device_id
+        assert live.json()["telemetry"]["hostname"] == "OvaLens-Rig-01"
+    finally:
+        with SessionLocal() as db:
+            db.query(DeviceModel).filter(DeviceModel.device_id == device_id).delete()
             db.commit()

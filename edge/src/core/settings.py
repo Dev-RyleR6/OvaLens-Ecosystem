@@ -7,6 +7,9 @@ from pathlib import Path
 import tempfile
 
 
+PRODUCTION_INFERTILE_ANGLE = 135
+
+
 @dataclass
 class CameraSettings:
     index: int = 0
@@ -69,6 +72,22 @@ class EdgeSettings:
     calibration: CalibrationSettings = field(default_factory=CalibrationSettings)
 
     @classmethod
+    def unified_board(cls):
+        """Single-board unified OvaLens rig defaults."""
+        settings = cls(rig_profile="unified_v4", conveyor_port="COM5",
+                       servo_port="", light_port="")
+        settings.camera.index = 0
+        settings.detection.confidence = .30
+        settings.calibration.speed_us = 3000
+        settings.calibration.settle_ms = 1500
+        settings.calibration.hold_ms = 300
+        settings.calibration.fertile_angle = 180
+        settings.calibration.infertile_angle = PRODUCTION_INFERTILE_ANGLE
+        settings.calibration.sorter_steps = 367
+        settings.calibration.gate_clearance_steps = 50
+        return settings
+
+    @classmethod
     def three_board(cls):
         """Handoff defaults are a starting point, never physical authorization."""
         settings = cls(rig_profile="three_v3", conveyor_port="COM5",
@@ -80,7 +99,7 @@ class EdgeSettings:
         settings.calibration.settle_ms = 1500
         settings.calibration.hold_ms = 300
         settings.calibration.fertile_angle = 180
-        settings.calibration.infertile_angle = 50
+        settings.calibration.infertile_angle = PRODUCTION_INFERTILE_ANGLE
         # 2.5 s at 3000 us half-period is about 417 steps to gate exit.
         settings.calibration.sorter_steps = 367
         settings.calibration.gate_clearance_steps = 50
@@ -91,14 +110,18 @@ class EdgeSettings:
             if type(value) is not int or not lo <= value <= hi:
                 raise ValueError(f"{label} must be a whole number between {lo} and {hi}")
         integer(self.version, 1, 1, "Settings version")
-        if self.rig_profile not in {"dual_v2", "three_v3"}:
-            raise ValueError("Select dual_v2 or three_v3 rig profile")
+        if self.rig_profile not in {"dual_v2", "three_v3", "unified_v4"}:
+            raise ValueError("Select dual_v2, three_v3 or unified_v4 rig profile")
         if not all(isinstance(p, str) for p in (self.conveyor_port, self.servo_port, self.light_port)):
             raise ValueError("Serial ports must be text")
-        ports = [p.casefold() for p in (self.conveyor_port, self.servo_port,
-                 self.light_port if self.rig_profile == "three_v3" else "") if p]
-        if len(ports) != len(set(ports)):
-            raise ValueError("Select separate serial ports for every board")
+        if self.rig_profile == "unified_v4":
+            if not self.conveyor_port:
+                raise ValueError("Select the serial port for the unified ESP32 controller")
+        else:
+            ports = [p.casefold() for p in (self.conveyor_port, self.servo_port,
+                     self.light_port if self.rig_profile == "three_v3" else "") if p]
+            if len(ports) != len(set(ports)):
+                raise ValueError("Select separate serial ports for every board")
         c, d, k = self.camera, self.detection, self.calibration
         integer(c.index, 0, 99, "Camera index")
         integer(c.width, 160, 7680, "Width")

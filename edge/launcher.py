@@ -1,4 +1,4 @@
-"""OvaLens desktop launcher: explicit preview, no unvalidated hardware motion."""
+"""OvaLens desktop launcher for the physical sorting station."""
 import os
 import sys
 
@@ -41,7 +41,7 @@ def main():
     print("=" * 65)
     device_id = os.getenv("DEVICE_ID", "STATION-01-RP5")
     db = LocalDatabaseManager()
-    config = show_startup_config(device_id=device_id, operator_name=db.get_batch_preferences().get("operator", ""))
+    config = show_startup_config(device_id=device_id)
     if config is None:
         print("[EXIT] Startup cancelled.")
         return
@@ -52,12 +52,12 @@ def main():
 
     # Register cleanup as soon as each worker exists, including UI-build failures.
     with ExitStack() as resources:
-        camera = CameraGrabber(camera_index=camera_index,
-                               allow_mock=bool(config.get("simulation", False)))
+        resources.enter_context(db.operator_session())
+        camera = CameraGrabber(camera_index=camera_index)
         resources.callback(_stop_resource, camera)
         engine = InferenceEngine()
         if not engine.engine_type.startswith("ONNX"):
-            print("[WARNING] Real ONNX model is not ready; only unsaved preview is available.")
+            print("[ERROR] ONNX model unavailable; scanning and sorting require a verified model.")
         worker = InferenceWorker(engine)
         resources.callback(_stop_resource, worker)
         worker.start()
@@ -76,14 +76,13 @@ def main():
                                     os.getenv("API_KEY", ""), device_id=device_id,
                                     device_name=os.getenv("DEVICE_NAME", device_id),
                                     hardware_platform=f"{platform.system()} {platform.machine()}",
-                                    model_version=engine.engine_type)
+                                    model_version=engine.engine_type,
+                                    telemetry_provider=getattr(station, "telemetry_server", None).get_telemetry if hasattr(station, "telemetry_server") else None)
         resources.callback(_stop_resource, sync)
-        if not config.get("simulation", False):
-            sync.start()
-        app = OvaLensOperatorApp(camera=camera, engine=engine, iot=None, db=db,
-                                 sync_worker=sync, chamber=None,
+        sync.start()
+        app = OvaLensOperatorApp(camera=camera, engine=engine, station=station,
+                                 db=db, sync_worker=sync,
                                  inference_worker=worker, device_id=device_id,
-                                 station=station,
                                  startup_config=config)
         try:
             app.mainloop()

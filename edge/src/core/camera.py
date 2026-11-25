@@ -28,8 +28,7 @@ FRAME_STALENESS_THRESHOLD_S = 1.5
 
 
 class CameraGrabber:
-    def __init__(self, camera_index: int = 0, width: int = 1280, height: int = 720, fps: int = 30,
-                 allow_mock: bool = False):
+    def __init__(self, camera_index: int = 0, width: int = 1280, height: int = 720, fps: int = 30):
         self.camera_index = camera_index
         self.width = width
         self.height = height
@@ -45,8 +44,6 @@ class CameraGrabber:
         self._fps_count = 0
         self._current_fps = 0.0
         self._last_fps_time = time.time()
-        self._static_bg: Optional[np.ndarray] = None
-        self.allow_mock = allow_mock
         self.last_error = None
         self._last_frame_at = 0.0
         self._sequence = 0
@@ -58,13 +55,6 @@ class CameraGrabber:
         self._discard_frames = 0
         self.initial_settings = None
         self.exposure_modes = {}
-
-    def _init_static_bg(self):
-        """Pre-render darkroom candling aperture background once to minimize CPU cycles."""
-        bg = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        cv2.circle(bg, (self.width // 2, self.height // 2), 260, (15, 35, 80), -1)
-        cv2.circle(bg, (self.width // 2, self.height // 2), 180, (20, 60, 160), -1)
-        self._static_bg = bg
 
     def start(self):
         """Open/read the camera on its worker; never silently substitute mock frames."""
@@ -79,10 +69,6 @@ class CameraGrabber:
         self._thread.start()
 
     def _open_camera(self):
-        if self.allow_mock:
-            self._is_mock_mode = True
-            self._init_static_bg()
-            return
         backend = cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_V4L2
         self.cap = cv2.VideoCapture(self.camera_index, backend)
         if not self.cap.isOpened():
@@ -111,8 +97,6 @@ class CameraGrabber:
         EdgeSettings(camera=settings).validate()
         if live_preview and not controls_only:
             raise ValueError("Live preview updates must preserve camera stream settings")
-        if self.allow_mock:
-            raise RuntimeError("Camera property tuning requires a real camera")
         if controls_only and settings.index != self.camera_index:
             raise RuntimeError("Use station settings to change the camera device")
         if settings.index != self.camera_index:
@@ -174,7 +158,7 @@ class CameraGrabber:
         """Flush and capture on the sole VideoCapture owner, never on the caller."""
         if type(drain) is not int or not 1 <= drain <= 30:
             raise ValueError("Camera drain must be between 1 and 30 frames")
-        if not self._is_running or self.allow_mock:
+        if not self._is_running:
             raise RuntimeError("Fresh capture requires an active real camera")
         future = Future()
         self._still_requests.put_nowait((drain, future))
@@ -195,7 +179,7 @@ class CameraGrabber:
     def _capture_loop(self):
         try:
             self._open_camera()
-            if self.initial_settings is not None and self._requests.empty() and not self.allow_mock:
+            if self.initial_settings is not None and self._requests.empty():
                 self._apply_on_worker(self.initial_settings)
             while self._is_running:
                 try:
@@ -225,13 +209,9 @@ class CameraGrabber:
                             future.set_result(self._apply_on_worker(settings, controls_only, live_preview))
                         except Exception as exc:
                             future.set_exception(exc)
-                if self._is_mock_mode:
-                    frame = self._generate_mock_candling_frame()
-                    time.sleep(1 / max(1, self.fps))
-                else:
-                    ret, frame = self.cap.read()
-                    if not ret or frame is None:
-                        raise RuntimeError("Camera frame acquisition failed; reconnect before restarting")
+                ret, frame = self.cap.read()
+                if not ret or frame is None:
+                    raise RuntimeError("Camera frame acquisition failed; reconnect before restarting")
                 if self._discard_frames:
                     self._discard_frames -= 1
                     continue
@@ -266,31 +246,6 @@ class CameraGrabber:
             self._current_fps = round(self._fps_count / (now - self._last_fps_time), 1)
             self._fps_count = 0
             self._last_fps_time = now
-
-    def _generate_mock_candling_frame(self) -> np.ndarray:
-        """Create a synthetic high-contrast duck egg candling image using cached background."""
-        if self._static_bg is not None:
-            img = self._static_bg.copy()
-        else:
-            img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-
-        # Draw egg silhouette in center
-        t = time.time()
-        offset_y = int(np.sin(t * 1.5) * 15)
-        center = (self.width // 2, (self.height // 2) + offset_y)
-        axes = (140, 190)
-
-        # Egg body (warm amber glow)
-        cv2.ellipse(img, center, axes, 0, 0, 360, (30, 140, 240), -1)
-
-        # Embryo / blood spider veins
-        cv2.circle(img, (center[0] - 20, center[1] - 15), 35, (10, 40, 160), -1)
-        for angle in np.linspace(0, 2 * np.pi, 8):
-            ex = int(center[0] - 20 + np.cos(angle) * 75)
-            ey = int(center[1] - 15 + np.sin(angle) * 75)
-            cv2.line(img, (center[0] - 20, center[1] - 15), (ex, ey), (15, 50, 180), 2)
-
-        return img
 
     def get_latest_frame(self, copy: bool = False) -> Optional[np.ndarray]:
         """Return the most recent video frame atomically."""

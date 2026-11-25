@@ -75,6 +75,7 @@ edge/db/edge_settings.json
 edge/db/*.tmp
 .flow_tests/
 *.db.lock
+*.db.operator.lock
 
 # Locally installed AI tooling and Impeccable integration files
 /.codex/
@@ -85,3 +86,4 @@ edge/db/*.tmp
 
 # Unused raster copy; the dashboard uses ovalens_logo.svg
 /dashboard/src/assets/logos/ovalens_logo.png
+edge/db/ui_appearance.json

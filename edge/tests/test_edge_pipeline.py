@@ -41,15 +41,15 @@ def test_candling_heuristics_and_vascularization():
     assert lum_info["vascular_index"] > 0.0
 
 
-def test_camera_mock_generation_and_lifecycle():
-    """Verify on-demand camera start/stop lifecycle and synthetic candling frame generator."""
+def test_camera_starts_without_frames_until_hardware_is_opened():
+    """An idle camera must not provide an invented preview or scan frame."""
     camera = CameraGrabber()
     assert camera.is_running is False
     assert camera.current_fps == 0.0
 
-    mock_frame = camera._generate_mock_candling_frame()
-    assert mock_frame is not None
-    assert mock_frame.shape == (720, 1280, 3)
+    assert camera.get_latest_frame() is None
+    assert camera.snapshot() is None
+    assert not camera.is_mock_mode
 
 
 def test_inference_engine_and_latency_benchmark():
@@ -127,15 +127,15 @@ def test_local_sqlite_wal_and_queue_diagnostics(tmp_path):
     assert remaining[0]["scan_id"] == s3
 
 
-def test_esp32_serial_mock_and_motor_commands():
-    """Verify non-blocking ESP32 commands (solenoid schedule, motor stepping, light PWM)."""
+def test_disconnected_esp32_rejects_commands():
+    """Disconnected hardware cannot silently accept motor or light commands."""
     iot = ESP32SerialDriver()
-    iot.schedule_ejection(delay_ms=2000, pulse_ms=250)
-    iot.set_conveyor(True)
-    iot.set_conveyor(False)
-    iot.set_candling_light(255)
-    iot.ping()
-    assert iot.is_connected is False  # Verified in Mock Actuator mode
+    for command in (lambda: iot.schedule_ejection(delay_ms=2000, pulse_ms=250),
+                    lambda: iot.set_conveyor(True), lambda: iot.set_conveyor(False),
+                    lambda: iot.set_candling_light(255), iot.ping):
+        with pytest.raises(ConnectionError, match="unavailable"):
+            command()
+    assert iot.is_connected is False
 
 
 def test_sync_worker_diagnostics(tmp_path):
@@ -260,3 +260,65 @@ def test_edge_rejects_removed_classes_and_stages(tmp_path):
         )
 
 
+
+
+def test_edge_telemetry_server_and_heartbeat_payload(tmp_path):
+    """Verify embedded Edge telemetry HTTP server and heartbeat integration."""
+    from src.core.edge_server import EdgeTelemetryServer
+    from src.core.settings import EdgeSettings
+    from types import SimpleNamespace
+    import urllib.request
+    import json
+
+    test_db_path = str(tmp_path / "test_telemetry.db")
+    db = LocalDatabaseManager(db_path=test_db_path)
+
+    unified_station = SimpleNamespace(
+        device_id="TEST-RIG-01",
+        settings=EdgeSettings.unified_board(),
+        camera=None,
+        inference=None,
+        db=db,
+        boards=None,
+        cycle=None,
+        calibrated=True,
+        settings_error="",
+    )
+
+    server = EdgeTelemetryServer(
+        station=unified_station,
+        device_id="TEST-RIG-01",
+        host="127.0.0.1",
+        port=8099,
+        db=db
+    )
+    try:
+        server.start()
+        telemetry = server.get_telemetry()
+        assert telemetry["device_id"] == "TEST-RIG-01"
+        assert "camera" in telemetry
+        assert "ai_model" in telemetry
+        assert "iot_rig" in telemetry
+        assert telemetry["iot_rig"]["rig_profile"] == "unified_v4"
+        assert telemetry["iot_rig"]["conveyor_port"] == "COM5"
+        assert telemetry["iot_rig"]["servo_port"] == ""
+        assert telemetry["iot_rig"]["light_port"] == ""
+        assert telemetry["iot_rig"]["holder_steps"] == 1000
+        assert telemetry["iot_rig"]["sorter_steps"] == 367
+        assert telemetry["iot_rig"]["silent_idle_enabled"] is True
+
+        # Probe the HTTP server
+        url = f"http://127.0.0.1:{server.port}/api/device"
+        req = urllib.request.urlopen(url, timeout=2.0)
+        assert req.status == 200
+        data = json.loads(req.read().decode("utf-8"))
+        assert data["status"] == "ok"
+        assert data["device"]["device_id"] == "TEST-RIG-01"
+
+        # Check health endpoint
+        health_req = urllib.request.urlopen(f"http://127.0.0.1:{server.port}/health", timeout=2.0)
+        assert health_req.status == 200
+        health_data = json.loads(health_req.read().decode("utf-8"))
+        assert health_data["status"] == "ONLINE"
+    finally:
+        server.stop()

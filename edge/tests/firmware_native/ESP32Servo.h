@@ -1,5 +1,8 @@
 #pragma once
 inline bool failServo = false;
+struct ESP32PWM {
+  static void allocateTimer(int) {}
+};
 struct Servo {
   bool connected = false;
   int requested = 90;
