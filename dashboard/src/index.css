@@ -253,7 +253,6 @@
 .hatchery-sidebar .nav-link { color: #f9e3df; border-radius: .5rem; padding: .8rem .875rem; }
 .hatchery-sidebar .nav-link:hover { background: #650000; color: white; }
 .hatchery-sidebar .nav-link.active { background: #fff5f2; color: #800000; font-weight: 600; }
-.hatchery-sidebar .nav-link.active::after { background: #800000; }
 .hatchery-sidebar :focus-visible { outline-color: #ffe1a8; outline-offset: 3px; }
 .hatchery-sidebar .nav-link.active:focus-visible { outline-offset: -3px; outline-color: #800000; }
 .sidebar-mobile-header, .sidebar-connections { border-top: 1px solid #ab4545; }
@@ -327,7 +326,6 @@
 .nav-link { display: flex; align-items: center; gap: .75rem; min-height: 44px; padding: .75rem; border-radius: .5rem; color: rgb(var(--slate-600)); transition: background-color 150ms ease, color 150ms ease; }
 .nav-link:hover { background: rgb(var(--slate-50)); color: var(--foreground); }
 .nav-link[aria-current="page"] { background: var(--maroon-surface); color: var(--brand-ink); font-weight: 600; }
-.nav-link[aria-current="page"]::after { content: ''; width: 5px; height: 5px; margin-left: auto; border-radius: 50%; background: currentColor; }
 .scan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 1rem; }
 .filter-panel { padding: 1rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--card); }
 @media (max-width: 639px) {

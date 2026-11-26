@@ -165,8 +165,9 @@ test('device sliders are disabled and explained for read-only operators', () => 
   assert.match(sources.DevicesPage, /Only administrators and managers can edit calibration records/);
   assert.match(sources.DevicesPage, /Single-ESP32 Unified \(v4\)/);
   assert.match(sources.DevicesPage, /Unified Serial Bus \(UNIFIED_V3\)/);
-  assert.match(sources.DevicesPage, /Operator on Duty:/);
-  assert.match(sources.DevicesPage, /Step Geometry:/);
+  assert.match(sources.DevicesPage, /label="Current operator"/);
+  assert.match(sources.DevicesPage, /label="Holder spacing"/);
+  assert.match(sources.DevicesPage, /label="Sorter offset"/);
 });
 
 test('finalizing hatch results preserves counts and scrolls within the viewport', () => {

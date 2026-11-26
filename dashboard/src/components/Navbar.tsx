@@ -78,7 +78,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, sidebarOpen = f
           <Menu className="w-5 h-5" aria-hidden="true" />
         </button>
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-lg bg-[#F8FAFC] flex items-center justify-center shrink-0"><img src={ovalensLogo} alt="OvaLens logo" className="w-9 h-9 object-contain" width={36} height={36} /></div>
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"><img src={ovalensLogo} alt="OvaLens logo" className="w-9 h-9 object-contain" width={36} height={36} /></div>
           <div className="min-w-0"><span className="font-semibold text-base text-foreground">OvaLens</span><p className="text-xs text-slate-500 hidden sm:block">Foundation University · Hatchery management</p></div>
         </div>
       </div>

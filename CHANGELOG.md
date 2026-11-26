@@ -88,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Capstone Manuscript Chapters 1, 2, 3, and References in `docs/manuscript/` with authentic proposal text and 15 APA 7th academic citations.
 
 ### Changed
+- **Dashboard**: [TASK-DASH-PG-07] simplify sorter device monitoring with a station list, camera snapshots, and expandable diagnostics and calibration (2026-11-26)
 - **Edge**: [TASK-NEW-EDGE-SELECT-LAYOUT-01] improve native selectors and workspace positioning (2026-11-13)
 - **Edge**: [TASK-NEW-EDGE-TYPE-CONTRAST-01] unify native typography and improve control contrast (2026-11-13)
 - **Edge**: [TASK-NEW-EDGE-SOFT-DESKTOP-01] simplify the native operator desktop layout (2026-11-13)
