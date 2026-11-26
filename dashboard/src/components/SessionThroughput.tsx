@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import type { CandlingSession } from '../types';
-import { estimateCapacity, formatRunDuration } from '../utils/sessionMetrics';
+import { estimateCapacity, formatReadableDuration } from '../utils/sessionMetrics';
 
 export function SessionThroughput({ session }: { session: CandlingSession }) {
   const [minutes, setMinutes] = useState('10');
@@ -10,7 +10,7 @@ export function SessionThroughput({ session }: { session: CandlingSession }) {
   const estimate = eligible ? estimateCapacity(count, seconds, minutes) : null;
   return (
     <div className="space-y-2 border-t border-border pt-2 text-sm text-foreground">
-      <p className="tabular-nums">Duration: {formatRunDuration(seconds)} · Average: {rate === null ? 'Unavailable' : `${rate.toFixed(1)} scans/min`}</p>
+      <p className="tabular-nums">Duration: {formatReadableDuration(seconds)} · Average: {rate === null ? 'Unavailable' : `${rate.toFixed(1)} scans/min`}</p>
       <p className="text-xs text-muted-foreground">Counts include manual-review captures and rescans. Diagnostic runs reflect diagnostic pace.</p>
       {eligible ? <>
         <div className="flex flex-wrap items-center gap-2">
@@ -24,7 +24,7 @@ export function SessionThroughput({ session }: { session: CandlingSession }) {
           {estimate === null ? 'Enter a finite number of minutes greater than zero.' :
             `Estimated capacity at this run’s average pace: approximately ${estimate.toLocaleString()} scans.`}
         </p>
-        <p className="text-xs text-muted-foreground">Based on {count.toLocaleString()} scans in {formatRunDuration(seconds)}. Estimates do not control the conveyor.</p>
+        <p className="text-xs text-muted-foreground">Based on {count.toLocaleString()} scans in {formatReadableDuration(seconds)}. Estimates do not control the conveyor.</p>
       </> : <p className="text-xs text-muted-foreground">Capacity estimates need a finalized run with positive duration and at least one scan.</p>}
     </div>
   );

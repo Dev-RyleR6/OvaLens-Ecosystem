@@ -30,6 +30,7 @@ import {
 } from 'recharts';
 import { apiClient } from '../api/client';
 import { BatchAnalyticsResponse } from '../types';
+import { formatReadableDuration, summarizeRunDurations } from '../utils/sessionMetrics';
 import { useModalAnimation } from '@/hooks/useModalAnimation';
 import { cn } from '@/lib/utils';
 
@@ -281,27 +282,46 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
               </div>
 
               {/* Candling Sessions Log */}
-              <div className="bg-card border border-slate-200 rounded-xl p-4  space-y-3">
-                <h3 className="text-xs font-bold text-slate-900">
-                  Candling Runs & Conveyor Throughput
-                </h3>
+              <div className="bg-card border border-slate-200 rounded-xl p-4 space-y-3">
+                {(() => {
+                  const summary = summarizeRunDurations(data.sessions);
+                  const totalDuration = data.total_scan_duration_seconds ?? summary.totalDurationSeconds;
+                  return (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-xs font-bold text-slate-900">
+                        Candling Runs & Conveyor Throughput
+                      </h3>
+                      {data.sessions.length > 0 && (
+                        <span className="text-xs text-slate-600 tabular-nums">
+                          Total scan duration:{' '}
+                          <strong className="text-slate-900">{formatReadableDuration(totalDuration ?? null)}</strong>
+                          {summary.untimedRuns > 0 && summary.timedRuns > 0
+                            ? ` (${summary.timedRuns} of ${summary.totalRuns} runs timed)`
+                            : ''}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {data.sessions.length === 0 ? (
                   <p className="text-xs text-slate-400 py-4 text-center">
                     No candling runs recorded yet for this batch.
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
+                  <div className="table-scroll" tabIndex={0} role="region" aria-label="Candling runs table, scroll horizontally on smaller screens">
+                    <table className="w-full min-w-[680px] text-xs text-left">
                       <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                         <tr>
-                          <th className="py-2 px-3 font-semibold">Stage</th>
-                          <th className="py-2 px-3 font-semibold">Operator</th>
-                          <th className="py-2 px-3 font-semibold text-right">Scanned</th>
-                          <th className="py-2 px-3 font-semibold text-right">Fertile</th>
-                          <th className="py-2 px-3 font-semibold text-right">Penoy</th>
-                          <th className="py-2 px-3 font-semibold text-right">Fertility Rate</th>
-                          <th className="py-2 px-3 font-semibold text-right">Avg ONNX Latency</th>
+                          <th scope="col" className="py-2 px-3 font-semibold">Stage</th>
+                          <th scope="col" className="py-2 px-3 font-semibold">Operator</th>
+                          <th scope="col" className="py-2 px-3 font-semibold text-right">Duration</th>
+                          <th scope="col" className="py-2 px-3 font-semibold text-right">Throughput</th>
+                          <th scope="col" className="py-2 px-3 font-semibold text-right">Scanned</th>
+                          <th scope="col" className="py-2 px-3 font-semibold text-right">Fertile</th>
+                          <th scope="col" className="py-2 px-3 font-semibold text-right">Penoy</th>
+                          <th scope="col" className="py-2 px-3 font-semibold text-right">Fertility Rate</th>
+                          <th scope="col" className="py-2 px-3 font-semibold text-right">Avg ONNX Latency</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -309,6 +329,10 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                           <tr key={s.session_id} className="hover:bg-slate-50/50">
                             <td className="py-2 px-3 font-bold text-slate-900">{s.stage}</td>
                             <td className="py-2 px-3 text-slate-600">{s.operator_name}</td>
+                            <td className="py-2 px-3 text-right tabular-nums text-slate-700">{formatReadableDuration(s.duration_seconds)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums text-slate-700">
+                              {s.eggs_per_minute === null ? '—' : `${s.eggs_per_minute.toFixed(1)} / min`}
+                            </td>
                             <td className="py-2 px-3 text-right font-semibold text-slate-900">{s.total_scanned}</td>
                             <td className="py-2 px-3 text-right text-emerald-700 font-bold">{s.fertile_count}</td>
                             <td className="py-2 px-3 text-right text-amber-700 font-bold">{s.infertile_count}</td>

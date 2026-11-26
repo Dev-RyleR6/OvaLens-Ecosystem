@@ -50,6 +50,7 @@ export interface BatchSummary extends Batch {
   manual_review_count?: number;
   fertility_rate: number;
   hatchability_rate: number;
+  total_scan_duration_seconds?: number | null;
   elapsed_days?: number;
   milestone_alert?: string;
 }
@@ -93,6 +94,7 @@ export interface BatchAnalyticsResponse {
   hatched_count: number;
   unhatched_count: number;
   actual_hatchability_rate: number;
+  total_scan_duration_seconds?: number | null;
   sessions: SessionSummaryItem[];
 }
 

@@ -21,6 +21,7 @@ import { apiClient } from '../api/client';
 import { BatchSummary, DuckBreed, BatchStage, CandlingSession } from '../types';
 import { ActionsMenu } from '../components/ActionsMenu';
 import { SessionThroughput } from '../components/SessionThroughput';
+import { formatReadableDuration, summarizeRunDurations } from '../utils/sessionMetrics';
 import { BatchIncubationStatus } from '../components/BatchIncubationStatus';
 import { BatchProgressTimeline } from '../components/BatchProgressTimeline';
 import { Dialog } from '../components/ui/dialog';
@@ -509,6 +510,7 @@ export const BatchesPage: React.FC = () => {
                       <span>Fertility</span><ArrowUpDown aria-hidden="true" className="w-4 h-4" />
                     </button>
                   </th>
+                  <th scope="col" className="py-3 px-4">Scan duration</th>
                   <th scope="col" className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -532,12 +534,22 @@ export const BatchesPage: React.FC = () => {
                         <p>{b.breed === 'KAYUMANGGI' ? 'IP-Kayumanggi' : b.breed === 'ITIM' ? 'IP-Itim' : 'IP-Khaki'} · {b.incubator_id}</p>
                         <p>Set {new Date(b.set_date).toLocaleDateString()}{b.elapsed_days !== undefined ? ` · Day ${b.elapsed_days}` : ''}</p>
                       </td>
-                      <td className="py-3 px-4 batch-numbers"><strong>{b.initial_egg_count.toLocaleString()}</strong><p>{b.total_scanned.toLocaleString()} scans</p></td>
+                      <td className="py-3 px-4 batch-numbers">
+                        <strong>{b.initial_egg_count.toLocaleString()}</strong>
+                        <p>{b.total_scanned.toLocaleString()} scans</p>
+                      </td>
                       <td className="py-3 px-4">
                         <BatchIncubationStatus batch={b} />
                       </td>
                       <td className="py-3 px-4 batch-numbers">
                         {b.total_scanned > 0 ? <><strong>{b.fertility_rate}%</strong><p>{b.fertile_count.toLocaleString()} fertile</p></> : <span className="text-slate-500">Awaiting scans</span>}
+                      </td>
+                      <td className="py-3 px-4 batch-numbers">
+                        {b.total_scan_duration_seconds != null ? (
+                          <strong>{formatReadableDuration(b.total_scan_duration_seconds)}</strong>
+                        ) : (
+                          <span className="text-slate-500">—</span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="batch-row-actions">
@@ -594,6 +606,9 @@ export const BatchesPage: React.FC = () => {
 
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-3 text-slate-600">
                   <span>Initial Egg Set: <strong>{b.initial_egg_count}</strong></span>
+                  {b.total_scan_duration_seconds != null && (
+                    <span className="tabular-nums">Scan duration: <strong>{formatReadableDuration(b.total_scan_duration_seconds)}</strong></span>
+                  )}
                   <span className="font-bold text-emerald-700">{b.total_scanned > 0 ? `${b.fertility_rate}% Fertile` : 'Pending'}</span>
                 </div>
               </div>
@@ -820,13 +835,25 @@ export const BatchesPage: React.FC = () => {
 
             {/* Candling Sessions Shift Log with Throughput Speed */}
             <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <Clock aria-hidden="true" className="w-3.5 h-3.5 text-slate-600" />
-                  <span>Operator Candling Sessions & Throughput</span>
-                </h4>
-                <span className="text-[10px] font-semibold text-slate-500">{batchSessions.length} recorded</span>
-              </div>
+              {(() => {
+                const durationSummary = summarizeRunDurations(batchSessions);
+                const totalDuration = durationSummary.totalDurationSeconds ?? selectedBatch.total_scan_duration_seconds ?? null;
+                return (
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <Clock aria-hidden="true" className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Operator Candling Sessions & Throughput</span>
+                    </h4>
+                    <span className="text-xs font-medium text-slate-600 tabular-nums">
+                      {batchSessions.length} recorded
+                      {totalDuration !== null ? ` · Total ${formatReadableDuration(totalDuration)}` : ''}
+                      {durationSummary.untimedRuns > 0 && durationSummary.timedRuns > 0
+                        ? ` (${durationSummary.timedRuns}/${durationSummary.totalRuns} timed)`
+                        : ''}
+                    </span>
+                  </div>
+                );
+              })()}
 
               {isSessionLoading ? <p role="status" className="text-sm text-muted-foreground">Loading saved runs…</p> : batchSessions.length > 0 ? (
                 <div className="space-y-2">
