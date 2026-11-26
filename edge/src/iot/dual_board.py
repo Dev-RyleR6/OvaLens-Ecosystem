@@ -190,7 +190,7 @@ class BoardLink:
         if self._pending and ident == self._pending[0]:
             if sep and key not in {"OK", "EVENT"}:
                 self._command_values[key] = value
-            if payload in {"OK:MOVE_DONE", "OK:SERVO_DONE", "OK:FAULT_ACKNOWLEDGED", "OK:HOME_SET",
+            if payload in {"OK:MOVE_DONE", "OK:REJECT_DONE", "OK:SERVO_DONE", "OK:FAULT_ACKNOWLEDGED", "OK:HOME_SET",
                            "OK:SPEED", "OK:PRESET_SET", "OK:IR_CONFIG", "OK:STATION_SET",
                            "OK:EGG_STOPPED", "OK:RESUME", "OK:PAUSE", "OK:LIGHT_ON", "OK:LIGHT_OFF",
                            "OK:STATUS", "OK:GATE_RESET_SCHEDULED", "OK:ARMED"}:

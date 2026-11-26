@@ -175,8 +175,15 @@ The backend applies the nullable session operator-ID migration automatically on 
 2. Wait through **Inspecting egg**, **Positioning gate** and **Wait ? egg passing**.
    Inference and boxes appear after the sensor stop is confirmed, lamp ON and
    camera settling; three agreeing fresh predictions are required.
-3. Classification saves locally before the servo moves. The gate confirms its
-   stroke before the stepper resumes, then holds its angle through gate exit.
+3. Classification saves locally before the servo moves. On the unified station,
+   the ESP32 sweeps the gate from neutral to the saved infertile angle while the
+   belt moves through the gate in one move at its saved speed. **Reject sweep
+   lead before gate centre (ms)** controls when it starts (`0` starts at gate
+   centre, positive starts earlier, negative starts after; default `225 ms`
+   centers a `450 ms` stroke on the egg) and **Reject sweep duration (ms)**
+   controls how long the servo takes to sweep. Increase lead if the stroke
+   arrives late. The gate sweeps back to neutral after the calibrated exit.
+   Flash the updated unified firmware before preparing the station.
 4. Low confidence or disagreement holds the egg for manual review. Review choices
    appear when needed; STOP halts the station and finalizes local records.
 5. At the target, final totals and **Set up run** appear on the same screen.

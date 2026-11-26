@@ -132,6 +132,8 @@ class UnifiedBoardController:
         state = self.link.snapshot()
         if not state.connected or not state.identified or state.error or not self.link._status_complete:
             raise RuntimeError("Unified ESP32 controller is not ready")
+        if state.telemetry.get("REJECT_SWEEP") != "3":
+            raise RuntimeError("Update the unified ESP32 firmware to enable smooth timed reject sweeps")
         if state.telemetry.get("FAULT") != "NONE" or state.telemetry.get("BUSY") != "0":
             raise RuntimeError("Unified controller requires idle fault acknowledgement")
         if state.telemetry.get("REFERENCE_VALID") != "1":

@@ -91,6 +91,68 @@ def test_unified_ir_stop_reports_holding_through_capture_and_clears(three_sketch
     assert output.rstrip().endswith("ID:9:STATE:WAITING")
 
 
+@pytest.mark.parametrize("direction", [1, -1])
+def test_unified_reject_sweeps_smoothly_at_configured_speed(three_sketches, direction):
+    output = run(
+        three_sketches, "UNIFIED", *ready("UNIFIED"),
+        "SEND @2 SETHOME", "SEND @3 ARM", "SEND @4 RESUME", "SEND @5 SPEED:4000",
+        f"SEND @6 ADVANCE_REJECT:{12 * direction}:4:8:450",
+        "TICKS 6", "SEND @7 STATUS", "TICKS 1", "CLOCK 600", "SEND @8 STATUS",
+        "TICKS 4", "CLOCK 725", "SEND @9 STATUS", "TICKS 13", "SEND @10 STATUS",
+        "CLOCK 949", "CLOCK 950",
+    )
+    assert "REJECT_SWEEP:3" in output
+    assert f"ID:7:POSITION:{3 * direction}" in output and "ID:7:ANGLE:90" in output
+    assert f"ID:8:POSITION:{4 * direction}" in output and "ID:8:ANGLE:97" in output
+    assert "ID:8:SPEED:4000" in output and "ID:8:PAUSED:0" in output
+    assert f"ID:9:POSITION:{6 * direction}" in output and "ID:9:ANGLE:114" in output
+    assert f"ID:10:POSITION:{12 * direction}" in output and "ID:10:BUSY:1" in output
+    assert output.index("ID:10:STATE:SETTLING") < output.index("ID:6:OK:REJECT_DONE")
+    final = output.split("ID:6:OK:REJECT_DONE", 1)[1]
+    assert f"ID:6:REJECT_AT:{4 * direction}" in final and "ID:6:SPEED:4000" in final
+    assert "ID:6:BUSY:0" in final and "ID:6:ANGLE:135" in final and "ID:6:OK:MOVE_DONE" not in output
+
+
+@pytest.mark.parametrize("action, fault", [
+    ("SEND @7 ESTOP", "EMERGENCY_STOP"),
+    ("SEND @7 PAUSE", "REJECT_INTERRUPTED"),
+    ("PIN 26 0", "REJECT_CHAMBER_BLOCKED"),
+])
+def test_unified_reject_aborts_before_sweep_when_transport_is_interrupted(three_sketches, action, fault):
+    output = run(
+        three_sketches, "UNIFIED", *ready("UNIFIED"),
+        "SEND @2 SETHOME", "SEND @3 ARM", "SEND @4 RESUME", "SEND @5 SPEED:4000",
+        "SEND @6 ADVANCE_REJECT:12:4:8:450", "TICKS 6", action, "TICKS 18", "SEND @8 STATUS",
+    )
+    assert f"ID:8:FAULT:{fault}" in output and "ID:8:ANGLE:90" in output
+    assert "ID:8:SPEED:4000" in output and "ID:6:OK:REJECT_DONE" not in output
+
+
+def test_unified_stop_cancels_a_sweep_in_progress(three_sketches):
+    output = run(
+        three_sketches, "UNIFIED", *ready("UNIFIED"),
+        "SEND @2 SETHOME", "SEND @3 ARM", "SEND @4 RESUME",
+        "SEND @5 ADVANCE_REJECT:12:4:8:450", "TICKS 7", "CLOCK 725", "SEND @6 STATUS",
+        "SEND @7 ESTOP", "TICKS 24", "CLOCK 1000", "SEND @8 STATUS",
+    )
+    assert "ID:6:ANGLE:114" in output and "ID:8:ANGLE:114" in output
+    assert "ID:8:FAULT:EMERGENCY_STOP" in output and "ID:5:OK:REJECT_DONE" not in output
+
+
+def test_unified_reject_starts_in_first_frame_and_returns_smoothly(three_sketches):
+    output = run(
+        three_sketches, "UNIFIED", *ready("UNIFIED"),
+        "SEND @2 SETHOME", "SEND @3 ARM", "SEND @4 RESUME",
+        "SEND @5 ADVANCE_REJECT:12:4:8:450", "TICKS 7", "CLOCK 550", "SEND @6 STATUS",
+        "TICKS 17", "CLOCK 950", "SEND @7 RESET", "CLOCK 1050", "SEND @8 STATUS", "CLOCK 1400",
+    )
+    assert "ID:6:POSITION:4" in output and "ID:6:ANGLE:92" in output
+    assert output.index("ID:5:OK:REJECT_DONE") < output.index("ID:7:OK:SERVO_ACCEPTED")
+    assert "ID:8:POSITION:12" in output and "ID:8:ANGLE:128" in output
+    assert output.index("ID:8:STATE:SETTLING") < output.index("ID:7:OK:SERVO_DONE")
+    assert output.split("ID:7:OK:SERVO_DONE", 1)[1].find("ID:7:ANGLE:90") >= 0
+
+
 @pytest.mark.parametrize("role", ["EGG", "UNIFIED"])
 def test_servo_completion_presets_and_strict_number_parsing(three_sketches, role):
     output = run(three_sketches, role, *ready(role), "SEND @2 SORT:FERTILE", "CLOCK 1000",

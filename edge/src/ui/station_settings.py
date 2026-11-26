@@ -126,6 +126,10 @@ class StationSettingsWindow(ctk.CTkToplevel):
                   "buffer_drain": "Fresh capture buffer drain (frames)", "jam_timeout_s": "Egg search timeout (seconds)"}
         for name, label in labels.items():
             self._entry(calibration, "calibration." + name, label, "")
+        self._heading(calibration, "Unified reject sweep",
+                      "0 starts at gate centre; increase lead to start earlier (negative starts after). Half of duration centers the sweep on the egg.")
+        self._entry(calibration, "calibration.reject_lead_ms", "Reject sweep lead before gate centre (ms)", "")
+        self._entry(calibration, "calibration.reject_sweep_ms", "Reject sweep duration (ms)", "")
         maintenance = ctk.CTkScrollableFrame(self.sections["Maintenance"], fg_color="transparent")
         maintenance.pack(fill="both", expand=True)
         self._heading(maintenance, "Hardware maintenance", "These commands can move the rig or switch the lamp. Empty the conveyor and inspect the path first. Position and passage remain estimated.")

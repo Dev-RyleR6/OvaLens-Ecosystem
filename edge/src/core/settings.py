@@ -54,6 +54,8 @@ class CalibrationSettings:
     neutral_angle: int = 90
     fertile_angle: int = 60
     infertile_angle: int = 120
+    reject_lead_ms: int = 225
+    reject_sweep_ms: int = 450
     hold_ms: int = 1500
     buffer_drain: int = 6
     jam_timeout_s: int = 30
@@ -153,6 +155,8 @@ class EdgeSettings:
         integer(k.position_tolerance_steps, 0, k.gate_clearance_steps - 1, "Position tolerance")
         integer(k.settle_ms, 0, 10000, "Settling time")
         integer(k.passage_ms, 0, 10000, "Passage time")
+        integer(k.reject_lead_ms, -500, 1500, "Reject sweep lead")
+        integer(k.reject_sweep_ms, 80, 1000, "Reject sweep duration")
         integer(k.hold_ms, 0, 10000, "Result hold time")
         integer(k.buffer_drain, 1, 30, "Camera buffer drain")
         integer(k.jam_timeout_s, 1, 120, "Egg search timeout")
