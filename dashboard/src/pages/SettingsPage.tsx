@@ -3,8 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Building,
-  Coins,
-  Zap,
   Save,
   CheckCircle2,
   AlertTriangle,
@@ -465,23 +463,15 @@ export const SettingsPage: React.FC = () => {
             </div>
           )}
 
-          {/* Section 1: Facility Branding */}
-          <div className="fu-card p-6">
-            <div className="flex items-start justify-between gap-4 pb-4 mb-5 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
-                  <Building aria-hidden="true" className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="section-heading text-base font-semibold text-foreground">Institution &amp; Facility Profile</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Primary hatchery identification printed on session records and official certificates.</p>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <section aria-labelledby="facility-profile-heading" className="fu-card p-4 sm:p-6">
+            <header className="mb-5 space-y-1 border-b border-border pb-4">
+              <h2 id="facility-profile-heading" className="section-heading">Institution &amp; Facility Profile</h2>
+              <p className="max-w-prose text-sm text-muted-foreground">Primary hatchery identification printed on session records and official certificates.</p>
+            </header>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-5">
               <div>
-                <label htmlFor="settingspage-field-1" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
-                  Facility Name
+                <label htmlFor="settingspage-field-1" className="mb-1.5 block text-sm font-medium text-foreground">
+                  Facility name
                 </label>
                 <input
                   id="settingspage-field-1"
@@ -493,8 +483,8 @@ export const SettingsPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label htmlFor="settingspage-field-2" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
-                  Institution Name (e.g. Foundation University)
+                <label htmlFor="settingspage-field-2" className="mb-1.5 block text-sm font-medium text-foreground">
+                  Institution name
                 </label>
                 <input
                   id="settingspage-field-2"
@@ -506,25 +496,17 @@ export const SettingsPage: React.FC = () => {
                 />
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* Section 2: Economic Salvage Values */}
-          <div className="fu-card p-6">
-            <div className="flex items-start justify-between gap-4 pb-4 mb-5 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-                  <Coins aria-hidden="true" className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="section-heading text-base font-semibold text-foreground">Economic Valuation &amp; Utility Tariffs</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Commercial market prices used for Day 10 Penoy salvage and incubator electricity savings.</p>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-2">
-                <label htmlFor="settingspage-day-10-penoy-unit-price" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Day-10 Penoy Unit Price
+          <section aria-labelledby="facility-economics-heading" className="fu-card p-4 sm:p-6">
+            <header className="mb-5 space-y-1 border-b border-border pb-4">
+              <h2 id="facility-economics-heading" className="section-heading">Economic Valuation &amp; Utility Tariffs</h2>
+              <p className="max-w-prose text-sm text-muted-foreground">Prices for Penoy and ducklings, plus inputs for estimating incubator energy savings.</p>
+            </header>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-5">
+              <div className="space-y-1.5">
+                <label htmlFor="settingspage-day-10-penoy-unit-price" className="block text-sm font-medium text-foreground">
+                  Day-10 Penoy unit price
                 </label>
                 <div className="relative">
                   <div aria-hidden="true" className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted-foreground font-semibold text-sm">
@@ -541,12 +523,12 @@ export const SettingsPage: React.FC = () => {
                     required
                   />
                 </div>
-                <p className="text-[11px] text-muted-foreground">Culled Day 10 salvage market value.</p>
+                <p className="text-xs text-muted-foreground">Culled Day 10 salvage market value.</p>
               </div>
 
-              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-2">
-                <label htmlFor="settingspage-day-28-duckling-selling-price" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Day-28 Duckling Selling Price
+              <div className="space-y-1.5">
+                <label htmlFor="settingspage-day-28-duckling-selling-price" className="block text-sm font-medium text-foreground">
+                  Day-28 duckling selling price
                 </label>
                 <div className="relative">
                   <div aria-hidden="true" className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted-foreground font-semibold text-sm">
@@ -563,12 +545,12 @@ export const SettingsPage: React.FC = () => {
                     required
                   />
                 </div>
-                <p className="text-[11px] text-muted-foreground">Hatched Day 28 duckling selling price.</p>
+                <p className="text-xs text-muted-foreground">Hatched Day 28 duckling selling price.</p>
               </div>
 
-              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-2">
-                <label htmlFor="settingspage-electricity-tariff-rate-kwh" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Electricity Tariff Rate
+              <div className="space-y-1.5">
+                <label htmlFor="settingspage-electricity-tariff-rate-kwh" className="block text-sm font-medium text-foreground">
+                  Electricity tariff rate
                 </label>
                 <div className="relative">
                   <div aria-hidden="true" className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted-foreground font-semibold text-sm">
@@ -588,12 +570,12 @@ export const SettingsPage: React.FC = () => {
                     /kWh
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground">Institutional utility tariff per kWh.</p>
+                <p className="text-xs text-muted-foreground">Institutional utility tariff per kWh.</p>
               </div>
 
-              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-2">
-                <label htmlFor="settingspage-kwh-saved-per-culled-egg" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Energy Saved per Egg
+              <div className="space-y-1.5">
+                <label htmlFor="settingspage-kwh-saved-per-culled-egg" className="block text-sm font-medium text-foreground">
+                  Energy saved per egg
                 </label>
                 <div className="relative">
                   <input
@@ -610,31 +592,23 @@ export const SettingsPage: React.FC = () => {
                     kWh/egg
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground">Energy avoided by culling Day 10 Penoy.</p>
+                <p className="text-xs text-muted-foreground">Energy avoided by culling Day 10 Penoy.</p>
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* Section 3: AI & Hardware Conveyor Calibration */}
-          <div className="fu-card p-6">
-            <div className="flex items-start justify-between gap-4 pb-4 mb-5 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-                  <Zap aria-hidden="true" className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="section-heading text-base font-semibold text-foreground">AI Vision &amp; Conveyor Sorter Parameters</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Real-time classification confidence cutoff and physical actuator timing offsets.</p>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-3">
+          <section aria-labelledby="facility-sorter-heading" className="fu-card p-4 sm:p-6">
+            <header className="mb-5 space-y-1 border-b border-border pb-4">
+              <h2 id="facility-sorter-heading" className="section-heading">AI Vision &amp; Conveyor Sorter Parameters</h2>
+              <p className="max-w-prose text-sm text-muted-foreground">Real-time classification confidence cutoff and physical actuator timing offsets.</p>
+            </header>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,14rem),1fr))] gap-5">
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <label htmlFor="settingspage-yolov8-confidence-threshold" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    YOLOv8 Cutoff Confidence
+                  <label htmlFor="settingspage-yolov8-confidence-threshold" className="text-sm font-medium text-foreground">
+                    YOLOv8 confidence cutoff
                   </label>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand/10 text-brand border border-brand/20 tabular-nums">
+                  <span aria-hidden="true" className="text-sm font-semibold tabular-nums text-foreground">
                     {(confidenceThreshold * 100).toFixed(0)}%
                   </span>
                 </div>
@@ -646,21 +620,22 @@ export const SettingsPage: React.FC = () => {
                   step="0.01"
                   value={confidenceThreshold}
                   onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-[#800000]"
+                  aria-valuetext={`${(confidenceThreshold * 100).toFixed(0)}%`}
+                  className="block h-11 w-full cursor-pointer accent-brand"
                 />
-                <div className="flex justify-between items-center text-[11px] text-muted-foreground font-mono">
+                <div className="flex flex-wrap justify-between gap-x-2 gap-y-1 text-xs tabular-nums text-muted-foreground">
                   <span>70% (Min)</span>
                   <span>85% (Standard)</span>
                   <span>99% (Max)</span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Scans below this score trigger <span className="font-semibold text-amber-600 dark:text-amber-400">Manual Review</span> diverter routing.
+                  Scans below this score trigger <strong className="font-semibold text-foreground">Manual Review</strong> diverter routing.
                 </p>
               </div>
 
-              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-3">
-                <label htmlFor="settingspage-field-3" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Conveyor Belt Speed
+              <div className="space-y-1.5">
+                <label htmlFor="settingspage-field-3" className="block text-sm font-medium text-foreground">
+                  Conveyor belt speed
                 </label>
                 <div className="relative">
                   <input
@@ -681,9 +656,9 @@ export const SettingsPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="p-4 rounded-lg bg-muted/30 border border-border/80 space-y-3">
-                <label htmlFor="settingspage-field-4" className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Optical Sensor to Chute
+              <div className="space-y-1.5">
+                <label htmlFor="settingspage-field-4" className="block text-sm font-medium text-foreground">
+                  Optical sensor to chute
                 </label>
                 <div className="relative">
                   <input
@@ -704,7 +679,7 @@ export const SettingsPage: React.FC = () => {
                 </p>
               </div>
             </div>
-          </div>
+          </section>
 
           {/* Action Footer */}
           <div className="fu-card p-4 flex flex-wrap items-center justify-between gap-4 border border-border shadow-xs">
