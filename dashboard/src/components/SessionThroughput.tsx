@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import type { CandlingSession } from '../types';
-import { estimateCapacity, formatReadableDuration } from '../utils/sessionMetrics';
+import { estimateCapacity, formatReadableDuration, formatRunDuration, formatRunTimeWindow } from '../utils/sessionMetrics';
 
 export function SessionThroughput({ session }: { session: CandlingSession }) {
   const [minutes, setMinutes] = useState('10');
@@ -8,9 +8,18 @@ export function SessionThroughput({ session }: { session: CandlingSession }) {
   const { duration_seconds: seconds, eggs_per_minute: rate, total_scanned: count } = session;
   const eligible = !!session.ended_at && seconds !== null && seconds > 0 && count > 0;
   const estimate = eligible ? estimateCapacity(count, seconds, minutes) : null;
+  const exact = formatRunDuration(seconds);
+  const windowText = formatRunTimeWindow(session.started_at, session.ended_at);
+  const hoverTitle = windowText ? `${exact} · ${windowText}` : exact;
   return (
     <div className="space-y-2 border-t border-border pt-2 text-sm text-foreground">
-      <p className="tabular-nums">Duration: {formatReadableDuration(seconds)} · Average: {rate === null ? 'Unavailable' : `${rate.toFixed(1)} scans/min`}</p>
+      <p className="tabular-nums">
+        Duration:{' '}
+        <span title={hoverTitle} className="cursor-help underline decoration-dotted underline-offset-4 decoration-slate-400">
+          {formatReadableDuration(seconds)}
+        </span>{' '}
+        · Average: {rate === null ? 'Unavailable' : `${rate.toFixed(1)} scans/min`}
+      </p>
       <p className="text-xs text-muted-foreground">Counts include manual-review captures and rescans. Diagnostic runs reflect diagnostic pace.</p>
       {eligible ? <>
         <div className="flex flex-wrap items-center gap-2">

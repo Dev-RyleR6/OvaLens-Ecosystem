@@ -30,7 +30,7 @@ import {
 } from 'recharts';
 import { apiClient } from '../api/client';
 import { BatchAnalyticsResponse } from '../types';
-import { formatReadableDuration, summarizeRunDurations } from '../utils/sessionMetrics';
+import { formatReadableDuration, formatRunDuration, formatRunTimeWindow, summarizeRunDurations } from '../utils/sessionMetrics';
 import { useModalAnimation } from '@/hooks/useModalAnimation';
 import { cn } from '@/lib/utils';
 
@@ -294,7 +294,12 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                       {data.sessions.length > 0 && (
                         <span className="text-xs text-slate-600 tabular-nums">
                           Total scan duration:{' '}
-                          <strong className="text-slate-900">{formatReadableDuration(totalDuration ?? null)}</strong>
+                          <strong
+                            title={totalDuration != null ? formatRunDuration(totalDuration) : undefined}
+                            className="text-slate-900 cursor-help underline decoration-dotted underline-offset-4 decoration-slate-400"
+                          >
+                            {formatReadableDuration(totalDuration ?? null)}
+                          </strong>
                           {summary.untimedRuns > 0 && summary.timedRuns > 0
                             ? ` (${summary.timedRuns} of ${summary.totalRuns} runs timed)`
                             : ''}
@@ -325,11 +330,19 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {data.sessions.map((s) => (
+                        {data.sessions.map((s) => {
+                          const windowText = formatRunTimeWindow(s.started_at, s.ended_at);
+                          const exactDuration = formatRunDuration(s.duration_seconds);
+                          const durationTitle = windowText ? `${exactDuration} · ${windowText}` : exactDuration;
+                          return (
                           <tr key={s.session_id} className="hover:bg-slate-50/50">
                             <td className="py-2 px-3 font-bold text-slate-900">{s.stage}</td>
                             <td className="py-2 px-3 text-slate-600">{s.operator_name}</td>
-                            <td className="py-2 px-3 text-right tabular-nums text-slate-700">{formatReadableDuration(s.duration_seconds)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums text-slate-700">
+                              <span title={durationTitle} className="cursor-help underline decoration-dotted underline-offset-4 decoration-slate-400">
+                                {formatReadableDuration(s.duration_seconds)}
+                              </span>
+                            </td>
                             <td className="py-2 px-3 text-right tabular-nums text-slate-700">
                               {s.eggs_per_minute === null ? '—' : `${s.eggs_per_minute.toFixed(1)} / min`}
                             </td>
@@ -339,7 +352,8 @@ export const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({
                             <td className="py-2 px-3 text-right font-bold text-brand">{s.fertility_rate}%</td>
                             <td className="py-2 px-3 text-right text-slate-500">{s.avg_inference_ms} ms</td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

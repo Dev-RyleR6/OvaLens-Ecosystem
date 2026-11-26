@@ -26,6 +26,25 @@ export function formatReadableDuration(seconds: number | null | undefined): stri
   return parts.join(' ');
 }
 
+export function formatRunTimeWindow(startedAt?: string | null, endedAt?: string | null): string | null {
+  if (!startedAt) return null;
+  const startMs = Date.parse(startedAt);
+  if (!Number.isFinite(startMs)) return null;
+  const fmt = new Intl.DateTimeFormat('en-PH', {
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+  });
+  const startText = fmt.format(startMs);
+  if (!endedAt) return `Started ${startText}`;
+  const endMs = Date.parse(endedAt);
+  if (!Number.isFinite(endMs)) return `Started ${startText}`;
+  const sameDay = new Date(startMs).toDateString() === new Date(endMs).toDateString();
+  const endText = sameDay
+    ? new Intl.DateTimeFormat('en-PH', { timeStyle: 'medium' }).format(endMs)
+    : fmt.format(endMs);
+  return `${startText} – ${endText}`;
+}
+
 export function estimateCapacity(count: number, seconds: number | null, minutes: string): number | null {
   const duration = Number(minutes);
   if (!minutes.trim() || !Number.isFinite(duration) || duration <= 0 || seconds === null || seconds <= 0 || count <= 0) return null;

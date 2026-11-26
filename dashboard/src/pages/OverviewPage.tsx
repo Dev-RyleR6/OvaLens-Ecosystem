@@ -7,7 +7,7 @@ import { BatchIncubationStatus } from '../components/BatchIncubationStatus';
 import { DataUnavailableState } from '../components/ui/DataUnavailableState';
 import { usePreferences } from '../hooks/usePreferences';
 import { OperationalCharts } from '../components/OperationalCharts';
-import { formatReadableDuration } from '../utils/sessionMetrics';
+import { formatReadableDuration, formatRunDuration } from '../utils/sessionMetrics';
 
 export const OverviewPage: React.FC = () => {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
@@ -76,7 +76,7 @@ export const OverviewPage: React.FC = () => {
           <caption className="sr-only">Batch stage, scanned eggs, fertility, scan duration, and expected hatch date</caption>
           <thead className="bg-slate-50 text-slate-600"><tr><th scope="col">Batch</th><th scope="col">Breed</th><th scope="col">Incubation</th><th scope="col" className="text-right">Scans / eggs set</th><th scope="col" className="text-right">Fertility</th><th scope="col" className="text-right">Scan duration</th><th scope="col">Expected hatch</th></tr></thead>
           <tbody className="divide-y divide-slate-200">{displayBatches.map(batch => <tr key={batch.batch_id}>
-            <td><Link className="font-medium text-brand underline underline-offset-4" to={`/batches?batch=${encodeURIComponent(batch.batch_id)}`}>{batch.batch_code}</Link><p className="text-xs text-slate-500 mt-1">{batch.incubator_id}</p></td><td>{batch.breed}</td><td><BatchIncubationStatus batch={batch} /></td><td className="text-right tabular-nums">{batch.total_scanned.toLocaleString()} / {batch.initial_egg_count.toLocaleString()}</td><td className="text-right tabular-nums">{batch.total_scanned ? `${batch.fertility_rate.toFixed(1)}%` : '—'}</td><td className="text-right tabular-nums">{batch.total_scan_duration_seconds != null ? formatReadableDuration(batch.total_scan_duration_seconds) : '—'}</td><td>{new Date(batch.target_hatch_date).toLocaleDateString('en-PH', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+            <td><Link className="font-medium text-brand underline underline-offset-4" to={`/batches?batch=${encodeURIComponent(batch.batch_id)}`}>{batch.batch_code}</Link><p className="text-xs text-slate-500 mt-1">{batch.incubator_id}</p></td><td>{batch.breed}</td><td><BatchIncubationStatus batch={batch} /></td><td className="text-right tabular-nums">{batch.total_scanned.toLocaleString()} / {batch.initial_egg_count.toLocaleString()}</td><td className="text-right tabular-nums">{batch.total_scanned ? `${batch.fertility_rate.toFixed(1)}%` : '—'}</td><td className="text-right tabular-nums">{batch.total_scan_duration_seconds != null ? <span title={formatRunDuration(batch.total_scan_duration_seconds)} className="cursor-help underline decoration-dotted underline-offset-4 decoration-slate-400">{formatReadableDuration(batch.total_scan_duration_seconds)}</span> : '—'}</td><td>{new Date(batch.target_hatch_date).toLocaleDateString('en-PH', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
           </tr>)}{!displayBatches.length && <tr><td colSpan={7} className="text-center py-10 text-slate-600">{loading ? 'Loading batches…' : 'No batches recorded. Create a batch to begin tracking incubation.'}</td></tr>}</tbody>
         </table></div>
       </section>

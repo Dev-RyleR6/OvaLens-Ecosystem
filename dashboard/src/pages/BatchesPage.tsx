@@ -21,7 +21,7 @@ import { apiClient } from '../api/client';
 import { BatchSummary, DuckBreed, BatchStage, CandlingSession } from '../types';
 import { ActionsMenu } from '../components/ActionsMenu';
 import { SessionThroughput } from '../components/SessionThroughput';
-import { formatReadableDuration, summarizeRunDurations } from '../utils/sessionMetrics';
+import { formatReadableDuration, formatRunDuration, formatRunTimeWindow, summarizeRunDurations } from '../utils/sessionMetrics';
 import { BatchIncubationStatus } from '../components/BatchIncubationStatus';
 import { BatchProgressTimeline } from '../components/BatchProgressTimeline';
 import { Dialog } from '../components/ui/dialog';
@@ -546,7 +546,9 @@ export const BatchesPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 batch-numbers">
                         {b.total_scan_duration_seconds != null ? (
-                          <strong>{formatReadableDuration(b.total_scan_duration_seconds)}</strong>
+                          <strong title={formatRunDuration(b.total_scan_duration_seconds)} className="cursor-help underline decoration-dotted underline-offset-4 decoration-slate-400">
+                            {formatReadableDuration(b.total_scan_duration_seconds)}
+                          </strong>
                         ) : (
                           <span className="text-slate-500">—</span>
                         )}
@@ -607,7 +609,12 @@ export const BatchesPage: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-3 text-slate-600">
                   <span>Initial Egg Set: <strong>{b.initial_egg_count}</strong></span>
                   {b.total_scan_duration_seconds != null && (
-                    <span className="tabular-nums">Scan duration: <strong>{formatReadableDuration(b.total_scan_duration_seconds)}</strong></span>
+                    <span className="tabular-nums">
+                      Scan duration:{' '}
+                      <strong title={formatRunDuration(b.total_scan_duration_seconds)} className="cursor-help underline decoration-dotted underline-offset-4 decoration-slate-400">
+                        {formatReadableDuration(b.total_scan_duration_seconds)}
+                      </strong>
+                    </span>
                   )}
                   <span className="font-bold text-emerald-700">{b.total_scanned > 0 ? `${b.fertility_rate}% Fertile` : 'Pending'}</span>
                 </div>
@@ -846,7 +853,14 @@ export const BatchesPage: React.FC = () => {
                     </h4>
                     <span className="text-xs font-medium text-slate-600 tabular-nums">
                       {batchSessions.length} recorded
-                      {totalDuration !== null ? ` · Total ${formatReadableDuration(totalDuration)}` : ''}
+                      {totalDuration !== null && (
+                        <>
+                          {' · Total '}
+                          <span title={formatRunDuration(totalDuration)} className="cursor-help underline decoration-dotted underline-offset-4 decoration-slate-400">
+                            {formatReadableDuration(totalDuration)}
+                          </span>
+                        </>
+                      )}
                       {durationSummary.untimedRuns > 0 && durationSummary.timedRuns > 0
                         ? ` (${durationSummary.timedRuns}/${durationSummary.totalRuns} timed)`
                         : ''}
@@ -866,7 +880,7 @@ export const BatchesPage: React.FC = () => {
                           {s.total_scanned} scans recorded
                         </span>
                       </div>
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600" title={formatRunTimeWindow(s.started_at, s.ended_at) ?? undefined}>
                         <span className="flex items-center gap-1">
                           <User aria-hidden="true" className="w-3 h-3 text-slate-400" />
                           {s.operator_name} • {s.device_id}
