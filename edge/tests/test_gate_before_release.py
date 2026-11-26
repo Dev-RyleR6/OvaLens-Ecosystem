@@ -7,12 +7,11 @@ import threading
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from test_three_board import fixture, wait_for
+from test_three_board import FakeLink, fixture, prediction, wait_for
 
 
 @pytest.mark.parametrize("kind", ["FERTILE", "INFERTILE"])
 def test_servo_command_precedes_display_hold_and_first_release(tmp_path, kind):
-    from test_three_board import prediction
     cycle, db, rig = fixture(tmp_path, count=1)
     cycle._capture = lambda: (prediction(kind), {})
     cycle.settings.calibration.hold_ms = 50
@@ -108,3 +107,65 @@ def test_gate_exit_at_exact_next_arrival_is_cleared_before_new_preset(tmp_path):
     assert cycle.count == cycle.routed == 2
     gate_events = [(text, position) for _, text, position, _ in rig.trace if text.startswith("SORT:") or text == "RESET"]
     assert gate_events == [("SORT:FERTILE", 100), ("RESET", 517), ("SORT:INFERTILE", 517), ("RESET", 934)]
+
+
+def unified_reject(tmp_path, arrivals=None, count=1):
+    cycle, db, rig = fixture(tmp_path, count=count, arrivals=arrivals)
+    cycle.settings.rig_profile = "unified_v4"
+    cycle.settings.calibration.speed_us = 4000
+    link = FakeLink("UNIFIED", rig)
+    rig.conveyor = rig.egg = rig.servo = rig.light = link
+    rig.links = (link,)
+    cycle._capture = lambda: (prediction("INFERTILE"), {})
+    return cycle, db, rig
+
+
+@pytest.mark.parametrize("lead_ms,trigger,limit", [(225, 338, 367), (500, 304, 367), (600, 292, 367), (0, 367, 372), (-100, 379, 384)])
+def test_unified_reject_uses_saved_speed_and_configured_lead(tmp_path, lead_ms, trigger, limit):
+    cycle, db, rig = unified_reject(tmp_path)
+    cycle.settings.calibration.hold_ms = 300
+    cycle.settings.calibration.reject_lead_ms = lead_ms
+    cycle._delay = lambda seconds: pytest.fail("A reject should leave without the display hold")
+    cycle._run()
+    assert cycle.status["state"] == "COMPLETE", cycle.status
+    assert cycle.routed == 1
+    commands = [(text, position) for _, text, position, _ in rig.trace]
+    release, reset = commands.index(("RESUME", 100)), commands.index(("RESET", 517))
+    assert [(text, position, saved) for _, text, position, saved in rig.trace[release + 1:reset]
+            if text.startswith(("ADVANCE", "SORT", "PAUSE", "RESUME", "SPEED"))] == [
+        (f"ADVANCE_REJECT:417:{trigger}:{limit}:450", 100, 1),
+    ]
+    assert cycle.settings.calibration.speed_us == 4000
+    assert db.load_machine_state("station")["rig_profile"] == "unified_v4"
+
+
+@pytest.mark.parametrize("fault", ["missing_sweep", "wrong_sweep_position", "wrong_angle", "overlapping_egg"])
+def test_unified_reject_stops_on_unconfirmed_gate_sweep(tmp_path, fault):
+    overlapping = fault == "overlapping_egg"
+    cycle, db, rig = unified_reject(tmp_path, arrivals=[100, 467] if overlapping else None,
+                                    count=2 if overlapping else 1)
+    original = rig.egg.command
+
+    def command(text, timeout=3):
+        reply = original(text, timeout)
+        if text.startswith("ADVANCE_REJECT:") and not overlapping:
+            values = reply.result()
+            if fault == "missing_sweep":
+                del values["REJECT_AT"]
+            elif fault == "wrong_sweep_position":
+                values["REJECT_AT"] = "468"
+            else:
+                values["ANGLE"] = "100"
+            changed = Future()
+            changed.set_result(values)
+            return changed
+        return reply
+
+    rig.egg.command = command
+    cycle._run()
+    assert cycle.status["state"] == "RECOVERY_REQUIRED"
+    assert cycle.routed == 0 and db.get_unsynced_count() == 1
+    commands = [(text, position) for _, text, position, _ in rig.trace]
+    assert sum(text.startswith("ADVANCE_REJECT:") for text, _ in commands) == 1
+    assert not any(text == "RESET" for text, _ in commands)
+    assert commands[-1] == ("ESTOP", 467 if overlapping else 517)

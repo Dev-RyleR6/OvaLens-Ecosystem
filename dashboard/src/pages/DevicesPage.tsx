@@ -1,74 +1,185 @@
-import { useAuth } from '../context/AuthContext';
-import { deviceAvailability } from '../lib/deviceStatus';
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Cpu,
-  RefreshCw,
-  Sliders,
-  CheckCircle2,
-  Save,
-  Camera,
-  Layers,
-  Radio,
-  Wifi,
-  WifiOff,
-  Activity,
-  HardDrive,
-  Brain,
-  ShieldCheck,
-  Zap,
-  Image as ImageIcon,
-} from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { Camera, Radio, RefreshCw, RotateCcw } from 'lucide-react';
 import { apiClient } from '../api/client';
-import { Device } from '../types';
 import { Badge } from '../components/Badge';
 import { DataUnavailableState } from '../components/ui/DataUnavailableState';
 import { EmptyState } from '../components/ui/EmptyState';
+import { useAuth } from '../context/AuthContext';
+import { deviceAvailability } from '../lib/deviceStatus';
+import type { Device } from '../types';
+import './DevicesPage.css';
 
-export const DevicesPage: React.FC = () => {
+type Availability = ReturnType<typeof deviceAvailability>;
+type Calibration = { speed: number; distance: number; pulse: number };
+type Feedback = { tone: 'success' | 'warning' | 'danger'; text: string };
+
+const stationStatus: Record<Availability, string> = {
+  ONLINE: 'App online',
+  SCANNING: 'Scanning',
+  OFFLINE: 'Offline',
+  ERROR: 'Error',
+  STALE: 'Heartbeat expired',
+  UNKNOWN: 'Status unknown',
+};
+
+const rigNames: Record<string, string> = {
+  unified_v4: 'Single-ESP32 Unified (v4)',
+  three_v3: 'Three-board (v3)',
+  dual_v2: 'Dual-board (v2)',
+};
+
+const isOnline = (status: Availability) => status === 'ONLINE' || status === 'SCANNING';
+
+function Fact({ label, children }: { label: string; children?: ReactNode }) {
+  return (
+    <div className="sorter-fact">
+      <dt>{label}</dt>
+      <dd>{children ?? <span className="sorter-muted">Not reported</span>}</dd>
+    </div>
+  );
+}
+
+function readCalibration(device: Device): Calibration {
+  return {
+    speed: device.conveyor_speed_cm_s,
+    distance: device.conveyor_dist_cm,
+    pulse: device.servo_pulse_ms,
+  };
+}
+
+function formatUptime(seconds?: number) {
+  if (seconds == null) return undefined;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return hours ? `${hours}h ${minutes}m` : `${minutes}m`;
+}
+
+function formatRelativeAge(iso?: string, now = Date.now()) {
+  if (!iso) return undefined;
+  const ts = Date.parse(iso);
+  if (!Number.isFinite(ts)) return undefined;
+  const diffSec = Math.max(0, Math.round((now - ts) / 1000));
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return `${Math.floor(diffHr / 24)}d ago`;
+}
+
+function formatPort(port?: string, status?: string) {
+  return [port, status?.toLowerCase().replace(/_/g, ' ')].filter(Boolean).join(' · ') || undefined;
+}
+
+function measurement(value: number | undefined, unit: string) {
+  return value == null ? undefined : `${value} ${unit}`;
+}
+
+function DeviceDiagnostics({ device }: { device: Device }) {
+  const telemetry = device.telemetry;
+  const model = telemetry?.ai_model;
+  const rig = telemetry?.iot_rig;
+  const profile = rig?.rig_profile;
+  const portStatus = rig?.ports_status;
+
+  return (
+    <div className="sorter-diagnostics-grid">
+      <div className="sorter-spec-group">
+        <h4>Station &amp; network</h4>
+        <dl>
+          <Fact label="Hostname">{telemetry?.hostname || undefined}</Fact>
+          <Fact label="IP address">{device.ip_address || undefined}</Fact>
+          <Fact label="Edge endpoint">{device.edge_url || undefined}</Fact>
+          <Fact label="Platform">{telemetry?.hardware_platform || device.hardware_platform || undefined}</Fact>
+          <Fact label="Operating system">{telemetry?.os_version || undefined}</Fact>
+          <Fact label="Python version">{telemetry?.python_version || undefined}</Fact>
+          <Fact label="Uptime">{formatUptime(telemetry?.uptime_seconds)}</Fact>
+        </dl>
+      </div>
+
+      <div className="sorter-spec-group">
+        <h4>Vision pipeline</h4>
+        <dl>
+          <Fact label="Model">{model?.model_version || device.model_version || undefined}</Fact>
+          <Fact label="Runtime">{model?.engine_type || undefined}</Fact>
+          <Fact label="Sort threshold">{model?.sort_confidence == null ? undefined : `${(model.sort_confidence * 100).toFixed(0)}%`}</Fact>
+          <Fact label="Warmup">{model?.warmup_complete == null ? undefined : model.warmup_complete ? 'Complete' : 'Incomplete'}</Fact>
+        </dl>
+      </div>
+
+      <div className="sorter-spec-group">
+        <h4>Controller &amp; I/O</h4>
+        <dl>
+          <Fact label="Rig profile">{profile ? rigNames[profile] ?? profile : undefined}</Fact>
+          {profile === 'unified_v4' ? (
+            <Fact label="Unified Serial Bus (UNIFIED_V3)">{formatPort(rig?.conveyor_port, portStatus?.conveyor)}</Fact>
+          ) : (
+            <>
+              <Fact label="Conveyor port">{formatPort(rig?.conveyor_port, portStatus?.conveyor)}</Fact>
+              <Fact label={profile === 'three_v3' ? 'Servo / sensor port' : 'Servo port'}>{formatPort(rig?.servo_port, portStatus?.servo)}</Fact>
+              {profile === 'three_v3' && <Fact label="Lamp port">{formatPort(rig?.light_port, portStatus?.light)}</Fact>}
+            </>
+          )}
+          {rig?.board_state?.fault && <Fact label="Board fault"><span className="sorter-alert-text">{rig.board_state.fault}</span></Fact>}
+          <Fact label="Fertile angle">{rig?.fertile_angle == null ? undefined : `${rig.fertile_angle}°`}</Fact>
+          <Fact label="Neutral angle">{rig?.neutral_angle == null ? undefined : `${rig.neutral_angle}°`}</Fact>
+          <Fact label="Infertile angle">{rig?.infertile_angle == null ? undefined : `${rig.infertile_angle}°`}</Fact>
+          {profile === 'unified_v4' && (
+            <>
+              <Fact label="Stepper / sleep">GPIO 16 / 4 / 17</Fact>
+              <Fact label="Gate servo">GPIO 32</Fact>
+              <Fact label="IR sensor · Lamp">GPIO 26 · GPIO 27</Fact>
+            </>
+          )}
+        </dl>
+      </div>
+
+      <div className="sorter-spec-group">
+        <h4>Stepper &amp; capture timing</h4>
+        <dl>
+          <Fact label="Holder spacing">{measurement(rig?.holder_steps, 'steps')}</Fact>
+          <Fact label="Sorter offset">{measurement(rig?.sorter_steps, 'steps')}</Fact>
+          <Fact label="Settle time">{measurement(rig?.settle_ms, 'ms')}</Fact>
+          <Fact label="Hold time">{measurement(rig?.hold_ms, 'ms')}</Fact>
+          <Fact label="Step half-period">{measurement(rig?.stepper_speed_us, 'µs')}</Fact>
+          {profile && rigNames[profile] && <Fact label="Optical lockout">600 ms</Fact>}
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+export function DevicesPage() {
   const { user } = useAuth();
   const canCalibrate = user?.role === 'ADMIN' || user?.role === 'MANAGER';
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedDeviceId, setSelectedDeviceId] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(true);
   const [isError, setIsError] = useState(false);
+  const [now, setNow] = useState(Date.now);
+  const [drafts, setDrafts] = useState<Record<string, Calibration | undefined>>({});
   const [savingDeviceId, setSavingDeviceId] = useState<string | null>(null);
   const [probingDeviceId, setProbingDeviceId] = useState<string | null>(null);
-  const [probeStatus, setProbeStatus] = useState<Record<string, { is_live: boolean; message: string }>>({});
-  const [now, setNow] = useState(Date.now);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [snapshotUrl, setSnapshotUrl] = useState<Record<string, string | null>>({});
+  const [probeFeedback, setProbeFeedback] = useState<Record<string, Feedback | undefined>>({});
+  const [saveFeedback, setSaveFeedback] = useState<Record<string, Feedback | undefined>>({});
+  const [snapshots, setSnapshots] = useState<Record<string, { url: string; captured: string }>>({});
   const [loadingSnapshot, setLoadingSnapshot] = useState<Record<string, boolean>>({});
-
-  // Calibration state per device
-  const [calibration, setCalibration] = useState<Record<string, { speed: number; dist: number; pulse: number }>>({});
+  const [snapshotError, setSnapshotError] = useState<Record<string, boolean>>({});
+  const snapshotUrls = useRef(new Map<string, string>());
+  const mounted = useRef(false);
 
   const fetchDevices = useCallback(async (background = false) => {
     if (!background) setIsRefreshing(true);
-    setIsError(false);
     try {
-      const data = await apiClient.getDevices();
-      const list = data || [];
+      const list = await apiClient.getDevices();
       setDevices(list);
+      setSelectedDeviceId(previous => list.some(device => device.device_id === previous)
+        ? previous
+        : list[0]?.device_id ?? '');
       setNow(Date.now());
-
-      setSelectedDeviceId(prev => {
-        if (prev && list.some(d => d.device_id === prev)) return prev;
-        return list[0]?.device_id || null;
-      });
-
-      const calMap: Record<string, { speed: number; dist: number; pulse: number }> = {};
-      list.forEach(d => {
-        calMap[d.device_id] = {
-          speed: d.conveyor_speed_cm_s || 12.5,
-          dist: d.conveyor_dist_cm || 25.0,
-          pulse: d.servo_pulse_ms || 250,
-        };
-      });
-      setCalibration(previous => background ? { ...calMap, ...previous } : calMap);
-    } catch (err) {
-      console.error('Error fetching devices:', err);
+      setIsError(false);
+    } catch {
       setIsError(true);
     } finally {
       if (!background) setIsRefreshing(false);
@@ -76,651 +187,433 @@ export const DevicesPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    mounted.current = true;
     void fetchDevices();
     const poll = setInterval(() => { void fetchDevices(true); }, 15_000);
     const timer = setInterval(() => setNow(Date.now()), 30_000);
-    return () => { clearInterval(timer); clearInterval(poll); };
+    const urls = snapshotUrls.current;
+    return () => {
+      mounted.current = false;
+      clearInterval(timer);
+      clearInterval(poll);
+      urls.forEach(url => URL.revokeObjectURL(url));
+      urls.clear();
+    };
   }, [fetchDevices]);
 
-  const handleProbeDevice = async (deviceId: string) => {
+  const checkConnection = async (deviceId: string) => {
     setProbingDeviceId(deviceId);
+    setProbeFeedback(previous => ({ ...previous, [deviceId]: undefined }));
     try {
       const result = await apiClient.getDeviceLive(deviceId);
-      setProbeStatus(prev => ({
-        ...prev,
-        [deviceId]: {
-          is_live: result.is_live,
-          message: result.is_live
-            ? `Live connection confirmed at ${result.edge_url}`
-            : `Edge app unreachable at ${result.edge_url}. Showing recorded data.`,
-        },
+      setProbeFeedback(previous => ({
+        ...previous,
+        [deviceId]: result.is_live
+          ? { tone: 'success', text: 'The edge app responded to the connection check.' }
+          : { tone: 'warning', text: 'The edge app did not respond. Showing its last recorded data.' },
       }));
       if (result.is_live && result.device) {
-        setDevices(prev => prev.map(d => (d.device_id === deviceId ? { ...d, ...result.device, telemetry: result.telemetry } : d)));
+        setDevices(previous => previous.map(device => device.device_id === deviceId
+          ? { ...device, ...result.device, telemetry: result.telemetry }
+          : device));
+        setNow(Date.now());
       }
-      setTimeout(() => {
-        setProbeStatus(prev => {
-          const next = { ...prev };
-          delete next[deviceId];
-          return next;
-        });
-      }, 5000);
     } catch {
-      setProbeStatus(prev => ({
-        ...prev,
-        [deviceId]: { is_live: false, message: 'Probe failed. Edge app offline or unreachable.' },
+      setProbeFeedback(previous => ({
+        ...previous,
+        [deviceId]: { tone: 'danger', text: 'Connection check failed. Try again.' },
       }));
     } finally {
       setProbingDeviceId(null);
     }
   };
 
-  const handleFetchSnapshot = async (deviceId: string) => {
-    setLoadingSnapshot(prev => ({ ...prev, [deviceId]: true }));
+  const captureSnapshot = async (deviceId: string) => {
+    setLoadingSnapshot(previous => ({ ...previous, [deviceId]: true }));
+    setSnapshotError(previous => ({ ...previous, [deviceId]: false }));
     try {
       const url = await apiClient.getDeviceCameraSnapshot(deviceId);
-      setSnapshotUrl(prev => ({ ...prev, [deviceId]: url }));
+      if (!mounted.current) {
+        if (url) URL.revokeObjectURL(url);
+        return;
+      }
+      if (!url) {
+        setSnapshotError(previous => ({ ...previous, [deviceId]: true }));
+        return;
+      }
+
+      const oldUrl = snapshotUrls.current.get(deviceId);
+      if (oldUrl) URL.revokeObjectURL(oldUrl);
+      snapshotUrls.current.set(deviceId, url);
+      setSnapshots(previous => ({ ...previous, [deviceId]: { url, captured: new Date().toISOString() } }));
     } catch {
-      setSnapshotUrl(prev => ({ ...prev, [deviceId]: null }));
+      setSnapshotError(previous => ({ ...previous, [deviceId]: true }));
     } finally {
-      setLoadingSnapshot(prev => ({ ...prev, [deviceId]: false }));
+      setLoadingSnapshot(previous => ({ ...previous, [deviceId]: false }));
     }
   };
 
-  const handleSaveCalibration = async (deviceId: string) => {
-    const cal = calibration[deviceId];
-    if (!cal) return;
-
+  const saveCalibration = async (deviceId: string, calibration: Calibration) => {
     setSavingDeviceId(deviceId);
-    setSaveError(null);
-    setSaveMessage(null);
+    setSaveFeedback(previous => ({ ...previous, [deviceId]: undefined }));
     try {
-      await apiClient.updateDeviceCalibration(deviceId, {
-        conveyor_speed_cm_s: cal.speed,
-        conveyor_dist_cm: cal.dist,
-        servo_pulse_ms: cal.pulse,
+      const saved = await apiClient.updateDeviceCalibration(deviceId, {
+        conveyor_speed_cm_s: calibration.speed,
+        conveyor_dist_cm: calibration.distance,
+        servo_pulse_ms: calibration.pulse,
       });
-      setSaveMessage(`Calibration record saved for ${deviceId}. Apply and verify these values in the edge application.`);
-      setTimeout(() => setSaveMessage(null), 3000);
+      setDevices(previous => previous.map(device => device.device_id === deviceId
+        ? {
+          ...device,
+          conveyor_speed_cm_s: saved.conveyor_speed_cm_s,
+          conveyor_dist_cm: saved.conveyor_dist_cm,
+          servo_pulse_ms: saved.servo_pulse_ms,
+        }
+        : device));
+      setDrafts(previous => ({ ...previous, [deviceId]: undefined }));
+      setSaveFeedback(previous => ({
+        ...previous,
+        [deviceId]: { tone: 'success', text: 'Calibration record saved.' },
+      }));
     } catch {
-      setSaveError('Calibration could not be saved. Your edits are retained; try again.');
+      setSaveFeedback(previous => ({
+        ...previous,
+        [deviceId]: { tone: 'danger', text: 'Could not save calibration. Your edits are still here. Try again.' },
+      }));
     } finally {
       setSavingDeviceId(null);
     }
   };
 
-  const formatUptime = (seconds?: number) => {
-    if (!seconds || seconds <= 0) return 'Just started';
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    if (h > 0) return `${h}h ${m}m active`;
-    return `${m}m active`;
-  };
+  const device = devices.find(item => item.device_id === selectedDeviceId) ?? devices[0];
+  const onlineCount = devices.filter(item => isOnline(deviceAvailability(item, now))).length;
 
-  // Fleet Aggregates
-  const totalFleet = devices.length;
-  const onlineFleet = devices.filter(d => ['ONLINE', 'SCANNING'].includes(deviceAvailability(d, now))).length;
-  const totalUnsynced = devices.reduce((sum, d) => sum + (d.telemetry?.storage?.unsynced_scans || 0), 0);
-  const healthRate = totalFleet > 0 ? Math.round((onlineFleet / totalFleet) * 100) : 100;
+  const renderStation = () => {
+    if (!device) {
+      if (isError) {
+        return (
+          <DataUnavailableState
+            title="Device records unavailable"
+            description="The dashboard could not load registered stations."
+            onRetry={() => fetchDevices()}
+            isRetrying={isRefreshing}
+          />
+        );
+      }
+      if (isRefreshing) return <p role="status" className="sorter-loading">Loading device records…</p>;
+      return <EmptyState title="No sorter devices registered" description="Registered edge stations will appear here." />;
+    }
 
-  const currentDevice = devices.find(d => d.device_id === selectedDeviceId) || devices[0];
+    const id = device.device_id;
+    const status = deviceAvailability(device, now);
+    const online = isOnline(status);
+    const storedCalibration = readCalibration(device);
+    const calibration = drafts[id] ?? storedCalibration;
+    const hasUnsavedCalibration = Boolean(drafts[id]) && (
+      calibration.speed !== storedCalibration.speed
+      || calibration.distance !== storedCalibration.distance
+      || calibration.pulse !== storedCalibration.pulse
+    );
+    const delay = calibration.speed > 0 ? Math.round(calibration.distance / calibration.speed * 1000) : undefined;
+    const permissionId = 'sorter-calibration-permission';
+    const telemetry = device.telemetry;
+    const camera = telemetry?.camera;
+    const cameraInfo = [camera?.identity, camera?.resolution, camera?.fps ? `${camera.fps} fps` : null, camera?.is_mock ? 'Simulated camera' : null].filter(Boolean).join(' · ');
+    const heartbeat = device.last_heartbeat && Number.isFinite(Date.parse(device.last_heartbeat)) ? device.last_heartbeat : undefined;
+    const heartbeatAge = formatRelativeAge(heartbeat, now);
+    const unsyncedScans = telemetry?.storage?.unsynced_scans;
+    const snapshot = snapshots[id];
+    const probe = probeFeedback[id];
+    const saveResult = saveFeedback[id];
+    const boardState = telemetry?.iot_rig?.board_state;
 
-  return (
-    <div className="min-w-0 space-y-6 pb-8" aria-busy={isRefreshing}>
-      {/* Page Header */}
-      <div className="page-header">
-        <div>
-          <h1>Sorter devices</h1>
-          <p className="page-description">
-            Telemetry cockpit for physical Candling &amp; Sorting edge machines at Foundation University.
-          </p>
-        </div>
+    function updateCalibration(field: keyof Calibration, value: number) {
+      setDrafts(previous => ({ ...previous, [id]: { ...(previous[id] ?? calibration), [field]: value } }));
+      setSaveFeedback(previous => ({ ...previous, [id]: undefined }));
+    }
 
-        <div className="page-actions">
-          <button
-            onClick={() => { void fetchDevices(); }}
-            disabled={isRefreshing}
-            className="secondary-action"
-          >
-            <RefreshCw aria-hidden="true" className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span>{isRefreshing ? 'Refreshing…' : 'Refresh Edge Fleet'}</span>
-          </button>
-        </div>
-      </div>
-
-      {saveMessage && (
-        <div role="status" className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800 flex items-center gap-2">
-          <CheckCircle2 aria-hidden="true" className="w-4 h-4 text-emerald-700 flex-shrink-0" />
-          <span>{saveMessage}</span>
-        </div>
-      )}
-
-      {saveError && <div role="alert" className="p-4 border border-red-300 rounded-xl bg-red-50 text-red-800">{saveError}</div>}
-      {isError && devices.length > 0 && <p role="alert" className="text-amber-800">Refresh failed. Previously loaded device records are shown.</p>}
-
-      {/* Fleet Summary Strip */}
-      {devices.length > 0 && (
-        <dl className="summary-strip grid grid-cols-2 lg:grid-cols-4 border border-border rounded-xl bg-card">
-          <div className="px-4 py-4 sm:px-6">
-            <dt className="text-xs font-medium text-slate-500 uppercase tracking-wide">Registered Sorters</dt>
-            <dd className="text-2xl font-bold tabular-nums mt-1 text-foreground">{totalFleet}</dd>
-            <dd className="text-xs text-slate-500 mt-1">Configured stations</dd>
+    return (
+      <div className="sorter-workbench">
+        <aside className="sorter-roster" aria-labelledby="sorter-roster-title">
+          <div className="sorter-roster-heading">
+            <h2 id="sorter-roster-title">Stations</h2>
+            <span className="sorter-roster-count">{onlineCount}/{devices.length} online</span>
           </div>
-          <div className="px-4 py-4 sm:px-6 border-l border-border">
-            <dt className="text-xs font-medium text-slate-500 uppercase tracking-wide">Online Stations</dt>
-            <dd className="text-2xl font-bold tabular-nums mt-1 text-agri-green">{onlineFleet} / {totalFleet}</dd>
-            <dd className="text-xs text-slate-500 mt-1">Transmitting heartbeats</dd>
-          </div>
-          <div className="px-4 py-4 sm:px-6 border-l border-border">
-            <dt className="text-xs font-medium text-slate-500 uppercase tracking-wide">Fleet Availability</dt>
-            <dd className="text-2xl font-bold tabular-nums mt-1 text-foreground">{healthRate}%</dd>
-            <dd className="text-xs text-slate-500 mt-1">Operational coverage</dd>
-          </div>
-          <div className="px-4 py-4 sm:px-6 border-l border-border">
-            <dt className="text-xs font-medium text-slate-500 uppercase tracking-wide">SQLite WAL Outbox</dt>
-            <dd className="text-2xl font-bold tabular-nums mt-1 text-foreground">{totalUnsynced}</dd>
-            <dd className="text-xs text-slate-500 mt-1">Pending scan records</dd>
-          </div>
-        </dl>
-      )}
-
-      {/* Empty / Error States */}
-      {isError && devices.length === 0 ? (
-        <DataUnavailableState
-          title="Edge Stations Offline"
-          description="Unable to connect to edge sorting hardware records in PostgreSQL. Ensure the backend REST service is reachable."
-          onRetry={fetchDevices}
-          isRetrying={isRefreshing}
-        />
-      ) : isRefreshing && devices.length === 0 ? (
-        <div role="status" className="py-12 text-center text-slate-600">Loading device records…</div>
-      ) : !isRefreshing && devices.length === 0 ? (
-        <EmptyState
-          title="No Sorter Stations Registered"
-          description="No edge sorting machines (ESP32 / Raspberry Pi / Workstation) have registered with the central backend yet."
-        />
-      ) : (
-        <div className="space-y-6">
-          {/* Station Roster Bar */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar border-b border-border" role="tablist" aria-label="Select Sorter Station">
-            {devices.map(device => {
-              const isSelected = device.device_id === (currentDevice?.device_id);
-              const isOnline = ['ONLINE', 'SCANNING'].includes(deviceAvailability(device, now));
+          <ul className="sorter-roster-list">
+            {devices.map(item => {
+              const availability = deviceAvailability(item, now);
+              const age = formatRelativeAge(item.last_heartbeat, now);
               return (
-                <button
-                  key={device.device_id}
-                  role="tab"
-                  aria-selected={isSelected}
-                  onClick={() => setSelectedDeviceId(device.device_id)}
-                  className={`flex items-center gap-2.5 px-4 py-2.5 font-medium text-xs whitespace-nowrap border-b-2 -mb-px transition-all ${
-                    isSelected
-                      ? 'border-brand text-brand font-semibold'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${isOnline ? 'bg-emerald-500 ring-2 ring-emerald-200' : 'bg-slate-400'}`} />
-                  <span>{device.device_name}</span>
-                  <span className="font-mono text-[11px] text-slate-400">({device.device_id})</span>
-                </button>
+                <li key={item.device_id}>
+                  <button
+                    type="button"
+                    className="sorter-station"
+                    aria-pressed={id === item.device_id}
+                    onClick={() => setSelectedDeviceId(item.device_id)}
+                  >
+                    <span className="sorter-station-row">
+                      <span aria-hidden="true" className="sorter-status-dot" data-status={availability} />
+                      <span className="sorter-station-name">{item.device_name}</span>
+                    </span>
+                    <span className="sorter-station-meta">
+                      <span>{item.device_id}</span>
+                      <span>{stationStatus[availability]}{age ? ` · ${age}` : ''}</span>
+                    </span>
+                  </button>
+                </li>
               );
             })}
+          </ul>
+          <label className="sorter-roster-select">
+            <span className="sr-only">Select station</span>
+            <select value={id} onChange={event => setSelectedDeviceId(event.target.value)}>
+              {devices.map(item => <option key={item.device_id} value={item.device_id}>{item.device_name}</option>)}
+            </select>
+          </label>
+        </aside>
+
+        <section key={id} className="sorter-inspector" aria-labelledby="sorter-station-title">
+          <header className="sorter-inspector-header">
+            <div className="min-w-0">
+              <div className="sorter-station-title">
+                <h2 id="sorter-station-title">{device.device_name}</h2>
+                <Badge type="device" value={status} />
+              </div>
+              <p className="sorter-identifier">
+                <span>{id}</span>
+                {telemetry?.hardware_platform || device.hardware_platform ? (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>{telemetry?.hardware_platform || device.hardware_platform}</span>
+                  </>
+                ) : null}
+                {telemetry?.uptime_seconds != null && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>Uptime {formatUptime(telemetry.uptime_seconds)}</span>
+                  </>
+                )}
+              </p>
+            </div>
+            <button type="button" className="secondary-action" onClick={() => void checkConnection(id)} disabled={probingDeviceId !== null}>
+              <Radio aria-hidden="true" />
+              {probingDeviceId === id ? 'Checking…' : 'Check connection'}
+            </button>
+          </header>
+
+          {probe && (
+            <p role={probe.tone === 'danger' ? 'alert' : 'status'} className="sorter-feedback" data-tone={probe.tone}>{probe.text}</p>
+          )}
+
+          <div className="sorter-overview">
+            <section className="sorter-camera" aria-labelledby="sorter-camera-title">
+              <div className="sorter-section-heading">
+                <div>
+                  <h3 id="sorter-camera-title">Camera snapshot</h3>
+                  {cameraInfo && <p className="sorter-camera-spec">{cameraInfo}</p>}
+                </div>
+                <button type="button" className="secondary-action" onClick={() => void captureSnapshot(id)} disabled={loadingSnapshot[id] || !online}>
+                  <Camera aria-hidden="true" />
+                  {loadingSnapshot[id] ? 'Capturing…' : snapshot ? 'Retake snapshot' : 'Capture snapshot'}
+                </button>
+              </div>
+              <figure>
+                <div className="sorter-camera-frame" data-captured={Boolean(snapshot)} aria-busy={loadingSnapshot[id] || undefined}>
+                  {snapshot ? (
+                    <img src={snapshot.url} alt={`Candling camera snapshot from ${device.device_name}`} />
+                  ) : (
+                    <div className="sorter-camera-placeholder">
+                      <Camera size={22} strokeWidth={1.75} aria-hidden="true" />
+                      <p className="sorter-camera-state">
+                        {loadingSnapshot[id] ? 'Capturing snapshot…' : online ? 'No snapshot captured' : 'Camera unavailable'}
+                      </p>
+                      <p className="sorter-muted">
+                        {online
+                          ? 'Capture a frame to inspect candling illumination and egg cradle framing.'
+                          : 'The station must be online to request a snapshot from the edge camera.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {snapshot && (
+                  <figcaption className="sorter-camera-caption">
+                    <span>Latest frame from {camera?.identity || 'edge camera'}</span>
+                    <time dateTime={snapshot.captured}>Captured at {new Date(snapshot.captured).toLocaleTimeString()}</time>
+                  </figcaption>
+                )}
+              </figure>
+              {snapshotError[id] && <p role="alert" className="sorter-feedback" data-tone="danger">Could not capture a snapshot. Check the connection and try again.</p>}
+            </section>
+
+            <section className="sorter-activity" aria-labelledby="sorter-activity-title">
+              <h3 id="sorter-activity-title">Station activity</h3>
+              <dl>
+                <Fact label="Last heartbeat">
+                  {heartbeat && (
+                    <span className="sorter-heartbeat-value">
+                      <time dateTime={heartbeat}>{new Date(heartbeat).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}</time>
+                      {heartbeatAge && <span className="sorter-muted">({heartbeatAge})</span>}
+                    </span>
+                  )}
+                </Fact>
+                <Fact label="Active batch">{telemetry?.active_batch_code === undefined ? undefined : telemetry.active_batch_code || 'No active batch'}</Fact>
+                <Fact label="Current operator">{telemetry?.active_operator === undefined ? undefined : telemetry.active_operator || 'Unassigned'}</Fact>
+                <Fact label="Scans awaiting sync">
+                  {unsyncedScans == null ? undefined : (
+                    <span className={unsyncedScans > 0 ? 'sorter-sync-pending' : undefined}>
+                      {unsyncedScans.toLocaleString()}
+                    </span>
+                  )}
+                </Fact>
+                <Fact label="Local buffer">{telemetry?.storage?.mode ? telemetry.storage.mode : undefined}</Fact>
+                <Fact label="Vision model">{telemetry?.ai_model?.model_version || device.model_version || undefined}</Fact>
+                {boardState && (
+                  <Fact label="Controller state">
+                    {boardState.fault && boardState.fault !== 'NONE'
+                      ? <span className="sorter-alert-text">{boardState.fault}</span>
+                      : [boardState.busy === '1' ? 'Busy' : 'Idle', boardState.light === '1' ? 'Lamp on' : 'Lamp off'].join(' · ')}
+                  </Fact>
+                )}
+              </dl>
+            </section>
           </div>
 
-          {/* 3-Column Split Cockpit Inspector */}
-          {devices.map(device => {
-            const isVisible = device.device_id === (currentDevice?.device_id);
-            if (!isVisible) return null;
+          <section className="sorter-section" aria-labelledby="sorter-diagnostics-title">
+            <div className="sorter-section-bar">
+              <h3 id="sorter-diagnostics-title">Hardware &amp; model telemetry</h3>
+              {telemetry && !online && <span className="sorter-muted">Last reported values</span>}
+            </div>
+            <DeviceDiagnostics device={device} />
+          </section>
 
-            const cal = calibration[device.device_id] || {
-              speed: device.conveyor_speed_cm_s || 12.5,
-              dist: device.conveyor_dist_cm || 25.0,
-              pulse: device.servo_pulse_ms || 250,
-            };
+          <section className="sorter-section" aria-labelledby="sorter-calibration-title">
+            <div className="sorter-section-bar">
+              <div>
+                <h3 id="sorter-calibration-title">Conveyor calibration</h3>
+                <p className="sorter-muted">Saved to the backend record. Apply and test physical motion in the edge app.</p>
+              </div>
+              {hasUnsavedCalibration && <span className="status-badge status-warning status-small">Unsaved edits</span>}
+            </div>
 
-            const calculatedDelayMs = Math.round((cal.dist / cal.speed) * 1000);
-            const t = device.telemetry;
-            const isOnline = ['ONLINE', 'SCANNING'].includes(deviceAvailability(device, now));
-            const probeInfo = probeStatus[device.device_id];
-            const currentSnapshot = snapshotUrl[device.device_id];
-            const isSnapshotLoading = loadingSnapshot[device.device_id];
+            <form className="sorter-calibration" onSubmit={event => {
+              event.preventDefault();
+              if (canCalibrate && savingDeviceId === null) void saveCalibration(id, calibration);
+            }}>
+              <div className="sorter-calibration-fields">
+                <label className="sorter-slider-field">
+                  <span className="sorter-slider-header">
+                    <span>Conveyor speed</span>
+                    <span className="sorter-calibration-value">{calibration.speed.toFixed(1)} cm/s</span>
+                  </span>
+                  <input
+                    type="range" min="5" max="25" step="0.5"
+                    value={calibration.speed}
+                    aria-label="Conveyor speed"
+                    aria-valuetext={`${calibration.speed} centimeters per second`}
+                    aria-describedby={!canCalibrate ? permissionId : undefined}
+                    disabled={!canCalibrate || savingDeviceId === id}
+                    onChange={event => updateCalibration('speed', event.target.valueAsNumber)}
+                  />
+                  <span className="sorter-slider-bounds" aria-hidden="true">
+                    <span>5 cm/s</span>
+                    <span>25 cm/s</span>
+                  </span>
+                </label>
 
-            return (
-              <div key={device.device_id} className="space-y-5 animate-in fade-in-50 duration-200">
-                {/* Cockpit Station Header Card */}
-                <div className="bg-card border border-border rounded-xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="relative">
-                      <div className="w-12 h-12 rounded-xl bg-maroon-50 text-brand border border-maroon-200 flex items-center justify-center font-bold shrink-0">
-                        <Cpu aria-hidden="true" className="w-6 h-6" />
-                      </div>
-                      {isOnline && (
-                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-card animate-pulse" />
-                      )}
-                    </div>
+                <label className="sorter-slider-field">
+                  <span className="sorter-slider-header">
+                    <span>Sensor to diverter distance</span>
+                    <span className="sorter-calibration-value">{calibration.distance.toFixed(1)} cm</span>
+                  </span>
+                  <input
+                    type="range" min="10" max="50" step="1"
+                    value={calibration.distance}
+                    aria-label="Sensor to diverter distance"
+                    aria-valuetext={`${calibration.distance} centimeters`}
+                    aria-describedby={!canCalibrate ? permissionId : undefined}
+                    disabled={!canCalibrate || savingDeviceId === id}
+                    onChange={event => updateCalibration('distance', event.target.valueAsNumber)}
+                  />
+                  <span className="sorter-slider-bounds" aria-hidden="true">
+                    <span>10 cm</span>
+                    <span>50 cm</span>
+                  </span>
+                </label>
 
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2.5 flex-wrap">
-                        <h2 className="text-base sm:text-lg font-bold text-foreground break-words">{device.device_name}</h2>
-                        <Badge type="device" value={deviceAvailability(device, now)} />
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 flex-wrap font-mono">
-                        <span>ID: {device.device_id}</span>
-                        <span>•</span>
-                        <span>IP: {device.ip_address || 'Not reported'}</span>
-                        <span>•</span>
-                        <span>Last ping: {device.last_heartbeat ? new Date(device.last_heartbeat).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Never'}</span>
-                      </div>
-                    </div>
-                  </div>
+                <label className="sorter-slider-field">
+                  <span className="sorter-slider-header">
+                    <span>Servo pulse duration</span>
+                    <span className="sorter-calibration-value">{calibration.pulse} ms</span>
+                  </span>
+                  <input
+                    type="range" min="150" max="400" step="10"
+                    value={calibration.pulse}
+                    aria-label="Servo pulse duration"
+                    aria-valuetext={`${calibration.pulse} milliseconds`}
+                    aria-describedby={!canCalibrate ? permissionId : undefined}
+                    disabled={!canCalibrate || savingDeviceId === id}
+                    onChange={event => updateCalibration('pulse', event.target.valueAsNumber)}
+                  />
+                  <span className="sorter-slider-bounds" aria-hidden="true">
+                    <span>150 ms</span>
+                    <span>400 ms</span>
+                  </span>
+                </label>
+              </div>
 
-                  <div className="flex items-center gap-2.5 self-start md:self-auto shrink-0">
+              <div className="sorter-calibration-footer">
+                <div className="sorter-delay-readout">
+                  <span>Estimated travel delay</span>
+                  <strong>{measurement(delay, 'ms') ?? '—'}</strong>
+                </div>
+                <div className="page-actions">
+                  {hasUnsavedCalibration && (
                     <button
-                      onClick={() => handleProbeDevice(device.device_id)}
-                      disabled={probingDeviceId === device.device_id}
-                      className="secondary-action text-xs"
-                      title="Directly ping the edge app's embedded HTTP diagnostic API"
+                      type="button"
+                      className="secondary-action"
+                      disabled={savingDeviceId !== null}
+                      onClick={() => {
+                        setDrafts(previous => ({ ...previous, [id]: undefined }));
+                        setSaveFeedback(previous => ({ ...previous, [id]: undefined }));
+                      }}
                     >
-                      <Radio aria-hidden="true" className={`w-3.5 h-3.5 text-brand ${probingDeviceId === device.device_id ? 'animate-spin' : ''}`} />
-                      <span>{probingDeviceId === device.device_id ? 'Probing…' : 'Probe Live Edge'}</span>
+                      <RotateCcw aria-hidden="true" />
+                      Reset
                     </button>
-                  </div>
-                </div>
-
-                {probeInfo && (
-                  <div role="status" className={`p-3 rounded-xl text-xs flex items-center gap-2.5 border ${
-                    probeInfo.is_live
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                      : 'bg-amber-50 text-amber-800 border-amber-200'
-                  }`}>
-                    {probeInfo.is_live ? <Wifi className="w-4 h-4 shrink-0 text-emerald-600" aria-hidden="true" /> : <WifiOff className="w-4 h-4 shrink-0 text-amber-600" aria-hidden="true" />}
-                    <span className="font-medium">{probeInfo.message}</span>
-                  </div>
-                )}
-
-                {/* 3-Column Operational Cockpit Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                  {/* Column 1: Host & Connectivity */}
-                  <div className="bg-card border border-border rounded-xl p-5 space-y-4 shadow-sm flex flex-col justify-between">
-                    <div className="space-y-3.5">
-                      <div className="flex items-center gap-2 pb-2.5 border-b border-border">
-                        <Activity className="w-4 h-4 text-brand" aria-hidden="true" />
-                        <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">1. Host &amp; Connectivity</h3>
-                      </div>
-
-                      <dl className="space-y-2.5 text-xs">
-                        <div className="flex justify-between py-1 border-b border-slate-100">
-                          <dt className="text-slate-500">System Hostname</dt>
-                          <dd className="font-mono font-medium text-foreground">{t?.hostname || device.device_id}</dd>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-100">
-                          <dt className="text-slate-500">Local LAN IP</dt>
-                          <dd className="font-mono font-semibold text-brand">{device.ip_address || '127.0.0.1'}</dd>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-100">
-                          <dt className="text-slate-500">Edge API Port</dt>
-                          <dd className="font-mono text-foreground">{device.edge_url ? device.edge_url.replace(/.*:/, '') : '8008'}</dd>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-100">
-                          <dt className="text-slate-500">Hardware Platform</dt>
-                          <dd className="font-medium text-foreground">{t?.hardware_platform || device.hardware_platform}</dd>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-100">
-                          <dt className="text-slate-500">OS Environment</dt>
-                          <dd className="text-slate-700 truncate max-w-[180px]" title={t?.os_version || 'Embedded'}>{t?.os_version || 'Embedded OS'}</dd>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-100">
-                          <dt className="text-slate-500">Python Runtime</dt>
-                          <dd className="font-mono text-slate-700">{t?.python_version ? `Python ${t.python_version}` : 'Python 3.11+'}</dd>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-100">
-                          <dt className="text-slate-500">Station Uptime</dt>
-                          <dd className="text-slate-700">{formatUptime(t?.uptime_seconds)}</dd>
-                        </div>
-                        <div className="flex justify-between py-1">
-                          <dt className="text-slate-500">SQLite Outbox</dt>
-                          <dd className="font-bold tabular-nums text-agri-green">{t?.storage?.unsynced_scans ?? 0} scans queued</dd>
-                        </div>
-                      </dl>
-                    </div>
-
-                    <div className="pt-3 border-t border-border space-y-1.5 text-[11px] text-slate-500">
-                      <div className="flex items-center justify-between">
-                        <span>Attributed Session:</span>
-                        <span className="font-medium text-foreground">{t?.active_batch_code || 'Idle (No Batch)'}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Operator on Duty:</span>
-                        <span className="font-medium text-foreground">{t?.active_operator || 'Unassigned'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Column 2: Computer Vision & AI Inference */}
-                  <div className="bg-card border border-border rounded-xl p-5 space-y-4 shadow-sm flex flex-col justify-between">
-                    <div className="space-y-3.5">
-                      <div className="flex items-center gap-2 pb-2.5 border-b border-border">
-                        <Camera className="w-4 h-4 text-brand" aria-hidden="true" />
-                        <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">2. Vision &amp; Model Pipeline</h3>
-                      </div>
-
-                      {/* Camera Stream Snapshot Canvas */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-xs font-medium text-slate-700">
-                          <span>Live Candling Stream Snapshot:</span>
-                          <button
-                            onClick={() => handleFetchSnapshot(device.device_id)}
-                            disabled={isSnapshotLoading || !isOnline}
-                            className="text-[11px] text-brand hover:underline flex items-center gap-1 disabled:opacity-50"
-                          >
-                            <RefreshCw className={`w-3 h-3 ${isSnapshotLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
-                            <span>Capture Frame</span>
-                          </button>
-                        </div>
-
-                        <div className="w-full h-36 bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex items-center justify-center relative">
-                          {currentSnapshot ? (
-                            <img
-                              src={currentSnapshot}
-                              alt="Real-time candling stream capture"
-                              className="w-full h-full object-contain"
-                            />
-                          ) : (
-                            <div className="text-center p-3 text-slate-400 text-xs space-y-1">
-                              <ImageIcon className="w-6 h-6 mx-auto opacity-50" aria-hidden="true" />
-                              <p className="font-medium">DirectShow Stream: {t?.camera?.resolution || '1280x720'}</p>
-                              <p className="text-[10px] text-slate-500">Click &ldquo;Capture Frame&rdquo; to pull the latest image</p>
-                            </div>
-                          )}
-                          <span className={`absolute top-2 right-2 text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                            t?.camera?.is_mock ? 'bg-amber-500 text-white' : 'bg-emerald-600 text-white'
-                          }`}>
-                            {t?.camera?.is_mock ? 'Mock Frames' : 'DirectShow'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Vision Hardware & Model Details */}
-                      <dl className="space-y-2 text-xs">
-                        <div className="flex justify-between py-1 border-b border-slate-100">
-                          <dt className="text-slate-500">Active Camera</dt>
-                          <dd className="font-medium text-foreground truncate max-w-[180px]">{t?.camera?.identity || 'Camera #0'}</dd>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-100">
-                          <dt className="text-slate-500">Stream Resolution</dt>
-                          <dd className="font-mono text-foreground">{t?.camera?.resolution || '1280x720'} @ {t?.camera?.fps || 30} FPS</dd>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-100">
-                          <dt className="text-slate-500">Vision Model File</dt>
-                          <dd className="font-mono font-medium text-brand truncate max-w-[180px]" title={t?.ai_model?.model_version || device.model_version}>
-                            {t?.ai_model?.model_version || device.model_version}
-                          </dd>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-100">
-                          <dt className="text-slate-500">Execution Runtime</dt>
-                          <dd className="font-medium text-slate-700">{t?.ai_model?.engine_type || 'ONNX Runtime FP16'}</dd>
-                        </div>
-                        <div className="flex justify-between py-1">
-                          <dt className="text-slate-500">Sort Threshold</dt>
-                          <dd className="font-bold tabular-nums text-foreground">{((t?.ai_model?.sort_confidence ?? 0.70) * 100).toFixed(0)}% (Confidence Gate)</dd>
-                        </div>
-                      </dl>
-                    </div>
-
-                    <div className="pt-3 border-t border-border flex items-center justify-between text-[11px] text-slate-500">
-                      <span>Model Cache State:</span>
-                      <span className="font-semibold text-agri-green">{t?.ai_model?.warmup_complete ? '3 Warmup Passes Ready' : 'Quantized FP16'}</span>
-                    </div>
-                  </div>
-
-                  {/* Column 3: Physical IoT Rig & Kinematics */}
-                  <div className="bg-card border border-border rounded-xl p-5 space-y-4 shadow-sm flex flex-col justify-between">
-                    <div className="space-y-3.5">
-                      <div className="flex items-center gap-2 pb-2.5 border-b border-border">
-                        <Layers className="w-4 h-4 text-brand" aria-hidden="true" />
-                        <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">3. IoT Rig &amp; Kinematics</h3>
-                      </div>
-
-                      {/* Rig Profile & Serial Ports */}
-                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2.5 text-xs">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-slate-600 font-medium">Controller Profile:</span>
-                          <span className="font-mono font-bold text-brand bg-white px-2 py-0.5 rounded border border-slate-200">
-                            {(t?.iot_rig?.rig_profile ?? 'unified_v4') === 'unified_v4'
-                              ? 'Single-ESP32 Unified (v4)'
-                              : t?.iot_rig?.rig_profile === 'three_v3'
-                              ? 'Three-Board (v3)'
-                              : 'Dual-Board (v2)'}
-                          </span>
-                        </div>
-
-                        {(t?.iot_rig?.rig_profile ?? 'unified_v4') === 'unified_v4' ? (
-                          <div className="space-y-2 pt-0.5">
-                            <div className="bg-white p-2 rounded border border-slate-200 flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span
-                                  aria-hidden="true"
-                                  className={`w-2 h-2 rounded-full shrink-0 ${
-                                    t?.iot_rig?.ports_status?.conveyor === 'CONNECTED' || t?.iot_rig?.is_connected
-                                      ? 'bg-emerald-500'
-                                      : 'bg-slate-400'
-                                  }`}
-                                />
-                                <div>
-                                  <span className="text-[10px] text-slate-500 block leading-tight">Unified Serial Bus (UNIFIED_V3)</span>
-                                  <span className="font-mono font-semibold text-slate-800 text-[11px]">
-                                    {t?.iot_rig?.conveyor_port || 'COM5'}
-                                  </span>
-                                </div>
-                              </div>
-                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono">
-                                {t?.iot_rig?.ports_status?.conveyor || (t?.iot_rig?.is_connected ? 'CONNECTED' : 'IDLE')}
-                              </span>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-                              <div className="bg-white px-2 py-1.5 rounded border border-slate-200 flex justify-between">
-                                <span className="text-slate-500">Stepper / Sleep</span>
-                                <span className="font-mono font-semibold text-slate-800">GPIO 16/4/17</span>
-                              </div>
-                              <div className="bg-white px-2 py-1.5 rounded border border-slate-200 flex justify-between">
-                                <span className="text-slate-500">Gate Servo</span>
-                                <span className="font-mono font-semibold text-slate-800">GPIO 32</span>
-                              </div>
-                              <div className="bg-white px-2 py-1.5 rounded border border-slate-200 flex justify-between">
-                                <span className="text-slate-500">IR Sensor</span>
-                                <span className="font-mono font-semibold text-slate-800">GPIO 26</span>
-                              </div>
-                              <div className="bg-white px-2 py-1.5 rounded border border-slate-200 flex justify-between">
-                                <span className="text-slate-500">Candling Lamp</span>
-                                <span className="font-mono font-semibold text-slate-800">GPIO 27</span>
-                              </div>
-                            </div>
-                          </div>
-                        ) : t?.iot_rig?.rig_profile === 'three_v3' ? (
-                          <div className="grid grid-cols-3 gap-1.5 text-[11px] pt-1">
-                            <div className="bg-white p-1.5 rounded border border-slate-200 text-center">
-                              <span className="text-slate-500 block text-[10px]">Stepper</span>
-                              <span className="font-mono font-semibold text-slate-800">{t?.iot_rig?.conveyor_port || 'COM5'}</span>
-                              <span className="block text-[9px] text-slate-500 font-mono">{t?.iot_rig?.ports_status?.conveyor || 'IDLE'}</span>
-                            </div>
-                            <div className="bg-white p-1.5 rounded border border-slate-200 text-center">
-                              <span className="text-slate-500 block text-[10px]">Servo / IR</span>
-                              <span className="font-mono font-semibold text-slate-800">{t?.iot_rig?.servo_port || 'COM7'}</span>
-                              <span className="block text-[9px] text-slate-500 font-mono">{t?.iot_rig?.ports_status?.servo || 'IDLE'}</span>
-                            </div>
-                            <div className="bg-white p-1.5 rounded border border-slate-200 text-center">
-                              <span className="text-slate-500 block text-[10px]">Lamp</span>
-                              <span className="font-mono font-semibold text-slate-800">{t?.iot_rig?.light_port || 'COM9'}</span>
-                              <span className="block text-[9px] text-slate-500 font-mono">{t?.iot_rig?.ports_status?.light || 'IDLE'}</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-1.5 text-[11px] pt-1">
-                            <div className="bg-white p-1.5 rounded border border-slate-200 text-center">
-                              <span className="text-slate-500 block text-[10px]">Conveyor / IR</span>
-                              <span className="font-mono font-semibold text-slate-800">{t?.iot_rig?.conveyor_port || 'COM5'}</span>
-                              <span className="block text-[9px] text-slate-500 font-mono">{t?.iot_rig?.ports_status?.conveyor || 'IDLE'}</span>
-                            </div>
-                            <div className="bg-white p-1.5 rounded border border-slate-200 text-center">
-                              <span className="text-slate-500 block text-[10px]">Servo Gate</span>
-                              <span className="font-mono font-semibold text-slate-800">{t?.iot_rig?.servo_port || 'COM7'}</span>
-                              <span className="block text-[9px] text-slate-500 font-mono">{t?.iot_rig?.ports_status?.servo || 'IDLE'}</span>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="space-y-1 pt-1 border-t border-slate-200/80 text-[11px] text-slate-500">
-                          <div className="flex justify-between">
-                            <span>Gate Angles:</span>
-                            <span className="font-medium text-slate-700 font-mono">
-                              Fertile {t?.iot_rig?.fertile_angle ?? 180}° • Neutral {t?.iot_rig?.neutral_angle ?? 90}° • Infertile {t?.iot_rig?.infertile_angle ?? 135}°
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Step Geometry:</span>
-                            <span className="font-medium text-slate-700 font-mono">
-                              Holder {t?.iot_rig?.holder_steps ?? 1000} st • Sorter {t?.iot_rig?.sorter_steps ?? 367} st
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Capture Timing:</span>
-                            <span className="font-medium text-slate-700 font-mono">
-                              Settle {t?.iot_rig?.settle_ms ?? 1500} ms • Hold {t?.iot_rig?.hold_ms ?? 300} ms
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Preserved Kinematics Calibration Sliders */}
-                      <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <Sliders aria-hidden="true" className="w-3.5 h-3.5 text-brand" />
-                            <span className="text-xs font-bold text-slate-800">Conveyor Kinematics (&Delta;t = D / v)</span>
-                          </div>
-                          <span className="text-[11px] font-semibold text-brand bg-maroon-50 px-2 py-0.5 rounded border border-maroon-200">
-                            &Delta;t = {calculatedDelayMs} ms delay
-                          </span>
-                        </div>
-
-                        <div className="space-y-2 text-xs">
-                          {/* Speed Slider */}
-                          <div>
-                            <div className="flex justify-between text-[11px] font-medium text-slate-700 mb-0.5">
-                              <span>Conveyor Velocity (v):</span>
-                              <span className="font-mono">{cal.speed.toFixed(1)} cm/s</span>
-                            </div>
-                            <input
-                              aria-label={`Conveyor speed for ${device.device_name}`}
-                              type="range"
-                              disabled={!canCalibrate || savingDeviceId === device.device_id}
-                              aria-describedby={!canCalibrate ? `calibration-permission-${device.device_id}` : undefined}
-                              min="5"
-                              max="25"
-                              step="0.5"
-                              value={cal.speed}
-                              onChange={(e) =>
-                                setCalibration(prev => ({
-                                  ...prev,
-                                  [device.device_id]: { ...cal, speed: Number(e.target.value) }
-                                }))
-                              }
-                              className="w-full min-h-11 accent-[#800000] cursor-pointer disabled:cursor-not-allowed"
-                            />
-                          </div>
-
-                          {/* Distance Slider */}
-                          <div>
-                            <div className="flex justify-between text-[11px] font-medium text-slate-700 mb-0.5">
-                              <span>Optical Sensor to Diverter Distance (D):</span>
-                              <span className="font-mono">{cal.dist.toFixed(1)} cm</span>
-                            </div>
-                            <input
-                              aria-label={`Sensor to chute distance for ${device.device_name}`}
-                              type="range"
-                              disabled={!canCalibrate || savingDeviceId === device.device_id}
-                              aria-describedby={!canCalibrate ? `calibration-permission-${device.device_id}` : undefined}
-                              min="10"
-                              max="50"
-                              step="1"
-                              value={cal.dist}
-                              onChange={(e) =>
-                                setCalibration(prev => ({
-                                  ...prev,
-                                  [device.device_id]: { ...cal, dist: Number(e.target.value) }
-                                }))
-                              }
-                              className="w-full min-h-11 accent-[#800000] cursor-pointer disabled:cursor-not-allowed"
-                            />
-                          </div>
-
-                          {/* Servo Pulse Slider */}
-                          <div>
-                            <div className="flex justify-between text-[11px] font-medium text-slate-700 mb-0.5">
-                              <span>ESP32 Ejector Solenoid Pulse:</span>
-                              <span className="font-mono">{cal.pulse} ms (Lockout: 600ms)</span>
-                            </div>
-                            <input
-                              aria-label={`Servo pulse duration for ${device.device_name}`}
-                              type="range"
-                              disabled={!canCalibrate || savingDeviceId === device.device_id}
-                              aria-describedby={!canCalibrate ? `calibration-permission-${device.device_id}` : undefined}
-                              min="150"
-                              max="400"
-                              step="10"
-                              value={cal.pulse}
-                              onChange={(e) =>
-                                setCalibration(prev => ({
-                                  ...prev,
-                                  [device.device_id]: { ...cal, pulse: Number(e.target.value) }
-                                }))
-                              }
-                              className="w-full min-h-11 accent-[#800000] cursor-pointer disabled:cursor-not-allowed"
-                            />
-                          </div>
-                        </div>
-
-                        {!canCalibrate && (
-                          <p id={`calibration-permission-${device.device_id}`} className="text-sm text-slate-600">
-                            Only administrators and managers can edit calibration records.
-                          </p>
-                        )}
-
-                        <div className="page-actions justify-end pt-1">
-                          <button
-                            onClick={() => handleSaveCalibration(device.device_id)}
-                            disabled={!canCalibrate || savingDeviceId === device.device_id}
-                            className="primary-action text-xs"
-                          >
-                            <Save aria-hidden="true" className="w-3.5 h-3.5" />
-                            <span>{savingDeviceId === device.device_id ? "Saving…" : "Save calibration record"}</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-3 border-t border-border flex items-center justify-between text-[11px] text-slate-500">
-                      <span>Step Velocity:</span>
-                      <span className="font-mono text-slate-700">{t?.iot_rig?.stepper_speed_us ?? 3000} &mu;s half-period</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Institutional Safety Notice */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-600 flex items-start gap-3">
-                  <ShieldCheck className="w-5 h-5 text-brand shrink-0 mt-0.5" aria-hidden="true" />
-                  <div>
-                    <h4 className="font-semibold text-slate-800">Physical Actuation Safety Lock</h4>
-                    <p className="mt-0.5 leading-relaxed">
-                      Conveyor travel timing and calibration records configured here are stored centrally. To execute mechanical motor tests, camera realignment, or candling lamp strobe tests, use the physical edge application station. Remote web commands do not trigger unvalidated physical motion.
-                    </p>
-                  </div>
+                  )}
+                  <button type="submit" className="primary-action" disabled={!canCalibrate || savingDeviceId !== null}>
+                    {savingDeviceId === id ? 'Saving…' : 'Save calibration record'}
+                  </button>
                 </div>
               </div>
-            );
-          })}
+
+              {!canCalibrate && <p id={permissionId} className="sorter-muted">Only administrators and managers can edit calibration records.</p>}
+              {saveResult && (
+                <p role={saveResult.tone === 'danger' ? 'alert' : 'status'} className="sorter-feedback" data-tone={saveResult.tone}>{saveResult.text}</p>
+              )}
+            </form>
+          </section>
+        </section>
+      </div>
+    );
+  };
+
+  return (
+    <div className="sorter-devices" aria-busy={isRefreshing}>
+      <header className="page-header">
+        <div>
+          <h1>Sorter devices</h1>
+          <p className="page-description">Live edge station status, camera inspection, controller telemetry, and conveyor timing records.</p>
         </div>
-      )}
+        <div className="page-actions">
+          <button type="button" className="secondary-action" onClick={() => void fetchDevices()} disabled={isRefreshing}>
+            <RefreshCw className={isRefreshing ? 'animate-spin' : undefined} aria-hidden="true" />
+            {isRefreshing ? 'Refreshing…' : 'Refresh stations'}
+          </button>
+        </div>
+      </header>
+      {isError && device && <p role="alert" className="feedback-warning">Could not refresh stations. Showing the last loaded records.</p>}
+      {renderStation()}
     </div>
   );
-};
+}

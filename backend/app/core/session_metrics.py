@@ -17,3 +17,14 @@ def session_metrics(started_at, ended_at, total_scanned):
         return {"duration_seconds": seconds, "eggs_per_minute": rate}
     except (ValueError, TypeError, AttributeError, OverflowError):
         return unavailable
+
+
+def total_scan_duration_seconds(sessions) -> float | None:
+    """Sum elapsed scan duration across finalized sessions; return None when none are timed."""
+    durations = [
+        metrics["duration_seconds"]
+        for session in sessions
+        for metrics in (session_metrics(session.started_at, session.ended_at, session.total_scanned),)
+        if metrics["duration_seconds"] is not None
+    ]
+    return sum(durations) if durations else None

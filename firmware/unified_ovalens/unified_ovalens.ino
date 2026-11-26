@@ -29,6 +29,11 @@ constexpr bool INVERT_DIR = true;
 constexpr uint32_t DETECT_CONFIRM_MS   = 40;
 constexpr uint32_t CLEAR_CONFIRM_MS    = 350;
 constexpr uint32_t SETTLE_MS           = 500;
+constexpr uint32_t SWEEP_UPDATE_MS     = 10;
+constexpr uint8_t SERVO_TIMER_BITS     = 14;
+constexpr size_t SERIAL_TX_BYTES       = 1024;
+constexpr int32_t SERVO_MIN_US         = 500;
+constexpr int32_t SERVO_MAX_US         = 2400;
 constexpr uint32_t DETECT_LOCKOUT_MS   = 600;
 constexpr uint32_t AUTO_OFF_TIMEOUT_MS = 15000;
 
@@ -91,6 +96,9 @@ volatile bool softwarePause = true;  // Replaces the physical pause wire!
 volatile uint32_t heartbeatAt = 0;
 uint32_t halfPeriodUs = 3000, activeMoveId = 0;
 bool awaitingMoveCompletion = false, referenced = false;
+uint32_t rejectSweepMs = 0, rejectReturnMs = 0;
+bool rejectPending = false, rejectForward = true;
+int32_t rejectTrigger = 0, rejectLimit = 0, rejectFiredAt = 0;
 
 // Sorting Gate & IR Sensor State
 Servo gate;
@@ -99,6 +107,8 @@ enum EggState { WAITING, HOLDING, CLEARING };
 EggState eggState = WAITING;
 bool settling = false, detecting = false, clearing = false;
 uint32_t detectAt = 0, clearAt = 0, movedAt = 0, activeServoId = 0, eggSequence = 0;
+uint32_t gateSweepMs = 0, lastSweepUpdate = 0;
+int sweepFrom = 0, sweepTo = 0;
 uint32_t lastDetectAt = 0;
 bool detectedBefore = false, resetCompletionPending = false;
 bool resetPending = false;
@@ -166,6 +176,8 @@ void report(uint32_t id) {
   prefix(id); Serial.printf("NEUTRAL:%d\n", neutral);
   prefix(id); Serial.printf("LIGHT:%d\n", lightOn);
   prefix(id); Serial.printf("GATE_RESET_PENDING:%d\n", resetPending);
+  prefix(id); Serial.println("REJECT_SWEEP:3");
+  prefix(id); Serial.printf("REJECT_AT:%ld\n", long(rejectFiredAt));
   prefix(id); Serial.printf("FAULT:%s\n", protocol.fault ? protocol.faultCode : "NONE");
   prefix(id); Serial.printf("LAST_ID:%lu\n", (unsigned long)protocol.lastId);
 
@@ -192,6 +204,8 @@ void latchFault(const char *reason) {
   softwarePause = true;
   portEXIT_CRITICAL(&motionMux);
 
+  rejectSweepMs = rejectReturnMs = gateSweepMs = 0;
+  rejectPending = false;
   digitalWrite(ENABLE_PIN, HIGH); // Silence coils on fault
   setLamp(false);
 
@@ -215,8 +229,21 @@ void checkLink() {
   }
 }
 
+void startGateSweep(int requested, uint32_t durationMs, uint32_t id) {
+  activeServoId = id;
+  sweepFrom = angle;
+  sweepTo = requested;
+  angle = requested;
+  gate.write(angle);
+  gateSweepMs = durationMs;
+  movedAt = millis();
+  lastSweepUpdate = movedAt;
+  settling = true;
+}
+
 void setServoAngle(int requested, uint32_t id) {
   resetPending = false; resetCompletionPending = false;
+  rejectReturnMs = 0;
   angle = requested;
   gate.write(angle);
   activeServoId = id;
@@ -226,16 +253,45 @@ void setServoAngle(int requested, uint32_t id) {
   report(id);
 }
 
-void moveTo(int32_t destination, uint32_t id) {
+void updateGateSweep() {
+  if (!gateSweepMs) return;
+  uint32_t now = millis(), elapsed = now - movedAt;
+  if (elapsed >= gateSweepMs) {
+    gateSweepMs = 0;
+    settling = false;
+    uint32_t id = activeServoId;
+    activeServoId = 0;
+    if (id) {
+      reply(id, "OK:SERVO_DONE");
+      report(id);
+    }
+    if (resetCompletionPending) {
+      resetCompletionPending = false;
+      Serial.printf("EVENT:GATE_RESET_DONE:%lu\n", (unsigned long)eggSequence);
+    }
+  }
+}
+
+void moveTo(int32_t destination, uint32_t id, int32_t sweepAt, int32_t sweepLimit, uint32_t sweepMs) {
   int32_t p; bool busy;
   snapshotMotion(p, busy);
   if (busy || awaitingMoveCompletion) { reply(id, "ERROR:SYSTEM_BUSY"); return; }
   if (softwarePause) { reply(id, "ERROR:PAUSE_ACTIVE"); return; }
   if (destination < -POSITION_LIMIT || destination > POSITION_LIMIT) { reply(id, "ERROR:POSITION_LIMIT"); return; }
+  if (sweepMs && (!pulseTimer || !gate.attached() || settling || resetPending
+                  || angle != neutral || neutral == infertile)) {
+    reply(id, "ERROR:REJECT_GATE_NOT_READY"); return;
+  }
 
   bool forward = destination >= p;
   digitalWrite(DIR_PIN, (INVERT_DIR ? !forward : forward) ? HIGH : LOW);
   timerStop(pulseTimer); timerWrite(pulseTimer, 0);
+  rejectSweepMs = sweepMs;
+  rejectPending = rejectSweepMs != 0;
+  rejectForward = forward;
+  rejectTrigger = sweepAt;
+  rejectLimit = sweepLimit;
+  rejectFiredAt = 0;
 
   portENTER_CRITICAL(&motionMux);
   heartbeatAt = millis();
@@ -251,6 +307,39 @@ void moveTo(int32_t destination, uint32_t id) {
 
   reply(id, "OK:MOVE_ACCEPTED");
   report(id);
+}
+
+void updateRejectMove() {
+  if (!rejectSweepMs) return;
+  int32_t p; bool busy;
+  snapshotMotion(p, busy);
+  if (softwarePause || (rejectPending && !busy)) {
+    latchFault("REJECT_INTERRUPTED");
+    return;
+  }
+  if (rejectPending && (rejectForward ? p >= rejectTrigger : p <= rejectTrigger)) {
+    if (rejectForward ? p > rejectLimit : p < rejectLimit) {
+      latchFault("REJECT_TRIGGER_LATE");
+      return;
+    }
+    if (eggState != WAITING || digitalRead(SENSOR_PIN) == LOW) {
+      latchFault("REJECT_CHAMBER_BLOCKED");
+      return;
+    }
+    rejectPending = false;
+    rejectFiredAt = p;
+    startGateSweep(infertile, rejectSweepMs, 0);
+  }
+  updateGateSweep();
+  if (!busy && !settling) {
+    uint32_t id = activeMoveId;
+    activeMoveId = 0;
+    awaitingMoveCompletion = false;
+    rejectReturnMs = rejectSweepMs;
+    rejectSweepMs = 0;
+    reply(id, "OK:REJECT_DONE");
+    report(id);
+  }
 }
 
 // ==============================================================================
@@ -278,7 +367,7 @@ void command(char *line) {
 
   // Fault Acknowledgment
   if (!strcmp(cmd, "ACK_FAULT")) {
-    if (settling) { reply(id, "ERROR:SYSTEM_BUSY"); return; }
+    if (settling || rejectSweepMs) { reply(id, "ERROR:SYSTEM_BUSY"); return; }
     protocol.fault = false;
     reply(id, "OK:FAULT_ACKNOWLEDGED");
     report(id);
@@ -294,6 +383,7 @@ void command(char *line) {
   }
 
   if (!protocol.healthy(id)) return;
+  if (rejectSweepMs && strcmp(cmd, "PAUSE")) { reply(id, "ERROR:SYSTEM_BUSY"); return; }
 
   // 1. Lamp Commands
   if (!strcmp(cmd, "LIGHT_ON") || !strcmp(cmd, "ON")) {
@@ -348,21 +438,52 @@ void command(char *line) {
 
   if (!strncmp(cmd, "JOG:", 4) && ovalens::integer(cmd + 4, -100000, 100000, value) && value) {
     int32_t p; bool busy; snapshotMotion(p, busy);
-    moveTo(p + value, id);
+    moveTo(p + value, id, 0, 0, 0);
     return;
   }
 
   if (!strncmp(cmd, "ADVANCE:", 8) && ovalens::integer(cmd + 8, -100000, 100000, value) && value) {
     if (!referenced) { reply(id, "ERROR:REFERENCE_REQUIRED"); return; }
     int32_t p; bool busy; snapshotMotion(p, busy);
-    moveTo(p + value, id);
+    moveTo(p + value, id, 0, 0, 0);
+    return;
+  }
+
+  if (!strncmp(cmd, "ADVANCE_REJECT:", 15)) {
+    if (!referenced) { reply(id, "ERROR:REFERENCE_REQUIRED"); return; }
+    char *distance = cmd + 15, *trigger = strchr(distance, ':');
+    char *centre = trigger ? strchr(trigger + 1, ':') : nullptr;
+    char *duration = centre ? strchr(centre + 1, ':') : nullptr;
+    if (!duration) { reply(id, "ERROR:INVALID_COMMAND"); return; }
+    *trigger++ = '\0'; *centre++ = '\0'; *duration++ = '\0';
+    long steps, triggerSteps, centreSteps, durationMs;
+    if (!ovalens::integer(distance, -100000, 100000, steps) || !steps
+        || !ovalens::integer(trigger, 1, labs(steps) - 1, triggerSteps)
+        || !ovalens::integer(centre, triggerSteps, labs(steps) - 1, centreSteps)
+        || !ovalens::integer(duration, 80, 1000, durationMs)) {
+      reply(id, "ERROR:INVALID_COMMAND"); return;
+    }
+    int32_t p; bool busy; snapshotMotion(p, busy);
+    int direction = steps > 0 ? 1 : -1;
+    moveTo(p + steps, id, p + direction * triggerSteps, p + direction * centreSteps, uint32_t(durationMs));
     return;
   }
 
   // 4. Sorting Gate Servo Commands
   if (settling) { reply(id, "ERROR:SYSTEM_BUSY"); return; }
 
-  if (!strcmp(cmd, "RESET")) { setServoAngle(neutral, id); return; }
+  if (!strcmp(cmd, "RESET")) {
+    if (rejectReturnMs) {
+      resetPending = resetCompletionPending = false;
+      startGateSweep(neutral, rejectReturnMs, id);
+      rejectReturnMs = 0;
+      reply(id, "OK:SERVO_ACCEPTED");
+      report(id);
+    } else {
+      setServoAngle(neutral, id);
+    }
+    return;
+  }
   if (!strcmp(cmd, "SORT:FERTILE")) { setServoAngle(fertile, id); return; }
   if (!strcmp(cmd, "SORT:INFERTILE")) { setServoAngle(infertile, id); return; }
 
@@ -403,6 +524,7 @@ void setup() {
   pinMode(LAMP_PIN, OUTPUT); digitalWrite(LAMP_PIN, LOW);
   pinMode(STATUS_LED, OUTPUT); digitalWrite(STATUS_LED, LOW);
 
+  Serial.setTxBufferSize(SERIAL_TX_BYTES);
   Serial.begin(115200);
   protocol.boot();
 
@@ -416,10 +538,11 @@ void setup() {
   timerAttachInterrupt(pulseTimer, &pulseTick);
   timerAlarm(pulseTimer, halfPeriodUs, true, 0);
 
-  // Initialize Servo Gate
+  // Initialize Servo Gate with 14-bit PWM resolution (~1.22 us steps instead of 10-bit 19.5 us jumps)
   ESP32PWM::allocateTimer(0);
   gate.setPeriodHertz(50);
-  gate.attach(SERVO_PIN, 500, 2400);
+  gate.setTimerWidth(SERVO_TIMER_BITS);
+  gate.attach(SERVO_PIN, SERVO_MIN_US, SERVO_MAX_US);
   if (!gate.attached()) {
     protocol.faultCode = "SERVO_ATTACH";
     report(0);
@@ -448,7 +571,7 @@ void loop() {
   // 2. Stepper Move Completion Monitoring
   int32_t p; bool busyMotion;
   snapshotMotion(p, busyMotion);
-  if (awaitingMoveCompletion && !busyMotion) {
+  if (awaitingMoveCompletion && !rejectSweepMs && !busyMotion) {
     uint32_t id = activeMoveId; activeMoveId = 0; awaitingMoveCompletion = false;
     bool stopped;
     portENTER_CRITICAL(&motionMux); stopped = pauseStop; pauseStop = false; portEXIT_CRITICAL(&motionMux);
@@ -457,7 +580,7 @@ void loop() {
   }
 
   // 3. Servo Settle Completion Monitoring
-  if (settling && uint32_t(now - movedAt) >= SETTLE_MS) {
+  if (!rejectSweepMs && !gateSweepMs && settling && uint32_t(now - movedAt) >= SETTLE_MS) {
     uint32_t id = activeServoId; activeServoId = 0; settling = false;
     reply(id, "OK:SERVO_DONE");
     report(id);
@@ -519,5 +642,7 @@ void loop() {
     if (result < 0) reply(0, "ERROR:INVALID_LINE");
     else if (result > 0) command(protocol.reader.buffer);
   }
+  if (rejectSweepMs) updateRejectMove();
+  else updateGateSweep();
 }
 

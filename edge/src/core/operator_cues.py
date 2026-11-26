@@ -17,7 +17,7 @@ def cycle_cue(status):
     if state == "ROUTING":
         return "Positioning gate", "Wait. The conveyor stays stopped during the servo stroke.", "wait"
     if state == "DISPLAYING":
-        return "Egg classified", "The gate is ready. Wait for the egg to pass.", "wait"
+        return "Egg classified", reason or "The gate is ready. Wait for the egg to pass.", "wait"
     if state == "INDEXING":
         return "Wait — egg passing", "Feed the next egg when this message changes.", "wait"
     if state == "MANUAL_REVIEW":

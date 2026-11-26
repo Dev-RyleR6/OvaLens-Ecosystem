@@ -47,6 +47,7 @@ struct SerialMock {
     void pop_front() { ++head; }
   } input;
   void begin(int) {}
+  size_t setTxBufferSize(size_t size) { return size; }
   int available() { return static_cast<int>(input.size()); }
   char read() { char c = input.front(); input.pop_front(); return c; }
   void println(const char *s) { ::printf("%s\n", s); }

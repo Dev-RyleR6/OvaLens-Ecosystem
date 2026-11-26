@@ -1,7 +1,7 @@
-"""Sensor arrivals and position events for the three-board candling rig.
+"""Sensor arrivals and position events for the three-board and unified rigs.
 
-The gate is positioned before releasing each classified egg and retained until
-its calibrated exit. A new arrival cannot change an earlier egg's gate preset.
+The gate is retained through the calibrated exit. The unified rig sweeps
+infertile eggs aside during a continuous conveyor move.
 """
 from dataclasses import asdict
 import heapq
@@ -34,6 +34,7 @@ class ThreeBoardCycle(SortingCycle):
         self._last_egg_seq = 0
         self._detected_events = set()
         self._gate_holder = None
+        self._reject_gate_centre = None
         self._search_deadline = None
         self._pause_requested = threading.Event()
         self._resume_requested = threading.Event()
@@ -135,7 +136,7 @@ class ThreeBoardCycle(SortingCycle):
 
     def _checkpoint(self, state):
         self.db.save_machine_state(self.device_id, finite_evidence({
-            "state": state, "rig_profile": "three_v3", "session_id": self.session_id,
+            "state": state, "rig_profile": self.settings.rig_profile, "session_id": self.session_id,
             "batch_id": self.batch_id, "travel": self.travel, "count": self.count,
             "routed": self.routed, "egg_seq": self._last_egg_seq,
             "holders": [asdict(h) for h in self.holders], "pending_capture": self.pending_capture,
@@ -245,9 +246,19 @@ class ThreeBoardCycle(SortingCycle):
         delta = destination - self.travel
         if not 0 < delta <= 100000:
             raise RuntimeError("Invalid position event order or movement bound")
+        reject_centre = self._reject_gate_centre
+        command = f"ADVANCE:{delta * k.direction}"
+        if reject_centre is not None:
+            step_us = 2 * k.speed_us
+            lead_steps = math.ceil(1000 * k.reject_lead_ms / step_us)
+            approach = min(destination - 1, max(self.travel + 1, reject_centre - lead_steps))
+            limit = max(reject_centre, min(destination - 1, approach + max(1, k.position_tolerance_steps)))
+            command = (f"ADVANCE_REJECT:{delta * k.direction}:{approach - self.travel}:"
+                       f"{limit - self.travel}:{k.reject_sweep_ms}")
         self._checkpoint("MOVE_IN_FLIGHT")
-        timeout = max(3.0, delta * 2 * k.speed_us / 1000000.0 + 3.0)
-        reply = self._command(self.boards.conveyor, f"ADVANCE:{delta * k.direction}", timeout)
+        timeout = max(3.0, delta * 2 * k.speed_us / 1_000_000
+                      + (k.reject_sweep_ms / 1000 if reject_centre is not None else 0) + 3.0)
+        reply = self._command(self.boards.conveyor, command, timeout)
         actual = (int(reply["POSITION"]) - self._origin) * k.direction
         if actual < self.travel or actual > destination:
             raise RuntimeError("Conveyor position disagrees with commanded travel")
@@ -269,6 +280,17 @@ class ThreeBoardCycle(SortingCycle):
                 f"Unexpected pause or lost sensor event (state {egg.get('STATE')}, "
                 f"sensor {egg.get('SENSOR')}, sequence {seq}, events {sorted(self._detected_events)})"
             )
+        if reject_centre is not None:
+            try:
+                swept_at = (int(reply["REJECT_AT"]) - self._origin) * k.direction
+            except (KeyError, ValueError) as exc:
+                raise RuntimeError("Reject sweep position was not reported") from exc
+            if (actual != destination or not approach <= swept_at <= limit
+                    or reply.get("ANGLE") != str(k.infertile_angle) or reply.get("BUSY") != "0"):
+                raise RuntimeError("Reject sweep or gate exit could not be confirmed")
+            holder = next(h for h in self.holders if h.number == self._gate_holder)
+            holder.stage = "ROUTE_COMMANDED"
+            self._reject_gate_centre = None
         self._checkpoint("STOPPED")
         return detected
 
@@ -313,23 +335,31 @@ class ThreeBoardCycle(SortingCycle):
             self.latest_result = {**result, "holder": holder.number, "scan_id": holder.scan_id, "routing_action": action}
             k = self.settings.calibration
             self._checkpoint("SAVED")
-            self._position_gate(holder)
-            heapq.heappush(events, (self.travel + k.sorter_steps + k.gate_clearance_steps, 0, "clear", holder.number))
-            self._state("DISPLAYING", holder=holder.number)
-            self._delay(k.hold_ms / 1000)
+            gate_centre = holder.chamber_position + k.sorter_steps
+            push = self.settings.rig_profile == "unified_v4" and holder.final_class == "INFERTILE"
+            if push:
+                self._gate_holder, holder.stage = holder.number, "REJECT_PENDING"
+                self._reject_gate_centre = gate_centre
+            else:
+                self._position_gate(holder)
+            heapq.heappush(events, (gate_centre + k.gate_clearance_steps, 0, "clear", holder.number))
+            message = "The gate will sweep the egg aside as it passes." if push else ""
+            self._state("DISPLAYING", message, holder=holder.number)
+            if not push:
+                self._delay(k.hold_ms / 1000)
         self._lamp_off()
         self.pending_capture = None
         self.review_frame = None
         self._checkpoint("CAPTURE_COMPLETE")
 
     def _position_gate(self, holder):
-        """Complete the servo stroke while the detected egg still holds the belt."""
+        """Complete the gate stroke while the conveyor is held."""
+        k = self.settings.calibration
         self._capture_health(lit=False)
         self._state("ROUTING", "Positioning sorting gate; belt held", holder=holder.number)
         self._checkpoint("SERVO_IN_FLIGHT")
         reply = self._command(self.boards.egg, f"SORT:{holder.final_class}")
-        angle = (self.settings.calibration.fertile_angle if holder.final_class == "FERTILE"
-                 else self.settings.calibration.infertile_angle)
+        angle = k.fertile_angle if holder.final_class == "FERTILE" else k.infertile_angle
         if reply.get("BUSY") != "0" or reply.get("ANGLE") != str(angle):
             raise RuntimeError("Sorting servo did not confirm the required gate position")
         self._capture_health(lit=False)
@@ -374,7 +404,10 @@ class ThreeBoardCycle(SortingCycle):
                 last_arrival += self._pause_at_boundary(events)
                 if self._gate_holder is None and self.count < self.target and time.monotonic() - last_arrival >= k.jam_timeout_s:
                     raise RuntimeError("No egg arrival before the search deadline")
-                destination = min(self.travel + k.holder_steps, events[0][0]) if events else self.travel + k.holder_steps
+                destination = self.travel + k.holder_steps
+                if events:
+                    boundary = events[0][0]
+                    destination = boundary if self._reject_gate_centre is not None else min(destination, boundary)
                 self._search_deadline = last_arrival + k.jam_timeout_s if self._gate_holder is None else None
                 if self._gate_holder is not None:
                     self._state("INDEXING", "Egg travelling to gate; wait before feeding", holder=self._gate_holder)

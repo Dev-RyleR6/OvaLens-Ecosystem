@@ -48,7 +48,10 @@ class Wire:
     def report(self, ident=None):
         prefix = f"ID:{ident}:" if ident is not None else ""
         fields = ["POSITION:0", "SENSOR:0", "EGG_SEQ:0", "PAUSED:1", "BUSY:0", f"LIGHT:{self.light}", f"ANGLE:{self.angle}",
-                  f"REFERENCE_VALID:{self.reference}", f"FAULT:{self.fault}", f"LAST_ID:{self.last_id}", "STATE:WAITING"]
+                  f"REFERENCE_VALID:{self.reference}", f"FAULT:{self.fault}", f"LAST_ID:{self.last_id}"]
+        if self.role == "UNIFIED":
+            fields.append("REJECT_SWEEP:3")
+        fields.append("STATE:WAITING")
         return "".join(prefix + field + "\n" for field in fields)
 
     def write(self, data):
@@ -244,8 +247,10 @@ class FakeLink:
         try:
             if rig.fail_command == (self.role, command):
                 raise RuntimeError("Injected acknowledgement timeout")
-            if command.startswith("ADVANCE:"):
-                destination = rig.position + int(command.split(":")[1])
+            if command.startswith(("ADVANCE:", "ADVANCE_REJECT:")):
+                parts = command.split(":")
+                start = rig.position
+                destination = start + int(parts[1])
                 arrivals = [p for p in rig.arrivals if rig.position < p <= destination]
                 rig.position = min(arrivals) if arrivals else destination
                 self.values["POSITION"] = str(rig.position)
@@ -256,6 +261,11 @@ class FakeLink:
                     rig.egg.events.put(("EGG_DETECTED", seq))
                     if rig.duplicate:
                         rig.egg.events.put(("EGG_DETECTED", seq))
+                if parts[0] == "ADVANCE_REJECT":
+                    if arrivals:
+                        raise RuntimeError("ERROR:REJECT_INTERRUPTED")
+                    strike = start + (1 if destination > start else -1) * int(parts[2])
+                    self.values.update(ANGLE="135", REJECT_AT=str(strike))
             elif command.startswith("SORT:") or command == "RESET":
                 self.values["ANGLE"] = "180" if command == "SORT:FERTILE" else "135" if command == "SORT:INFERTILE" else "90"
             elif command == "RESUME":
