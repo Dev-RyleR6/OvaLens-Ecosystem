@@ -11,7 +11,7 @@ from app.models.scan import EggScanModel, FertilityClass
 from app.models.settings import HatcherySettingsModel
 from app.models.audit import AuditLogModel
 from app.services.scan_metrics import scan_totals
-from app.core.session_metrics import session_metrics
+from app.core.session_metrics import session_metrics, total_scan_duration_seconds
 from app.schemas.batch import (
     BatchCreate, BatchUpdate, BatchSummaryResponse,
     BatchAnalyticsResponse, SessionSummaryItem, MilestoneCheckResponse, FinalizeHatchPayload
@@ -216,6 +216,8 @@ class BatchService:
         hatchability_rate = (batch.hatched_count / batch.initial_egg_count * 100.0) if batch.initial_egg_count > 0 else 0.0
 
         elapsed, alert = BatchService._compute_milestone(batch.set_date, batch.current_stage)
+        sessions = db.query(CandlingSessionModel).filter(CandlingSessionModel.batch_id == batch_id).all()
+        scan_duration = total_scan_duration_seconds(sessions)
 
         return BatchSummaryResponse(
             batch_id=batch.batch_id,
@@ -235,6 +237,7 @@ class BatchService:
             manual_review_count=manual_review,
             fertility_rate=round(fertility_rate, 2),
             hatchability_rate=round(hatchability_rate, 2),
+            total_scan_duration_seconds=scan_duration,
             notes=batch.notes,
             elapsed_days=elapsed,
             milestone_alert=alert
@@ -287,6 +290,7 @@ class BatchService:
             ))
 
         elapsed, _ = BatchService._compute_milestone(batch.set_date, batch.current_stage)
+        scan_duration = total_scan_duration_seconds(sessions)
 
         return BatchAnalyticsResponse(
             batch_id=batch.batch_id,
@@ -310,5 +314,6 @@ class BatchService:
             hatched_count=batch.hatched_count,
             unhatched_count=batch.unhatched_count,
             actual_hatchability_rate=round(hatch_rate, 2),
+            total_scan_duration_seconds=scan_duration,
             sessions=session_items
         )

@@ -97,6 +97,7 @@ class BatchSummaryResponse(BaseModel):
     manual_review_count: int = 0
     fertility_rate: float = 0.0
     hatchability_rate: float = 0.0
+    total_scan_duration_seconds: Optional[float] = None
     notes: Optional[str] = None
     elapsed_days: int = 0
     milestone_alert: Optional[str] = None
@@ -157,6 +158,7 @@ class BatchAnalyticsResponse(BaseModel):
     actual_hatchability_rate: float
     
     # Candling Runs
+    total_scan_duration_seconds: Optional[float] = None
     sessions: List[SessionSummaryItem]
 
 

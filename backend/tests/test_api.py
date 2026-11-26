@@ -105,6 +105,10 @@ def test_session_throughput_survives_duplicate_upload_and_completion(image_scan)
     listed = client.get("/api/v1/sessions", params={"batch_id": scan["batch_id"], "limit": 200}).json()
     assert next(item for item in listed if item["session_id"] == session_id)["eggs_per_minute"] == 12
     analytics = client.get(f"/api/v1/batches/{scan['batch_id']}/analytics").json()
+    expected_total = sum(item["duration_seconds"] for item in analytics["sessions"] if item["duration_seconds"] is not None)
+    assert analytics["total_scan_duration_seconds"] == expected_total
+    batches = client.get("/api/v1/batches").json()
+    assert next(item for item in batches if item["batch_id"] == scan["batch_id"])["total_scan_duration_seconds"] == expected_total
     summary = next(item for item in analytics["sessions"] if item["session_id"] == session_id)
     assert summary["duration_seconds"] == 600 and summary["eggs_per_minute"] == 12
     for invalid in ((start - timedelta(seconds=1)).isoformat(), start.replace(tzinfo=None).isoformat()):
